@@ -7,7 +7,7 @@
     "html": "html-minifier-terser --config-file=.html-minifier.json --input-dir=docs --output-dir=docs --file-ext=html",
     "css": "postcss src/_css/main.css --output docs/css/main.css && postcss src/_css/events.css --output docs/css/events.css",
     "js": "shx mkdir -p docs/js && terser src/_js/main.mjs -cm --module -o docs/js/main.mjs",
-    "json": "json-minify src/.webmanifest > docs/.webmanifest",
+    "json": "json-minify src/webmanifest.json > docs/webmanifest.json",
     "xml": "minify-xml --in-place docs/sitemap.xml && minify-xml --in-place docs/articles.atom && minify-xml --in-place docs/events.atom",
     "init-sw": "workbox wizard",
     "sw": "workbox generateSW workbox-config-v6.js",
