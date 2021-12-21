@@ -1,0 +1,11 @@
+---
+layout: layouts/article.njk
+title: "找寻JS一些小技巧"
+date: 2014-04-11T14:19:32Z
+updated: 2014-04-12T07:39:41Z
+tags:
+  - javascript
+  - trivial
+---
+
+这些技巧更多主要针对JS效率方面而言（不一定）。持续更新，欢迎登录Github在Comment中共享您的一些发现。

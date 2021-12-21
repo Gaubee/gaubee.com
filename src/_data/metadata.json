@@ -1,0 +1,15 @@
+{
+  "title": "Gaubee",
+  "subtitle": "Gaubee's Website",
+  "url": "https://gaubee.com/",
+  "feed": {
+    "subtitle": "Gaubee's Articles",
+    "filename": "articles.atom",
+    "path": "/articles.atom",
+    "url": "https://gaubee.com/articles.atom",
+    "id": "https://gaubee.com/"
+  },
+  "author": {
+    "name": "Gaubee Bangeel"
+  }
+}

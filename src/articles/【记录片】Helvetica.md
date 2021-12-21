@@ -1,0 +1,2062 @@
+---
+layout: layouts/article.njk
+title: "【记录片】Helvetica"
+date: 2014-01-15T16:58:00Z
+updated: 2019-04-03T19:36:02Z
+---
+
+### 《传奇字体 Helvetica》——2007
+
+**介绍：**
+你可能没听过Helvetica，但你一定见过它，而且每天都要见个好几次，如果你有iPhone，说不定一天会看见它几十次甚至上百次。 Helvetica 存在于我们的周遭，却让人浑然不觉。不过对某一群人来说，Helvetica 绝对是耳熟能详的字眼。对他们而言，Helvetica 是老师、是朋友，同时也是敌人，Helvetica 是个摆脱不去的枷锁。
+
+这群人是平面设计师与字体设计师（当然还有很多我没提到的，例如网页设计师、app 开发者）。而Helvetica 是一款字体的名字，一款被大量使用的字体。
+
+2007年，传奇字体「Helvetica」诞生满五十周年。独立制片人，同时也是本片导演Gary Hustwit 拍摄这部以字体Helvetica 为主题的纪录片，他的理由很简单：「因为它就在我们的身边。」
+
+Type is saying things to us all the time.
+
+Typefaces express a mood,an atmosphere,
+
+they give words a certain coloring.
+
+Everywhere you look, you see typefaces.
+
+But there's probably one you see more than any other one, and that's Helvetica.
+
+You know, there it is, and it just seems to come from nowhere.
+
+lt seems like air, it seems like gravity.
+
+lt's hard to evaluate it,
+
+it's like being asked what you think about off-white paint,
+
+it's just, there.
+
+lt's hard to get your head around something that big.
+
+Most people who use Helvetica use it because it's ubiquitous.
+
+lt's like going to McDonalds instead of thinking about food.
+
+Because it's there, it's on every street corner.
+
+So let's eat crap, because it's on the corner.
+
+For me, Helvetica's just this beautiful, timeless thing.
+
+And certain things shouldn't be messed with, you know?
+
+Graphic design is the communication framework,
+
+through which these messages, about what the world is now
+
+and what we should aspire to,
+
+it's the way they reach us.
+
+The designer has an enormous responsibility,
+
+those are the people putting their wires into our heads.
+
+Now should l talk? Should l not talk?
+
+You want me to say something?
+
+Say something, say nothing?
+
+The life of a designer is a life of fight:
+
+fight against the ugliness.
+
+Just like a doctor fights against disease.
+
+For us, the visual disease is what we have around,
+
+and what we try to do is to cure it somehow, with design.
+
+A good typographer always has sensitivity about the distance between the  letters.
+
+We think typography is black and white.
+
+Typography is really white, it's not even black.
+
+lt is the space between the blacks that really makes it.
+
+ln a sense it's like music,
+
+it's not the notes, it's the space you put between the notes that makes the music.
+
+For instance, we designed the corporate identity for American Airlines.
+
+This was done in 1966,
+
+and the novelty at the time was the fact of making one word instead of two
+
+American Airlines by making AmericanAirlines all one word,
+
+half red and half blue, just separated by the color.
+
+What could me more American than red and blue? You know, so it's perfect.
+
+lt's the only airline in the last forty years that has
+
+not changed their identity.
+
+All the airlines coming and going and changing... 
+American Airlines is still the same. There's no need to change,
+
+and how can they improve it?
+
+They got the best already: American Airlines in Helvetica.
+
+We always had a tendency to use very few typefaces.
+
+lt's not that we don't believe in type.
+
+We believe there are not that many good typefaces.
+
+lf l want to be really generous there's a dozen,
+
+basically l use no more than three.
+
+There are people that think that type should be expressive.
+
+They have a different point of view than mine.
+
+l don't think type should be expressive at all.
+
+l can write the word 'dog' with any typeface
+
+and it doesn't have to look like a dog.
+
+But there are people that think when they write 'dog' it should bark!
+
+What Helvetica is: it's a typeface that was generated
+
+by a desire of having better legibility.
+
+lt is a modern type. lt is a very clear type.
+
+lt's good for everything, pretty much.
+
+You can say l love you in Helvetica.
+
+And you can say it with Helvetica Extra Light if you want to be really fancy.
+
+Or you can say it in Extra Bold if it's really 
+intensive and passionate,
+
+and it might work.
+
+You can also say l hate you.
+
+l can write . . . l certainly can write a few letters in Helvetica saying that . . .
+
+to Washington D.C. in particular, if l can put it that way.
+
+When Helvetica came about, we were all ready for it.
+
+lt just had all the right connotations we were looking for,
+
+for anything that had to spell out loud and clear: modern.
+
+The 1950s is an interesting period in the development of graphic design.
+
+ln that postwar period,
+
+after the horror and the cataclysm of the Second World War,
+
+there's a real feeling of idealism among some designers, many perhaps,
+
+across the world, certainly in Europe,
+
+that design is part of that need to rebuild,to reconstruct,
+
+to make things more open,
+
+make them run more smoothly, be more democratic.
+
+There was this real sense of social responsibility among designers.
+
+And this is the period when the early 
+experiments of the high Modernist period
+
+start to be broken down, rationalized, codified,
+
+you get the emergence of this so-called international typographic style
+
+or Swiss style.
+
+And it's Swiss designers in the 1950s who are really driving that along.
+
+This is where Helvetica comes in.
+
+Helvetica emerges in that period, in 1957,
+
+where there's felt to be a need for rational typefaces
+
+which can be applied to all kinds of contemporary information,
+
+whether it's sign systems or corporate identity
+
+and present those visual expressions of the modern world to the public
+
+in an intelligible, legible way.
+
+So, it's underpinned, is what l'm saying
+
+by this great feeling shared by many designers of idealism.
+
+l'm a Modernist, you know.
+
+l was trained in that period,
+
+l lived in that period. l love Modernism.
+
+l go next week to London to see the exhibition of Modernism.
+
+l want it, you know.
+
+And well, that's my life.
+
+l'm surrounded with furniture from that period. l can't change myself any more.
+
+But if l see today designers, they use all typefaces-one day one typeface,
+
+the other day the other typeface, all in favor of a certain atmosphere,
+
+l'm not . . . l don't like that.
+
+l'm always interested in clarity.
+
+lt should be clear,
+
+it should be readable, it should be straightforward.
+
+So l started using, gradually, grids for my design,
+
+for my catalogues for museums.
+
+l invented a grid, and within the grid
+
+l played my game.
+
+But always along the lines of the grid,
+
+so that there is a certain order in it.
+
+That's why l use grids,
+
+that's why they call me ''Gridnik.''
+
+For me, it's a tool of creating order,
+
+and creating order is typography.
+
+l started late with the computer.
+
+l think it was in 1993 that l bought my first computer
+
+and l learned myself and l can handle it now quite well
+
+but not like the young people.
+
+l am slow with it and l can do it.
+
+But l'm very much interested and
+
+l would have liked to have in the sixties the computer
+
+because we can speed up our work, we can do it so much better,
+
+and especially all the layers you can bring into your work.
+
+We had the greatest problem in the sixties to bring two or three layers into the work.
+
+You need to do it by photograph, you did all kinds of crazy techniques
+
+and working on a poster took us days.
+
+And now within half an hour you have your ideas and you can make variations
+
+and make a good choice.
+
+You can't do better design with a computer,
+
+but you can speed up your work enormously.
+
+Shall l begin?
+
+l made these post stamps on the Stijl movement.
+
+ln the beginning, if you see the sketches,
+
+l tried to use typefaces from van Doesburg,
+one of the artists of the Stijl movement.
+
+Then l decided for the final designs
+
+not to use these typefaces because the
+illustration is already from that period,
+
+and l used the most neutral typeface-Helvetica.
+
+Helvetica was a real step from the nineteenth-century typefaces.
+
+lt was a little more machined,
+
+it was doing away with these manual details in it,
+
+and we were impressed by that, because it was more neutral.
+
+And neutralism was a word that we loved.
+
+lt should be neutral;
+
+it shouldn't have a meaning in itself. lt should . . .
+
+the meaning is in the content of the text, not in the typeface.
+
+That's why we loved Helvetica very much.
+
+l have to say that for a lot of my life
+
+l rather dreaded the moment of having to explain to someone...
+
+you know, you find yourself sitting next to some nice person on a plane
+
+or a train and they ask you sooner or later what you do
+
+and if you say type designer, they generally look completely blank.
+
+Occasionally, someone will actually know the term
+
+but then will say, ''l thought they were all dead.''
+
+Since l did some work for Microsoft in the mid-nineties on screen fonts,
+
+particularly Verdana and Georgia,
+
+l've had quite comical encounters with people who will say,
+
+''Oh, you work with fonts.
+
+We just got this memo round the office
+saying we've all got to start using something called Verdana.
+
+Have you ever heard of it?''
+
+Funny conversations that never would have happened to me
+thirty, forty years ago.
+
+My dad was a typographer, and although he didn't push me to follow in his footsteps
+
+when l left school, high school in the UK, l 
+had a year to fill before going to university
+
+and l got sent as a trainee, an unpaid trainee, intern,
+
+to a type foundry in the Netherlands,
+
+where l spent a year learning what turned
+out to be a completely obsolete trade
+
+of making type by hand.
+
+lt was a matter of cutting letters in steel, engraving them at actual size.
+
+You know, l doubt if l ever got up quite to one letter a day at that time.
+
+So, you know, l could say that really l've made type by practically all the means
+
+it's ever been made in the fifty, fifty-one years that l've been working.
+
+lt's hard to generalize about the way type designers work.
+
+There isn't a generality of us.
+
+But l think that most type designers if they were sitting in this chair
+
+would essentially start in much the same way.
+
+l'd probably start with a lowercase h.
+
+it tells me, first of all, whether this is a sans serif or a serif typeface.
+
+lf it were a serif face it would look like this
+
+here are the serifs so called, these little feet
+
+on the bottom and top of the principal strokes of the letter.
+
+Are they heavy, are they light, what is the nature of the serif,
+
+is there a lot of thick-thin contrast in the letter form;
+
+what are the proportions of the overall height, the ascender, so-called of the h,
+
+and the x-height part of it,
+
+Then because an h is a straight-sided letter,
+
+l would then do a round letter like an o along side it.
+
+l can get a sense of how the weight of the curved part of the o 
+relates to the straight part of the h.
+
+And already there is a huge amount of DNA is just a couple of letterforms like that.
+
+l'd then probably do something like a lowercase p
+
+because it's half straight and half round;
+
+and also it has a descending stroke,
+
+which is another vertical dimension that l
+would be interested in establishing.
+
+Then l would then build on that.
+
+lf you've got an h you've got an awful lot of information
+
+about m, n, and u in the lower case.
+
+lf you've got a p you've got q and b and d and so on.
+
+And then just as soon as possible l would get them into words
+
+or something that looked like words
+
+because for me the experience of reading
+something is so critical in judging it as a typeface
+
+because l find that is the acid test of how a typeface performs.
+
+One of the most characteristic and to my
+mind beautiful things about Helvetica
+
+is these horizontal terminals, you see in the lower case a and c and e and g.
+
+The whole structure is based on this horizontal slicing off of the terminals.
+
+It's very hard for a designer to look at these characters and say,
+
+how would l improve them? How would l make them any different?
+
+They just seem to be exactly right.
+
+l'm glad no one asked me to
+
+second-guess Helvetica
+
+because l wouldn't know what to do.
+
+This is the original type specimen of Helvetica
+
+before it was Helvetica. lt had its original name, Die Neue Haas Grotesk.
+
+The whole story of how Helvetica came into being
+
+is not entirely clear, at least to me.
+
+lt is said, and l think it's true,
+
+that Eduard Hoffmann, who had been the boss at Haas type foundry,
+
+wished to make a modernized version of Akzidenz Grotesk,
+
+which was essentially a traditional nineteenth-century German sans serif,
+
+and his method of doing that was sort of to clean it up and so on.
+
+And it was of course Max Miedinger who made the drawings for Helvetica.
+
+l received the impression from people l knew back in the sixties and seventies
+
+that Hoffmann's part in this was a very much more significant one
+
+than you might just assume by reading in a textbook
+
+that Max Miedinger was the designer of Helvetica.
+
+You can easily say this was a joint product
+
+of both Miedinger and my father.
+
+Miedinger couldn't produce a typeface alone;
+
+neither could my father.
+
+But when both were working hard together then something good resulted.
+
+Here are the first trials of Neue Haas Grotesk,
+
+which was the first name of Helvetica.
+
+l knew the way things worked at Haas
+
+and l had gradually picked up on the importance of Eduard Hoffman,
+
+and his almost pathological shyness
+
+and the way that he would use other people's hands.
+
+But boy could you see his mind at work on the faces
+
+where he was deeply involved.
+
+You have here a note by Eduard Hoffmann
+
+indicating all the desired corrections.
+
+''The capital Y is too slim.
+
+The capital A is also too slim.''
+
+When you talk about the design of Haas Neue Grotesk or Helvetica,
+
+what it's all about is the interrelationship of the negative shape
+
+the figure-ground relationship,
+
+the shapes between characters and within characters,
+
+with the black if you like, with the inked surface.
+
+And the Swiss pay more attention to the background,
+
+so that the counters and the space
+between characters just hold the letters.
+
+l mean you can't imagine anything moving;
+
+it is so firm.
+
+lt's not a letter that's bent to shape;
+
+it's a letter that lives in a powerful matrix of surrounding space.
+
+lt's . . . oh it's brilliant when it's done well.
+
+My father had clear ideas
+
+how the typeface should look.
+
+So my father and Miedinger sat together,
+and he started drawing.
+
+Here you have a proof of an alphabet
+
+with observations by Max Miedinger.
+
+When Miedinger worked for Haas he did
+not work as a designer.
+
+He was actually a salesman.
+
+His job was to travel around Switzerland
+
+taking orders for fonts of type.
+
+By profession he was a graphic artist,
+
+but he realized that he could make more
+money by selling foundry type.
+
+But my father said, lf ever l have an idea of
+a new typeface, l'm sure that you could design it.
+
+l have here a type specimen book
+
+of both type foundries, Stempel and Haas.
+
+You have to know that Haas was
+controlled by the German type foundry Stempel.
+
+And in turn Stempel was also controlled by Linotype.
+
+Now we go down to the cellar and see in
+our archives where we can find Helvetica.
+
+Here we have number 24.
+
+And there it is, the Helvetica drawings.
+
+The marketing director at Stempel had the
+idea to give it a better name
+
+because Neue Haas Grotesk didn't sound very good for a
+
+typeface that was intended to be sold in the United States.
+
+Stempel suggested the name of Helvetia.
+
+This is very important: Helvetia is the Latin name of Switzerland.
+
+My father said, That's impossible.
+
+You cannot call a typeface after the name of a country.
+
+So he said, why don't you call it Helvetica.
+
+So in other words this would be the Swiss typeface.
+
+And they agreed.
+
+l think Helvetica was a perfect name at the time.
+
+Swiss typography at that time also was well-known worldwide.
+
+So it was the best solution for Helvetica
+
+to get into the market.
+
+Once we'd introduced Helvetica, it really ran away.
+
+lt was exactly what the designers were looking for.
+
+l mean, l don't think there's been such a hot thing since
+
+as the figure-ground relationship properly executed
+
+and it was. . . oh, just a landslide waiting to 
+go down the mountain.
+
+And away it went.
+
+l imagine there was a time when it just felt so good
+
+to take something that was old and dusty
+and homemade and crappy looking
+
+and replace it with Helvetica.
+
+lt just must have felt like you were scraping
+the crud off of like filthy old things
+
+and restoring them to shining beauty. And in fact
+
+corporate identity in the sixties, that's what
+it sort of consisted of.
+
+Clients would come in and they'd have
+piles of goofy old brochures from the fifties
+
+that hide like shapes on them and goofy bad photographs.
+
+They'd have some letterhead that would
+say Amalgamated Widget on the top
+
+in some goofy, maybe a script typeface,
+above Amalgamated Widget
+
+it would have an engraving showing their headquarters
+
+in Paducah, lowa, with smokestacks belching smoke
+
+you know, and then you go to a corporate
+identity consultant circa 1965, 1966,
+
+and they would take that and lay it here
+and say, Here's your current stationery,
+
+and all it implies, and this is what we're proposing.
+
+And next to that, next to the belching smokestacks and
+
+the nuptial script and the ivory paper,
+
+they'd have a crisp bright white piece of paper
+
+and instead of Amalgamated Widget, founded 1 857,
+
+it just would say Widgco, in Helvetica Medium
+
+Can you imagine how bracing and thrilling that was?
+
+That must have seemed like you'd crawled through a desert
+
+with your mouth just caked with filthy dust
+
+and then someone is offering you a clear,
+refreshing, distilled, icy glass of water
+
+to clear away all this horrible, kind of like, burden of history.
+
+lt must have been just fantastic. And you
+know it must have been fantastic
+
+because it was done over and over and over again.
+
+So this is what l'm talking about, this is Life Magazine 1 953.
+
+One ad after another in here, that just kind of shows every 
+single visual bad habit that was endemic in those days.
+
+You've got zany hand lettering everywhere,
+
+swash typography to signify elegance,
+
+exclamation points, exclamation points,
+exclamation points.
+
+Cursive wedding invitation typography
+down here reading,
+
+''Almost everyone appreciates the best.''
+
+This was everywhere in the Fifties, this is
+how everything looked in the Fifties.
+
+You cut to - this is after Helvetica was in
+full swing - same product.
+
+No people, no smiling fakery,
+
+just a beautiful big glass of ice-cold Coke.
+
+The slogan underneath: lt's the Real Thing,
+
+period.
+
+Coke, period.
+
+ln Helvetica, period.
+
+Any questions? Of course not. Drink Coke, period.
+
+Simple.
+
+Governments and corporations love Helvetica
+
+because on one hand it makes them seem neutral and efficient,
+
+but also the smoothness of the letters
+makes them seem almost human.
+
+That is a quality they all want to convey
+
+because of course they have the image they are always fighting
+
+that they are authoritarian they're bureaucratic,
+
+you lose yourself in them, they're oppressive.
+
+So instead, by using Helvetica
+
+they can come off seeming more
+accessible, transparent, and accountable,
+
+which are all the buzzwords for what corporations
+
+and governments are supposed to be today.
+
+Now they don't have to be accessible or
+accountable or transparent
+
+but they can look that way.
+
+Our tax forms from the lRS are in Helvetica.
+
+The EPA uses it
+
+now there's someone who wants to look
+clean and official and efficient.
+
+Designers, and l think even readers, invest
+so much of the surroundings in the typeface.
+
+American Apparel uses Helvetica and it looks cheeky.
+
+American Airlines uses it and it looks sober.
+
+And it's not just a matter of the weight they
+use and the letter spacing and the colors.
+
+There's something about the typeface l think 
+really invites this sort of open interpretation.
+
+l suppose you could say the typefaces are either
+
+those that are fully open to interpretation
+
+or merely have one association attached to them.
+
+A typeface made of icicles or candy canes
+or something just says one thing.
+
+And Helvetica maybe says everything.
+
+And that's perhaps part of its appeal.
+
+Typography has this real poverty of terms to describe things.
+
+Beyond x height and cap height and weight and so on.
+
+I find when Tobias and I work on projects together
+
+we tend to use a lot of qualitative terms that are entirely subjective.
+
+Working on the typeface for Esquire years ago, I remember us saying,
+
+I remember my saying, No this has that Saturn 5 rocket early NASA quality.
+
+lt needs to have that orange plastic Olivetti
+typewriter, Roman Holiday espresso feeling.
+
+I know you got exactly what I was saying. -I did. -
+
+But it's that there's really no way to describe the qualitative parts
+of a typeface without resorting to things are fully outside it.
+
+And we're constantly saying, You know,
+this has that, it feels kind of Erik Satie;
+
+it needs to be Debussy.
+
+Or this has a kind of belt and suspenders look.
+
+lt needs to be, you know, much more elegant. . . hand-lasted shoe.
+
+l've been collecting these signs for a couple of years now
+
+and one of my favorites is these signs. l have a number of these.
+
+This is what the street signs in New York City used to look like.
+
+This actually functions so much more clearly
+
+and so much more effectively than what we
+see out on the street now.
+
+The sort of classical modernist line on
+
+how aware a reader should be of a typeface
+
+is that they shouldn't be aware of it at all.
+
+lt should be this crystal goblet
+
+there to just hold and display and organize
+
+the information. But I don't think it's really quite as simple as that.
+
+I think even if they're not consciously
+
+aware of the typeface they're reading,
+they'll certainly be affected by it.
+
+The same way that an actor that's miscast
+in a role will affect someone's experience
+
+of a movie or play that they're watching.
+They'll still follow the plot,
+
+but, you know, be less convinced or excited or affected.
+
+I think that typography is similar to that,
+
+where the designer choosing typefaces is
+essentially a casting director.
+
+There's very little type in my world outside of work.
+
+Like everybody else I'm aware of fonts
+being used in my environment.
+
+You know, the standing joke that graphic
+designers can't see historical movies
+
+because the fonts are always wrong is certainly true.
+
+lt definitely makes the world outside the office very different.
+
+in our neighborhood, and she remembered it as that new place
+
+that's just a couple blocks down from the dry cleaner.
+
+I remembered it as that new place just a couple blocks down from
+
+the place with the bad letter spacing out front.
+
+Nobody doesn't know what Helvetica is,
+
+I mean, at the beginning of our careers
+certainly before anybody had a PC or a Mac,
+
+no one knew what fonts were.
+
+I think even then people might have known what Helvetica was.
+
+The fact that it's been so heavily licensed
+
+and made available through these very populist technologies
+
+has kind of furthered the mythology that it's 
+the ultimate typeface in some way.
+
+And even for us professionals that's hard to escape from.
+
+I kind of find myself buying into the idea
+
+that ''Oh, the sans serif evolved for a hundred years
+
+and the ultimate expression was Helvetica.''
+
+And realizing, wait a minute that's not quite true, historically
+
+or aesthetically or culturally or politically.
+
+But there's something about it that does have the feeling of finality to it,
+
+This is the conclusion of one line of reasoning with this typeface,
+
+and perhaps everything after it is secondary in some way.
+
+I'm obviously a typomaniac, which is an incurable, if not mortal, disease.
+
+I can't explain it I just love, I just like looking at type,
+
+I just get a total kick out of it. They are my friends.
+
+Other people look at bottles of wine or whatever, or girls' bottoms,
+
+I get kicks out of looking at type.
+
+lt's a little worrying I must admit, it's a very nerdish thing to do.
+
+I'm very much a word person.
+
+So that's why typography for me is the obvious extension.
+
+lt just makes my words visible.
+
+A real typeface needs rhythm, needs contrast; it comes from handwriting.
+
+That's why I can read your handwriting, and you can read mine.
+
+And I'm sure our handwriting is miles away from Helvetica
+
+or anything that would be considered legible.
+
+But we can read it because there's a rhythm to it, there's a contrast to it.
+
+Helvetica hasn't got any of that.
+
+|Why is it fifty years later still so popular?|
+
+I don't know. What is bad taste ubiquitous?
+
+No, actually, Helvetica was a good typeface at the time.
+
+lt really answered a demand.
+
+But now it's become one of those defaults that,
+
+partly because of the proliferation of the 
+computer, which is now twenty years,
+
+the PC I mean,
+
+it was the default on the Apple Macintosh
+and then it became the default on Windows
+
+which copied everything that Apple did, as you know.
+
+lnterface and everything else, and then they did the clone version, Arial,
+
+which is worse than Helvetica but
+
+fills the same purpose I think. Now it's probably never going to go away
+
+because it's ubiquitous; it's a default. lt's air,
+
+you know, it's just there. There's no choice.
+
+You have to breathe, so you have to use Helvetica.
+
+lt brings style with it; every typeface does.
+
+lt has a certain,
+
+well, it's like a person, if you are slightly heavy in the middle
+
+you're not going to walk around in tight T-shirts. You'd look like an idiot.
+
+And Helvetica is heavy in the middle. So it has a certain,
+
+it needs certain space around it, needs a lot of white space;
+
+it needs very carefully to be looked at the weight gradations.
+
+lt needs a lot of space sideways also.
+
+Then it's very legible, but
+
+very small and very tightly done and very lightly as modern designers do,
+
+it's a nightmare, a total nightmare.
+
+I wouldn't say this if I hadn't tried it.
+
+Because all the letters . . . it's the whole Swiss ideology;
+
+the guy who designed it tried to make all the letters look the same.
+
+Hello??? You know, that's called an army. That's not people.
+
+That's people having the same fucking helmet on.
+
+lt doesn't further individualism.
+
+And the aim with type design always is to make it individual enough
+
+so that it's interesting,
+
+but of course ninety-five percent of any
+alphabet has to look like the other alphabet
+
+otherwise you wouldn't be able to read it.
+
+l've never sort of woken up with a typeface coming out,
+
+you know, like some people . . . l've got to do this, and they go to their,
+
+whatever, their easel, and these amazing brush strokes.
+
+I don't have that urge.
+
+You know, I wake up and usually I want to go back to sleep.
+
+I mean, everybody puts their history into their work.
+
+I certainly know that when I draw something it has
+
+I'm fast, I'm loud, I'm chaotic,
+
+I'm not very rule based, even though I'm German and I love rules,
+
+I'm a Gemini, I had my birthday yesterday, so I'm all over the place essentially.
+
+I'm always on time, but a year late, you know what I mean,
+
+but then I'm on the second.
+
+So I have this horrible thing, which comes out in my typefaces.
+
+They're never perfect. They always have a little edge
+
+in the sense that I leave them alone when l get bored with them.
+
+I know there's people who hate me, who
+would never use one of my typefaces in a million years
+
+and vice versa, people who would use any typeface I design
+
+not because it's good for them or it fits the purpose,
+
+simply because I did it.
+
+I think we alI do that. Certain bands I buy every CD from them;
+
+some of them are crap.
+
+But I buy it because l've always bought their CDs
+
+lch habe sie immer gekauft,
+
+or their music.
+
+Why do people buy certain things? The brand rubs off on them.
+
+And typefaces are a brand.
+
+You're telling an audience, This is for you, 
+by using a certain typographic voice.
+
+You'd recognize a Marlboro brand two miles away
+
+because they use a typeface that they only use
+
+You can buy it; I have it; anyone can, it's called Neo Contact. Anybody can buy it,
+
+but Marlboro have made the typeface theirs.
+
+You can recognize any Marlboro ad from miles away
+
+because of that stupid typeface.
+
+lf they'd used Helvetica. . . Hello??? lt wouldn't quite work.
+
+The way something is presented will define the way you react to it.
+
+So you can take the same message and present it in three different typefaces,
+
+and the response to that, the immediate emotional response will be different.
+
+And the choice of typeface is the prime weapon,
+
+if you want, in that communication.
+
+And I say weapon largely because with
+commercial marketing and advertising,
+
+the way a message is dressed is going to
+define our reaction to that message in the advertising.
+
+So if it says, buy these jeans, and it's a grunge font,
+
+you would expect it to be some kind of ripped jeans
+
+or to be sold in some kind of underground clothing store.
+
+lf you see that same message in Helvetica,
+
+you know, it's probably on sale at Gap.
+
+You know it's going to be clean, that you're
+going to fit in, you're not going to stand out.
+
+All of us, I would suggest, are prompted in subliminal ways.
+
+Maybe the feeling you have when you see a particular 
+typographic choices used on a piece of packaging,
+
+is just, I like the look of that, that feels good, that's my kind of product.
+
+But that's the type casting its secret spell.
+
+ln a way, Helvetica is a club. lt's a mark of membership;
+
+it's a badge that says we're part of modern society,
+
+we share the same ideals.
+
+lt's well-rounded, it's not going to be damaging or dangerous.
+
+Helvetica has almost like a perfect balance of push and pull in its letters,
+
+and that perfect balance sort of is saying to us,
+
+well not sort of, it is saying to us,
+
+Don't worry, any of the problems you're having, or problems in the world,
+
+538 
+00:42:26,010 --> 00:42:28,979 
+or problems getting through the subway or finding a bathroom,   
+
+all those problems aren't going to spill over, they'll be contained,  
+
+and in fact maybe they don't exist.
+
+What I like is if this very serious typeface
+
+tells you the do's and don'ts of street life,
+
+and it must be Helvetica at that moment.
+
+The image of Helvetica as the corporate typeface
+
+made it the so-called typeface of capitalism,
+
+which I would actually reject and say
+
+it's the typeface of socialism
+
+because it is available all over and it's 
+inviting dilettantes and amateurs and
+
+everybody to do typography,
+
+to create their own type designs, and l think that's a good thing.
+
+And I think I'm right calling Helvetica the perfume of the city.
+
+lt's just something we don't notice usually
+
+but we would miss very much if it wouldn't be there.
+
+I think it's quite amazing that a typeface can advance to such a status
+
+in our lives
+
+As is always the case with any style, there's a law of diminishing returns.
+
+The more you see it, the more the public sees it,
+
+the more the designer uses those typographic and graphic solutions,
+
+the more familiar, predictable, and ultimately dull they become.
+
+By the time I started as a designer, it sort
+of seemed there was only one trick in town,
+
+which was like, what can you use instead of Helvetica.
+
+You know, ABH, Anything But Helvetica.
+
+And you do need lot of sans serif typefaces,
+
+but it seemed like Helvetica had just been used so much and overused so much 
+
+and associated with so many big, faceless things
+
+that it had lost all its capacity even, to my eyes at least, to look nice.
+
+And by the seventies, especially in America,
+
+you start to get a reaction against,
+
+what it seems to those designers is the conformity,
+
+the kind of dull blanket of sameness
+
+that this way of designing is imposing on the world.
+
+So something that had come out of idealism
+
+has by this time become merely routine, and there's a need for a change.
+
+You come into design,
+
+at the point that you start out in history,
+
+without knowing that you're starting out in history,
+
+and often you don't have a sense of what came before you and how it got there,
+
+and you certainly don't know what's going to come after.
+
+And when I walked into design as a student at Tyler School of Art,
+
+what struck me was sort of two separate cultures of design.
+
+One was the corporate culture,
+
+and the corporate culture was the visual language of big corporations,
+
+and at that time they were persuasively Helvetica.
+
+They looked alike, they looked a little fascistic to me.
+
+They were clean, it reminded me of cleaning up your room.
+
+I felt like, this was some conspiracy of my
+mother's, to make me keep the house clean,
+
+that all my messy room adolescent rebellion was coming back at me
+
+in the form of Helvetica, and I had to overthrow it.
+
+Hey, I got some printouts of the stuff from last night.
+
+I also was morally opposed to Helvetica,
+
+because I viewed the big corporations that were slathered in Helvetica
+
+as sponsors of the Vietnam War.
+
+So therefore, if you used Helvetica,
+
+it meant that you were in favor of the Vietnam War,
+
+so how could you use it?
+
+What looked cool to me at that point were
+record album covers, Zig-Zag rolling papers,
+
+the accoutrements of dope life and counterculture,
+
+obviously underground newspapers and magazines, and Pushpin Studios.
+
+Pushpin Studios was the height of, at the time I was in college,
+
+everybody's ambition. To work there, to do
+work that was as inspiring as their work,
+
+because it seemed fresh and alive and witty and content-laden,
+
+aside from the fact that Seymour Chwast and Milton Glazer could really draw.
+
+And I wanted to make work that looked like that.
+
+When I was at Tyler, I wanted to be an illustrator,
+
+and I had a teacher named Stanislaw Zagorski.
+
+And I never knew what to do with the typography on my designs.
+
+We would make book covers and record covers as school projects,
+
+and l'd go to the local art store, l'd go to
+Sam Flax, and l'd buy Helvetica as press type,
+
+and l'd rub it down in the corner of the album 
+the way I thought it was supposed to be, kind of flush left.
+
+And of course it would never line up
+properly and thing would crackle and break
+
+and it'd be terrible.
+
+And Zagorski told me to let go of the press type,
+
+and illustrate the type.
+
+And it hadn't dawned on me that typography could have personality
+
+the way drawing did.
+
+I realized that type had spirit and could convey mood,
+
+and that it could be your own medium,
+
+that it was its own palate, a broad palate to express all kinds of things.
+
+So I painted this cover the AlGA Annual,
+
+and the title of the AlGA Annual was
+Graphic Design U.S.A.
+
+And I decided I would take the title literally
+
+and sort of analyze what Graphic Design U.S.A. was,
+
+so I decided what l'd do is list every state in the United States,
+
+and the percentage of people who used Helvetica.
+
+And I didn't have any scientific evidence of knowing
+what percentage of people in each state used Helvetica,
+
+so I decided to base it on the last Reagan election.
+
+So that the states that went for Reagan
+
+all had more than 50% of the people who used Helvetica.
+
+| lf Helvetica was the typeface of the Vietnam War,
+
+what's the typeface of this war? |
+
+The lraqi War?
+
+Helvetica.
+
+Same time period, I mean it is, it's the same, it repeated.
+
+That's why we're there. Helvetica caused it.
+
+And so ln the Postmodern period, designers were breaking things up.
+
+They wanted to get away from the orderly, clean, smooth surface of design
+
+the horrible slickness of it all, as they saw it
+
+and produce something that had vitality.
+
+I myself got fairly disappointed
+
+with Modernism in general.
+
+lt simply became boring.
+
+lf I see a brochure now, with lots of white space
+
+that has like six lines of Helvetica up on the top
+
+and a little abstract logo on the bottom
+
+and a picture of a businessman walking somewhere,
+
+the overall communication that says to me is,
+
+Do Not Read Me, because I will bore the shit out of you
+
+not just visually, but also in content
+
+because the content will likely say the same as it says to me visually.
+
+I was in terrible rock bands when I was fifteen, sixteen, seventeen,
+
+and I think through that experience got close to the album cover
+
+and essentially I went to art school because of album covers.
+
+I probably was the last generation who got taught doing everything by hand,
+
+so you know, we drew 10 pt. type with a brush.
+
+ln general, I was always fairly bored, you know, looking at type books
+
+and deciding over and over again which type to pick for a certain project.
+
+lt just didn't seem a very interesting task to do.
+
+So here and there I think with the records, with the CD covers,
+
+we started to do our own type
+
+and I think there was one instance, it was
+for a Lou Reed cover,
+
+where this hand drawn typography resonated,
+
+and numerous projects came out in that vein, in all sorts of directions.
+
+You know, in a more funny direction and in a more serious direction,
+
+where one time an intern carved a hand type into my skin for a lecture poster.
+
+The type in an instant, in a single image,
+
+tells the story of its making, tells you about its process,
+
+in a very elegant way, in a very fast way.
+
+That typography strangely became so well
+known, just within the design community
+
+of course, that some people thought that's all we do,
+
+which thankfully is not the case.
+
+Well, I always thought that approach of people 
+using only three or four typefaces very suspect.
+
+I think this could be interesting to do for a single project
+
+as an exercise to put up additional limitations in order to focus yourself.
+
+But as a strategy over a lifetime
+
+I think it's akin to a writer saying,
+
+I'm only going to write in three or four words.
+
+Yes, you could probably do it, but for one why would you,
+
+and for the second would it really yield an
+interesting body of work over a lifetime?
+
+Designers wanted to express their subjectivity,
+
+their own feelings about the world,
+
+their sense that they had something to say through design,
+
+through the design choices they made.
+
+And of course this caused controversy.
+
+lf you take a figure like Massimo Vignelli,
+who'd been one of the Sixties' high priests,
+
+with his company Unimark,
+
+it's right there in the name, Unimark, the idea of a uniform kind of expression.
+
+When he looked at this new work,
+
+this expressive, subjective, wayward,
+
+to his way of thinking irrational new way of designing,
+
+lt seemed like the barbarians were not only at the gate,
+
+but they'd stormed through and they'd taken over.
+
+ln the '70s, the young generation was after psychedelic type,
+
+and all the junk that you could find.
+
+And also in the '80s, with their minds completely confused
+
+by that. . . disease that was called Postmodernism,
+
+people were just going around like 
+chickens without their heads,
+
+by using all kinds of typefaces that came around that could say ''not modern''.
+
+They didn't know what they were caring for,
+
+they only knew about what they were against.
+
+And what they were against was Helvetica.
+
+I had no formal training in the field,
+
+ln my case I never learned all the things l wasn't supposed to do.
+
+I just did what made sense to me.
+
+I was just experimenting really.
+
+So when people started getting really upset, I didn't really understand why.
+
+l'd say, ''What's the big deal? What are you talking about?''
+
+And it was many years later that somebody explained to me,
+
+probably better than I can explain it now,
+
+is that basically there was this group that
+spent a lot of time trying to organize things,
+
+and get some kind of system going,
+
+and they saw me as coming in and throwing that out the window.
+
+Which I might have done, but it wasn't the starting point
+
+and it wasn't the plan.
+
+Only much later did I learn the terms Modernism, and this and that.
+
+Raygun Magazine was very much experimental,
+
+it was completely experimental. Every issue we'd try a lot of things
+
+and a lot of them worked,
+
+and a lot of them didn't work.
+
+I never saw proofs so a lot of times there were just mistakes,
+
+flat-out mistakes, that people would write long essays on
+
+why I did this black type on a black boot, or something.
+
+No, I never saw a proof, what are you talking about?
+
+lt's very hard to do the more subjective, interpretive stuff well.
+
+You know, I can teach anybody off the street
+
+how to design a reasonable business card or newsletter.
+
+But if I bring the same group off the street and play a CD
+
+and say, ''Okay, now let's interpret that music for a cover,
+
+well 9 out of 1 0 are going to be lost
+
+and are going to do something corny and expected,
+
+and one person is going to do something amazing
+
+because that music spoke to them and it sent them in some direction
+
+that nobody else could go. And that's the
+area to me where it gets more interesting
+
+and exciting, and more emotional.
+
+And that's where the best work comes from.
+
+This is an article on the singer Bryan Ferry,
+
+and when I read the article it was very
+much like so many of these others I had read,
+
+and I was like, oh man, how disappointing, how boring.
+
+And I went through all my fonts, which at
+the time would've been hundreds and hundreds,
+
+uhm, well, it still is for that matter, and
+
+didn't find one that seemed to fit my disgust and boredom with this article.
+
+And I finally came to the bottom and there was Dingbats,
+
+which of course now it's Zapf Dingbats so it's literally the last one.
+
+And I was like, well it's boring and not worth reading,
+
+why not do it in Zapf Dingbats?
+
+lt's a font. So it's all set in Dingbats,
+
+it is the actual font, you could highlight it 
+and make it Helvetica or something
+
+and you'd be able to read it
+
+but it really wouldn't be worthwhile, it's not very well-written.
+
+Don't confuse legibility with communication.
+
+Just because something's legible, doesn't mean it communicates
+
+And more importantly doesn't mean it communicates the right thing.
+
+And vice-versa, something that may be difficult to initially read
+
+could be sending a completely different message
+
+that is valid for where it's being used,
+
+and that may require a little more time or the involvement of the reader.
+
+But it almost seems stronger the other way,
+
+if something is a very important message
+and it's set in a boring, non-descript way,
+
+the message can be lost.
+
+I mean that doesn't say ''caffeinated''!
+
+It's just like, hello?
+
+|Why Not?|
+
+It's just sitting there! There's nothing caffeinated about it!
+
+There's nothing ''extramarital'' about that.
+
+There's no ''sunshine'' here.
+
+That's no fun, that's not a fun sandlot.
+
+Where's the explosion?
+
+This could be the first date.
+
+This might be close, these buses are kind of boring.
+
+There's a very thin line between simple and clean and powerful,
+and simple and clean and boring.
+
+That was sort of the rise of what's referred to as grunge typography,
+
+and that became an all-consuming aesthetic for two, three, four, five years
+
+as that trend worked its way down from the masters who originated it
+
+to anyone who sort of already had a tendency to make mistakes
+
+and all of sudden found that they looked good now instead of incompetent,
+
+which is how they looked the day before.
+
+Typography was so broken by the end of the grunge period,
+
+just lying there in a twisted heap,
+
+all rules cast aside, no apparent way forward,
+
+that all those designers could perhaps do by the late nineties was to go back
+
+to return to an earlier way of designing,
+
+but with a new set of theories to support it.
+
+For us, modernism does have a more subversive side.
+
+I think that the whole image of modernism
+
+as something that is primarily concerned with functionalism,
+
+utilitarianism, that is something that emerged much later,
+
+that is a sort of a late-modernist thing.
+
+I think the early-modernist movements,
+
+like Dadaism, Futurism, Surrealism,
+
+all had their more subversive sides
+
+and their more, how do you call it,
+
+dialectical sides, so they went against something.
+
+It's not that we are against that experimentation
+
+that people like David Carson and Emigre and Fuse, that Neville Brody did.
+
+We think what we do is a sort of an extension of that.
+
+All that hunting to the next typeface every time, it took a lot of energy,
+
+and I can still remember as students that we were really disappointed
+
+because you wanted to use a certain
+typeface and then you saw somebody else had used it,
+
+and then you couldn't use it because you wanted to be original.
+
+And with Helvetica this whole problem is
+non-existent because everybody's using Helvetica.
+
+A lot of people see the way a young generation of 
+designers uses a typeface such as Helvetica
+
+as a more superficial way, as a sort of appropriation of a style.
+
+I think we would very much disagree with that.
+
+I think all three of us grew up in the '70s
+
+in the Netherlands which was dominated by the last moment of late Modernism.
+
+For example, the city I was born in and grew up in, Rotterdam,
+
+the logotype was designed by Wim Crouwel,
+
+the stamps were designed by Crouwel,
+
+the telephone book was designed by Crouwel,
+
+the atlas that we used in school was designed by Crouwel.
+
+So for us it is almost like a natural mother tongue,
+
+that's something really natural.
+
+It's not that we ... I mean, a lot of people think you sort of study it
+
+from books and then copy it or something, but
+
+I would really say that it's almost in our blood.
+
+It's also funny because a lot of people connect Helvetica
+
+sometimes with the dangers of globalization and standardization.
+
+I'm not afraid for that quality at all
+
+because I'm just know that everybody can put a twist on it.
+
+I think you can put as much nationality
+in the spacing of a typeface as in the typeface itself.
+
+And I think the way people like Crouwel
+use Helvetica is typically Dutch, I think,
+
+and that's why I'm never really impressed with the argument
+
+that Helvetica is a sort of global monster.
+
+I'm not one of those people who is a real typographer,
+
+I don't know all the fancy words for all the letters,
+
+and the sort of ligatures and ascenders
+and descenders and all that kind of thing.
+
+I just more, sort of, react to certain things,
+
+and just do what I feel is right,
+
+so I'm never sort of a classical type guy.
+
+So I get obsessed about things, I collect things,
+
+you know, I've got so many bits and scraps
+of paper, of things that you find on the street,
+
+or wrappers. It's just making something
+beautiful out of something very ordinary.
+
+That's what I really enjoy, the ordinary things
+
+that most people would just gloss over, I find really beautiful.
+
+The biggest thing for me in terms of design
+
+is to get a sort of emotional response from a piece.
+
+That's some of the best design, I think.
+
+I see stuff and to me, if it makes me go,
+
+I wish I'd done that, that for me is the biggest thing, you know.
+
+Or you just get this real whooo, kind of like, oooh, that's nice.
+
+It's all about that emotional response.
+
+One of the things I've always really wanted to design is airplane signage,
+
+an identity for an airline.
+
+I'd love to do the uniforms, or you know,
+seats and the whole thing, the trucks and
+
+that kind of thing. I think it would be brilliant.
+
+You know, I've done these twelve-inch sleeves for so long;
+
+I want to go a little bit bigger scale now.
+
+It's that idea that something's designed to stand the test of time,
+
+and hopefully some of the things I'm
+designing will be still being used in twenty, thirty years.
+
+I'd love to think that.
+
+I got married about three years ago. I did the wedding invites,
+
+which believe me, is just the worst job you can ever do as a graphic designer.
+
+I've done other people's wedding invites, and I'll never do one again.
+
+It's the most stressful job I've ever had,
+
+dealing with mother in laws is just horrific. But I did ours,
+
+and on the order of service
+
+I did a little credit to give thanks to Max Miedinger for Helvetica.
+
+But my wife vetoed that; I had to take it off the invite.
+
+But it was funny . . .
+
+I think I fell into the step of Helvetica when I was at DR.
+
+I always really enjoy using Helvetica
+
+because . . .some people say they use a
+different typeface because it gives a different feeling.
+
+And I really enjoy the challenge of making Helvetica speak in different ways.
+
+It's been around for fifty years, coming up,
+
+and it's just as fresh as it was . . . obviously,
+it wasn't intended to be this cool thing,
+
+but it's just a beautiful font.
+
+Well, we are less obsessed with Helvetica
+
+than we used to be.
+
+Yes, we were really obsessed with Helvetica, yet not more so much.
+
+We accepted it somehow ... We came to a
+point where we accepted that it's just there.
+
+We like restrictions.
+
+We can't operate, we can do nothing without restrictions.
+
+The more restrictions we have, the more，happy we are.
+
+When we started school,
+
+the influences in graphic design were like Brody and Carson.
+
+It's only after that we really looked at Josef
+
+work, and '60s Swiss Typography.
+
+When we started the office we really said
+
+we wanted to look back,
+
+to find more structured design.
+
+For us it's very important to reduce the elements we use.
+
+When it comes to type, we will only use, if possible, one typeface,
+
+or two, and if possible we will use one size.
+
+We don't like humanistic typefaces for example,
+
+it must be more rational
+
+because otherwise it has too much expression.
+
+We think that Helvetica contains somehow a design program.
+
+It will lead you to a certain language also, and this is also
+
+one of the secrets of the success of Helvetica
+
+that in itself it is already
+
+it has a certain style, a certain aesthetic
+
+that you will just use it like that,
+
+because of the typeface, because the typeface wants it like that.
+
+You wilI do what the typeface wants you to do.
+
+If you are not a good designer, or if you are not a designer,
+
+just use Helvetica Bold in one size,
+
+like for a flyer. . . it looks good.
+
+So it may very well be that when it comes to trends,
+
+at least in graphic design, we've reached sort of the end of history.
+
+The pendulum that swings back and forth
+doesn't have any more directions it can swing in.
+
+The final trend may simply be the completely 
+democratic distribution of the means of production
+
+to anyone who wants it or anyone who can afford it.
+
+You can have a music studio for a couple thousand bucks,
+
+you can have a film studio for ten grand,
+
+you definitely can be a designer with one or two thousand dollars,
+
+and have basically
+
+similar tools as the people who do this for a living.
+
+If all these people have the tools to make good design,
+
+they realize that it ain't that easy.
+
+It's not just opening a template in CorelDraw or in Powerpoint.
+
+It's not about having the latest version of whatever program.
+
+If you don't have the eye, if you don't a sense of design,
+
+the program's not going to give it to you.
+
+I remember, years ago, a friend of mine
+who produced radio commercials
+
+had five guys go out in the hallway of CBS Records
+
+and sing the beginning of ''Round Round Get Around, I Get Around''
+
+by the Beach Boys.
+
+And they really tried, they rehearsed for a
+week to get their harmonies right,
+
+and they were the best vocalists who worked in that department on that floor,
+
+and they loved music.
+
+And they went out and they sang it,
+
+and of course they were totally flat and sounded horribly...
+
+terrible. But they'd rehearsed. And then
+
+the voiceover for the commercial said,
+''Now you can appreciate the Beach Boys.''
+
+And it's really sort of the same thing.
+
+The closer you come to it, and the more you see it,
+
+the more you appreciate it when it's terrific.
+
+There are more good, young type designers
+
+now, by young I mean probably late
+twenties, early thirties, than at any time in history.
+
+So who knows what typefaces they will design
+
+in terms of style and so on. But they'll be good.
+
+And to my way of thinking, that is a huge gain,
+
+a huge benefit that comes with this more
+democratic, more accessible technology.
+
+There's just something about Helvetica.
+
+Something about the fact that people keep
+saying I've come up with an improvement of Helvetica.
+
+And it never is really good.
+
+You know, I wonder whether or not somehow there's 
+some whole undiscovered science of typography
+
+that would sort of say it's not just because we're used to seeing it,
+
+it's not just because it was associated with all these things
+
+that we consider authoritative,
+
+but it somehow has this kind of inherent rightness.
+
+You know, the rightness of the way the lowercase a meets the curve,
+
+the rightness of the way the G has the thing that comes down,
+
+the rightness of the way the c strokes are like that instead of that.
+
+I mean, I wouldn't have believed that those
+things actually could be right or wrong
+
+as opposed to someone's tastes.
+
+Yet we sort of have nearly fifty years of
+history of the thing just sitting there
+
+daring people to fix it. And it seems to be unfixable.
+
+It's always changing, time is changing,
+
+the appreciation of typefaces is changing very much.
+
+Why you grab a certain typeface for a certain job
+
+has a different meaning than we grabbed a typeface in the fifties for a certain job.
+
+You are always child of your time, and you cannot step out of that.
+
+What we have is a climate now in which the very idea of visual communication
+
+and graphic design, if we still want to call it that,
+
+is accepted by many more people.
+
+They get it. They understand it. They're starting to see graphic communication
+
+as an expression of their own identity.
+
+And the classic case of this is the social networking programs
+
+such as MySpace, where you can customize your profile.
+
+You can change the background, you can put pictures in,
+
+you can change the typeface to anything you want,
+
+and those choices, those decisions you make,
+
+become expressions of who you are. You start to care about it, in the way
+
+you care about the clothing you're wearing as an expression of who you are,
+
+or your haircut or whatever,
+
+or how you decorate your apartment-all of those things.
+
+You know, we accept the idea of identity being expressed in that way,
+
+through these consumer choices.
+
+Well, now it's happening in the sphere of visual communication
+
+and there's no reason as the tools become ever more sophisticated,
+
+why this just won't go on developing, devoloping and developing.
