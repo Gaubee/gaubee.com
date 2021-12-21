@@ -217,7 +217,7 @@
 &lt;blockquote&gt;
 &lt;p&gt;This is the code that has been tested:&lt;/p&gt;
 &lt;/blockquote&gt;
-&lt;figure&gt;&lt;img src=&quot;https://gaubee.com/_img/comlink-v2/effect-preview.jpg&quot; alt=&quot;&quot; width=&quot;1280&quot; height=&quot;1706&quot; loading=&quot;lazy&quot; /&gt;&lt;figcaption&gt;Effect Preview&lt;/figcaption&gt;&lt;/figure&gt;
+&lt;figure&gt;&lt;img src=&quot;https://gaubee.com/img/comlink-v2/effect-preview.jpg&quot; alt=&quot;&quot; width=&quot;1280&quot; height=&quot;1706&quot; loading=&quot;lazy&quot; /&gt;&lt;figcaption&gt;Effect Preview&lt;/figcaption&gt;&lt;/figure&gt;
 &lt;h2 id=&quot;%E5%AE%9E%E7%8E%B0%E6%80%9D%E8%B7%AF-implementation-approach&quot; tabindex=&quot;-1&quot;&gt;&lt;a class=&quot;header-anchor&quot; href=&quot;https://gaubee.com/articles/Comlink%EF%BC%8Dv2#%E5%AE%9E%E7%8E%B0%E6%80%9D%E8%B7%AF-implementation-approach&quot;&gt;实现思路 Implementation approach&lt;/a&gt;&lt;/h2&gt;
 &lt;p&gt;众所周知，Comlink-v1使用&lt;code&gt;await&lt;/code&gt;来隐式调用&lt;code&gt;then&lt;/code&gt;函数的特性来实现的。&lt;/p&gt;
 &lt;blockquote&gt;
@@ -473,12 +473,12 @@ v8论坛上有类似的bug提交：https://bugs.chromium.org/p/v8/issues/detail?
 &lt;/thead&gt;
 &lt;tbody&gt;
 &lt;tr&gt;
-&lt;td&gt;&lt;img src=&quot;https://gaubee.com/_img/mi10-for-mom/mi10-take-photo.png&quot; alt=&quot;image&quot; width=&quot;1080&quot; height=&quot;2340&quot; loading=&quot;lazy&quot; /&gt;&lt;/td&gt;
-&lt;td&gt;&lt;img src=&quot;https://gaubee.com/_img/mi10-for-mom/mix2s-take-photo.png&quot; alt=&quot;image&quot; width=&quot;1080&quot; height=&quot;2160&quot; loading=&quot;lazy&quot; /&gt;&lt;/td&gt;
+&lt;td&gt;&lt;img src=&quot;https://gaubee.com/img/mi10-for-mom/mi10-take-photo.png&quot; alt=&quot;image&quot; width=&quot;1080&quot; height=&quot;2340&quot; loading=&quot;lazy&quot; /&gt;&lt;/td&gt;
+&lt;td&gt;&lt;img src=&quot;https://gaubee.com/img/mi10-for-mom/mix2s-take-photo.png&quot; alt=&quot;image&quot; width=&quot;1080&quot; height=&quot;2160&quot; loading=&quot;lazy&quot; /&gt;&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr&gt;
-&lt;td&gt;&lt;img src=&quot;https://gaubee.com/_img/mi10-for-mom/mi10-take-photo-zoom-in.png&quot; alt=&quot;image&quot; width=&quot;514&quot; height=&quot;514&quot; loading=&quot;lazy&quot; /&gt;&lt;/td&gt;
-&lt;td&gt;&lt;img src=&quot;https://gaubee.com/_img/mi10-for-mom/mix2s-take-photo-zoom-in.png&quot; alt=&quot;image&quot; width=&quot;430&quot; height=&quot;459&quot; loading=&quot;lazy&quot; /&gt;&lt;/td&gt;
+&lt;td&gt;&lt;img src=&quot;https://gaubee.com/img/mi10-for-mom/mi10-take-photo-zoom-in.png&quot; alt=&quot;image&quot; width=&quot;514&quot; height=&quot;514&quot; loading=&quot;lazy&quot; /&gt;&lt;/td&gt;
+&lt;td&gt;&lt;img src=&quot;https://gaubee.com/img/mi10-for-mom/mix2s-take-photo-zoom-in.png&quot; alt=&quot;image&quot; width=&quot;430&quot; height=&quot;459&quot; loading=&quot;lazy&quot; /&gt;&lt;/td&gt;
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
