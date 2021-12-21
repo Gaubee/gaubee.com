@@ -1,0 +1,12 @@
+---
+navtitle: Blog
+layout: layouts/home.njk
+description: 'Gaubee is an developer.'
+---
+<h1>Gaubee 的站点</h1>
+
+<h2>最新话题 Latest posts</h2>
+
+{% set posts = collections.allPosts | head(10) %}
+{% set start = collections.allPosts | length %}
+{% include "articles.njk" %}

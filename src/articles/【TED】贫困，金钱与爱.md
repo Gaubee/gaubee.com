@@ -1,0 +1,1813 @@
+---
+layout: layouts/article.njk
+title: "【TED】贫困，金钱与爱"
+date: 2013-05-01T03:05:49Z
+updated: 2013-05-01T11:47:08Z
+tags:
+  - lift
+  - cogitation
+---
+
+## [贫困，金钱与爱](http://v.163.com/movie/2012/1/O/C/M78DAQ7KH_M8BL7FVOC.html)
+
+The stories we tell about each other
+
+我们互相讲述的故事
+
+matter very much.
+
+非常重要
+
+The stories we tell ourselves about our own lives matter.
+
+我们谈论与自己生活相关故事是有意义的
+
+And most of all,
+
+而我认为最重要的是
+
+I think the way that we participate in each other's stories
+
+我们参与到他人故事的方式
+
+is of deep importance.
+
+才是至关重要的
+
+I was six years old
+
+我六岁时
+
+when I first heard stories about the poor.
+
+当我第一次听到关于穷人的故事的时候
+
+Now I didn't hear those stories from the poor themselves,
+
+我并没有直接从穷人口中听到这些故事
+
+I heard them from my Sunday school teacher
+
+我从教堂周日学校的老师那里听到这些故事
+
+and Jesus, kind of via my Sunday school teacher.
+
+和耶稣，也就是这些老师那里
+
+I remember learning that people who were poor
+
+我记得我学到了穷人
+
+needed something material --
+
+需要物质帮助
+
+food, clothing, shelter -- that they didn't have.
+
+如食物，衣服，住处，那些他们没有的
+
+And I also was taught, coupled with that,
+
+我还学到了
+
+that it was my job -- this classroom full of five and six year-old children --
+
+我们这些五六岁的孩子应该做的是
+
+it was our job, apparently, to help.
+
+很明显，去帮助
+
+This is what Jesus asked of us.
+
+这也是耶稣需要我们做的
+
+And then he said, "What you do for the least of these, you do for me."
+
+他还说，你为他们做的就是为我做的
+
+Now I was pretty psyched.
+
+现在， 我被极大的鼓舞了
+
+I was very eager to be useful in the world --
+
+我非常热切地希望自己能向世界证明自己的意义
+
+I think we all have that feeling.
+
+相信我们都有这样的感觉
+
+And also, it was kind of interesting that God needed help.
+
+此外，有意思的是上帝也需要帮助
+
+That was news to me,
+
+那对我来说真是个新闻
+
+and it felt like it was a very important thing to get to participate in.
+
+而且，这是貌似一个很重要的事情值得我们参与
+
+But I also learned very soon thereafter
+
+但是自从耶稣说了那句话之后，我也很快地理解了耶稣所说
+
+that Jesus also said, and I'm paraphrasing,
+
+那我同时将其释义为
+
+the poor would always be with us.
+
+贫穷和我们同在
+
+This frustrated and confused me;
+
+这让我沮丧和迷惑
+
+I felt like I had been just given a homework assignment
+
+我感觉我被安排了一个
+
+that I had to do, and I was excited to do,
+
+不得不做的同时令人振奋的作业
+
+but no matter what I would do, I would fail.
+
+但是不论我做什么，我都会失败
+
+So I felt confused, a little bit frustrated and angry,
+
+因此我感到迷茫，有点郁闷以及恼怒
+
+like maybe I'd misunderstood something here.
+
+好像我似乎误解了这里的一些东西
+
+And I felt overwhelmed.
+
+同时我感到了压力
+
+And for the first time,
+
+这也是第一次
+
+I began to fear this group of people
+
+我开始害怕一类人群
+
+and to feel negative emotion towards a whole group of people.
+
+并对这一人群有负面的情绪
+
+I imagined in my head, a kind of long line of individuals
+
+我的脑袋里呈现出这些人组成的长队
+
+that were never going away, that would always be with us.
+
+这个长队将一直伴随我们，永不会离去
+
+They were always going to ask me to help them and give them things,
+
+他们会总是不停地要求我的帮助，要求我给他们东西
+
+which I was excited to do,
+
+这些虽然都是我喜欢做的
+
+but I didn't know how it was going to work.
+
+但是我并不知道将来会发生什么
+
+And I didn't know what would happen when I ran out of things to give,
+
+我不知道但我无物可给的时候将会发生什么
+
+especially if the problem was never going away.
+
+特别是这个问题永远不会离去
+
+In the years following,
+
+几年之后
+
+the other stories I heard about the poor growing up
+
+我听到一些其他的故事关于减贫
+
+were no more positive.
+
+并不是那么积极
+
+For example, I saw pictures and images
+
+例如，我曾经看到了令人悲伤和苦恼的
+
+frequently of sadness and suffering.
+
+一些照片和图像
+
+I heard about things that were going wrong in the lives of the poor.
+
+我听到穷人生活的不尽如人意
+
+I heard about disease, I heard about war --
+
+关于疾病，关于战争
+
+they always seemed to be kind of related.
+
+似乎这些都是和贫穷相关联的
+
+And in general,
+
+总的来说
+
+I got this sort of idea
+
+我有个这样的想法
+
+that the poor in the world lived lives
+
+穷人生活的世界
+
+that were wrought with suffering and sadness,
+
+充满悲伤，充满苦闷
+
+devastation, hopelessness.
+
+充满破坏，充满绝望
+
+And after a while, I developed what I think many of us do,
+
+在那之后，我想到我们大家的感觉
+
+is this predictable response,
+
+就是这个可预知的回应
+
+where I started to feel bad every time I heard about them.
+
+当我每次听到穷人时，我开始感觉不舒服
+
+I started to feel guilty for my own relative wealth,
+
+由于我的相对富裕让我开始感觉到罪恶
+
+because I wasn't doing more, apparently, to make things better.
+
+很明显的是因为我没有尽我所能把事情做得更好
+
+And I even felt a sense of shame because of that.
+
+因此，我感到羞愧
+
+And so naturally,
+
+自然地
+
+I started to distance myself.
+
+我开始疏远我自己
+
+I stopped listening to their stories
+
+我不再像以前一样细心地倾听
+
+quite as closely as I had before.
+
+他们的故事
+
+And I stopped expecting things to really change.
+
+我不再期望事情能真正有所改变
+
+Now I still gave -- on the outside it looked like I was still quite involved.
+
+我还是会给予。表面看来，我似乎还在继续参与
+
+I gave of my time and my money,
+
+给予我的时间和金钱
+
+I gave when solutions were on sale.
+
+我给予的都是廉价的方案
+
+The cost of a cup of coffee can save a child's life, right.
+
+一杯咖啡就是救一个孩子的命，是这样的
+
+I mean who can argue with that?
+
+我的意思是谁能说那是错的呢？
+
+I gave when I was cornered, when it was difficult to avoid
+
+当我无路可退时，当我难以推辞时，我才给予
+
+and I gave, in general, when the negative emotions built up enough
+
+总体来说，负面情绪驱使我给予
+
+that I gave to relieve my own suffering,
+
+我的给予是为了减轻我自己的烦恼
+
+not someone else's.
+
+而不是其他人的
+
+The truth be told, I was giving out of that place,
+
+确实，我离开了那里地方
+
+not out of a genuine place of hope
+
+但我并没有远离希望之地
+
+and excitement to help and of generosity.
+
+没有远离帮助他人和慷慨解囊的兴奋
+
+It became a transaction for me,
+
+它变成了我的一个转折点
+
+became sort of a trade.
+
+变成了一种交易
+
+I was purchasing something --
+
+我是在购买什么东西
+
+I was buying my right to go on with my day
+
+我是在购买我继续生存
+
+and not necessarily be bothered by this bad news.
+
+且不被这些糟糕新闻烦恼的权利
+
+And I think the way that we go through that sometimes
+
+我认为我们采用的这种方法，有时候
+
+can, first of all,
+
+首先能够
+
+disembody a group of people, individuals out there in the world.
+
+让一部分人或者一些个体灵魂出窍
+
+And it can also turn into a commodity,
+
+这种想法也能够变成一种商品
+
+which is a very scary thing.
+
+一种令人恐怖的东西
+
+So as I did this, and as I think many of us do this,
+
+就是正如我所说所想
+
+we kind of buy our distance,
+
+我们好像在购买我们之间的距离
+
+we kind of buy our right to go on with our day.
+
+我们好像在购买我们继续生活的权利
+
+I think that exchange can actually get in the way of the very thing that we want most.
+
+我想这种交易事实上阻碍了我们得到我们最想得到的东西
+
+It can get in the way of our desire
+
+阻碍了我们的愿望
+
+to really be meaningful and useful in another person's life
+
+就是给予对他人真正有意义和有用的东西
+
+and, in short to love.
+
+即，去爱
+
+Thankfully, a few years ago, things shifted for me
+
+欣慰地是，几年之后，我被改变了
+
+because I heard this gentleman speak, Dr. Muhammad Yunus.
+
+因为我听了穆罕默德·尤努斯博士的演讲
+
+I know many in the room probably know exactly who he is,
+
+在座大部分人也许知道他是谁
+
+but to give the shorthand version
+
+但我还是想给没有听说过他的人
+
+for any who have not heard him speak,
+
+做个简短的叙述
+
+Dr. Yunus won the Nobel Peace Prize a few years ago
+
+尤努斯博士在几年前获得了诺贝尔和平奖
+
+for his work pioneering modern microfinance.
+
+因为他在现代微金融领域所做的先驱工作
+
+When I heard him speak, it was three years before that.
+
+在他获得诺贝尔和平奖三年之前，我就听了他的演讲
+
+But basically, microfinance -- if this is new to you as well --
+
+如果你对微金融是陌生的，基本上，它可以
+
+think of that as financial services for the poor.
+
+理解为给穷人提供的金融服务
+
+Think of all the things you get at your bank
+
+就是，所有你在银行里
+
+and imagine those products and services
+
+可以获得的以及可以想到的
+
+tailored to the needs of someone living on a few dollars a day.
+
+针对每天只有几美元生活费的人所提供的产品和服务
+
+Dr. Yunus shared his story,
+
+尤努斯博士分享了他的故事
+
+explaining what that was,
+
+阐述了事情的原貌
+
+and what he had done with his Grameen Bank.
+
+以及他和他的格莱珉银行所做到的
+
+He also talked about, in particular, microlending,
+
+他也讲到了，特别是，微信贷
+
+which is a tiny loan
+
+即，能够帮助人们创业和企业发展的
+
+that could help someone start or grow a business.
+
+微型贷款
+
+Now, when I heard him speak, it was exciting for a number of reasons.
+
+他的演讲有如下几点原因让我感到兴奋
+
+First and foremost, I learned about this new method of change in the world
+
+第一，我学到了一种新的方法来改变世界
+
+that, for once, showed me, maybe,
+
+其曾经向我展示了
+
+a way to interact with someone
+
+一种和他人互动的方式
+
+and to give, to share of a resource in a way that wasn't weird
+
+并且给出一种让人不感到怪异的分享资源的方式
+
+and didn't make me feel bad --
+
+同时，这种方式不让我感到难堪
+
+that was exciting.
+
+很不错
+
+But more importantly, he told stories about the poor
+
+但更重要的是，他讲述关于穷人的故事
+
+that were different than any stories I had heard before.
+
+和我以前听到的故事有很多不同
+
+In fact, those individuals he talked about who were poor was sort of a side note.
+
+事实上，以前听到的穷人在各方面都是弱势的
+
+He was talking about strong, smart,
+
+但他所讲的穷人是
+
+hardworking entrepreneurs who woke up every day
+
+坚强，聪明，刻苦的企业家们
+
+and were doing things to make their lives and their family's lives better.
+
+这些企业家起早贪黑，努力地工作为了让他们和他们家人有更好的生活
+
+All they needed to do that more quickly and to do it better
+
+他们只需少量的资金就能更快地，更好地拥有
+
+was a little bit of capital.
+
+他们理想的生活
+
+It was an amazing sort of insight for me.
+
+这对我来说是一个令人惊叹的见解
+
+And I, in fact, was so deeply moved by this --
+
+事实上，我被这个见解真真的打动了
+
+it's hard to express now how much that affected me --
+
+很难表达这个观点对我有多大的影响
+
+but I was so moved that I actually quit my job a few weeks later,
+
+不论如何，我确实被打动了。我也的确在几周后放弃了我的工作
+
+and I moved to East Africa
+
+继而搬迁到了东非
+
+to try to see for myself what this was about.
+
+就是想亲自看看情况
+
+For the first time, actually, in a long time
+
+这么长时间里，这是确实是第一次，
+
+I wanted to meet those individuals, I wanted to meet these entrepreneurs,
+
+我想见到这些人，我想去见这些企业家
+
+and see for myself what their lives were actually about.
+
+并亲自看看他们真实的生活
+
+So I spent three months in Kenya, Uganda and Tanzania
+
+因此，我在肯尼亚，乌干达，坦桑尼亚呆了3个月
+
+interviewing entrepreneurs that had received 100 dollars
+
+和那些企业家们进行了交流
+
+to start or grow a business.
+
+就是用100美元贷款创业或者拓展业务的企业家们
+
+And in fact, through those interactions,
+
+事实上，通过这些交流
+
+for the first time, I was starting to get to be friends
+
+我第一次开始和这些各色各样的
+
+with some of those people in that big amorphous group out there
+
+原先本来远离我的
+
+that was supposed to be far away.
+
+人们成了朋友
+
+I was starting to be friends and get to know their personal stories.
+
+我开始不断地交朋友
+
+And over and over again,
+
+并了解到他们的个人生活
+
+as I interviewed them and spent my days with them,
+
+我和他们交谈并且他们在一起待几天
+
+I did hear stories of life change
+
+我的确听到了他们生活改变的故事
+
+and amazing little details of change.
+
+以及那些令人惊叹的生活细节改变
+
+So I would hear from goat herders
+
+因此，我希望能够听到
+
+who had used that money that they had received to buy a few more goats.
+
+那些牧羊人能够用他们得到的贷款去买更多的山羊
+
+Their business trajectory would change.
+
+他们的商业轨迹改变了
+
+They would make a little bit more money;
+
+他们能够赚更多的钱
+
+their standard of living
+
+他们的生活质量
+
+would shift and would get better.
+
+改变了，并变的更好了
+
+And they would make really interesting little adjustments in their lives,
+
+他们能够对他们的生活做些细小的但卓有意义的调整
+
+like they would start to send their children to school.
+
+比如，他们可以开始把他们的孩子送去学校
+
+They might be able to buy mosquito nets.
+
+他们可以买蚊帐
+
+Maybe they could afford a lock for the door and feel secure.
+
+也许他们可以买得起一个门锁让他们感到更安全
+
+Maybe it was just that they could put sugar in their tea
+
+也许，仅仅是他们可以在他们的茶里放糖
+
+and offer that to me when I came as their guest
+
+当我做客时来款待我
+
+and that made them feel proud.
+
+这让他们感到自豪
+
+But there were these beautiful details, even if I talked to 20 goat herders in a row,
+
+即使我和20个不同的牧羊人聊天，也会有很多美丽的细节。
+
+and some days that's what happened --
+
+相信总有一天
+
+these beautiful details of life change
+
+这些美丽的令生活改变的细节
+
+that were meaningful to them.
+
+对他们来说是意义非凡的
+
+That was another thing that really touched me.
+
+这是另一个令我触动的事情
+
+It was really humbling to see for the first time,
+
+这是我第一次谦虚的感受到
+
+to really understand
+
+以至于确实懂得
+
+that even if I could have taken a magic wand and fixed everything,
+
+即使我会用魔法棒并能够修好所有东西
+
+I probably would have gotten a lot wrong.
+
+但是我也很有可能把事情搞砸
+
+Because the best way for people to change their lives
+
+因为让人们改变生活的最好的方式
+
+is for them to have control and to do that in a way that they believe is best for them.
+
+就是让他们自己去控制并按照他们自己认为最佳的方式进行
+
+So I saw that and it was very humbling.
+
+我看到了这一点，我感到那是很震撼人心的
+
+Anyway, another interesting thing happened while I was there.
+
+此外，还有一件事情很有意思
+
+I never once was asked for a donation,
+
+我从未被要求捐助
+
+which had kind of been my mode, right.
+
+这似乎是我的作风，是吧？
+
+There's poverty, you give money to help --
+
+这里有贫困，你该给予金钱的帮助
+
+no one asked me for a donation.
+
+没有人请求我来捐款
+
+In fact, no one wanted me to feel bad for them at all.
+
+事实上，没有人想让我怜悯他们
+
+If anything, they just wanted to be able to do more of what they were doing already
+
+他们只是想把自己的事业做得更好
+
+and to build on their own capabilities.
+
+同时加强他们自己的能力
+
+So what I did hear, once in a while,
+
+因此，我一直听到的是
+
+was that people wanted a loan --
+
+人们需要贷款
+
+I thought that sounded very reasonable and really exciting.
+
+我认为这听起来很合理并真的很令人激动
+
+And by the way, I was a philosophy and poetry major in school,
+
+顺便说一下，我在大学里学的是哲学和诗歌
+
+so I didn't know the difference between profit and revenue when I went to East Africa.
+
+因此我在东非时并不懂利润和销售的区别
+
+I just got this impression that the money would work.
+
+我留下的印象是，钱就可以帮助他们
+
+And my introduction to business
+
+我的业务开端
+
+was in these $100 little infuses of capital.
+
+就是这些100美元的资金注入
+
+And I learned about profit and revenue, about leverage, all sorts of things,
+
+我学到了利润，销售，杠杆和相关的知识
+
+from farmers, from seamstresses, from goat herders.
+
+从农民，缝纫女工，牧羊人那里
+
+So this idea
+
+将这个想法
+
+that these new stories of business and hope
+
+这些商业和希望的新奇故事
+
+might be shared with my friends and family,
+
+和我的朋友和家人分享
+
+and through that, maybe we could get some of the money that they needed
+
+以此，我们就能够得到他们需要的钱
+
+to be able to continue their businesses as loans,
+
+这些钱作为贷款让他们继续他们的事业
+
+that's this little idea that turned into Kiva.
+
+就是这样的一个点子变成了Kiva
+
+A few months later, I went back to Uganda
+
+几个月之后，我回到了乌干达
+
+with a digital camera and a basic website
+
+带着数码相机和一个很简单的网站
+
+that my partner, Matthew, and I had kind of built,
+
+我和我的合作伙伴，Matthew一起做的
+
+and took pictures of seven of my new friends,
+
+然后给我的七个新朋友照了些照片
+
+posted their stories, these stories of entrepreneurship, up on the website,
+
+并在网上贴出了他们的创业故事
+
+spammed friends and family and said, "We think this is legal.
+
+随后疯狂地给朋友和家人发，并声称“我们没犯法”
+
+Haven't heard back yet from SEC on all the details,
+
+虽然还没有从证监会那里得到反馈
+
+but do you say, do you want to help participate in this,
+
+但是你觉得怎么样，想参与下么？
+
+provide the money that they need?"
+
+给需要钱的人提供资金?
+
+The money came in basically overnight.
+
+这些钱当天晚上就发过来了
+
+We sent it over to Uganda.
+
+我们就发给乌干达
+
+And over the next six months, a beautiful thing happened;
+
+六个月之后，美妙是事情发生了
+
+the entrepreneurs received the money,
+
+这些企业家支付了他们的借款
+
+they were paid, and their businesses, in fact, grew,
+
+同时他们的事业也蒸蒸日上
+
+and they were able to support themselves
+
+他们能够丰衣足食了
+
+and change the trajectory of their lives.
+
+他们的生活轨迹改变了
+
+In October of '05,
+
+2005年十月份
+
+after those first seven loans were paid,
+
+在这七笔贷款都返还后
+
+Matt and I took the word beta off of the site.
+
+Matt和我取消了网页上的beta标志(测试期)
+
+We said, "Our little experiment has been a success.
+
+我们认为：这个小测验取得了成功
+
+Let's start for real." That was our official launch.
+
+我们开始正式运营这个网站
+
+And then that first year, October '05 through '06,
+
+在这之后的第一年，即2005年十月至2006年十月
+
+Kiva facilitated $500,000 in loans.
+
+Kiva协助了50万美元的贷款
+
+The second year, it was a total of 15 million.
+
+第二年，总额变成了1500万美元
+
+The third year, the total was up to around 40.
+
+第三年，到了4000万
+
+The fourth year, we were just short of 100.
+
+第四年，差不多1个亿了
+
+And today, less than five years in,
+
+至今，不到五年时间里
+
+Kiva's facilitated
+
+Kiva协助了
+
+more than 150 million dollars, in little 25-dollar bits,
+
+超过1.5亿美元的贷款，这可都是一个个25美元积累出来的哦
+
+from lenders and entrepreneurs --
+
+这些钱来自放贷人和企业家们
+
+more than a million of those, collectively in 200 countries.
+
+他们来自世界200个国家
+
+So that's where Kiva is today, just to bring you right up to the present.
+
+这就是你今天看到的Kiva
+
+And while those numbers and those statistics
+
+这些数字和统计结果
+
+are really fun to talk about and they're interesting,
+
+对我来说很有趣也很有意思
+
+to me, Kiva's really about stories.
+
+对我来说，Kiva充满了故事
+
+It's about retelling
+
+它重述着
+
+the story of the poor,
+
+穷人的故事
+
+and it's about giving ourselves
+
+以及给他们
+
+an opportunity to engage
+
+一个机会来积极参与并承担责任
+
+that validates their dignity,
+
+这证明了他们的尊严
+
+validates a partnership relationship,
+
+证明了一种合作的关系
+
+not a relationship that's based
+
+而不是以前那种基于
+
+on the traditional sort of donor beneficiary
+
+捐款人和受款人
+
+weirdness that can happen.
+
+那种古怪的关系
+
+But instead a relationship that can promote respect
+
+现在的这种合作关系促进了尊敬
+
+and hope
+
+和希望
+
+and this optimism
+
+还有就是这种乐观向上的精神
+
+that together we can move forward.
+
+让我们携手共进
+
+So what I hope is that,
+
+我希望
+
+not only can the money keep flowing forth through Kiva --
+
+这些钱不仅能够通过Kiva流动
+
+that's a very positive and meaningful thing --
+
+那是非常积极的和有意义的事情
+
+but I hope Kiva can blur those lines, like I said,
+
+而且我希望Kiva能够模糊
+
+between the traditional rich and poor categories
+
+传统的富裕和贫穷之间的界限
+
+that we're taught to see in the world,
+
+也就是我们小时候所认为的世界
+
+this false dichotomy of us and them, have and have not.
+
+这个错误的二分法将世界分隔成我们和他们， 有产和无产
+
+I hope that Kiva can blur those lines.
+
+我希望Kiva能够模糊这种界限
+
+Because as that happens,
+
+因为，当其发生时
+
+I think we can feel free to interact
+
+我想我们能够自由地交流
+
+in a way that's more open, more just and more creative,
+
+以更开放，更公正，更有创造力的方式
+
+to engage with each other and to help each other.
+
+来相互激励，相互帮助
+
+Imagine how you feel
+
+想象一下你的感觉
+
+when you see somebody on street who is begging
+
+当你看到一个人在街上乞讨时
+
+and you're about to approach them.
+
+而你又向他走去
+
+Imagine how you feel;
+
+想象一下你自己的感觉
+
+and then imagine the difference when you might see somebody
+
+这个人的不同的情形
+
+who has a story of entrepreneurship and hard work
+
+这个人的创业故事和他所做的努力
+
+who wants to tell you about their business.
+
+这个人期望谈论他们的事业
+
+Maybe they're smiling, and they want to talk to you about what they've done.
+
+他们微笑着谈论他们的成就
+
+Imagine if you're speaking with somebody
+
+试想，如果你正在
+
+who's growing things and making them flourish,
+
+事业蓬勃向上的人交谈
+
+somebody who's using their talents
+
+某人用他的智慧
+
+to do something productive,
+
+卓有成效地工作
+
+somebody who's built their own business from scratch,
+
+某人从零开始创业
+
+someone who is surrounded by abundance,
+
+他能够丰衣足食
+
+not scarcity,
+
+并远离贫穷
+
+who's in fact creating abundance,
+
+他确实在创造富足
+
+somebody with full hands with something to offer,
+
+他手上有东西可以奉献
+
+not empty hands
+
+而不是两手空空地
+
+asking for you to give them something.
+
+向你索要东西
+
+Imagine if you could hear a story you didn't expect
+
+试想，如果你能够听到你期望听到的故事
+
+of somebody who wakes up every day
+
+某人每天起床
+
+and works very, very hard to make their life better.
+
+工作努力，生活蒸蒸日上
+
+These stories can really change the way that we think about each other.
+
+这些故事确实能够改变我们思考对方的方式
+
+And if we can catalyze
+
+如果我们能催化出
+
+a supportive community to come around these individuals
+
+一个支持性的社区来帮助这些人
+
+and to participate in their story
+
+来参与他们的故事
+
+by lending a little bit of money,
+
+给他们提供一点钱
+
+I think that can change the way we believe in each other
+
+我想那就能改变我们互信的方式
+
+and each other's potential.
+
+以及相互的潜力
+
+Now for me, Kiva is just the beginning.
+
+现在对我来说，Kiva只是刚刚开始
+
+And as I look forward to what is next,
+
+当我寻找下一个目标时
+
+it's been helpful to reflect on the things I've learned so far.
+
+我至今学到的这些是非常有帮助的
+
+The first one is, as I mentioned, entrepreneurship was a new idea to me.
+
+第一就是，我所提到的，创业是新观点
+
+Kiva borrowers, as I interviewed them and got to know them over the last few years,
+
+Kiva的借款人，在我和他们交谈时，在我了解他们几年后
+
+have taught me what entrepreneurship is.
+
+他们教会我什么是创业
+
+And I think, at its core, it's deciding that you want your life to be better.
+
+我认为，它的核心是一种让生活更美好的决心
+
+You see an opportunity
+
+你看到了机会
+
+and you decide what you're going to do to try to seize that.
+
+你决定去做些什么来把握机会
+
+In short, it's deciding that tomorrow can better than today
+
+即，明天会更好
+
+and going after that.
+
+并持续这种信念
+
+Second thing that I've learned is that loans are a very interesting tool for connectivity.
+
+第二件事就是，这些贷款是很有意思的交流工具
+
+So they're not a donation.
+
+他们不是为了捐款
+
+Yeah, maybe it doesn't sound that much different.
+
+是的，好像听起来差不多
+
+But in fact, when you give something to someone
+
+但事实上，当你给予时
+
+and they say, "Thanks," and let you know how things go,
+
+他们说谢谢并告诉你事情的发展
+
+that's one thing.
+
+那仅是一方面
+
+When you lend them money, and they slowly pay you back over time,
+
+当你借钱时，他们慢慢地还钱
+
+you have this excuse to have an ongoing dialogue.
+
+你有了借口来持续对话
+
+This continued attention -- this ongoing attention --
+
+这种持续性的关注，不断发展的关注
+
+is a really big deal
+
+才是至关重要的
+
+to build different kinds of relationships among us.
+
+这建立起我们之间的各种不同的关系
+
+And then third, from what I've heard from the entrepreneurs I've gotten to know,
+
+第三，我从这些企业家那里学到了我该知道的东西
+
+when all else is equal,
+
+在同等情况下
+
+given the option to have just money to do what you need to do,
+
+一个选择是仅仅给他们钱，让他们做他们需要做的事情
+
+or money plus the support and encouragement
+
+另一个选择是钱以及来自全球的
+
+of a global community,
+
+支持和鼓励
+
+people choose the community plus the money.
+
+人们选择的是第二个
+
+That's a much more meaningful combination, a more powerful combination.
+
+这是一个更加有意义的组合，更有力量的组合
+
+So with that in mind, this particular incident
+
+有了那样的想法，这特别的需求
+
+has led to the things that I'm working on now.
+
+引导出了我现在所做的
+
+I see entrepreneurs everywhere now, now that I'm tuned into this.
+
+我看到了各个地方的企业家们，是我乐于看到的
+
+And one thing that I've seen
+
+我还看到了一件事
+
+is there are a lot of supportive communities that already exist in the world.
+
+世界上已经有很多支持性社区存在了
+
+With social networks,
+
+通过社交网络
+
+it's an amazing way, growing the number of people that we all have around us
+
+一种令人惊奇的方式，让和我们有共同目标的人的数量
+
+in our own supportive communities, rapidly.
+
+在我们的支持性社区里迅速增长
+
+And so, as I have been thinking about this,
+
+也因此，我曾想过这些
+
+I've been wondering: how can we engage these supportive communities
+
+我一直在想，如何我们能够激励这些支持性社区
+
+to catalyze even more entrepreneurial ideas
+
+去催化更多的创业点子
+
+and to catalyze all of us
+
+去催化更多像我们一样的人
+
+to make tomorrow better than today?
+
+让明天更美好呢
+
+As I've researched what's going on in the United States,
+
+我研究了一些在美国发生的事情
+
+a few interesting little insights have come up.
+
+几个很有意思的事情
+
+So one is that, of course, as we all might expect,
+
+其中一个是，当然，众望所归
+
+many small businesses in the U.S. and all over the world
+
+很多美国的和世界范围内的小企业
+
+still need money to grow and to do more of what they want to do
+
+仍旧需要资金来成长和扩张
+
+or they might need money during a hard month.
+
+或者他们需要资金度过某个艰难时期
+
+But there's always a need for resources close by.
+
+对资源的需求总是存在的
+
+Another thing is, it turns out,
+
+但是
+
+those resources don't usually come from the places you might expect --
+
+这些资源通常不是来源于你所期望的地方
+
+banks, venture capitalists,
+
+比如银行，风投
+
+other organizations and support structures --
+
+或者一些组织和支持性结构
+
+they come from friends and family.
+
+这些资源来自于朋友和家庭
+
+Some statistics say 85 percent or more of funding for small businesses
+
+一些数据显示85%或更多的小企业的资金
+
+comes from friends and family.
+
+来源于朋友和家庭
+
+That's around 130 billion dollars a year --
+
+每年大概有1300亿美元
+
+it's a lot.
+
+很多啊
+
+And third, so as people are doing this friends and family fundraising process,
+
+第三，对于这些从朋友和家庭来筹集资金的人们
+
+it's very awkward, people don't know exactly what to ask for,
+
+是很尴尬的，他们不知道怎么开口
+
+how to ask, what to promise in return,
+
+也不知道怎么来担保回报
+
+even though they have the best of intentions
+
+即使他们有最佳的计划
+
+and want to thank those people that are supporting them.
+
+并想感谢这些帮助他们的人们
+
+So to harness the power of these supportive communities in a new way
+
+因此，以一种全新的方式来使用支持性社区的力量
+
+and to allow entrepreneurs to decide for themselves
+
+并让企业家自己去决定
+
+exactly what that financial exchange should look like,
+
+是什么样的金融交易的方式
+
+exactly what fits them and the people around them,
+
+以及他们所适合的和他们周围的人
+
+this week actually,
+
+事实上，这周
+
+we're quietly doing a launch of Profounder,
+
+我们低调地启动了Profounder
+
+which is a crowd funding platform for small businesses to raise what they need
+
+一个“众筹”平台让他们朋友和家人投资
+
+through investments from their friends and family.
+
+这些小企业
+
+And it's investments, not donations, not loans,
+
+这些投资不是捐款，也不是贷款
+
+but investments that have a dynamic return.
+
+而是具有动态回报的投资
+
+So the mapping of participating in the story,
+
+这个“故事”的映射
+
+it actually flows with the up and down.
+
+事实上，时上时下
+
+So in short, it's a do-it-yourself tool
+
+基本上，这是一个自己动手的工具
+
+for small businesses to raise these funds.
+
+用于小企业融资
+
+And what you can do is go onto the site, create a profile,
+
+你所要做的就是浏览这个网站，然后建立主页
+
+create investment terms in a really easy way.
+
+以简单明了的方式建立投资条款
+
+We make it really, really simple for me
+
+我们要让它简明扼要
+
+as well as anyone else who wants to use the site.
+
+也让其他用这个网站的人觉得简明扼要
+
+And we allow entrepreneurs to share a percentage of their revenues.
+
+我们允许创业者分享一定百分比的销售额
+
+They can raise up to a million dollars
+
+他们可以融资上百万美元
+
+from an unlimited number of unaccredited, unsophisticated investors --
+
+从无限的，未认证的，投资理念简单的投资者那里
+
+everyday people, heaven forbid --
+
+--都是些普通的投资者嘛，上帝会允许滴--
+
+and they can share those returns over time --
+
+他们能够分享回报
+
+again, whatever terms they set.
+
+不论什么他们设置的什么条款
+
+As investors choose to become involved
+
+当投资者参与其中时
+
+based on those terms,
+
+基于这些条款
+
+they can either take their rewards back as cash,
+
+他们能够得到现金回报
+
+or they can decide in advance
+
+或者他们可以提前决定
+
+to give those returns away to a non-profit.
+
+将这些回报送给非盈利组织
+
+So they can be a cash, or a cause, investor.
+
+因此，他们可以做现金投资者或者非现金回报投资者
+
+It's my hope that this kind of tool can show anybody who has an idea
+
+我的希望是这类的工具能给任何有帮助别人想法人们
+
+a path to go do what they want to do in the world
+
+一条途径去做他们想做的
+
+and to gather the people around them that they already have,
+
+凝聚他们周围的人
+
+the people that know them best
+
+这些最了解的他们人
+
+and that love them and want to support them,
+
+爱他们的以及想帮助他们的人
+
+to gather them to make this happen.
+
+大家一起将梦想变成现实
+
+So that's what I'm working on now.
+
+那就是我现在做的
+
+And to close, I just want to say, look these are tools.
+
+更进一步，我就想说，看看这些工具
+
+Right now, Profounder's right at the very beginning,
+
+现在，Profounder才刚刚开始
+
+and it's very palpable; it's very clear to me, that it's just a vessel, it's just a tool.
+
+它是可以触及的，是清楚的。它就是一根血管，一个工具
+
+What we need are for people to care, to actually go use it,
+
+我们需要人们的关注并去使用它
+
+just like they've cared enough to use Kiva
+
+就想他们关注并使用Kiva一样
+
+to make those connections.
+
+来连接彼此
+
+But the good news is I don't think I need to stand here and convince you to care --
+
+好消息是我不认为我站在这里是想说服你们，去关注
+
+I'm not even going to try.
+
+我根本不想尝试
+
+I don't think, even though we often hear,
+
+我不认为，即使我们经常听到
+
+you know, hear the ethical and moral reasons,
+
+那些道德和品质的原因
+
+the religious reasons,
+
+还有宗教的原因
+
+"Here's why caring and giving will make you happier."
+
+比如，这就是为什么关心和给予让你感到幸福之类的
+
+I don't think we need to be convinced of that. I think we know;
+
+我不需要去解释，你们懂的。
+
+in fact, I think we know so much,
+
+事实上，我想我们非常了解
+
+and it's such a reality
+
+现实
+
+that we care so deeply,
+
+我们很关心的现实
+
+that in fact, what usually stops us
+
+实际上，通常让我们停下来的
+
+is that we're afraid to try and to mess up,
+
+是我们害怕尝试害怕失败
+
+because we care so very much about helping each other
+
+因为我们太关心彼此
+
+and being meaningful in each other's lives.
+
+想在彼此的生活中做些有意义的事情
+
+So what I think I can do today,
+
+我想我今天能做的
+
+that best thing I can give you --
+
+就是给你讲述
+
+I've given you my story, which is the best I can do.
+
+我的故事，我已尽我所能了
+
+And I think I can remind us that we do care.
+
+我想提醒大家我们真的很在乎
+
+I think we all already know that.
+
+我们都很清楚
+
+And I think we know that love is resilient enough
+
+我想我们明白爱是足够坚韧的
+
+for us to get out there and try.
+
+让我们尽可能的去尝试
+
+Just a sec.
+
+稍等（感动啊~~）
+
+(Applause)
+
+（掌声）
+
+Thanks.
+
+谢谢
+
+(Applause)
+
+（掌声）
+
+Thanks.
+
+谢谢
+
+(Applause)
+
+（掌声）
+
+For me, the best way to be inspired to try
+
+对我来说，最好的激励自己去尝试的方法就是
+
+is to stop and to listen
+
+停下来并倾听
+
+to someone else's story.
+
+别人的故事
+
+And I'm grateful that I've gotten to do that here at TED.
+
+在此，我很感谢TED让我站在这里
+
+And I'm grateful that whenever I do that,
+
+我同时感激无论何时
+
+guaranteed, I am inspired --
+
+我保证，我都是倍受激励的
+
+I am inspired by the person I am listening to.
+
+我被那些有故事的人激励着
+
+And I believe more and more every time I listen
+
+每次我倾听他们的故事，我都会越来越相信
+
+in that that person's potential to do great things in the world
+
+对这个世界所做的伟大的贡献的人
+
+and in my own potential to maybe help.
+
+和我自己所提供的帮助
+
+And that --
+
+因此
+
+forget the tools, forget the moving around of resources --
+
+忘了那些工具吧，忘了移动那些资源
+
+that stuff's easy.
+
+它们都不算什么
+
+Believing in each other,
+
+相信彼此
+
+really being sure when push comes to shove
+
+才是真正的价值
+
+that each one of us can do amazing things in the world,
+
+我们每一个人都能为这个世界出一把力
+
+that is what can make our stories into love stories
+
+那才是将故事变成爱的原因
+
+and our collective story
+
+以及把最后的故事
+
+into one that continually perpetuates hope
+
+变成一个持续永恒的希望
+
+and good things for all of us.
+
+和对我们都有益的事业
+
+So that, this belief in each other,
+
+因此，相信彼此
+
+knowing that without a doubt
+
+执此信念，坚定不移
+
+and practicing that every day in whatever you do,
+
+不论你做什么，都积极地实践这种信念
+
+that's what I believe will change the world and make tomorrow better than today.
+
+我相信这种信念终将改变世界并让明天更美好
+
+Thank you.
+
+谢谢大家
+
+(Applause)
+
+（掌声）
+
+**2013/5/1 9:56:03**

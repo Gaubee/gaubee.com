@@ -1,0 +1,10 @@
+---
+layout: layouts/article.njk
+title: "C++ Primer 学习笔记（一）"
+date: 2013-08-06T12:33:14Z
+updated: 2013-08-21T08:44:22Z
+tags:
+  - C++
+---
+
+_笔记在comment中_
