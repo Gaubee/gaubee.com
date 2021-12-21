@@ -27,12 +27,12 @@ updated: 2016-07-29T09:23:04Z
 
 看这样一张图来说明 vertices, indices 这两个变量的默认值：
 
-![Figure 1: vertices and indices](/_img/pixi-dash-line/vertices-and-indices.png)
+![Figure 1: vertices and indices](/img/pixi-dash-line/vertices-and-indices.png)
 
 如图，首先把 vertices 的数据中的顶点 4 个坐标点出，每两个数据为一组数据点 x,y，这里一共四个点。
 然后这四个点如何连成三角形？上面提到点的顺序必须是 0,1,2 然后 1,2,3。如果还有更多，那就是 2,3,4，如此下去，就形成三角网状结构。而 indices 参数就是用来指出这四个点的顺序。默认是[0，1，3，2]，那么就得到一下顺序：
 
-![Figure:connect vertices](/_img/pixi-dash-line/connect-vertices.png)
+![Figure:connect vertices](/img/pixi-dash-line/connect-vertices.png)
 
 而 uvs，则是指出这个点在贴图中的百分比，和 vertices 一样，没两个数据为一组数据点 x,y。
 
@@ -41,20 +41,20 @@ updated: 2016-07-29T09:23:04Z
 接下来会涉及到大量算法代码，我不贴出代码了，就说一下重点难点的思路：
 其中最重要的是线段加粗算法，比如下图的三个点所组成的线段：
 
-![Figure:point to segment](/_img/pixi-dash-line/point-to-segment.png)
+![Figure:point to segment](/img/pixi-dash-line/point-to-segment.png)
 
 我们 可以很直接的得出这样的贴图顶点。
 这里推荐一种思路：点画圆：
 
-![Figure:circle to line](/_img/pixi-dash-line/circle-to-line.png)
+![Figure:circle to line](/img/pixi-dash-line/circle-to-line.png)
 
 如图，除了首位两个点是取与相邻点的法线与圆的交点外，其余的点，取法如图所示，直接取两圆交点所在弧 间点，化成数学就是这样的算法：左右两点的法线所在线上取两点，这两点与中间点的距离相等
 
-![Figure:circle to line](/_img/pixi-dash-line/circle-to-line-math.png)
+![Figure:circle to line](/img/pixi-dash-line/circle-to-line-math.png)
 
 > 不过我有一个不是很理解的问题，就是贴图交织的问题，不知道如何解决：如果遇到这种情况呢？
 >
-> ![Figure:texture mess up](/_img/pixi-dash-line/texture-mess-up.png)
+> ![Figure:texture mess up](/img/pixi-dash-line/texture-mess-up.png)
 >
 > 图片估计看得很奇怪，奇怪就够了，因为贴图已经不是按照我想要的交织在一起，因为蛇、龙的身体在扭曲后，并不是后面的贴图把前面的覆盖了，而是把扭曲的部分合并在一起了。这里的问题就是这条线加粗后，如何正确的取到它两边的点。
 
@@ -63,11 +63,11 @@ updated: 2016-07-29T09:23:04Z
 说完 vertices 这个变量的取值方法，还有一个难点就是 uvs 的问题，uvs 取值 0~1，如何是我们需求提到的虚线、蛇、龙等，那么 y 方向的都是 0，1 即可。x 方向就变成要根据点与点的距离来手动计算了。
 要注意的是如果在从 0 递增到 1 后，接下来，要进行一次反转，然后才能从 0 再重新开始，如下面图：
 
-![Figure:vertices order](/_img/pixi-dash-line/vertices-order.png)
+![Figure:vertices order](/img/pixi-dash-line/vertices-order.png)
 
 如果不进行反转，那么就会发生 1,0 | 1,1 | 0,0 三个点画了一个三角形，这个三角形明显就是贴图镜像效果，如何避免，我们可以在 1,0 | 1,1 这两个点的坐标上面直接加上 0,0 | 1,0。效果就等于在看不到的地方直接进行了反转，避免镜像贴图的出现，如图：（PS：这里的重复点可以用 indices 来实现）
 
-![Figure:vertices fixed order](/_img/pixi-dash-line/vertices-fixed-order.png)
+![Figure:vertices fixed order](/img/pixi-dash-line/vertices-fixed-order.png)
 
 还有一个问题就是补点的问题，两点之间的距离不一定，我们要保持贴图的比例，就要确保两 uvs 的值要和两点之间的距离来确定。当 uvs 累计到>=1 的时候，就要在 uvs 为 1 的地方补点。如何实现我就不赘述了，实现不难。
 我这里讲一个另外一种脏方法，可以免去补点的问题。就是用 svg 的 path 对象，我们将线绘制到 path 对象上后调用接口就是 getPointAtLength(number)。贴图宽高知道的情况下，可以获取指定长度来取到对应的点的坐标。这样就免去补点的麻烦了。

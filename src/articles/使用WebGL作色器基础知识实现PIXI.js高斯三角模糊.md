@@ -79,7 +79,7 @@ vColor = vec4(aColor.rgb * aColor.a, aColor.a);
 
 当我把 strength 值调整到 100 后，是这样的效果：
 
-![image](/_img/pixi-webgl-gaussian-blur/strength-100.png)
+![image](/img/pixi-webgl-gaussian-blur/strength-100.png)
 
 我不得不诟病这个模糊效果（不然也不会有这篇文章了）。所以现在理解一下上面的代码：
 `vec2( X , Y)` 意味着一个偏移量，其中 Y=0，而`aTextureCoord`从命名理解就是**纹理坐标**，这里 j 把纹理贴图左右两边的数据拿了过来，在执行片元作色器的时候用上了：
@@ -206,7 +206,7 @@ void main() {
 要注意的是，PIXI.js 的风格就是数据都是从顶点作色器那边传入的，所以 detal 参数就从顶点作色器那边进行赋值并在片元作色器那边使用。片元作色器那边基本就是把 glfx 的代码拷贝过来，然后把参数命名改成 PIXI 中的参数命名即可。要注意的是`precision lowp float;`这一句 glfx 没有，PIXI 中一定要加，好像是声明精度的问题，作为一个小白，暂时不理解，只是在做的过程中发现如果没有这句的话作色器编译的时候会报错。
 最终效果（blur=10）：
 
-![image](/_img/pixi-webgl-gaussian-blur/blur-10.png)
+![image](/img/pixi-webgl-gaussian-blur/blur-10.png)
 
 还有一个要注意的问题就是这个滤镜要跑两次才行，就是 X\Y 是分开来模糊的，如果一起的话，会变成斜方向的模糊。PIXI 中类似的实现参考[BlurFilter](https://github.com/pixijs/pixi.js/blob/master/src/filters/blur/BlurFilter.js)，因为它也是 X、Y 两次模糊滤镜后的效果。以下是我 applyFilter 的代码：
 

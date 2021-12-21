@@ -12,14 +12,14 @@ updated: 2014-02-11T11:16:47Z
 以 php 为例
 稍等，我简单 coding 一下
 
-![image](/_img/fis/img-1.png)
+![image](/img/fis/img-1.png)
 
 这是一个传统 html 页面
 有三个小部件
 A、B、C
 现在，我们希望用组件化的方式来维护他们，代码可能变成了
 
-![image](/_img/fis/img-2.png)
+![image](/img/fis/img-2.png)
 
 假设，这个页面的 url 是 /index
 好了，我们是否能开发一种框架，使得：

@@ -9,7 +9,7 @@ QT 离线安装包对于把 Android 编译和 MSVC 编译混在一起搞，非�
 
 而关于[在线安装](http://download.qt.io/online/qtsdkrepository/windows_x86/root/qt/Updates_orig.xml.mirrorlist)。官方给出的一个完整的包地址，里头的 URL 竟然是绝对路径而且还带 SHA1 校验了。
 
-![](/_img/qt-download-proxy/capture-1.png)
+![](/img/qt-download-proxy/capture-1.png)
 
 所以如果你用第三方镜像，会导致解析下载下来的 XML 文件后最后还是由于绝对路径跑到官方的站点下下载，而如果你自己篡改 XML 文件转发到镜像站点，就会发现各种莫名奇妙的问题，什么插件、依赖找不到之类的。
 

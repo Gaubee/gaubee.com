@@ -25,7 +25,7 @@ tags:
 这是已经通过测试的代码：
 > This is the code that has been tested:
 
-![Effect Preview](/_img/comlink-v2/effect-preview.jpg)
+![Effect Preview](/img/comlink-v2/effect-preview.jpg)
 
 
 ## 实现思路 Implementation approach

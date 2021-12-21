@@ -78,7 +78,7 @@ module.exports = (md) => {
       if (t.type !== "image") continue;
       let imgSrc = t.attrGet("src");
       // We only embed self-hosted images.
-      if (imgSrc.startsWith("/_img/")) {
+      if (imgSrc.startsWith("/img/")) {
         const { width, height } = imageSize("src" + imgSrc);
         // Lazify image and embed its sizes to avoid layout jump.
         t.attrs.push(["width", width], ["height", height], ["loading", "lazy"]);
@@ -88,10 +88,10 @@ module.exports = (md) => {
           // If it does, use it in `srcset` as an alternative variant.
           t.attrs.push(["srcset", `${imgSrc2x} 2x`]);
         }
-      } else if (imgSrc.startsWith("/_svg/")) {
+      } else if (imgSrc.startsWith("/svg/")) {
         // Ignore; we’ll fix this in the embed_svg pass.
       } else {
-        throw new Error(`Image ${imgSrc} is not in the \`/_img/…\` directory.`);
+        throw new Error(`Image ${imgSrc} is not in the \`/img/…\` directory.`);
       }
     }
   });
@@ -105,7 +105,7 @@ module.exports = (md) => {
       const image = t.children.find((t) => t.type === "image");
       if (!image) continue;
       const imgSrc = image.attrGet("src");
-      if (imgSrc.startsWith("/_svg/")) {
+      if (imgSrc.startsWith("/svg/")) {
         const svgContent = readFileSync(`src${imgSrc}`, "utf8");
         image.type = "html_inline";
         image.tag = "";

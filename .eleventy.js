@@ -81,6 +81,11 @@ md.renderer.rules.table_column_open = (tokens, idx, options, env, self) => {
   }
 };
 
+/**
+ *
+ * @param {import('@11ty/eleventy/src/EleventyConfig')} eleventyConfig
+ * @returns
+ */
 module.exports = (eleventyConfig) => {
   eleventyConfig.addPlugin(pluginRss);
 
@@ -178,8 +183,8 @@ module.exports = (eleventyConfig) => {
   // Copy assets that don’t require a build step.
   eleventyConfig.addPassthroughCopy("src/favicon*.ico");
   eleventyConfig.addPassthroughCopy("src/robots.txt");
-  eleventyConfig.addPassthroughCopy("src/_img");
-  eleventyConfig.addPassthroughCopy("src/_css/img");
+  eleventyConfig.addPassthroughCopy("src/img");
+  eleventyConfig.addPassthroughCopy({ "src/_css/img": "css/img" });
 
   // // add ignores
   // eleventyConfig.ignores.add("src/private")

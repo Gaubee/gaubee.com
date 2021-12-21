@@ -111,7 +111,7 @@ body {
   font-size: 1rem;
   position: absolute;
   bottom: 0;
-  background: url(/_img/head.webp) no-repeat center center;
+  background: url(/img/head.webp) no-repeat center center;
   background-size: 80%;
   width: 6.5em;
   height: 6.5em;
@@ -132,7 +132,7 @@ body {
   display: none;
 }
 #nav-toggle::after {
-  background: url(/_img/head.webp) no-repeat center center;
+  background: url(/img/head.webp) no-repeat center center;
   background-size: contain;
   content: "";
   width: 2em;
@@ -193,7 +193,7 @@ hr {
 }
 .retweet {
   display: inline-block;
-  background: url(/_img/twitter.svg) no-repeat 0 0;
+  background: url(/img/twitter.svg) no-repeat 0 0;
   padding-left: 1.75em;
   color: var(--darkgray);
   border-color: var(--darkgray);
@@ -207,7 +207,7 @@ hr {
 }
 #footer {
   color: var(--footer-color);
-  background: var(--footer-background) url(/_img/head.webp) no-repeat 95.5%
+  background: var(--footer-background) url(/img/head.webp) no-repeat 95.5%
     center;
   padding-right: 12em;
   background-size: 10em;
@@ -490,8 +490,8 @@ video {
 }
 
 dark-mode-toggle {
-  --dark-mode-toggle-light-icon: url(/_css/img/moon.svg);
-  --dark-mode-toggle-dark-icon: url(/_css/img/sun.svg);
+  --dark-mode-toggle-light-icon: url(/css/img/moon.svg);
+  --dark-mode-toggle-dark-icon: url(/css/img/sun.svg);
   --dark-mode-toggle-color: var(--main-and-footer-link-color);
   --dark-mode-toggle-icon-filter: invert(80%);
   margin-left: 1em;

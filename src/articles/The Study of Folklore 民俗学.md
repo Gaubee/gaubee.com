@@ -56,11 +56,11 @@ updated: 2014-11-26T13:03:50Z
 - [中国民居的特点](http://video.study.163.com/edu-video/nos/mp4/2013/10/27/299311_hd.mp4)
 - [民间建筑研究](http://video.study.163.com/edu-video/nos/mp4/2013/10/27/299310_hd.mp4)
 - 相关图片
-  - ![天井5](/_img/the-study-of-folklore/tianjing5.jpg)
-  - ![天井4](/_img/the-study-of-folklore/tianjing4.jpg)
-  - ![天井3](/_img/the-study-of-folklore/tianjing3.jpg)
-  - ![天井2](/_img/the-study-of-folklore/tianjing2.jpg)
-  - ![天井1](/_img/the-study-of-folklore/tianjing1.jpg)
+  - ![天井5](/img/the-study-of-folklore/tianjing5.jpg)
+  - ![天井4](/img/the-study-of-folklore/tianjing4.jpg)
+  - ![天井3](/img/the-study-of-folklore/tianjing3.jpg)
+  - ![天井2](/img/the-study-of-folklore/tianjing2.jpg)
+  - ![天井1](/img/the-study-of-folklore/tianjing1.jpg)
 
 ## 民间服饰
 
