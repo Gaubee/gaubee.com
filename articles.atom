@@ -101,7 +101,79 @@
 &lt;/li&gt;
 &lt;li&gt;用户会有更多的选择权与话语权。体现在用户可以更加轻松地杜绝个人信息盗取，这也会为整个互联网的发展带来更加良性的循环，而不是靠着贩卖用户信息牟利。&lt;/li&gt;
 &lt;/ol&gt;
-</content></entry><entry><title>CSS“文字”渐变，一种比background-clip通用性更好的方案（CSS svg icon gradients, a more versatile solution than background-clip）</title><link href="https://gaubee.com/articles/CSS%E2%80%9C%E6%96%87%E5%AD%97%E2%80%9D%E6%B8%90%E5%8F%98%EF%BC%8C%E4%B8%80%E7%A7%8D%E6%AF%94background%EF%BC%8Dclip%E9%80%9A%E7%94%A8%E6%80%A7%E6%9B%B4%E5%A5%BD%E7%9A%84%E6%96%B9%E6%A1%88%EF%BC%88CSS%20svg%20icon%20gradients,%20a%20more%20versatile%20solution%20than%20background%EF%BC%8Dclip%EF%BC%89"/><updated>2021-08-05T15:19:04Z</updated><id>https://gaubee.com/articles/CSS%E2%80%9C%E6%96%87%E5%AD%97%E2%80%9D%E6%B8%90%E5%8F%98%EF%BC%8C%E4%B8%80%E7%A7%8D%E6%AF%94background%EF%BC%8Dclip%E9%80%9A%E7%94%A8%E6%80%A7%E6%9B%B4%E5%A5%BD%E7%9A%84%E6%96%B9%E6%A1%88%EF%BC%88CSS%20svg%20icon%20gradients,%20a%20more%20versatile%20solution%20than%20background%EF%BC%8Dclip%EF%BC%89</id><content type="html">&lt;h2 id=&quot;%E8%B5%B7%E5%9B%A0-the-story&quot; tabindex=&quot;-1&quot;&gt;&lt;a class=&quot;header-anchor&quot; href=&quot;https://gaubee.com/articles/CSS%E2%80%9C%E6%96%87%E5%AD%97%E2%80%9D%E6%B8%90%E5%8F%98%EF%BC%8C%E4%B8%80%E7%A7%8D%E6%AF%94background%EF%BC%8Dclip%E9%80%9A%E7%94%A8%E6%80%A7%E6%9B%B4%E5%A5%BD%E7%9A%84%E6%96%B9%E6%A1%88%EF%BC%88CSS%20svg%20icon%20gradients,%20a%20more%20versatile%20solution%20than%20background%EF%BC%8Dclip%EF%BC%89#%E8%B5%B7%E5%9B%A0-the-story&quot;&gt;起因 The Story&lt;/a&gt;&lt;/h2&gt;
+</content></entry><entry><title>CSS“文字”渐变，一种比background-clip通用性更好的方案，可以用于SVG中（CSS svg icon gradients, a more versatile solution than background-clip）</title><link href="https://gaubee.com/articles/CSS%E2%80%9C%E6%96%87%E5%AD%97%E2%80%9D%E6%B8%90%E5%8F%98%EF%BC%8C%E4%B8%80%E7%A7%8D%E6%AF%94background%EF%BC%8Dclip%E9%80%9A%E7%94%A8%E6%80%A7%E6%9B%B4%E5%A5%BD%E7%9A%84%E6%96%B9%E6%A1%88%EF%BC%88CSS%20svg%20icon%20gradients,%20a%20more%20versatile%20solution%20than%20background%EF%BC%8Dclip%EF%BC%89"/><updated>2021-08-05T15:19:04Z</updated><id>https://gaubee.com/articles/CSS%E2%80%9C%E6%96%87%E5%AD%97%E2%80%9D%E6%B8%90%E5%8F%98%EF%BC%8C%E4%B8%80%E7%A7%8D%E6%AF%94background%EF%BC%8Dclip%E9%80%9A%E7%94%A8%E6%80%A7%E6%9B%B4%E5%A5%BD%E7%9A%84%E6%96%B9%E6%A1%88%EF%BC%88CSS%20svg%20icon%20gradients,%20a%20more%20versatile%20solution%20than%20background%EF%BC%8Dclip%EF%BC%89</id><content type="html">&lt;h2 id=&quot;%E7%A4%BA%E4%BE%8B-demo&quot; tabindex=&quot;-1&quot;&gt;&lt;a class=&quot;header-anchor&quot; href=&quot;https://gaubee.com/articles/CSS%E2%80%9C%E6%96%87%E5%AD%97%E2%80%9D%E6%B8%90%E5%8F%98%EF%BC%8C%E4%B8%80%E7%A7%8D%E6%AF%94background%EF%BC%8Dclip%E9%80%9A%E7%94%A8%E6%80%A7%E6%9B%B4%E5%A5%BD%E7%9A%84%E6%96%B9%E6%A1%88%EF%BC%88CSS%20svg%20icon%20gradients,%20a%20more%20versatile%20solution%20than%20background%EF%BC%8Dclip%EF%BC%89#%E7%A4%BA%E4%BE%8B-demo&quot;&gt;示例 Demo&lt;/a&gt;&lt;/h2&gt;
+&lt;div id=&quot;demo&quot;&gt;
+  &lt;div class=&quot;gradient-text&quot;&gt;
+   SOME
+   &lt;svg class=&quot;icon&quot; style=&quot;width: 1em;height: 1em;vertical-align: middle;fill: currentColor;overflow: hidden;&quot; viewBox=&quot;0 0 1024 1024&quot; version=&quot;1.1&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot; p-id=&quot;8288&quot;&gt;&lt;path d=&quot;M512 0C230.4 0 0 230.4 0 512s230.4 512 512 512 512-230.4 512-512S793.6 0 512 0z m0 939.2c-235.2 0-427.2-192-427.2-427.2S276.8 84.8 512 84.8s427.2 192 427.2 427.2-192 427.2-427.2 427.2zM320 363.2m-64 0a64 64 0 1 0 128 0 64 64 0 1 0-128 0ZM704 363.2m-64 0a64 64 0 1 0 128 0 64 64 0 1 0-128 0ZM734.4 555.2H289.6c-17.6 0-33.6 8-46.4 20.8s-17.6 33.6-12.8 51.2C256 763.2 376 857.6 512 857.6s256-97.6 281.6-230.4c4.8-17.6 0-33.6-12.8-51.2-12.8-12.8-30.4-20.8-46.4-20.8zM512 772.8c-84.8 0-161.6-56-187.2-132.8H704c-30.4 81.6-107.2 132.8-192 132.8z&quot; p-id=&quot;8289&quot;&gt;&lt;/path&gt;&lt;/svg&gt;
+   TEXT
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;div class=&quot;controllers&quot;&gt;
+  &lt;fieldset&gt;
+    &lt;legend&gt;背景色 Background Color&lt;/legend&gt;
+    &lt;input id=&quot;bg-color&quot; type=&quot;color&quot; /&gt;
+    &lt;script&gt;
+      const bindInputColor = (selector, cssProperty, defaultValue) =&gt; {
+        const ele = document.querySelector(selector);
+        ele.oninput = () =&gt; demo.style.setProperty(cssProperty, ele.value);
+        ele.value = defaultValue;
+        ele.oninput();
+      };
+      bindInputColor(&quot;#bg-color&quot;, &quot;--background-color&quot;, &quot;#fff&quot;);
+    &lt;/script&gt;
+  &lt;/fieldset&gt;
+  &lt;fieldset&gt;
+    &lt;legend&gt;渐变色 Gradient Color&lt;/legend&gt;
+    &lt;label for=&quot;start-color&quot;&gt;开始色 Start Color&lt;/label&gt;
+    &lt;input id=&quot;start-color&quot; type=&quot;color&quot; /&gt;
+    &lt;label for=&quot;end-color&quot;&gt;结束色 End Color&lt;/label&gt;
+    &lt;input id=&quot;end-color&quot; type=&quot;color&quot; /&gt;
+    &lt;script&gt;
+      bindInputColor(&quot;#start-color&quot;, &quot;--gradient-color-start&quot;, &quot;#1f00ff&quot;);
+      bindInputColor(&quot;#end-color&quot;, &quot;--gradient-color-end&quot;, &quot;#ff0000&quot;);
+    &lt;/script&gt;
+  &lt;/fieldset&gt;
+&lt;/div&gt;
+&lt;style&gt;
+  #demo {
+    --gradient-color: linear-gradient(
+      45deg,
+      var(--gradient-color-start),
+      var(--gradient-color-end)
+    );
+    background-color: var(--background-color);
+    font-size: 3em;
+    font-weight: bold;
+    display: inline-block;
+  }
+  #demo .gradient-text {
+    display: flex;
+    align-items: center;
+  }
+  #demo .gradient-text {
+    background: var(--gradient-color);
+    color: var(--background-color);
+    position: relative;
+    mix-blend-mode: difference;
+  }
+  #demo .gradient-text::before {
+    content: &quot; &quot;;
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: inherit;
+    mix-blend-mode: difference;
+    pointer-events: none;
+  }
+  .controllers {
+    display: flex;
+  }
+&lt;/style&gt;
+&lt;h2 id=&quot;%E8%B5%B7%E5%9B%A0-the-story&quot; tabindex=&quot;-1&quot;&gt;&lt;a class=&quot;header-anchor&quot; href=&quot;https://gaubee.com/articles/CSS%E2%80%9C%E6%96%87%E5%AD%97%E2%80%9D%E6%B8%90%E5%8F%98%EF%BC%8C%E4%B8%80%E7%A7%8D%E6%AF%94background%EF%BC%8Dclip%E9%80%9A%E7%94%A8%E6%80%A7%E6%9B%B4%E5%A5%BD%E7%9A%84%E6%96%B9%E6%A1%88%EF%BC%88CSS%20svg%20icon%20gradients,%20a%20more%20versatile%20solution%20than%20background%EF%BC%8Dclip%EF%BC%89#%E8%B5%B7%E5%9B%A0-the-story&quot;&gt;起因 The Story&lt;/a&gt;&lt;/h2&gt;
 &lt;p&gt;探究这个问题的起因，是源于我打算把公司的图标从 font 逐步转化成 svg。&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;My plan is convert the company&#39;s icon from font to svg gradually.&lt;/p&gt;
@@ -112,46 +184,38 @@
 &lt;/blockquote&gt;
 &lt;p&gt;但之前使用&lt;code&gt;background-clip:text&lt;/code&gt;的方案就不好用了，因为默认情况下，svg 的 path 使用的是&lt;code&gt;fill=&amp;quot;currentColor&amp;quot;&lt;/code&gt;这样的写法。诸多原因，我不得不思考较好的替代的方案。&lt;/p&gt;
 &lt;blockquote&gt;
-&lt;p&gt;But the previous solution of using &lt;code&gt;background-clip:text&lt;/code&gt; doesn&#39;t work well, because by default, svg&#39;s path use &lt;code&gt;fill=&amp;quot;currentColor&amp;quot;&lt;/code&gt;. For many reasons, I had to think of a better alternative.&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;h2 id=&quot;%E5%81%9A%E6%B3%95-usage&quot; tabindex=&quot;-1&quot;&gt;&lt;a class=&quot;header-anchor&quot; href=&quot;https://gaubee.com/articles/CSS%E2%80%9C%E6%96%87%E5%AD%97%E2%80%9D%E6%B8%90%E5%8F%98%EF%BC%8C%E4%B8%80%E7%A7%8D%E6%AF%94background%EF%BC%8Dclip%E9%80%9A%E7%94%A8%E6%80%A7%E6%9B%B4%E5%A5%BD%E7%9A%84%E6%96%B9%E6%A1%88%EF%BC%88CSS%20svg%20icon%20gradients,%20a%20more%20versatile%20solution%20than%20background%EF%BC%8Dclip%EF%BC%89#%E5%81%9A%E6%B3%95-usage&quot;&gt;做法 Usage&lt;/a&gt;&lt;/h2&gt;
-&lt;p&gt;核心思路是使用&lt;code&gt;mix-blend-mode&lt;/code&gt;。&lt;/p&gt;
-&lt;blockquote&gt;
-&lt;p&gt;The core idea is to use &lt;code&gt;mix-blend-mode&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;But the previous solution of using &lt;code&gt;background-clip:text&lt;/code&gt; doesn&#39;t work well,&lt;br /&gt;
+because by default, svg&#39;s path use &lt;code&gt;fill=&amp;quot;currentColor&amp;quot;&lt;/code&gt;. For many reasons, I&lt;br /&gt;
+had to think of a better alternative. ## 做法 Usage&lt;br /&gt;
+核心思路是使用&lt;code&gt;mix-blend-mode&lt;/code&gt;。 &amp;gt; The core idea is to use &lt;code&gt;mix-blend-mode&lt;/code&gt;.&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;pre class=&quot;language-html&quot;&gt;&lt;code class=&quot;language-html&quot;&gt;&lt;span class=&quot;token tag&quot;&gt;&lt;span class=&quot;token tag&quot;&gt;&lt;span class=&quot;token punctuation&quot;&gt;&amp;lt;&lt;/span&gt;body&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;&gt;&lt;/span&gt;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token tag&quot;&gt;&lt;span class=&quot;token tag&quot;&gt;&lt;span class=&quot;token punctuation&quot;&gt;&amp;lt;&lt;/span&gt;div&lt;/span&gt; &lt;span class=&quot;token attr-name&quot;&gt;class&lt;/span&gt;&lt;span class=&quot;token attr-value&quot;&gt;&lt;span class=&quot;token punctuation attr-equals&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;&quot;&lt;/span&gt;gradient-text&lt;span class=&quot;token punctuation&quot;&gt;&quot;&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;&gt;&lt;/span&gt;&lt;/span&gt;SOME TEXT&lt;span class=&quot;token tag&quot;&gt;&lt;span class=&quot;token tag&quot;&gt;&lt;span class=&quot;token punctuation&quot;&gt;&amp;lt;/&lt;/span&gt;div&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;&gt;&lt;/span&gt;&lt;/span&gt;&lt;br /&gt;&lt;span class=&quot;token tag&quot;&gt;&lt;span class=&quot;token tag&quot;&gt;&lt;span class=&quot;token punctuation&quot;&gt;&amp;lt;/&lt;/span&gt;body&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
-&lt;pre class=&quot;language-css&quot;&gt;&lt;code class=&quot;language-css&quot;&gt;&lt;span class=&quot;token selector&quot;&gt;.gradient-text&lt;/span&gt; &lt;span class=&quot;token punctuation&quot;&gt;{&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;background&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;token function&quot;&gt;var&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;--gradient-color&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;color&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; #fff&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;position&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; relative&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;mix-blend-mode&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; difference&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;&lt;span class=&quot;token punctuation&quot;&gt;}&lt;/span&gt;&lt;br /&gt;&lt;span class=&quot;token selector&quot;&gt;.gradient-text::before&lt;/span&gt; &lt;span class=&quot;token punctuation&quot;&gt;{&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;content&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;token string&quot;&gt;&quot; &quot;&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;display&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; block&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;position&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; absolute&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;width&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; 100%&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;height&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; 100%&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;background&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; inherit&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;mix-blend-mode&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; difference&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;pointer-event&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; none&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;&lt;span class=&quot;token punctuation&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&quot;language-css&quot;&gt;&lt;code class=&quot;language-css&quot;&gt;&lt;span class=&quot;token selector&quot;&gt;body&lt;/span&gt; &lt;span class=&quot;token punctuation&quot;&gt;{&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;background&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;token function&quot;&gt;var&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;--bg-color&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;&lt;span class=&quot;token punctuation&quot;&gt;}&lt;/span&gt;&lt;br /&gt;&lt;span class=&quot;token selector&quot;&gt;.gradient-text&lt;/span&gt; &lt;span class=&quot;token punctuation&quot;&gt;{&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;background&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;token function&quot;&gt;var&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;--gradient-color&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;color&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;token function&quot;&gt;var&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;(&lt;/span&gt;--bg-color&lt;span class=&quot;token punctuation&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;position&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; relative&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;mix-blend-mode&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; difference&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;&lt;span class=&quot;token punctuation&quot;&gt;}&lt;/span&gt;&lt;br /&gt;&lt;span class=&quot;token selector&quot;&gt;.gradient-text::before&lt;/span&gt; &lt;span class=&quot;token punctuation&quot;&gt;{&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;content&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;token string&quot;&gt;&quot; &quot;&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;display&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; block&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;position&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; absolute&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;top&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; 0&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;left&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; 0&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;right&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; 0&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;bottom&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; 0&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;background&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; inherit&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;mix-blend-mode&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; difference&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;  &lt;span class=&quot;token property&quot;&gt;pointer-events&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;:&lt;/span&gt; none&lt;span class=&quot;token punctuation&quot;&gt;;&lt;/span&gt;&lt;br /&gt;&lt;span class=&quot;token punctuation&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
 &lt;h2 id=&quot;%E5%8E%9F%E7%90%86-principle&quot; tabindex=&quot;-1&quot;&gt;&lt;a class=&quot;header-anchor&quot; href=&quot;https://gaubee.com/articles/CSS%E2%80%9C%E6%96%87%E5%AD%97%E2%80%9D%E6%B8%90%E5%8F%98%EF%BC%8C%E4%B8%80%E7%A7%8D%E6%AF%94background%EF%BC%8Dclip%E9%80%9A%E7%94%A8%E6%80%A7%E6%9B%B4%E5%A5%BD%E7%9A%84%E6%96%B9%E6%A1%88%EF%BC%88CSS%20svg%20icon%20gradients,%20a%20more%20versatile%20solution%20than%20background%EF%BC%8Dclip%EF%BC%89#%E5%8E%9F%E7%90%86-principle&quot;&gt;原理 Principle&lt;/a&gt;&lt;/h2&gt;
 &lt;p&gt;DEMO 中，一共有三层定义：&lt;/p&gt;
 &lt;ol&gt;
-&lt;li&gt;&lt;code&gt;body&lt;/code&gt;：我们称之为 &lt;code&gt;TOP-LAYER-0&lt;/code&gt; ；
-&lt;blockquote&gt;
-&lt;p&gt;&lt;code&gt;body&lt;/code&gt;: we call it &lt;code&gt;TOP-LAYER-0&lt;/code&gt;;&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;body&lt;/code&gt;：我们称之为 &lt;code&gt;TOP-LAYER-0&lt;/code&gt; ；&lt;/li&gt;
 &lt;li&gt;&lt;code&gt;.gradient-text&lt;/code&gt;：我们称之为 &lt;code&gt;CONTENT-LAYER-1&lt;/code&gt; ，它由两部分组成：
-&lt;blockquote&gt;
-&lt;p&gt;&lt;code&gt;.gradient-text&lt;/code&gt;: we call it &amp;quot;&lt;code&gt;CONTENT-LAYER-1&lt;/code&gt;&amp;quot; and it consists of two parts:&lt;/p&gt;
-&lt;/blockquote&gt;
 &lt;ol&gt;
-&lt;li&gt;&lt;code&gt;CONTENT-BG-1&lt;/code&gt; ：绘制着我们定义的&lt;code&gt;var(--gradient-color)&lt;/code&gt;
-&lt;blockquote&gt;
-&lt;p&gt;&amp;quot;&lt;code&gt;CONTENT-BG-1&lt;/code&gt;&amp;quot;: draws the &lt;code&gt;var(--gradient-color)&lt;/code&gt; we defined&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;/li&gt;
-&lt;li&gt;&lt;code&gt;CONTENT-INNER-2&lt;/code&gt; ：绘制着我们的文本、svg 等内容
-&lt;blockquote&gt;
-&lt;p&gt;&amp;quot;&lt;code&gt;CONTENT-INNER-2&lt;/code&gt;&amp;quot;: drawing our text, svg, etc.&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;CONTENT-BG-1&lt;/code&gt; ：绘制着我们定义的&lt;code&gt;var(--gradient-color)&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;CONTENT-INNER-2&lt;/code&gt; ：绘制着我们的文本、svg 等内容&lt;/li&gt;
 &lt;/ol&gt;
 &lt;/li&gt;
-&lt;li&gt;&lt;code&gt;.gradient-text::before&lt;/code&gt;：我们称之为“&lt;code&gt;TOP-LAYER-3&lt;/code&gt; ；
-&lt;blockquote&gt;
-&lt;p&gt;&lt;code&gt;.gradient-text::before&lt;/code&gt;: we call it &lt;code&gt;TOP-LAYER-3&lt;/code&gt;；&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;.gradient-text::before&lt;/code&gt;：我们称之为 &lt;code&gt;TOP-LAYER-3&lt;/code&gt; ；&lt;/li&gt;
 &lt;/ol&gt;
+&lt;blockquote&gt;
+&lt;p&gt;In Demo, There are three layers defined:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;code&gt;body&lt;/code&gt;: we call it &lt;code&gt;TOP-LAYER-0&lt;/code&gt;;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;.gradient-text&lt;/code&gt;: we call it &amp;quot;&lt;code&gt;CONTENT-LAYER-1&lt;/code&gt;&amp;quot; and it consists of two parts:
+&lt;ol&gt;
+&lt;li&gt;&amp;quot;&lt;code&gt;CONTENT-BG-1&lt;/code&gt;&amp;quot;: draws the &lt;code&gt;var(--gradient-color)&lt;/code&gt; we defined&lt;/li&gt;
+&lt;li&gt;&amp;quot;&lt;code&gt;CONTENT-INNER-2&lt;/code&gt;&amp;quot;: drawing our text, svg, etc.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;.gradient-text::before&lt;/code&gt;: we call it &lt;code&gt;TOP-LAYER-3&lt;/code&gt;；&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/blockquote&gt;
 &lt;p&gt;所以这里总共有四种景受到影响，我们可以逐一推理每一种景发生的混合：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;So there are a total of four layer affected here, and we can reason about the mix one by one.&lt;/p&gt;
@@ -191,9 +255,21 @@
 &lt;p&gt;Only &lt;code&gt;CONTENT-INNER-2-RES&lt;/code&gt; is left to draw the contents of &lt;code&gt;TOP-LAYER-3&lt;/code&gt;, which is the gradient color we eventually need.&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;h2 id=&quot;%E7%BC%BA%E9%99%B7-defects&quot; tabindex=&quot;-1&quot;&gt;&lt;a class=&quot;header-anchor&quot; href=&quot;https://gaubee.com/articles/CSS%E2%80%9C%E6%96%87%E5%AD%97%E2%80%9D%E6%B8%90%E5%8F%98%EF%BC%8C%E4%B8%80%E7%A7%8D%E6%AF%94background%EF%BC%8Dclip%E9%80%9A%E7%94%A8%E6%80%A7%E6%9B%B4%E5%A5%BD%E7%9A%84%E6%96%B9%E6%A1%88%EF%BC%88CSS%20svg%20icon%20gradients,%20a%20more%20versatile%20solution%20than%20background%EF%BC%8Dclip%EF%BC%89#%E7%BC%BA%E9%99%B7-defects&quot;&gt;缺陷 Defects&lt;/a&gt;&lt;/h2&gt;
-&lt;p&gt;因为使用混合模式，它需要小心元素所在的父级。如果父级是一个复杂的图层，比如有复杂的背景，那么这个方案就无法生效了。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;因为使用混合模式，它需要小心元素所在的父级。如果父级是一个复杂的图层，比如有复杂的背景，那么这个方案就无法生效了。所以父级最好是白色或者黑色&lt;/li&gt;
+&lt;/ol&gt;
 &lt;blockquote&gt;
-&lt;p&gt;Because using blend mode, it needs to be careful about the parent level where the element is located. If the parent is a complex layer, for example with a complex background, then this scheme will not work.&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Because using blend mode, it needs to be careful about the parent layer where the element is located. If the parent is a complex layer, for example with a complex background, then this scheme will not work. so the parent layer should preferably be white or black.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/blockquote&gt;
+&lt;ol start=&quot;2&quot;&gt;
+&lt;li&gt;渐变的颜色不可以是带有透明通道的颜色，但由于这个方案本身就对背景颜色有明确的要求，所以这点可以间接规避。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;blockquote&gt;
+&lt;ol start=&quot;2&quot;&gt;
+&lt;li&gt;The color of the gradient cannot with alpha, but the good thing is that we explicitly require the background color, so this can be circumvented indirectly.&lt;/li&gt;
+&lt;/ol&gt;
 &lt;/blockquote&gt;
 </content></entry><entry><title>初识go-wasm</title><link href="https://gaubee.com/articles/%E5%88%9D%E8%AF%86go%EF%BC%8Dwasm"/><updated>2021-04-22T12:53:00Z</updated><id>https://gaubee.com/articles/%E5%88%9D%E8%AF%86go%EF%BC%8Dwasm</id><content type="html">&lt;p&gt;https://github.com/Gaubee/big-json-parser&lt;/p&gt;
 </content></entry><entry><title>Comlink-v2</title><link href="https://gaubee.com/articles/Comlink%EF%BC%8Dv2"/><updated>2021-07-22T23:59:26Z</updated><id>https://gaubee.com/articles/Comlink%EF%BC%8Dv2</id><content type="html">&lt;p&gt;我是Comlink-v1的重度用户，并在我的公司重努力推广它。&lt;/p&gt;
