@@ -83,6 +83,10 @@ html {
   color: var(--html-color);
   background: var(--html-background);
 }
+body:lang(zh-CN) {
+  font-family: "SF Pro SC", "SF Pro Text", "SF Pro Icons", "PingFang SC",
+    "Helvetica Neue", "Helvetica", "Arial", sans-serif;
+}
 body {
   max-width: 860px;
   margin: 0 auto;
