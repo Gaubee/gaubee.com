@@ -178,3 +178,15 @@ DEMO 中，一共有三层定义：
 2. 渐变的颜色不可以是带有透明通道的颜色，但由于这个方案本身就对背景颜色有明确的要求，所以这点可以间接规避。
 
 > 2. The color of the gradient cannot with alpha, but the good thing is that we explicitly require the background color, so this can be circumvented indirectly.
+
+## 小提示 Tip
+
+在复杂的图层中，你可以需要这个 css 属性：
+
+> In complex layers, you can need this css property:
+
+```css
+.gradient-text-parent {
+  isolation: isolate;
+}
+```
