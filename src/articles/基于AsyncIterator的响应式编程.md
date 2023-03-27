@@ -106,7 +106,7 @@ try {
     /* 核心代码 */
   } while (true);
 } finally {
-  this._subs.add(sub);
+  this._subs.delete(sub);
 }
 ```
 
