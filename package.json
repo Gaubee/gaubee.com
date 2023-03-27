@@ -1,7 +1,7 @@
 {
   "name": "@gaubee/blog",
   "scripts": {
-    "postinstall": "npx synp --source-file yarn.lock --force",
+    "-postinstall": "npx synp --source-file yarn.lock --force",
     "lint": "markdownlint \"src/**/*.md\"",
     "eleventy": "eleventy",
     "html": "html-minifier-terser --config-file=.html-minifier.json --input-dir=docs --output-dir=docs --file-ext=html",
