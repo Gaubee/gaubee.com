@@ -1,4 +1,12 @@
-# 在本机配置 CNAME
+---
+layout: layouts/article.njk
+title: "在本机配置 CNAME"
+date: 2022-10-10T08:19:46.754Z
+updated: 2022-10-10T08:19:46.754Z
+tags:
+  - linux
+  - dns
+---
 
 1. 安装 dnsmasq
 
