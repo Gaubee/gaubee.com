@@ -1,9 +1,20 @@
-// @ts-check
+// Copyright 2018 Google Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the “License”);
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// <https://apache.org/licenses/LICENSE-2.0>.
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an “AS IS” BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 const { DateTime } = require("luxon");
 const he = require("he");
 const markdownIt = require("markdown-it");
 const markdownItAnchor = require("markdown-it-anchor");
-const permalink = markdownItAnchor.default.permalink;
 const markdownItAttrs = require("markdown-it-attrs");
 const markdownItContainer = require("markdown-it-container");
 const markdownItEmbedImage = require("./md-embed-image.js");
@@ -12,6 +23,9 @@ const markdownItFootnote = require("markdown-it-footnote");
 const markdownItMultiMdTable = require("markdown-it-multimd-table");
 const pluginRss = require("@11ty/eleventy-plugin-rss");
 const pluginSyntaxHighlight = require("@11ty/eleventy-plugin-syntaxhighlight");
+
+const installPrismLanguages = require("./prism-languages.js");
+const expandFeatureSupport = require("./feature-support.js");
 
 const markdownItConfig = {
   html: true,
@@ -55,10 +69,7 @@ const md = markdownIt(markdownItConfig)
     rowspan: true,
     multiline: true,
   })
-  .use(markdownItAnchor.default, {
-    permalink: permalink.headerLink(),
-    class: "bookmark",
-  })
+  .use(markdownItAnchor, markdownItAnchorConfig)
   .use(markdownItImplicitFigures, {
     figcaption: true,
   })
@@ -81,13 +92,13 @@ md.renderer.rules.table_column_open = (tokens, idx, options, env, self) => {
   }
 };
 
-/**
- *
- * @param {import('@11ty/eleventy/src/EleventyConfig')} eleventyConfig
- * @returns
- */
 module.exports = (eleventyConfig) => {
   eleventyConfig.addPlugin(pluginRss);
+  eleventyConfig.addPlugin(pluginSyntaxHighlight, {
+    init({ Prism }) {
+      installPrismLanguages(Prism);
+    },
+  });
 
   // 文件后缀所对应的语言，参考 https://github.com/github/linguist/blob/master/lib/linguist/languages.yml
   eleventyConfig.addPlugin(pluginSyntaxHighlight);
@@ -100,14 +111,13 @@ module.exports = (eleventyConfig) => {
     return `<relative-time datetime="${datetime}">${datetime}</relative-time>`;
   });
 
-  // https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#valid-date-string
-  eleventyConfig.addFilter("htmlDateString", (dateObj) => {
-    return DateTime.fromJSDate(dateObj).toLocaleString();
+  eleventyConfig.addFilter("readableDate", (dateObj) => {
+    return DateTime.fromJSDate(dateObj).toFormat("yyyy-LL-dd");
   });
 
-  eleventyConfig.addFilter("localTime", (dateObj) => {
-    const datetime = DateTime.fromJSDate(dateObj).toISO();
-    return `<local-time datetime="${datetime}">${datetime}</local-time>`;
+  // https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#valid-date-string
+  eleventyConfig.addFilter("htmlDateString", (dateObj) => {
+    return DateTime.fromJSDate(dateObj).toFormat("yyyy-LL-dd");
   });
 
   eleventyConfig.addFilter("markdown", (string) => {
@@ -160,6 +170,13 @@ module.exports = (eleventyConfig) => {
       .sort((a, b) => b.date - a.date);
   });
 
+  // Patch the Markdown renderer to recognize <feature-support>.
+  const oldRender = md.render.bind(md);
+  md.render = (input) => {
+    const preprocessed = expandFeatureSupport(input);
+    return oldRender(preprocessed);
+  };
+
   // Treat `*.md` files as Markdown.
   eleventyConfig.setLibrary("md", md);
 
@@ -169,11 +186,10 @@ module.exports = (eleventyConfig) => {
       if ("tags" in item.data) {
         const tags = item.data.tags;
         if (typeof tags === "string") {
-          set.add(tags);
-        } else {
-          for (const tag of tags) {
-            set.add(tag);
-          }
+          tags = [tags];
+        }
+        for (const tag of tags) {
+          set.add(tag);
         }
       }
     }
@@ -181,21 +197,17 @@ module.exports = (eleventyConfig) => {
   });
 
   // Copy assets that don’t require a build step.
-  eleventyConfig.addPassthroughCopy("src/favicon*.ico");
+  eleventyConfig.addPassthroughCopy("src/favicon.ico");
   eleventyConfig.addPassthroughCopy("src/robots.txt");
-  eleventyConfig.addPassthroughCopy("src/img");
-  eleventyConfig.addPassthroughCopy({ "src/_css/img": "css/img" });
-
-  // // add ignores
-  // eleventyConfig.ignores.add("src/private")
-  // eleventyConfig.ignores.add("src/old")
+  eleventyConfig.addPassthroughCopy("src/_img");
+  eleventyConfig.addPassthroughCopy("src/_css/img");
 
   return {
     templateFormats: ["md", "njk", "html"],
 
     pathPrefix: "/",
 
-    markdownTemplateEngine: "md",
+    markdownTemplateEngine: "liquid",
     htmlTemplateEngine: "njk",
     dataTemplateEngine: "njk",
     passthroughFileCopy: true,

@@ -1,0 +1,36 @@
+{
+  "default": true,
+  "emphasis-style": false,
+  "heading-style": { "style": "atx" },
+  "line-length": false,
+  "no-trailing-punctuation": { "punctuation": ".,;:!" },
+  "single-title": { "front_matter_title": "" },
+  "ul-indent": { "indent": 4 },
+  "ul-style": { "style": "dash" },
+  "fenced-code-language": false,
+  "link-fragments": false,
+  "no-alt-text": false,
+  "no-inline-html": {
+    "allowed_elements": [
+      "a",
+      "abbr",
+      "b",
+      "code",
+      "div",
+      "em",
+      "figcaption",
+      "figure",
+      "i",
+      "iframe",
+      "img",
+      "kbd",
+      "pre",
+      "sub",
+      "sup",
+      "video"
+    ]
+  },
+  "no-multiple-blanks": false,
+  "no-trailing-spaces": false,
+  "ol-prefix": false
+}

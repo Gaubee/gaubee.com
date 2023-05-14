@@ -2,3 +2,15 @@ node_modules
 private
 old
 docs
+# @alrra/browser-logos image dependencies, managed through npm:
+src/_css/img/chrome.svg
+src/_css/img/firefox.svg
+src/_css/img/node.js.svg
+src/_css/img/safari.svg
+# Other ignores:
+dist/
+.firebase/
+firebase-debug.log
+node_modules/
+package-lock.json
+*.bak
