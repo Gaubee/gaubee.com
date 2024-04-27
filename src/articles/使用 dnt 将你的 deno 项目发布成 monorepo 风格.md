@@ -43,9 +43,10 @@ updated: 2024-04-27T04:40:46.724Z
    参考 [Setup](https://github.com/denoland/dnt?tab=readme-ov-file#setup)，因为我们需要构建多个 npm 包，所以创建 `scripts/npmBuilder.ts` 文件：
 
    ```ts
-   import { BuildOptions, build, emptyDir } from "@deno/dnt";
+   import { build, BuildOptions, emptyDir } from "@deno/dnt";
    import fs from "node:fs";
-   import { fileURLToPath, pathToFileURL } from "node:url";
+   import path from "node:path";
+   import { fileURLToPath } from "node:url";
 
    const rootDir = import.meta.resolve("../");
    const rootResolve = (path: string) => fileURLToPath(new URL(path, rootDir));
@@ -58,16 +59,18 @@ updated: 2024-04-27T04:40:46.724Z
      const { packageDir, version, importMap, options } = config;
      const packageResolve = (path: string) =>
        fileURLToPath(new URL(path, packageDir));
-
      const packageJson = JSON.parse(
        fs.readFileSync(packageResolve("./package.json"), "utf-8")
      );
+     // remove some field which dnt will create. if you known how dnt work, you can keep them.
+     delete packageJson.main;
+     delete packageJson.module;
+     delete packageJson.exports;
+
      console.log(`\nstart dnt: ${packageJson.name}`);
 
-     const npmDir = pathToFileURL(
-       rootResolve(`./npm/${packageJson.name.split("/").pop()}`)
-     ).href;
-     const npmResolve = (path: string) => fileURLToPath(new URL(path, npmDir));
+     const npmDir = rootResolve(`./npm/${packageJson.name.split("/").pop()}`);
+     const npmResolve = (p: string) => path.resolve(npmDir, p);
 
      await emptyDir(npmDir);
 
@@ -80,8 +83,9 @@ updated: 2024-04-27T04:40:46.724Z
        outDir: npmDir,
        packageManager: "pnpm",
        shims: {
-         deno: false,
+         deno: true,
        },
+       // you should open it in actual
        test: false,
        importMap: importMap,
        package: packageJson,
