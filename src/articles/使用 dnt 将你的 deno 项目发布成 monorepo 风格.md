@@ -1,0 +1,249 @@
+---
+layout: layouts/article.njk
+title: "使用 dnt 将你的 deno 项目发布成 monorepo 风格"
+date: 2024-04-27T04:40:46.724Z
+updated: 2024-04-27T04:40:46.724Z
+---
+
+## 使用 dnt 将你的 deno 项目发布成 monorepo 风格
+
+> 在提供理论指导之前，我们先看具体的实践如何做到，完成后，我再说明这种项目管理方案的优势在哪里。
+
+### 工具
+
+1. [deno](https://deno.com/)
+2. [pnpm](https://pnpm.io/installation)
+
+### 准备工作
+
+1. 创建你的项目：
+   ```shell
+   deno init dnt-mono
+   # cd dnt-mono
+   # code . # open in ide
+   ```
+1. 初始化 git 仓库
+   ```shell
+   git init
+   echo "npm\nnode_modules" > .gitignore # ignore the npm folder
+   ```
+1. 初始化 package.json，以及一些 npm/pnpm 通常所需的文件
+   ```shell
+   npm init --yes --private # create a package.json file
+   echo "MIT" > LICENSE
+   echo "# Hello Dnt ❤️ Monorepo" > README.md
+   echo "packages:\n  - \"npm/*\"" > pnpm-workspace.yaml
+   ```
+1. 准备 dnt 脚本
+
+   ```shell
+   deno add @deno/dnt
+   ```
+
+   参考 [Setup](https://github.com/denoland/dnt?tab=readme-ov-file#setup)，因为我们需要构建多个 npm 包，所以创建 `scripts/npmBuilder.ts` 文件：
+
+   ```ts
+   import { BuildOptions, build, emptyDir } from "@deno/dnt";
+   import fs from "node:fs";
+   import { fileURLToPath, pathToFileURL } from "node:url";
+
+   const rootDir = import.meta.resolve("../");
+   const rootResolve = (path: string) => fileURLToPath(new URL(path, rootDir));
+   export const npmBuilder = async (config: {
+     packageDir: string;
+     version?: string;
+     importMap?: string;
+     options?: Partial<BuildOptions>;
+   }) => {
+     const { packageDir, version, importMap, options } = config;
+     const packageResolve = (path: string) =>
+       fileURLToPath(new URL(path, packageDir));
+
+     const packageJson = JSON.parse(
+       fs.readFileSync(packageResolve("./package.json"), "utf-8")
+     );
+     console.log(`\nstart dnt: ${packageJson.name}`);
+
+     const npmDir = pathToFileURL(
+       rootResolve(`./npm/${packageJson.name.split("/").pop()}`)
+     ).href;
+     const npmResolve = (path: string) => fileURLToPath(new URL(path, npmDir));
+
+     await emptyDir(npmDir);
+
+     if (version) {
+       Object.assign(packageJson, { version: version });
+     }
+
+     await build({
+       entryPoints: [{ name: ".", path: packageResolve("./index.ts") }],
+       outDir: npmDir,
+       packageManager: "pnpm",
+       shims: {
+         deno: false,
+       },
+       test: false,
+       importMap: importMap,
+       package: packageJson,
+       // custom by yourself
+       compilerOptions: {
+         lib: ["DOM", "ES2022"],
+         target: "ES2022",
+         emitDecoratorMetadata: true,
+       },
+       postBuild() {
+         // steps to run after building and before running the tests
+         Deno.copyFileSync(rootResolve("./LICENSE"), npmResolve("./LICENSE"));
+         Deno.copyFileSync(
+           packageResolve("./README.md"),
+           npmResolve("./README.md")
+         );
+       },
+       ...options,
+     });
+   };
+   ```
+
+### 主要步骤
+
+1. 创建两个子文件夹，加入一些项目文件
+
+   ```shell
+   # start from root
+   mkdir packages/module-a
+   cd packages/module-a
+   echo "export const a = 1;" > index.ts
+   echo "# @dnt-mono/module-a" > README.md
+   npm init --scope @dnt-mono --yes # name : @dnt-mono/module-a
+   ```
+
+   同样的步骤，创建 `module-b` 文件夹
+
+   ```shell
+   # start from root
+   mkdir packages/module-b
+   cd packages/module-b
+   echo "import { a } from \"@dnt-mono/module-a\";\nexport const b = a + 1;" > index.ts
+   echo "# @dnt-mono/module-b" > README.md
+   npm init --scope @dnt-mono --yes # name : @dnt-mono/module-b
+
+   pnpm add @dnt-mono/module-a --workspace # add module-a as dependencie
+   ```
+
+1. 在这个事例中， `module-b` 依赖了 `module-a`，同时我们在代码中使用了 `@dnt-mono/module-a` 这个 specifier，所以我们为了让 deno 的语言服务器正确工作，还需要做一些配置。在 `deno.json` 的 `imports` 字段中加入这些配置：
+
+   ```jsonc
+    "@dnt-mono/module-a": "./packages/module-a/index.ts", // in imports
+    "@dnt-mono/module-b": "./packages/module-b/index.ts" // in imports
+   ```
+
+1. 接着，我们创建构建脚本和配置文件
+
+   1. `scripts/build_npm.ts`
+
+      ```ts
+      import { npmBuilder } from "./npmBuilder.ts";
+
+      const version = Deno.args[0];
+      await npmBuilder({
+        packageDir: import.meta.resolve("../packages/module-a/"),
+        importMap: import.meta.resolve("./import_map.npm.json"),
+        version,
+      });
+      await npmBuilder({
+        packageDir: import.meta.resolve("../packages/module-b/"),
+        importMap: import.meta.resolve("./import_map.npm.json"),
+        version,
+      });
+      ```
+
+   1. `scripts/import_map.npm.json`
+
+      ```json
+      {
+        "imports": {
+          "@dnt-mono/module-a": "npm:@dnt-mono/module-a",
+          "@dnt-mono/module-b": "npm:@dnt-mono/module-b"
+        }
+      }
+      ```
+
+1. 然后，在你的 `deno.json` 中配置 build 指令：
+
+   ```jsonc
+   "build": "deno run -A ./scripts/build_npm.ts" // in tasks
+   ```
+
+1. 最后，尝试执行 build 指令，构建出 npm 目录
+   ```shell
+   deno task build
+   ```
+   这时候，你可以看到 npm 目录下输出了 module-a 和 module-b 两个 npm 包文件夹。
+   现在你可以尝试发布这些 npm 包了：
+   ```shell
+   pnpm publish -r --no-git-checks --dry-run # you should remove --dry-run actual
+   ```
+
+### 工作原理
+
+1. 我们使用 deno 作为语言服务器，它很强大，很多体验经过定制化开发，已经超越 tsc 本身。
+1. 所以 package.json 在这里只是一个“模板文件”，而不是配置文件。在开发中，真正生效的配置文件只有 deno.json
+1. 因此，pnpm 在这里是一个面向 dnt 最终编译产出的工具，也就是只服务于 `npm/*` 的目录。这也是为什么 `pnpm-workspaces.yaml` 的配置是这样的
+1. dnt 中使用的 `import_map.npm.json` 很重要，我们不能直接使用 `deno.json` 作为 `importMap`，因为`deno.json`配置给 deno 语言服务器，而 `import_map.npm.json` 是配置给 dnt/pnpm 使用的。在复杂的项目中，建议你用脚本自动生成并管理它。
+
+### 进阶技巧
+
+在 deno 的开发中，我们的理念是面向文件而不是面向模块，因此如果有需要，你需要增加这样的配置在`deno.json`中：
+
+```jsonc
+{
+  // ...
+  "imports": {
+    // ...
+    "@dnt-mono/module-a": "./packages/module-a/index.ts",
+    "@dnt-mono/module-a/": "./packages/module-a/src/",
+    "@dnt-mono/module-b": "./packages/module-b/index.ts",
+    "@dnt-mono/module-b/": "./packages/module-b/src/"
+    // ...
+  }
+}
+```
+
+我习惯将除了 `index.ts` 意外的文件放到 `src` 目录下，这会更加符合 node 项目的风格。
+
+> 但切记，不要把 index.ts 文件也挪到 `src` 目录下，否则会引发异常 [#249](https://github.com/denoland/dnt/issues/249)
+
+然后，就是 dnt 的配置，你需要遍历你所有的文件，并将它配置到 entryPoints 中：
+
+```ts
+build({
+  entryPoints: [
+    // default entry
+    { name: ".", path: packageResolve("./index.ts") },
+    // src files
+    ALL_SRC_TS_FILES.map((name) => ({
+      name: `./${name}`,
+      path: `./src/${name}`,
+    })),
+  ],
+  // ...
+});
+```
+
+现在，你就可以写这样的代码了：
+
+```ts
+import { xxx } from "@dnt-mono/module-a/xxx.ts";
+```
+
+### 注意事项
+
+1. 规划好你的项目结构，避免形成循环依赖。如果有需要，你需要自己配置 peerDependencies
+1. 不要在某个模块中做自引入。
+   > 语言服务器并不理解你最终要发布 npm 的意图，所以即便 deno 能正确工作，但你的目的是让 node 也能工作。
+   ```ts
+   import { a } from "@dnt-mono/module-a"; // don't import module-a in module-a
+   ```
+   在正式的项目中，建议编写 lint 规则来避免这种错误的发生
+
+### 优势
