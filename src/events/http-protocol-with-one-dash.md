@@ -39,5 +39,7 @@ import { Server } from "https:/deno.land/std@0.187.0/http/server.ts"; // 这里�
   }
 }
 ```
+
 最终效果如下图：
+
 ![](/img/http-protocol-with-one-dash/node-as-deno.png)

@@ -4,7 +4,7 @@ date: 2023-04-07T00:50:33.815Z
 ---
 
 这是社区的讨论：[Add onclose event to MessagePort #1766](https://github.com/whatwg/html/issues/1766#issuecomment-633197720)
-当初我提到一个垫片方案，那时是2020年，所以当初只有chrome69+的内核能支持：
+当初我提到一个垫片方案，那时是 2020 年，所以当初只有 chrome69+的内核能支持：
 
 ```ts
 /// worker
@@ -21,5 +21,7 @@ worker.addEventListener("message", (me) => {
   }
 });
 ```
+
 现在已经普遍支持
+
 ![caniuse-locks](/img/message-port-onclose/caniuse-locks.png)

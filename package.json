@@ -18,15 +18,15 @@
     "watch": "npm run build && npx eleventy --watch",
     "serve": "npm start",
     "debug": "DEBUG=* npx eleventy",
-    "start": "superstatic --port=9001",
+    "start": "superstatic docs --port=9001",
     "deploy": "firebase deploy",
     "ci": "npm run lint && npm run build",
     "bd": "npx @11ty/eleventy --input=. --output=docs"
   },
   "devDependencies": {
-    "@11ty/eleventy": "^2.0.0",
-    "@11ty/eleventy-plugin-rss": "^1.2.0",
-    "@11ty/eleventy-plugin-syntaxhighlight": "^4.2.0",
+    "@11ty/eleventy": "^3.0.0",
+    "@11ty/eleventy-plugin-rss": "^2.0.2",
+    "@11ty/eleventy-plugin-syntaxhighlight": "^5.0.0",
     "@browser-logos/chrome": "^1.0.18",
     "@browser-logos/firefox": "^3.0.9",
     "@browser-logos/safari": "^2.1.0",
@@ -63,5 +63,8 @@
     "terser": "^5.10.0",
     "time-elements": "^3.0.0",
     "workbox-cli": "^6.4.2"
+  },
+  "dependencies": {
+    "ci": "^2.3.0"
   }
 }

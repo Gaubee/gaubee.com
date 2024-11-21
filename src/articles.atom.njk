@@ -8,7 +8,7 @@ excludeFromSitemap: true
   <subtitle>{{ metadata.feed.subtitle }}</subtitle>
   <link href="{{ metadata.feed.url }}" rel="self"/>
   <link href="{{ metadata.url }}"/>
-  <updated>{{ collections.articles | head(1) | rssLastUpdatedDate }}</updated>
+  <updated>{{ collections.articles | head(1) | getNewestCollectionItemDate | dateToRfc822 }}</updated>
   <id>{{ metadata.feed.id }}</id>
   <author>
     <name>{{ metadata.author.name }}</name>
@@ -18,7 +18,7 @@ excludeFromSitemap: true
   <entry>
     <title>{{ post.data.title or post.data.content }}</title>
     <link href="{{ absolutePostUrl }}"/>
-    <updated>{{ (post.data.updated or post.date) | rssDate }}</updated>
+    <updated>{{ (post.data.updated or post.date) | dateToRfc822 }}</updated>
     <id>{{ absolutePostUrl }}</id>
     <content type="html">{{ post.templateContent | htmlToAbsoluteUrls(absolutePostUrl) }}</content>
   </entry>
