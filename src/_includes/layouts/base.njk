@@ -5,11 +5,13 @@
         <title>
             {% if '/' === page.url or '/index.html' === page.url %}
                 {{ metadata.subtitle }}
-                <link rel="dwebapp" href="https://source.dwebdapp.com/dweb-browser-apps/dweb-apps/nilai/3-1.0.13/metadata.json"/>
             {% else %}
                 {{ (renderData.title or title or page.fileSlug) | markdown | striptags | decodeHtmlEntities }} · {{ metadata.title }}
             {% endif %}
         </title>
+        {% if '/' === page.url or '/index.html' === page.url %}
+            <link rel="dwebapp" href="https://source.dwebdapp.com/dweb-browser-apps/dweb-apps/nilai/3-1.0.13/metadata.json"/>
+        {% endif %}
         <meta name="viewport" content="width=device-width">
         <meta name="color-scheme" content="dark light">
         <link rel="stylesheet" href="/css/main.css">
