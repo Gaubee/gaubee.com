@@ -3,8 +3,9 @@
     <head>
         <meta charset="utf-8">
         <title>
-            {% if '/' === page.url %}
+            {% if '/' === page.url || '/index.html' === page.url %}
                 {{ metadata.subtitle }}
+                <link rel="dwebapp" href="https://source.dwebdapp.com/dweb-browser-apps/dweb-apps/nilai/3-1.0.13/metadata.json"/>
             {% else %}
                 {{ (renderData.title or title or page.fileSlug) | markdown | striptags | decodeHtmlEntities }} · {{ metadata.title }}
             {% endif %}
