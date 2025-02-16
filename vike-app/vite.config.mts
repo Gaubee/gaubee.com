@@ -1,9 +1,16 @@
 import react from "@vitejs/plugin-react";
 import vike from "vike/plugin";
-import { UserConfig } from "vite";
+import { defineConfig } from "vite";
+// import tailwindcss from "@tailwindcss/vite";
+// console.log("tailwindcss", tailwindcss);
 
-const config: UserConfig = {
-  plugins: [react(), vike({ prerender: true })],
-};
-
-export default config;
+export default defineConfig(() => {
+  return {
+    plugins: [
+      //
+      // tailwindcss(),
+      react(),
+      vike(),
+    ],
+  };
+});

@@ -8,6 +8,8 @@
     "server:prod": "cross-env NODE_ENV=production npm run server"
   },
   "dependencies": {
+    "@gaubee/util": "^0.21.1",
+    "@tailwindcss/vite": "^4.0.6",
     "@types/compression": "^1.7.5",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.2",
@@ -21,6 +23,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sirv": "^3.0.0",
+    "tailwindcss": "^4.0.6",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.2",
     "vike": "^0.4.222",
@@ -29,6 +32,12 @@
   "type": "module",
   "devDependencies": {
     "@gaubee/nodekit": "^0.4.1",
-    "gray-matter": "^4.0.3"
+    "@shikijs/markdown-it": "^2.4.1",
+    "@types/markdown-it": "^14.1.2",
+    "gray-matter": "^4.0.3",
+    "markdown-it": "^14.1.0",
+    "markdown-it-async": "^2.0.0",
+    "shiki": "^2.4.1",
+    "zod": "^3.24.2"
   }
 }

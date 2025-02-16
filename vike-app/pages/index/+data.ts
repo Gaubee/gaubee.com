@@ -6,27 +6,14 @@ export type Data = Awaited<ReturnType<typeof data>>;
 // this file always runs on the server-side, see https://vike.dev/data#server-side
 import type { PageContextServer } from "vike/types";
 
-import path from "node:path";
-import matter from "gray-matter";
-import { walkFiles } from "@gaubee/nodekit";
-
-function getArticles() {
-  const articlesDirname = path.resolve(
-    import.meta.dirname,
-    "../../../src/articles"
-  );
-  console.log("dir", articlesDirname);
-  return [...walkFiles(articlesDirname)].map((entry) => {
-    console.log(entry.path);
-    return matter(entry.readText());
-  });
-}
+import { getAllArticles } from "../../database/articles.controller";
+import { getAllEvents } from "../../database/events.controller";
 
 const data = async (pageContext: PageContextServer) => {
-  const articles = await getArticles();
+  const articles = await getAllArticles();
+  const events = await getAllEvents();
   return {
-    // We remove data we don't need because the data is passed to the client; we should
-    // minimize what is sent over the network.
     articles: articles,
+    events: events,
   };
 };

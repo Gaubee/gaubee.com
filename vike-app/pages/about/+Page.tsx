@@ -1,6 +1,4 @@
-import './code.css'
-
-export { Page }
+export { Page };
 
 function Page() {
   return (
@@ -8,5 +6,5 @@ function Page() {
       <h1>About</h1>
       <p>Example of using Vike.</p>
     </>
-  )
+  );
 }

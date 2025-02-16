@@ -1,4 +1,5 @@
-@import './reset.css';
-@import './links.css';
-@import './code.css';
-@import './page-transition-loading-animation.css';
+/* @import "tailwindcss"; */
+@import "./reset.css";
+@import "./links.css";
+@import "./code.css";
+@import "./page-transition-loading-animation.css";

@@ -11,7 +11,11 @@ function Page() {
       <h1>文章</h1>
       <ol>
         {data.articles.map((article, index) => (
-          <li key={index}>{article.data.title}</li>
+          <li key={index}>
+            <a href={`/article/${article.metadata.title}`}>
+              {article.metadata.title}
+            </a>
+          </li>
         ))}
       </ol>
     </>
