@@ -2,3 +2,4 @@ node_modules
 private
 old
 docs
+.DS_Store
