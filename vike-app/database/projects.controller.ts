@@ -5,6 +5,7 @@ const projectsJsonFilepath = path.resolve(import.meta.dirname, "projects.json");
 type RepoContributionCounts = Array<{
   id: number;
   name: string;
+  fullName: string;
   url: string;
   description: string;
   firstCommitTime: string;
@@ -20,12 +21,13 @@ const writeProjectsJson = async (
     JSON.stringify(repoContributionCounts, null, 2)
   );
 };
-const readProjectsJson = async () => {
+export const readProjectsJson = async () => {
   return JSON.parse(
     await readFile(projectsJsonFilepath, "utf-8")
   ) as RepoContributionCounts;
 };
 
+/**从github上下载所有的项目信息 */
 async function getAllProjects() {
   if (!process.env.GITHUB_TOKEN) {
     throw new Error("GITHUB_TOKEN is not set!");
@@ -80,8 +82,11 @@ async function getAllProjects() {
       item.name = repo.name;
       item.url = repo.html_url;
       item.description = repo.description || "_No description_";
+      item.fullName = repo.full_name;
       return true;
     });
+
+  writeProjectsJson(repoContributionCounts);
 
   console.log("\nRepositories with your commits (sorted by commit count):");
 
@@ -155,6 +160,7 @@ async function getAllProjects() {
       const item = {
         id: repo.id,
         name: repo.name,
+        fullName: repo.full_name,
         url: repo.html_url,
         description: repo.description || "_No description_",
         firstCommitTime: firstCommitTime,
