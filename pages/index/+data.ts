@@ -2,15 +2,12 @@
 export { data };
 export type Data = Awaited<ReturnType<typeof data>>;
 
-// The node-fetch package (which only works on the server-side) can be used since
-// this file always runs on the server-side, see https://vike.dev/data#server-side
-import type { PageContextServer } from "vike/types";
-
 import { getAllArticles } from "../../database/articles.controller";
 import { getAllEvents } from "../../database/events.controller";
 import { map_get_or_put } from "@gaubee/util";
+import { md } from "../../database/markdown.helper";
 
-const data = async (pageContext: PageContextServer) => {
+const data = async () => {
   const articles = await getAllArticles();
   const events = await getAllEvents();
   type Articles = (typeof articles)[number];
@@ -21,7 +18,7 @@ const data = async (pageContext: PageContextServer) => {
       | {
           type: "article";
           createdAt: Date;
-          data: Articles["metadata"];
+          data: Articles["metadata"] & { previewContent: string };
         }
       | {
           type: "event";
@@ -38,7 +35,12 @@ const data = async (pageContext: PageContextServer) => {
     ).push({
       type: "article",
       createdAt: article.metadata.createdAt,
-      data: article.metadata,
+      data: {
+        ...article.metadata,
+        previewContent: await md.renderAsync(
+          article.markdownContent.split("\n").slice(0, 20).join("\n")
+        ),
+      },
     });
   }
   for (const event of events) {

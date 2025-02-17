@@ -9,7 +9,7 @@ import { getAllArticles } from "../../../database/articles.controller";
 const data = async (pageContext: PageContextServer) => {
   const allArticles = await getAllArticles();
   const article = allArticles.find(
-    (it) => it.metadata.title === pageContext.routeParams!.id
+    (it) => it.metadata.id === pageContext.routeParams!.id
   );
 
   if (!article) {

@@ -18,7 +18,7 @@ function Layout({ children, pageContext }: { children: React.ReactNode; pageCont
             <Link href="/">Timeline</Link>
             <Link href="/projects">Projects</Link>
             <Link href="/about">About</Link>
-            <Link href="/star-wars">Data Fetching</Link>
+            {/* <Link href="/star-wars">Data Fetching</Link> */}
           </Sidebar>
           <Content>{children}</Content>
         </Frame>

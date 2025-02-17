@@ -1,0 +1,50 @@
+/* @import "tailwindcss"; */
+@import "./reset.css";
+@import "./links.css";
+@import "./code.css";
+@import "./page-transition-loading-animation.css";
+
+.event {
+  display: inline-flex;
+  flex-direction: column;
+  box-shadow: 0.5px 0.5px 6px -3px #000;
+  padding: 0px 12px;
+  border-radius: 12px;
+  opacity: 0.9;
+  background-color: #a5d6a7;
+  margin-bottom: 2em;
+  max-width: 40em;
+}
+.article {
+  display: inline-flex;
+  flex-direction: column;
+  box-shadow: 0.5px 0.5px 6px -3px #000;
+  padding: 0px 12px;
+  border-radius: 12px;
+  overflow: hidden;
+  opacity: 0.9;
+  background-color: #fff9c4;
+  margin-bottom: 2em;
+  max-width: 40em;
+  max-height: 40em;
+  position: relative;
+}
+.article::after {
+  content: " ";
+  z-index: 2;
+  display: block;
+  position: absolute;
+  width: 100%;
+  height: 20em;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), #ffeb3b);
+  bottom: 0;
+  left: 0;
+}
+.article > .title {
+  z-index: 3;
+}
+
+.event img,
+.article img {
+  max-width: 100%;
+}

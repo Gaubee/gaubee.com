@@ -1,7 +1,10 @@
+node_modules/
+dist/
+pnpm-lock.yaml
+.DS_Store
+.env.local
+repos.json
 node_modules
 private
 old
 docs
-.DS_Store
-.env.local
-vike-app/database/repos.json

@@ -18,13 +18,22 @@ function Page() {
                   if (item.type === "article") {
                     return (
                       <li>
-                        <a
-                          href={`/article/${encodeURIComponent(
-                            item.data.title
-                          )}`}
-                        >
-                          {item.data.title}
-                        </a>
+                        <div className="article">
+                          <h3 className="title">
+                            <a
+                              href={`/article/${encodeURIComponent(
+                                item.data.id
+                              )}/`}
+                            >
+                              {item.data.title}
+                            </a>
+                          </h3>
+                          <article
+                            dangerouslySetInnerHTML={{
+                              __html: item.data.previewContent,
+                            }}
+                          ></article>
+                        </div>
                       </li>
                     );
                   } else {

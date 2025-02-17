@@ -1,6 +1,6 @@
 import { Octokit } from "@octokit/rest";
 
-const projectsJsonFilepath = path.resolve(import.meta.dirname, "projects.json");
+const projectsJsonFilepath = rootResolver("./database/projects.json");
 
 type RepoContributionCounts = Array<{
   id: number;
@@ -22,6 +22,9 @@ const writeProjectsJson = async (
   );
 };
 export const readProjectsJson = async () => {
+  // return await import("./projects.json").then(
+  //   (r) => r.default as RepoContributionCounts
+  // );
   return JSON.parse(
     await readFile(projectsJsonFilepath, "utf-8")
   ) as RepoContributionCounts;
@@ -138,11 +141,11 @@ async function getAllProjects() {
         }
       }
     } catch (error) {
-      if (error.status === 403) {
+      if ((error as any).status === 403) {
         throw error;
       }
       // 针对 404 错误进行处理，表示可能仓库没有 contributors stats 信息 (例如空仓库)
-      if (error.status === 404) {
+      if ((error as any).status === 404) {
         console.warn(
           `Contributors stats not found for repo ${repo.full_name}, skipping stats.`
         );
@@ -192,6 +195,7 @@ async function getAllProjects() {
 import { import_meta_ponyfill } from "import-meta-ponyfill";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { rootResolver } from "./common.helper";
 
 // node --env-file=.env --env-file=.env.local ./vike-app/database/projects.controller.ts
 if (import_meta_ponyfill(import.meta).main) {

@@ -1,11 +1,11 @@
-import path from "node:path";
-import matter, { GrayMatterFile } from "gray-matter";
 import { walkFiles } from "@gaubee/nodekit";
 import { func_remember } from "@gaubee/util";
+import matter from "gray-matter";
+import { rootResolver } from "./common.helper";
 import { md } from "./markdown.helper";
 
 export const getAllEvents = func_remember(async () => {
-  const eventsDirname = path.resolve(import.meta.dirname, "../../src/events");
+  const eventsDirname = rootResolver("./events");
   return (
     await Promise.all(
       [...walkFiles(eventsDirname)].map(async (entry) => {
