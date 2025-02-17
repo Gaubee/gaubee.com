@@ -9,13 +9,15 @@ export const getAllEvents = func_remember(async () => {
   return (
     await Promise.all(
       [...walkFiles(eventsDirname)].map(async (entry) => {
-        const info = matter(entry.readText());
-        if (info.data.date) {
-          return {
-            metadata: info.data as { date: string } & Record<string, unknown>,
-            htmlContent: await md.renderAsync(info.content),
-          };
+        if (!(entry.path.endsWith(".md") || entry.path.endsWith(".mdx"))) {
+          return;
         }
+        const info = matter(entry.readText());
+        const createdAt = new Date(info.data.date || entry.stats.birthtimeMs);
+        return {
+          metadata: { ...info.data, createdAt },
+          htmlContent: await md.renderAsync(info.content),
+        };
       })
     )
   ).filter((it) => it !== undefined);

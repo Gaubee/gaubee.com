@@ -10,13 +10,16 @@ pre.shiki {
   padding: 8px;
   border-radius: 8px;
   box-shadow: 0 1px 4px -2px #000;
+  background-color: rgba(255, 255, 255, 0.62) !important;
+  overflow: auto;
 }
 pre.shiki code {
   background-color: transparent;
 }
 blockquote {
-  background: linear-gradient(135deg, #880e4f, #e91e63, #fce4ec), linear-gradient(100deg, #FCE4EC, #fce4ec00);
-  background-size: 5px 100%, 60% 100%;
+  background: linear-gradient(135deg, #880e4f, #e91e63, #fce4ec),
+    linear-gradient(135deg, #fce4ec, #fce4ec00, transparent);
+  background-size: 5px 100%, 100% 100%;
   background-repeat: no-repeat;
   padding-inline-start: 0.75em;
   padding-block: 0.25em;
@@ -25,4 +28,21 @@ blockquote {
 }
 blockquote > p {
   margin: 0;
+}
+*::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.4);
+  border-radius: 10rem;
+  border: 1px solid #fff;
+}
+
+*::-webkit-scrollbar-track-piece:start {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-track-piece:end {
+  background: transparent;
 }
