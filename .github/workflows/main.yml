@@ -1,5 +1,5 @@
 name: Build and Deploy
-on: 
+on:
   push:
     branches:
       - main
@@ -20,10 +20,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 23
-          cache: 'pnpm'
+          cache: "pnpm"
 
-      - name: Install dependencies
-        run: 
+      - name: Install dependencies and build
+        run: |
           pnpm install
           pnpm build
 

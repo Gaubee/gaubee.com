@@ -15,7 +15,7 @@
 import express from "express";
 import compression from "compression";
 import { renderPage, createDevMiddleware } from "vike/server";
-import { root } from "./root.js";
+import { root } from "./root.ts";
 const isProduction = process.env.NODE_ENV === "production";
 
 startServer();
@@ -23,7 +23,6 @@ startServer();
 async function startServer() {
   const app = express();
 
-  // @ts-expect-error Express.js buggy types
   app.use(compression());
 
   // Vite integration
