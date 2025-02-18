@@ -4,7 +4,7 @@
     "module": "NodeNext",
     "target": "ES2024",
     // Doesn't apply to server/, see ts-node config down below and server/tsconfig.json
-    "moduleResolution": "Bundler",
+    "moduleResolution": "nodenext",
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "types": ["vite/client"],
     "jsx": "react-jsx",

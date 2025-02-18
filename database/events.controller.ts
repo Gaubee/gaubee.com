@@ -1,8 +1,8 @@
 import { walkFiles } from "@gaubee/nodekit";
 import { func_remember } from "@gaubee/util";
 import matter from "gray-matter";
-import { rootResolver } from "./common.helper";
-import { md } from "./markdown.helper";
+import { rootResolver } from "./common.helper.ts";
+import { md } from "./markdown.helper.ts";
 
 export const getAllEvents = func_remember(async () => {
   const eventsDirname = rootResolver("./events");

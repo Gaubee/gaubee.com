@@ -2,8 +2,8 @@ import { walkFiles } from "@gaubee/nodekit";
 import { func_remember } from "@gaubee/util";
 import matter from "gray-matter";
 import path from "node:path";
-import { rootResolver } from "./common.helper";
-import { md } from "./markdown.helper";
+import { rootResolver } from "./common.helper.ts";
+import { md } from "./markdown.helper.ts";
 
 export const getAllArticles = func_remember(async () => {
   const articlesDirname = rootResolver("./articles");
