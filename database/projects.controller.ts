@@ -195,9 +195,9 @@ async function getAllProjects() {
 import { import_meta_ponyfill } from "import-meta-ponyfill";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { rootResolver } from "./common.helper";
+import { rootResolver } from "./common.helper.ts";
 
-// node --env-file=.env --env-file=.env.local ./vike-app/database/projects.controller.ts
+// node --env-file=.env --env-file=.env.local ./database/projects.controller.ts
 if (import_meta_ponyfill(import.meta).main) {
   (async () => {
     const repoContributionCounts = await getAllProjects().catch((e) => {

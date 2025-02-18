@@ -1,7 +1,6 @@
 export { Layout }
 
 import React from 'react'
-import logoUrl from './logo.svg'
 import { PageContextProvider } from './usePageContext'
 import { Link } from './Link'
 import type { PageContext } from 'vike/types'
@@ -85,7 +84,7 @@ function Logo() {
       }}
     >
       <a href="/">
-        <img src={logoUrl} height={64} width={64} alt="logo" />
+        <img src="img/head.webp" height={64} width={64} alt="logo" />
       </a>
     </div>
   )
