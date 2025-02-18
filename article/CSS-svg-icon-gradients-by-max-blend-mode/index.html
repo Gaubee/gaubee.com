@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <link rel="stylesheet" type="text/css" href="/assets/static/renderer_css_index-e8e12f67.CaHEwVA7.css">
+        <link rel="stylesheet" type="text/css" href="/assets/static/renderer_Layout-031b266d.CEjdw0pU.css">
+        <meta charset="UTF-8" />
+        <link rel="icon" href="/img/head.webp" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="description" content="Demo of using Vike" />
+        <title>Vike Demo</title>
+      </head>
+      <body>
+        <div id="root"><link rel="preload" as="image" href="img/head.webp"/><div style="display:flex;max-width:900px;margin:auto"><div id="sidebar" style="padding:20px;flex-shrink:0;display:flex;flex-direction:column;line-height:1.8em;border-right:2px solid #eee"><div style="margin-top:20px;margin-bottom:10px"><a href="/"><img src="img/head.webp" height="64" width="64" alt="logo"/></a></div><a href="/" class="">Timeline</a><a href="/projects" class="">Projects</a><a href="/about" class="">About</a></div><div id="page-container"><div id="page-content" style="padding:20px;padding-bottom:50px;min-height:100vh"><h1>CSS“文字”渐变，一种比background-clip通用性更好的方案，可以用于SVG中（CSS svg icon gradients, a more versatile solution than background-clip）</h1><main><h2>示例 Demo</h2>
+<main id="demo">
+  <div id="text-container">
+    <div class="gradient-text">
+    SOME
+    <svg class="icon" style="width: 1em;height: 1em;vertical-align: middle;fill: currentColor;overflow: hidden;" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="8288"><path d="M512 0C230.4 0 0 230.4 0 512s230.4 512 512 512 512-230.4 512-512S793.6 0 512 0z m0 939.2c-235.2 0-427.2-192-427.2-427.2S276.8 84.8 512 84.8s427.2 192 427.2 427.2-192 427.2-427.2 427.2zM320 363.2m-64 0a64 64 0 1 0 128 0 64 64 0 1 0-128 0ZM704 363.2m-64 0a64 64 0 1 0 128 0 64 64 0 1 0-128 0ZM734.4 555.2H289.6c-17.6 0-33.6 8-46.4 20.8s-17.6 33.6-12.8 51.2C256 763.2 376 857.6 512 857.6s256-97.6 281.6-230.4c4.8-17.6 0-33.6-12.8-51.2-12.8-12.8-30.4-20.8-46.4-20.8zM512 772.8c-84.8 0-161.6-56-187.2-132.8H704c-30.4 81.6-107.2 132.8-192 132.8z" p-id="8289"></path></svg>
+    TEXT
+    </div>
+  </div>
+  <div class="controllers">
+    <fieldset>
+      <legend>背景色 Background Color</legend>
+      <input id="bg-color" type="color" />
+      <script>
+        const bindInputColor = (selector, cssProperty, defaultValue) => {
+          const ele = document.querySelector(selector);
+          ele.oninput = () => demo.style.setProperty(cssProperty, ele.value);
+          ele.value = defaultValue;
+          ele.oninput();
+        };
+        bindInputColor("#bg-color", "--background-color", "#ffffff");
+      </script>
+    </fieldset>
+    <fieldset>
+      <legend>渐变色 Gradient Color</legend>
+      <label for="start-color">开始色 Start Color</label>
+      <input id="start-color" type="color" />
+      <label for="end-color">结束色 End Color</label>
+      <input id="end-color" type="color" />
+      <script>
+        bindInputColor("#start-color", "--gradient-color-start", "#1f00ff");
+        bindInputColor("#end-color", "--gradient-color-end", "#ff0000");
+      </script>
+    </fieldset>
+  </div>
+  <style>
+    #demo {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #text-container {
+      --gradient-color: linear-gradient(
+        45deg,
+        var(--gradient-color-start),
+        var(--gradient-color-end)
+      );
+      background-color: var(--background-color);
+      font-size: 3em;
+      font-weight: bold;
+      display: inline-block;
+    }
+    #text-container .gradient-text {
+      display: flex;
+      align-items: center;
+    }
+    #text-container .gradient-text {
+      background: var(--gradient-color);
+      color: var(--background-color);
+      position: relative;
+      mix-blend-mode: difference;
+    }
+    #text-container .gradient-text::before {
+      content: " ";
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: inherit;
+      mix-blend-mode: difference;
+      pointer-events: none;
+    }
+    .controllers {
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+    .controllers fieldset {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+  </style>
+</main>
+<h2>起因 The Story</h2>
+<p>探究这个问题的起因，是源于我打算把公司的图标从 font 逐步转化成 svg。</p>
+<blockquote>
+<p>My plan is convert the company's icon from font to svg gradually.</p>
+</blockquote>
+<p>虽然绘制性能有所下降，但是整体的好处是比 font 多得多的：比如“按需引入”，“多色”，“动画”，“可访问性”等等。</p>
+<blockquote>
+<p>Although the drawing performance maybe reduced, the overall benefits are much more than font: &quot;dynamic import&quot;, &quot;multi-color&quot;, &quot;animation&quot;, &quot;accessibility&quot;, etc.</p>
+</blockquote>
+<p>但之前使用<code>background-clip:text</code>的方案就不好用了，因为默认情况下，svg 的 path 使用的是<code>fill=&quot;currentColor&quot;</code>这样的写法。诸多原因，我不得不思考较好的替代的方案。</p>
+<blockquote>
+<p>But the previous solution of using <code>background-clip:text</code> doesn't work well,
+because by default, svg's path use <code>fill=&quot;currentColor&quot;</code>. For many reasons, I
+had to think of a better alternative.</p>
+</blockquote>
+<h2>做法 Usage</h2>
+<p>核心思路是使用<code>mix-blend-mode</code>。</p>
+<blockquote>
+<p>The core idea is to use <code>mix-blend-mode</code>.</p>
+</blockquote>
+<pre class="shiki shiki-themes github-light github-dark" style="background-color:#fff;--shiki-dark-bg:#24292e;color:#24292e;--shiki-dark:#e1e4e8" tabindex="0"><code class="language-html"><span class="line"><span style="color:#24292E;--shiki-dark:#E1E4E8">&#x3C;</span><span style="color:#22863A;--shiki-dark:#85E89D">body</span><span style="color:#24292E;--shiki-dark:#E1E4E8">></span></span>
+<span class="line"><span style="color:#24292E;--shiki-dark:#E1E4E8">  &#x3C;</span><span style="color:#22863A;--shiki-dark:#85E89D">div</span><span style="color:#6F42C1;--shiki-dark:#B392F0"> class</span><span style="color:#24292E;--shiki-dark:#E1E4E8">=</span><span style="color:#032F62;--shiki-dark:#9ECBFF">"gradient-text"</span><span style="color:#24292E;--shiki-dark:#E1E4E8">>SOME TEXT&#x3C;/</span><span style="color:#22863A;--shiki-dark:#85E89D">div</span><span style="color:#24292E;--shiki-dark:#E1E4E8">></span></span>
+<span class="line"><span style="color:#24292E;--shiki-dark:#E1E4E8">&#x3C;/</span><span style="color:#22863A;--shiki-dark:#85E89D">body</span><span style="color:#24292E;--shiki-dark:#E1E4E8">></span></span></code></pre>
+<pre class="shiki shiki-themes github-light github-dark" style="background-color:#fff;--shiki-dark-bg:#24292e;color:#24292e;--shiki-dark:#e1e4e8" tabindex="0"><code class="language-css"><span class="line"><span style="color:#22863A;--shiki-dark:#85E89D">body</span><span style="color:#24292E;--shiki-dark:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#005CC5;--shiki-dark:#79B8FF">  background</span><span style="color:#24292E;--shiki-dark:#E1E4E8">: </span><span style="color:#005CC5;--shiki-dark:#79B8FF">var</span><span style="color:#24292E;--shiki-dark:#E1E4E8">(</span><span style="color:#E36209;--shiki-dark:#FFAB70">--bg-color</span><span style="color:#24292E;--shiki-dark:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#24292E;--shiki-dark:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#6F42C1;--shiki-dark:#B392F0">.gradient-text</span><span style="color:#24292E;--shiki-dark:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#005CC5;--shiki-dark:#79B8FF">  background</span><span style="color:#24292E;--shiki-dark:#E1E4E8">: </span><span style="color:#005CC5;--shiki-dark:#79B8FF">var</span><span style="color:#24292E;--shiki-dark:#E1E4E8">(</span><span style="color:#E36209;--shiki-dark:#FFAB70">--gradient-color</span><span style="color:#24292E;--shiki-dark:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#005CC5;--shiki-dark:#79B8FF">  color</span><span style="color:#24292E;--shiki-dark:#E1E4E8">: </span><span style="color:#005CC5;--shiki-dark:#79B8FF">var</span><span style="color:#24292E;--shiki-dark:#E1E4E8">(</span><span style="color:#E36209;--shiki-dark:#FFAB70">--bg-color</span><span style="color:#24292E;--shiki-dark:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#005CC5;--shiki-dark:#79B8FF">  position</span><span style="color:#24292E;--shiki-dark:#E1E4E8">: </span><span style="color:#005CC5;--shiki-dark:#79B8FF">relative</span><span style="color:#24292E;--shiki-dark:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#005CC5;--shiki-dark:#79B8FF">  mix-blend-mode</span><span style="color:#24292E;--shiki-dark:#E1E4E8">: </span><span style="color:#005CC5;--shiki-dark:#79B8FF">difference</span><span style="color:#24292E;--shiki-dark:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#24292E;--shiki-dark:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#6F42C1;--shiki-dark:#B392F0">.gradient-text::before</span><span style="color:#24292E;--shiki-dark:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#005CC5;--shiki-dark:#79B8FF">  content</span><span style="color:#24292E;--shiki-dark:#E1E4E8">: </span><span style="color:#032F62;--shiki-dark:#9ECBFF">" "</span><span style="color:#24292E;--shiki-dark:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#005CC5;--shiki-dark:#79B8FF">  display</span><span style="color:#24292E;--shiki-dark:#E1E4E8">: </span><span style="color:#005CC5;--shiki-dark:#79B8FF">block</span><span style="color:#24292E;--shiki-dark:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#005CC5;--shiki-dark:#79B8FF">  position</span><span style="color:#24292E;--shiki-dark:#E1E4E8">: </span><span style="color:#005CC5;--shiki-dark:#79B8FF">absolute</span><span style="color:#24292E;--shiki-dark:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#005CC5;--shiki-dark:#79B8FF">  top</span><span style="color:#24292E;--shiki-dark:#E1E4E8">: </span><span style="color:#005CC5;--shiki-dark:#79B8FF">0</span><span style="color:#24292E;--shiki-dark:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#005CC5;--shiki-dark:#79B8FF">  left</span><span style="color:#24292E;--shiki-dark:#E1E4E8">: </span><span style="color:#005CC5;--shiki-dark:#79B8FF">0</span><span style="color:#24292E;--shiki-dark:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#005CC5;--shiki-dark:#79B8FF">  right</span><span style="color:#24292E;--shiki-dark:#E1E4E8">: </span><span style="color:#005CC5;--shiki-dark:#79B8FF">0</span><span style="color:#24292E;--shiki-dark:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#005CC5;--shiki-dark:#79B8FF">  bottom</span><span style="color:#24292E;--shiki-dark:#E1E4E8">: </span><span style="color:#005CC5;--shiki-dark:#79B8FF">0</span><span style="color:#24292E;--shiki-dark:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#005CC5;--shiki-dark:#79B8FF">  background</span><span style="color:#24292E;--shiki-dark:#E1E4E8">: </span><span style="color:#005CC5;--shiki-dark:#79B8FF">inherit</span><span style="color:#24292E;--shiki-dark:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#005CC5;--shiki-dark:#79B8FF">  mix-blend-mode</span><span style="color:#24292E;--shiki-dark:#E1E4E8">: </span><span style="color:#005CC5;--shiki-dark:#79B8FF">difference</span><span style="color:#24292E;--shiki-dark:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#005CC5;--shiki-dark:#79B8FF">  pointer-events</span><span style="color:#24292E;--shiki-dark:#E1E4E8">: </span><span style="color:#005CC5;--shiki-dark:#79B8FF">none</span><span style="color:#24292E;--shiki-dark:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#24292E;--shiki-dark:#E1E4E8">}</span></span></code></pre>
+<h2>原理 Principle</h2>
+<p>DEMO 中，一共有三层定义：</p>
+<ol>
+<li><code>body</code>：我们称之为 <code>TOP-LAYER-0</code> ；</li>
+<li><code>.gradient-text</code>：我们称之为 <code>CONTENT-LAYER-1</code> ，它由两部分组成：
+<ol>
+<li><code>CONTENT-BG-1</code> ：绘制着我们定义的<code>var(--gradient-color)</code></li>
+<li><code>CONTENT-INNER-2</code> ：绘制着我们的文本、svg 等内容</li>
+</ol>
+</li>
+<li><code>.gradient-text::before</code>：我们称之为 <code>TOP-LAYER-3</code> ；</li>
+</ol>
+<blockquote>
+<p>In Demo, There are three layers defined:</p>
+<ol>
+<li><code>body</code>: we call it <code>TOP-LAYER-0</code>;</li>
+<li><code>.gradient-text</code>: we call it &quot;<code>CONTENT-LAYER-1</code>&quot; and it consists of two parts:
+<ol>
+<li>&quot;<code>CONTENT-BG-1</code>&quot;: draws the <code>var(--gradient-color)</code> we defined</li>
+<li>&quot;<code>CONTENT-INNER-2</code>&quot;: drawing our text, svg, etc.</li>
+</ol>
+</li>
+<li><code>.gradient-text::before</code>: we call it <code>TOP-LAYER-3</code>；</li>
+</ol>
+</blockquote>
+<p>所以这里总共有四种景受到影响，我们可以逐一推理每一种景发生的混合：</p>
+<blockquote>
+<p>So there are a total of four layer affected here, and we can reason about the mix one by one.</p>
+</blockquote>
+<ol>
+<li><code>TOP-LAYER-0-RES</code> = <code>TOP-LAYER-0</code> ^ <code>CONTENT-BG-1</code> ^ <code>TOP-LAYER-3</code>；
+<ol>
+<li>∵ <code>CONTENT-BG-1</code> == <code>TOP-LAYER-3</code></li>
+<li>∴ <code>TOP-LAYER-0-RES</code> = <code>TOP-LAYER-0</code></li>
+</ol>
+</li>
+<li><code>CONTENT-BG-1-RES</code> = <code>TOP-LAYER-0</code> ^ <code>CONTENT-BG-1</code> ^ <code>TOP-LAYER-3</code>
+<ol>
+<li>∵ <code>CONTENT-BG-1</code> ^ <code>TOP-LAYER-3</code></li>
+<li>∴ <code>CONTENT-BG-1-RES</code> = <code>TOP-LAYER-0</code></li>
+</ol>
+</li>
+<li><code>CONTENT-INNER-2-RES</code> = <code>TOP-LAYER-0</code> ^ <code>CONTENT-INNER-2</code> ^ <code>TOP-LAYER-3</code>
+<ol>
+<li>∵ <code>TOP-LAYER-0</code> == <code>CONTENT-INNER-2</code></li>
+<li>∴ <code>CONTENT-INNER-2-RES</code> = <code>TOP-LAYER-3</code></li>
+</ol>
+</li>
+<li><code>TOP-LAYER-3-RES</code> = <code>TOP-LAYER-0</code> ^ <code>CONTENT-BG-1</code> ^ <code>TOP-LAYER-3</code>
+<ol>
+<li>∵ <code>CONTENT-BG-1</code> == <code>TOP-LAYER-3</code></li>
+<li>∴ <code>TOP-LAYER-3-RES</code> = <code>TOP-LAYER-0</code></li>
+</ol>
+</li>
+</ol>
+<p>可以看到， <code>TOP-LAYER-0-RES</code> 、 <code>CONTENT-BG-1-RES</code> 、 <code>TOP-LAYER-3-RES</code> 最终都等于 <code>TOP-LAYER-0</code> ，所以它们看上去跟直接看到 <code>TOP-LAYER-0</code> 的效果一样。像是透明层一般。</p>
+<blockquote>
+<p>As you can see, <code>TOP-LAYER-0-RES</code>, <code>CONTENT-BG-1-RES</code>, and <code>TOP-LAYER-3-RES</code> end up being equal to <code>TOP-LAYER-0</code>, so they look the same as if you see <code>TOP-LAYER-0</code> directly. It looks like a transparent layer.</p>
+</blockquote>
+<p>只剩下 <code>CONTENT-INNER-2-RES</code> 绘制的是 <code>TOP-LAYER-3</code> 的内容，也就是我们最终需要的渐变色。</p>
+<blockquote>
+<p>Only <code>CONTENT-INNER-2-RES</code> is left to draw the contents of <code>TOP-LAYER-3</code>, which is the gradient color we eventually need.</p>
+</blockquote>
+<h2>缺陷 Defects</h2>
+<ol>
+<li>因为使用混合模式，它需要小心元素所在的父级。如果父级是一个复杂的图层，比如有复杂的背景，那么这个方案就无法生效了。所以父级最好是白色或者黑色</li>
+</ol>
+<blockquote>
+<ol>
+<li>Because using blend mode, it needs to be careful about the parent layer where the element is located. If the parent is a complex layer, for example with a complex background, then this scheme will not work. so the parent layer should preferably be white or black.</li>
+</ol>
+</blockquote>
+<ol start="2">
+<li>渐变的颜色不可以是带有透明通道的颜色，但由于这个方案本身就对背景颜色有明确的要求，所以这点可以间接规避。</li>
+</ol>
+<blockquote>
+<ol start="2">
+<li>The color of the gradient cannot with alpha, but the good thing is that we explicitly require the background color, so this can be circumvented indirectly.</li>
+</ol>
+</blockquote>
+<h2>小提示 Tip</h2>
+<p>在复杂的图层中，你可以需要这个 css 属性：</p>
+<blockquote>
+<p>In complex layers, you can need this css property:</p>
+</blockquote>
+<pre class="shiki shiki-themes github-light github-dark" style="background-color:#fff;--shiki-dark-bg:#24292e;color:#24292e;--shiki-dark:#e1e4e8" tabindex="0"><code class="language-css"><span class="line"><span style="color:#6F42C1;--shiki-dark:#B392F0">.gradient-text-parent</span><span style="color:#24292E;--shiki-dark:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#005CC5;--shiki-dark:#79B8FF">  isolation</span><span style="color:#24292E;--shiki-dark:#E1E4E8">: </span><span style="color:#005CC5;--shiki-dark:#79B8FF">isolate</span><span style="color:#24292E;--shiki-dark:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#24292E;--shiki-dark:#E1E4E8">}</span></span></code></pre>
+</main></div></div></div></div>
+        <script id="vike_pageContext" type="application/json">{"abortReason":"!undefined","_urlRewrite":null,"_urlRedirect":"!undefined","abortStatusCode":"!undefined","_abortCall":"!undefined","_pageContextInitIsPassedToClient":"!undefined","pageId":"/pages/article/@id","routeParams":{"id":"CSS-svg-icon-gradients-by-max-blend-mode"},"data":{"article":{"metadata":{"layout":"layouts/article.njk","title":"CSS“文字”渐变，一种比background-clip通用性更好的方案，可以用于SVG中（CSS svg icon gradients, a more versatile solution than background-clip）","date":"!Date:2021-07-30T10:27:26.000Z","updated":"!Date:2021-08-05T15:19:04.000Z","id":"CSS-svg-icon-gradients-by-max-blend-mode","createdAt":"!Date:2021-07-30T10:27:26.000Z","updatedAt":"!Date:2021-08-05T15:19:04.000Z","tags":[]},"htmlContent":"\u003ch2>示例 Demo\u003c/h2>\n\u003cmain id=\"demo\">\n  \u003cdiv id=\"text-container\">\n    \u003cdiv class=\"gradient-text\">\n    SOME\n    \u003csvg class=\"icon\" style=\"width: 1em;height: 1em;vertical-align: middle;fill: currentColor;overflow: hidden;\" viewBox=\"0 0 1024 1024\" version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" p-id=\"8288\">\u003cpath d=\"M512 0C230.4 0 0 230.4 0 512s230.4 512 512 512 512-230.4 512-512S793.6 0 512 0z m0 939.2c-235.2 0-427.2-192-427.2-427.2S276.8 84.8 512 84.8s427.2 192 427.2 427.2-192 427.2-427.2 427.2zM320 363.2m-64 0a64 64 0 1 0 128 0 64 64 0 1 0-128 0ZM704 363.2m-64 0a64 64 0 1 0 128 0 64 64 0 1 0-128 0ZM734.4 555.2H289.6c-17.6 0-33.6 8-46.4 20.8s-17.6 33.6-12.8 51.2C256 763.2 376 857.6 512 857.6s256-97.6 281.6-230.4c4.8-17.6 0-33.6-12.8-51.2-12.8-12.8-30.4-20.8-46.4-20.8zM512 772.8c-84.8 0-161.6-56-187.2-132.8H704c-30.4 81.6-107.2 132.8-192 132.8z\" p-id=\"8289\">\u003c/path>\u003c/svg>\n    TEXT\n    \u003c/div>\n  \u003c/div>\n  \u003cdiv class=\"controllers\">\n    \u003cfieldset>\n      \u003clegend>背景色 Background Color\u003c/legend>\n      \u003cinput id=\"bg-color\" type=\"color\" />\n      \u003cscript>\n        const bindInputColor = (selector, cssProperty, defaultValue) => {\n          const ele = document.querySelector(selector);\n          ele.oninput = () => demo.style.setProperty(cssProperty, ele.value);\n          ele.value = defaultValue;\n          ele.oninput();\n        };\n        bindInputColor(\"#bg-color\", \"--background-color\", \"#ffffff\");\n      \u003c/script>\n    \u003c/fieldset>\n    \u003cfieldset>\n      \u003clegend>渐变色 Gradient Color\u003c/legend>\n      \u003clabel for=\"start-color\">开始色 Start Color\u003c/label>\n      \u003cinput id=\"start-color\" type=\"color\" />\n      \u003clabel for=\"end-color\">结束色 End Color\u003c/label>\n      \u003cinput id=\"end-color\" type=\"color\" />\n      \u003cscript>\n        bindInputColor(\"#start-color\", \"--gradient-color-start\", \"#1f00ff\");\n        bindInputColor(\"#end-color\", \"--gradient-color-end\", \"#ff0000\");\n      \u003c/script>\n    \u003c/fieldset>\n  \u003c/div>\n  \u003cstyle>\n    #demo {\n      display: flex;\n      flex-direction: column;\n      align-items: center;\n    }\n    #text-container {\n      --gradient-color: linear-gradient(\n        45deg,\n        var(--gradient-color-start),\n        var(--gradient-color-end)\n      );\n      background-color: var(--background-color);\n      font-size: 3em;\n      font-weight: bold;\n      display: inline-block;\n    }\n    #text-container .gradient-text {\n      display: flex;\n      align-items: center;\n    }\n    #text-container .gradient-text {\n      background: var(--gradient-color);\n      color: var(--background-color);\n      position: relative;\n      mix-blend-mode: difference;\n    }\n    #text-container .gradient-text::before {\n      content: \" \";\n      display: block;\n      position: absolute;\n      top: 0;\n      left: 0;\n      right: 0;\n      bottom: 0;\n      background: inherit;\n      mix-blend-mode: difference;\n      pointer-events: none;\n    }\n    .controllers {\n      display: flex;\n      justify-content: space-around;\n      flex-wrap: wrap;\n      width: 100%;\n    }\n    .controllers fieldset {\n      display: flex;\n      align-items: center;\n      justify-content: center;\n      flex-direction: column;\n    }\n  \u003c/style>\n\u003c/main>\n\u003ch2>起因 The Story\u003c/h2>\n\u003cp>探究这个问题的起因，是源于我打算把公司的图标从 font 逐步转化成 svg。\u003c/p>\n\u003cblockquote>\n\u003cp>My plan is convert the company's icon from font to svg gradually.\u003c/p>\n\u003c/blockquote>\n\u003cp>虽然绘制性能有所下降，但是整体的好处是比 font 多得多的：比如“按需引入”，“多色”，“动画”，“可访问性”等等。\u003c/p>\n\u003cblockquote>\n\u003cp>Although the drawing performance maybe reduced, the overall benefits are much more than font: &quot;dynamic import&quot;, &quot;multi-color&quot;, &quot;animation&quot;, &quot;accessibility&quot;, etc.\u003c/p>\n\u003c/blockquote>\n\u003cp>但之前使用\u003ccode>background-clip:text\u003c/code>的方案就不好用了，因为默认情况下，svg 的 path 使用的是\u003ccode>fill=&quot;currentColor&quot;\u003c/code>这样的写法。诸多原因，我不得不思考较好的替代的方案。\u003c/p>\n\u003cblockquote>\n\u003cp>But the previous solution of using \u003ccode>background-clip:text\u003c/code> doesn't work well,\nbecause by default, svg's path use \u003ccode>fill=&quot;currentColor&quot;\u003c/code>. For many reasons, I\nhad to think of a better alternative.\u003c/p>\n\u003c/blockquote>\n\u003ch2>做法 Usage\u003c/h2>\n\u003cp>核心思路是使用\u003ccode>mix-blend-mode\u003c/code>。\u003c/p>\n\u003cblockquote>\n\u003cp>The core idea is to use \u003ccode>mix-blend-mode\u003c/code>.\u003c/p>\n\u003c/blockquote>\n\u003cpre class=\"shiki shiki-themes github-light github-dark\" style=\"background-color:#fff;--shiki-dark-bg:#24292e;color:#24292e;--shiki-dark:#e1e4e8\" tabindex=\"0\">\u003ccode class=\"language-html\">\u003cspan class=\"line\">\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">&#x3C;\u003c/span>\u003cspan style=\"color:#22863A;--shiki-dark:#85E89D\">body\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">>\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">  &#x3C;\u003c/span>\u003cspan style=\"color:#22863A;--shiki-dark:#85E89D\">div\u003c/span>\u003cspan style=\"color:#6F42C1;--shiki-dark:#B392F0\"> class\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">=\u003c/span>\u003cspan style=\"color:#032F62;--shiki-dark:#9ECBFF\">\"gradient-text\"\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">>SOME TEXT&#x3C;/\u003c/span>\u003cspan style=\"color:#22863A;--shiki-dark:#85E89D\">div\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">>\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">&#x3C;/\u003c/span>\u003cspan style=\"color:#22863A;--shiki-dark:#85E89D\">body\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">>\u003c/span>\u003c/span>\u003c/code>\u003c/pre>\n\u003cpre class=\"shiki shiki-themes github-light github-dark\" style=\"background-color:#fff;--shiki-dark-bg:#24292e;color:#24292e;--shiki-dark:#e1e4e8\" tabindex=\"0\">\u003ccode class=\"language-css\">\u003cspan class=\"line\">\u003cspan style=\"color:#22863A;--shiki-dark:#85E89D\">body\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\"> {\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">  background\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">: \u003c/span>\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">var\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">(\u003c/span>\u003cspan style=\"color:#E36209;--shiki-dark:#FFAB70\">--bg-color\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">);\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">}\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#6F42C1;--shiki-dark:#B392F0\">.gradient-text\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\"> {\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">  background\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">: \u003c/span>\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">var\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">(\u003c/span>\u003cspan style=\"color:#E36209;--shiki-dark:#FFAB70\">--gradient-color\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">);\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">  color\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">: \u003c/span>\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">var\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">(\u003c/span>\u003cspan style=\"color:#E36209;--shiki-dark:#FFAB70\">--bg-color\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">);\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">  position\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">: \u003c/span>\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">relative\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">;\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">  mix-blend-mode\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">: \u003c/span>\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">difference\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">;\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">}\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#6F42C1;--shiki-dark:#B392F0\">.gradient-text::before\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\"> {\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">  content\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">: \u003c/span>\u003cspan style=\"color:#032F62;--shiki-dark:#9ECBFF\">\" \"\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">;\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">  display\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">: \u003c/span>\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">block\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">;\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">  position\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">: \u003c/span>\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">absolute\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">;\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">  top\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">: \u003c/span>\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">0\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">;\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">  left\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">: \u003c/span>\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">0\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">;\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">  right\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">: \u003c/span>\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">0\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">;\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">  bottom\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">: \u003c/span>\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">0\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">;\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">  background\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">: \u003c/span>\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">inherit\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">;\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">  mix-blend-mode\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">: \u003c/span>\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">difference\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">;\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">  pointer-events\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">: \u003c/span>\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">none\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">;\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">}\u003c/span>\u003c/span>\u003c/code>\u003c/pre>\n\u003ch2>原理 Principle\u003c/h2>\n\u003cp>DEMO 中，一共有三层定义：\u003c/p>\n\u003col>\n\u003cli>\u003ccode>body\u003c/code>：我们称之为 \u003ccode>TOP-LAYER-0\u003c/code> ；\u003c/li>\n\u003cli>\u003ccode>.gradient-text\u003c/code>：我们称之为 \u003ccode>CONTENT-LAYER-1\u003c/code> ，它由两部分组成：\n\u003col>\n\u003cli>\u003ccode>CONTENT-BG-1\u003c/code> ：绘制着我们定义的\u003ccode>var(--gradient-color)\u003c/code>\u003c/li>\n\u003cli>\u003ccode>CONTENT-INNER-2\u003c/code> ：绘制着我们的文本、svg 等内容\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\u003ccode>.gradient-text::before\u003c/code>：我们称之为 \u003ccode>TOP-LAYER-3\u003c/code> ；\u003c/li>\n\u003c/ol>\n\u003cblockquote>\n\u003cp>In Demo, There are three layers defined:\u003c/p>\n\u003col>\n\u003cli>\u003ccode>body\u003c/code>: we call it \u003ccode>TOP-LAYER-0\u003c/code>;\u003c/li>\n\u003cli>\u003ccode>.gradient-text\u003c/code>: we call it &quot;\u003ccode>CONTENT-LAYER-1\u003c/code>&quot; and it consists of two parts:\n\u003col>\n\u003cli>&quot;\u003ccode>CONTENT-BG-1\u003c/code>&quot;: draws the \u003ccode>var(--gradient-color)\u003c/code> we defined\u003c/li>\n\u003cli>&quot;\u003ccode>CONTENT-INNER-2\u003c/code>&quot;: drawing our text, svg, etc.\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\u003ccode>.gradient-text::before\u003c/code>: we call it \u003ccode>TOP-LAYER-3\u003c/code>；\u003c/li>\n\u003c/ol>\n\u003c/blockquote>\n\u003cp>所以这里总共有四种景受到影响，我们可以逐一推理每一种景发生的混合：\u003c/p>\n\u003cblockquote>\n\u003cp>So there are a total of four layer affected here, and we can reason about the mix one by one.\u003c/p>\n\u003c/blockquote>\n\u003col>\n\u003cli>\u003ccode>TOP-LAYER-0-RES\u003c/code> = \u003ccode>TOP-LAYER-0\u003c/code> ^ \u003ccode>CONTENT-BG-1\u003c/code> ^ \u003ccode>TOP-LAYER-3\u003c/code>；\n\u003col>\n\u003cli>∵ \u003ccode>CONTENT-BG-1\u003c/code> == \u003ccode>TOP-LAYER-3\u003c/code>\u003c/li>\n\u003cli>∴ \u003ccode>TOP-LAYER-0-RES\u003c/code> = \u003ccode>TOP-LAYER-0\u003c/code>\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\u003ccode>CONTENT-BG-1-RES\u003c/code> = \u003ccode>TOP-LAYER-0\u003c/code> ^ \u003ccode>CONTENT-BG-1\u003c/code> ^ \u003ccode>TOP-LAYER-3\u003c/code>\n\u003col>\n\u003cli>∵ \u003ccode>CONTENT-BG-1\u003c/code> ^ \u003ccode>TOP-LAYER-3\u003c/code>\u003c/li>\n\u003cli>∴ \u003ccode>CONTENT-BG-1-RES\u003c/code> = \u003ccode>TOP-LAYER-0\u003c/code>\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\u003ccode>CONTENT-INNER-2-RES\u003c/code> = \u003ccode>TOP-LAYER-0\u003c/code> ^ \u003ccode>CONTENT-INNER-2\u003c/code> ^ \u003ccode>TOP-LAYER-3\u003c/code>\n\u003col>\n\u003cli>∵ \u003ccode>TOP-LAYER-0\u003c/code> == \u003ccode>CONTENT-INNER-2\u003c/code>\u003c/li>\n\u003cli>∴ \u003ccode>CONTENT-INNER-2-RES\u003c/code> = \u003ccode>TOP-LAYER-3\u003c/code>\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\u003ccode>TOP-LAYER-3-RES\u003c/code> = \u003ccode>TOP-LAYER-0\u003c/code> ^ \u003ccode>CONTENT-BG-1\u003c/code> ^ \u003ccode>TOP-LAYER-3\u003c/code>\n\u003col>\n\u003cli>∵ \u003ccode>CONTENT-BG-1\u003c/code> == \u003ccode>TOP-LAYER-3\u003c/code>\u003c/li>\n\u003cli>∴ \u003ccode>TOP-LAYER-3-RES\u003c/code> = \u003ccode>TOP-LAYER-0\u003c/code>\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003c/ol>\n\u003cp>可以看到， \u003ccode>TOP-LAYER-0-RES\u003c/code> 、 \u003ccode>CONTENT-BG-1-RES\u003c/code> 、 \u003ccode>TOP-LAYER-3-RES\u003c/code> 最终都等于 \u003ccode>TOP-LAYER-0\u003c/code> ，所以它们看上去跟直接看到 \u003ccode>TOP-LAYER-0\u003c/code> 的效果一样。像是透明层一般。\u003c/p>\n\u003cblockquote>\n\u003cp>As you can see, \u003ccode>TOP-LAYER-0-RES\u003c/code>, \u003ccode>CONTENT-BG-1-RES\u003c/code>, and \u003ccode>TOP-LAYER-3-RES\u003c/code> end up being equal to \u003ccode>TOP-LAYER-0\u003c/code>, so they look the same as if you see \u003ccode>TOP-LAYER-0\u003c/code> directly. It looks like a transparent layer.\u003c/p>\n\u003c/blockquote>\n\u003cp>只剩下 \u003ccode>CONTENT-INNER-2-RES\u003c/code> 绘制的是 \u003ccode>TOP-LAYER-3\u003c/code> 的内容，也就是我们最终需要的渐变色。\u003c/p>\n\u003cblockquote>\n\u003cp>Only \u003ccode>CONTENT-INNER-2-RES\u003c/code> is left to draw the contents of \u003ccode>TOP-LAYER-3\u003c/code>, which is the gradient color we eventually need.\u003c/p>\n\u003c/blockquote>\n\u003ch2>缺陷 Defects\u003c/h2>\n\u003col>\n\u003cli>因为使用混合模式，它需要小心元素所在的父级。如果父级是一个复杂的图层，比如有复杂的背景，那么这个方案就无法生效了。所以父级最好是白色或者黑色\u003c/li>\n\u003c/ol>\n\u003cblockquote>\n\u003col>\n\u003cli>Because using blend mode, it needs to be careful about the parent layer where the element is located. If the parent is a complex layer, for example with a complex background, then this scheme will not work. so the parent layer should preferably be white or black.\u003c/li>\n\u003c/ol>\n\u003c/blockquote>\n\u003col start=\"2\">\n\u003cli>渐变的颜色不可以是带有透明通道的颜色，但由于这个方案本身就对背景颜色有明确的要求，所以这点可以间接规避。\u003c/li>\n\u003c/ol>\n\u003cblockquote>\n\u003col start=\"2\">\n\u003cli>The color of the gradient cannot with alpha, but the good thing is that we explicitly require the background color, so this can be circumvented indirectly.\u003c/li>\n\u003c/ol>\n\u003c/blockquote>\n\u003ch2>小提示 Tip\u003c/h2>\n\u003cp>在复杂的图层中，你可以需要这个 css 属性：\u003c/p>\n\u003cblockquote>\n\u003cp>In complex layers, you can need this css property:\u003c/p>\n\u003c/blockquote>\n\u003cpre class=\"shiki shiki-themes github-light github-dark\" style=\"background-color:#fff;--shiki-dark-bg:#24292e;color:#24292e;--shiki-dark:#e1e4e8\" tabindex=\"0\">\u003ccode class=\"language-css\">\u003cspan class=\"line\">\u003cspan style=\"color:#6F42C1;--shiki-dark:#B392F0\">.gradient-text-parent\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\"> {\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">  isolation\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">: \u003c/span>\u003cspan style=\"color:#005CC5;--shiki-dark:#79B8FF\">isolate\u003c/span>\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">;\u003c/span>\u003c/span>\n\u003cspan class=\"line\">\u003cspan style=\"color:#24292E;--shiki-dark:#E1E4E8\">}\u003c/span>\u003c/span>\u003c/code>\u003c/pre>\n","markdownContent":"\n## 示例 Demo\n\n\u003cmain id=\"demo\">\n  \u003cdiv id=\"text-container\">\n    \u003cdiv class=\"gradient-text\">\n    SOME\n    \u003csvg class=\"icon\" style=\"width: 1em;height: 1em;vertical-align: middle;fill: currentColor;overflow: hidden;\" viewBox=\"0 0 1024 1024\" version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" p-id=\"8288\">\u003cpath d=\"M512 0C230.4 0 0 230.4 0 512s230.4 512 512 512 512-230.4 512-512S793.6 0 512 0z m0 939.2c-235.2 0-427.2-192-427.2-427.2S276.8 84.8 512 84.8s427.2 192 427.2 427.2-192 427.2-427.2 427.2zM320 363.2m-64 0a64 64 0 1 0 128 0 64 64 0 1 0-128 0ZM704 363.2m-64 0a64 64 0 1 0 128 0 64 64 0 1 0-128 0ZM734.4 555.2H289.6c-17.6 0-33.6 8-46.4 20.8s-17.6 33.6-12.8 51.2C256 763.2 376 857.6 512 857.6s256-97.6 281.6-230.4c4.8-17.6 0-33.6-12.8-51.2-12.8-12.8-30.4-20.8-46.4-20.8zM512 772.8c-84.8 0-161.6-56-187.2-132.8H704c-30.4 81.6-107.2 132.8-192 132.8z\" p-id=\"8289\">\u003c/path>\u003c/svg>\n    TEXT\n    \u003c/div>\n  \u003c/div>\n  \u003cdiv class=\"controllers\">\n    \u003cfieldset>\n      \u003clegend>背景色 Background Color\u003c/legend>\n      \u003cinput id=\"bg-color\" type=\"color\" />\n      \u003cscript>\n        const bindInputColor = (selector, cssProperty, defaultValue) => {\n          const ele = document.querySelector(selector);\n          ele.oninput = () => demo.style.setProperty(cssProperty, ele.value);\n          ele.value = defaultValue;\n          ele.oninput();\n        };\n        bindInputColor(\"#bg-color\", \"--background-color\", \"#ffffff\");\n      \u003c/script>\n    \u003c/fieldset>\n    \u003cfieldset>\n      \u003clegend>渐变色 Gradient Color\u003c/legend>\n      \u003clabel for=\"start-color\">开始色 Start Color\u003c/label>\n      \u003cinput id=\"start-color\" type=\"color\" />\n      \u003clabel for=\"end-color\">结束色 End Color\u003c/label>\n      \u003cinput id=\"end-color\" type=\"color\" />\n      \u003cscript>\n        bindInputColor(\"#start-color\", \"--gradient-color-start\", \"#1f00ff\");\n        bindInputColor(\"#end-color\", \"--gradient-color-end\", \"#ff0000\");\n      \u003c/script>\n    \u003c/fieldset>\n  \u003c/div>\n  \u003cstyle>\n    #demo {\n      display: flex;\n      flex-direction: column;\n      align-items: center;\n    }\n    #text-container {\n      --gradient-color: linear-gradient(\n        45deg,\n        var(--gradient-color-start),\n        var(--gradient-color-end)\n      );\n      background-color: var(--background-color);\n      font-size: 3em;\n      font-weight: bold;\n      display: inline-block;\n    }\n    #text-container .gradient-text {\n      display: flex;\n      align-items: center;\n    }\n    #text-container .gradient-text {\n      background: var(--gradient-color);\n      color: var(--background-color);\n      position: relative;\n      mix-blend-mode: difference;\n    }\n    #text-container .gradient-text::before {\n      content: \" \";\n      display: block;\n      position: absolute;\n      top: 0;\n      left: 0;\n      right: 0;\n      bottom: 0;\n      background: inherit;\n      mix-blend-mode: difference;\n      pointer-events: none;\n    }\n    .controllers {\n      display: flex;\n      justify-content: space-around;\n      flex-wrap: wrap;\n      width: 100%;\n    }\n    .controllers fieldset {\n      display: flex;\n      align-items: center;\n      justify-content: center;\n      flex-direction: column;\n    }\n  \u003c/style>\n\u003c/main>\n\n## 起因 The Story\n\n探究这个问题的起因，是源于我打算把公司的图标从 font 逐步转化成 svg。\n\n> My plan is convert the company's icon from font to svg gradually.\n\n虽然绘制性能有所下降，但是整体的好处是比 font 多得多的：比如“按需引入”，“多色”，“动画”，“可访问性”等等。\n\n> Although the drawing performance maybe reduced, the overall benefits are much more than font: \"dynamic import\", \"multi-color\", \"animation\", \"accessibility\", etc.\n\n但之前使用`background-clip:text`的方案就不好用了，因为默认情况下，svg 的 path 使用的是`fill=\"currentColor\"`这样的写法。诸多原因，我不得不思考较好的替代的方案。\n\n> But the previous solution of using `background-clip:text` doesn't work well,\n> because by default, svg's path use `fill=\"currentColor\"`. For many reasons, I\n> had to think of a better alternative.\n\n## 做法 Usage\n\n核心思路是使用`mix-blend-mode`。\n\n> The core idea is to use `mix-blend-mode`.\n\n```html\n\u003cbody>\n  \u003cdiv class=\"gradient-text\">SOME TEXT\u003c/div>\n\u003c/body>\n```\n\n```css\nbody {\n  background: var(--bg-color);\n}\n.gradient-text {\n  background: var(--gradient-color);\n  color: var(--bg-color);\n  position: relative;\n  mix-blend-mode: difference;\n}\n.gradient-text::before {\n  content: \" \";\n  display: block;\n  position: absolute;\n  top: 0;\n  left: 0;\n  right: 0;\n  bottom: 0;\n  background: inherit;\n  mix-blend-mode: difference;\n  pointer-events: none;\n}\n```\n\n## 原理 Principle\n\nDEMO 中，一共有三层定义：\n\n1. `body`：我们称之为 `TOP-LAYER-0` ；\n1. `.gradient-text`：我们称之为 `CONTENT-LAYER-1` ，它由两部分组成：\n   1. `CONTENT-BG-1` ：绘制着我们定义的`var(--gradient-color)`\n   1. `CONTENT-INNER-2` ：绘制着我们的文本、svg 等内容\n1. `.gradient-text::before`：我们称之为 `TOP-LAYER-3` ；\n\n> In Demo, There are three layers defined:\n>\n> 1. `body`: we call it `TOP-LAYER-0`;\n> 1. `.gradient-text`: we call it \"`CONTENT-LAYER-1`\" and it consists of two parts:\n>    1. \"`CONTENT-BG-1`\": draws the `var(--gradient-color)` we defined\n>    1. \"`CONTENT-INNER-2`\": drawing our text, svg, etc.\n> 1. `.gradient-text::before`: we call it `TOP-LAYER-3`；\n\n所以这里总共有四种景受到影响，我们可以逐一推理每一种景发生的混合：\n\n> So there are a total of four layer affected here, and we can reason about the mix one by one.\n\n1. `TOP-LAYER-0-RES` = `TOP-LAYER-0` ^ `CONTENT-BG-1` ^ `TOP-LAYER-3`；\n   1. ∵ `CONTENT-BG-1` == `TOP-LAYER-3`\n   1. ∴ `TOP-LAYER-0-RES` = `TOP-LAYER-0`\n1. `CONTENT-BG-1-RES` = `TOP-LAYER-0` ^ `CONTENT-BG-1` ^ `TOP-LAYER-3`\n   1. ∵ `CONTENT-BG-1` ^ `TOP-LAYER-3`\n   1. ∴ `CONTENT-BG-1-RES` = `TOP-LAYER-0`\n1. `CONTENT-INNER-2-RES` = `TOP-LAYER-0` ^ `CONTENT-INNER-2` ^ `TOP-LAYER-3`\n   1. ∵ `TOP-LAYER-0` == `CONTENT-INNER-2`\n   1. ∴ `CONTENT-INNER-2-RES` = `TOP-LAYER-3`\n1. `TOP-LAYER-3-RES` = `TOP-LAYER-0` ^ `CONTENT-BG-1` ^ `TOP-LAYER-3`\n   1. ∵ `CONTENT-BG-1` == `TOP-LAYER-3`\n   1. ∴ `TOP-LAYER-3-RES` = `TOP-LAYER-0`\n\n可以看到， `TOP-LAYER-0-RES` 、 `CONTENT-BG-1-RES` 、 `TOP-LAYER-3-RES` 最终都等于 `TOP-LAYER-0` ，所以它们看上去跟直接看到 `TOP-LAYER-0` 的效果一样。像是透明层一般。\n\n> As you can see, `TOP-LAYER-0-RES`, `CONTENT-BG-1-RES`, and `TOP-LAYER-3-RES` end up being equal to `TOP-LAYER-0`, so they look the same as if you see `TOP-LAYER-0` directly. It looks like a transparent layer.\n\n只剩下 `CONTENT-INNER-2-RES` 绘制的是 `TOP-LAYER-3` 的内容，也就是我们最终需要的渐变色。\n\n> Only `CONTENT-INNER-2-RES` is left to draw the contents of `TOP-LAYER-3`, which is the gradient color we eventually need.\n\n## 缺陷 Defects\n\n1. 因为使用混合模式，它需要小心元素所在的父级。如果父级是一个复杂的图层，比如有复杂的背景，那么这个方案就无法生效了。所以父级最好是白色或者黑色\n\n> 1. Because using blend mode, it needs to be careful about the parent layer where the element is located. If the parent is a complex layer, for example with a complex background, then this scheme will not work. so the parent layer should preferably be white or black.\n\n2. 渐变的颜色不可以是带有透明通道的颜色，但由于这个方案本身就对背景颜色有明确的要求，所以这点可以间接规避。\n\n> 2. The color of the gradient cannot with alpha, but the good thing is that we explicitly require the background color, so this can be circumvented indirectly.\n\n## 小提示 Tip\n\n在复杂的图层中，你可以需要这个 css 属性：\n\n> In complex layers, you can need this css property:\n\n```css\n.gradient-text-parent {\n  isolation: isolate;\n}\n```\n"}}}</script>
+        <script src="/assets/entries/entry-client-routing.CCKOlsvO.js" type="module" async></script>
+        <link rel="modulepreload" href="/assets/entries/pages_article_-id.B90W03kN.js" as="script" type="text/javascript">
+        <link rel="modulepreload" href="/assets/chunks/chunk-DwSuT-WT.js" as="script" type="text/javascript">
+        <link rel="modulepreload" href="/assets/chunks/chunk-DdC9uZfL.js" as="script" type="text/javascript">
+      </body>
+    </html>
