@@ -2,10 +2,10 @@
 export { onRenderHtml };
 
 import ReactDOMServer from "react-dom/server";
-import { Layout } from "./Layout";
+import { Layout } from "./Layout.tsx";
 import { escapeInject as html, dangerouslySkipEscape } from "vike/server";
 import type { OnRenderHtmlAsync } from "vike/types";
-import { getPageTitle } from "./getPageTitle";
+import { getPageTitle } from "./getPageTitle.ts";
 
 const onRenderHtml: OnRenderHtmlAsync = async (
   pageContext
@@ -30,7 +30,7 @@ const onRenderHtml: OnRenderHtmlAsync = async (
   const desc =
     pageContext.data?.description ||
     pageContext.config.description ||
-    "Demo of using Vike";
+    "Gaubee's Blogs / Events / Projects";
 
   const documentHtml = html`<!DOCTYPE html>
     <html lang="en">
