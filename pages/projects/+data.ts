@@ -6,10 +6,7 @@ export type Data = Awaited<ReturnType<typeof data>>;
 // this file always runs on the server-side, see https://vike.dev/data#server-side
 import type { PageContextServer } from "vike/types";
 
-import { getAllArticles } from "../../database/articles.controller";
-import { getAllEvents } from "../../database/events.controller";
-import { map_get_or_put } from "@gaubee/util";
-import { readProjectsJson } from "../../database/projects.controller";
+import { readProjectsJson } from "../../database/projects.controller.ts";
 
 const data = async (pageContext: PageContextServer) => {
   const projects = await readProjectsJson();

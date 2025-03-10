@@ -2,8 +2,8 @@
 export { onRenderClient }
 
 import ReactDOM from 'react-dom/client'
-import { Layout } from './Layout'
-import { getPageTitle } from './getPageTitle'
+import { Layout } from './Layout.tsx'
+import { getPageTitle } from './getPageTitle.ts'
 import type { OnRenderClientAsync } from 'vike/types'
 
 let root: ReactDOM.Root

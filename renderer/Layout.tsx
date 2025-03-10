@@ -103,6 +103,8 @@ function Content({ children }: { children: React.ReactNode }) {
           padding: 20,
           paddingBottom: 50,
           minHeight: "100vh",
+          backgroundColor: "#fafafa" /* 浅灰背景降低视觉疲劳 */,
+          color: "#333" /* 深灰文字提高对比度 */,
         }}
       >
         {children}
@@ -120,7 +122,7 @@ function Logo() {
       }}
     >
       <a href="/">
-        <img src="img/head.webp" height={64} width={64} alt="logo" />
+        <img src="/img/head.webp" height={64} width={64} alt="logo" />
       </a>
     </div>
   );

@@ -1,9 +1,32 @@
 body {
   margin: 0;
-  font-family: sans-serif;
+  font-family: 
+    /* macOS 优先 */ "PingFang SC",
+    /* 苹方（macOS系统默认）[1](@ref) */ /* Windows 优先 */ "HarmonyOS Sans SC",
+    /* 华为/荣耀设备首选（需手动安装）[1](@ref) */ /* 国产设备优先 */
+      "HONOR Sans SC",
+    /* 荣耀设备默认字体（MagicOS系统）[1,2,3,5](@ref) */ "MiSans",
+    /* 小米设备默认字体（MIUI系统）[7](@ref) */ /* 开源兜底 */
+      "Source Han Sans SC",
+    /* 思源黑体（Adobe/Google开源） */ "Microsoft YaHei",
+    /* Windows备选 */ sans-serif; /* 通用无衬线回退 */
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 2;
 }
 * {
   box-sizing: border-box;
+}
+/* 网页5、网页9的卡片阴影与标题留白 */
+h1,
+h2,
+h3 {
+  margin: 1.5em 0 0.8em;
+  font-weight: 600;
+  letter-spacing: 0.05em; /* 标题字间距微调 */
+}
+
+h1 {
+  font-size: 2.2rem;
+  border-bottom: 2px solid #eee; /* 主标题下划线分隔 */
+  padding-bottom: 0.5em;
 }

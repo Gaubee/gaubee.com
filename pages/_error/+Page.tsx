@@ -1,6 +1,6 @@
 export { Page }
 
-import { usePageContext } from '../../renderer/usePageContext'
+import { usePageContext } from '../../renderer/usePageContext.tsx'
 
 function Page() {
   const pageContext = usePageContext()

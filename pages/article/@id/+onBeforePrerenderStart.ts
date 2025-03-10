@@ -2,8 +2,8 @@
 export { onBeforePrerenderStart };
 
 import type { OnBeforePrerenderStartAsync } from "vike/types";
-import { getAllArticles } from "../../../database/articles.controller";
-import { Data } from "./+data";
+import { getAllArticles } from "../../../database/articles.controller.ts";
+import { Data } from "./+data.ts";
 
 const onBeforePrerenderStart: OnBeforePrerenderStartAsync<Data> = async () => {
   const allArticles = await getAllArticles();

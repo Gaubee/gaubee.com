@@ -1,7 +1,7 @@
 export { Page };
 
-import { useData } from "../../renderer/useData";
-import { Data } from "./+data";
+import { useData } from "../../renderer/useData.ts";
+import { Data } from "./+data.ts";
 
 function Page() {
   const projects = useData<Data>();

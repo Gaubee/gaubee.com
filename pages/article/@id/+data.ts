@@ -4,7 +4,7 @@ export type Data = Awaited<ReturnType<typeof data>>;
 
 import type { PageContextServer } from "vike/types";
 import { redirect } from "vike/abort";
-import { getAllArticles } from "../../../database/articles.controller";
+import { getAllArticles } from "../../../database/articles.controller.ts";
 
 const data = async (pageContext: PageContextServer) => {
   const allArticles = await getAllArticles();

@@ -1,8 +1,8 @@
 export { Page };
 
-import { useData } from "../../renderer/useData";
-import { Data } from "./+data";
-import { Counter } from "./Counter";
+import { useData } from "../../renderer/useData.ts";
+import { Data } from "./+data.ts";
+import { Counter } from "./Counter.tsx";
 
 function Page() {
   const data = useData<Data>();

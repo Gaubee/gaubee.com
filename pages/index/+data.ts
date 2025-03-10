@@ -2,10 +2,10 @@
 export { data };
 export type Data = Awaited<ReturnType<typeof data>>;
 
-import { getAllArticles } from "../../database/articles.controller";
-import { getAllEvents } from "../../database/events.controller";
+import { getAllArticles } from "../../database/articles.controller.ts";
+import { getAllEvents } from "../../database/events.controller.ts";
 import { map_get_or_put } from "@gaubee/util";
-import { md } from "../../database/markdown.helper";
+import { md } from "../../database/markdown.helper.ts";
 
 const data = async () => {
   const articles = await getAllArticles();
