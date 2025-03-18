@@ -21,6 +21,8 @@ export const getAllArticles = func_remember(async () => {
         const updatedAt = new Date(info.data.updated || entry.stats.ctimeMs);
         const tags = Array.isArray(info.data.tags) ? info.data.tags : [];
         return {
+          fileEntry: entry,
+          originMetadata: info.data,
           metadata: { ...info.data, id, title, createdAt, updatedAt, tags },
           htmlContent: await md.renderAsync(info.content),
           markdownContent: info.content,

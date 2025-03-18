@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@gaubee/util':
-        specifier: ^0.21.1
-        version: 0.21.1
+        specifier: ^0.25.1
+        version: 0.25.1
       '@tailwindcss/vite':
         specifier: ^4.0.6
         version: 4.0.6(vite@6.1.0(@types/node@22.13.4)(jiti@2.4.2)(lightningcss@1.29.1))
@@ -70,8 +70,8 @@ importers:
         version: 6.1.0(@types/node@22.13.4)(jiti@2.4.2)(lightningcss@1.29.1)
     devDependencies:
       '@gaubee/nodekit':
-        specifier: ^0.5.0
-        version: 0.5.0
+        specifier: ^0.6.2
+        version: 0.6.2
       '@octokit/rest':
         specifier: ^21.1.1
         version: 21.1.1
@@ -363,11 +363,11 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@gaubee/nodekit@0.5.0':
-    resolution: {integrity: sha512-68KlksHGBdasPmL8IB7RmP1olPByO+9mQWHUefSWb6ObAXqnOV5hhP9xVk9HOuczuLWx6fGiXNk6iD2poKWgdw==}
+  '@gaubee/nodekit@0.6.2':
+    resolution: {integrity: sha512-Tm1LPtD6CH9CBDHZky5jg6/q0RrKEQe2yTcsAtW3bPNxYcllZ9lFkyKYSTOLN+wGAsY8VXheol0ql0VexEpp9g==}
 
-  '@gaubee/util@0.21.1':
-    resolution: {integrity: sha512-De7pWnAAUXtPM40KXw/hxT7JMXTeRxm0R58v//AxEUS8vu50LIxI+3hXxHaVQFLVFNjM/HrHOUXPe5nrkiIbrA==}
+  '@gaubee/util@0.25.1':
+    resolution: {integrity: sha512-pcWPtIeqfSgB5A2DyC9g1Kh9ScAFq0Mt0saiZJtKeG2oJDsw5UOW3sG6UYDGCfQQcN3LNaqnxfbiGqA3lKEXFA==}
 
   '@jridgewell/gen-mapping@0.3.8':
     resolution: {integrity: sha512-imAbBGkb+ebQyxKgzv5Hu2nmROxoDOXHh80evxdoXNOrvAnVx7zimzc1Oo5h9RlfV4vPXaE2iM5pOFbvOCClWA==}
@@ -1967,15 +1967,16 @@ snapshots:
   '@esbuild/win32-x64@0.24.2':
     optional: true
 
-  '@gaubee/nodekit@0.5.0':
+  '@gaubee/nodekit@0.6.2':
     dependencies:
-      '@gaubee/util': 0.21.1
+      '@gaubee/util': 0.25.1
       dax-sh: 0.42.0
+      gray-matter: 4.0.3
       ignore: 6.0.2
       minimatch: 10.0.1
       tslib: 2.8.1
 
-  '@gaubee/util@0.21.1':
+  '@gaubee/util@0.25.1':
     dependencies:
       tslib: 2.8.1
 
