@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <link rel="stylesheet" type="text/css" href="/assets/static/renderer_css_index-e8e12f67.BMrmlmx0.css">
+        <link rel="stylesheet" type="text/css" href="/assets/static/renderer_Layout-031b266d.CEjdw0pU.css">
+        <meta charset="UTF-8" />
+        <link rel="icon" href="/img/head.webp" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="description" content="Gaubee&#039;s Blogs / Events / Projects" />
+        <title>Gaubee&#039;s Site</title>
+      </head>
+      <body>
+        <div id="root"><link rel="preload" as="image" href="/img/head.webp"/><div style="display:flex;max-width:900px;margin:auto"><div style="display:flex;flex-direction:column;justify-content:space-between;max-height:100vh;width:38%;max-width:26em;position:sticky;top:0"><div id="sidebar" style="padding:20px;flex-shrink:0;display:flex;flex-direction:column;line-height:1.8em;border-right:2px solid #eee"><div style="margin-top:20px;margin-bottom:10px"><a href="/"><img src="/img/head.webp" height="64" width="64" alt="logo"/></a></div><a href="/" class="">Timeline</a><a href="/projects" class="">Projects</a><a href="/about" class="">About</a></div><div style="padding:16px"><small>本网站不收集任何访问者的行为与信息，不做任何商业运作，仅仅为个人使用。</small><small style="display:block;margin-top:8px"><a href="https://beian.miit.gov.cn/#/Integrated/recordQuery">闽ICP备17026139号-1</a></small></div></div><div id="page-container"><div id="page-content" style="padding:20px;padding-bottom:50px;min-height:100vh;background-color:#fafafa;color:#333"><style type="text/css">
+          main > p {
+            text-indent: 1em;
+          }
+        </style><h1>JS的心灵契约——Mide-Pact.js一个简洁又异常强大的Key-Value管理器</h1><main><h1>前言</h1>
+<p><a href="https://gist.github.com/Gaubee/e32b0001413d641b224c1f9c9d359161">mind-pact.js</a>
+这个东西，以前做过，但是做得不够好，而且是整合在以前开发的MVVM框架里头，作为Model层。
+这两天整理了一下，凝练了核心的思想。</p>
+<p>这个库，是一个key-value管理器。简单的说就是：</p>
+<pre><code class="language-js">model.set("a.b",1);
+model.get("a");//{ b:1 }
+</code></pre>
+<p><strong>最重要的特性：支持表达式</strong>：</p>
+<pre><code class="language-js">model.get("a['b']");//1
+</code></pre>
+<p>但我们知道JS的表达式里头是可以支持函数的定义等等的，这里做了一定的限制，但又不会失去灵活性，具体看如下API描述：</p>
+<h1>API 文档</h1>
+<h2>MP(basedata)</h2>
+<ul>
+<li><strong>basedata</strong> (<em>except Primitive values</em>) : 除了<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Data_structures#Primitive_values">Primitive values</a> 以外的任意对象</li>
+</ul>
+<h2>MP.prototype.set(paths, value, context)</h2>
+<ul>
+<li><strong>paths</strong> (<em>string</em>) : <del>懒得描述</del></li>
+<li><strong>value</strong> (<em>any</em>) : <del>懒得描述</del></li>
+<li><strong>context</strong> (<em>object | null</em>) : 表达式的上下文对象，具体怎么用后面描述</li>
+</ul>
+<h2>MP.prototype.get(paths, context)</h2>
+<ul>
+<li><strong>paths</strong> (<em>string</em>) : <del>懒得描述</del></li>
+<li><strong>context</strong> (<em>object | null</em>) : 表达式的上下文对象，具体怎么用后面描述</li>
+</ul>
+<p>这里说一下这个<strong>context</strong>对象的作用把。就是前面说到的“JS的表达式里头是可以支持函数的定义等等的，这里做了一定的限制，但又不会失去灵活性”的一个解决方案，比如说：</p>
+<pre><code class="language-js">// 原始表达式
+a+(function(){ return Math.random() })()+b;
+// 提取出function部分后变成：
+a+foo()+b
+//context就是提取出来的对象：
+context = {
+  foo:function(){ return Math.random() }
+}
+</code></pre>
+<p>如何深入去用我就不多说了</p>
+<h2>MP.CustomType(getter [, setter])</h2>
+<blockquote>
+<p>自定义数据类型</p>
+</blockquote>
+<ul>
+<li><strong>getter</strong> (<em>string| [string,any] | function($cur_key, $pre_path_str, $full_path_str)</em>) : 支持三种格式：字符串表达式、字符串表达式+上下文，函数</li>
+<li><strong>setter</strong> (<em>string| [string,any] | function($cur_key, $new_value, $pre_path_str, $full_path_str)</em>) : <em>此参数可空</em></li>
+</ul>
+<p>自定义数据类型，为什么不直接使用JS内置的Getter、Setter呢？这个自定义类型的优势如下：</p>
+<ol>
+<li>支持字符串，而且是<strong>鸭子类型</strong>的数据，这就意味着可以序列化，使用JSON来传递这个动态数据的Getter、Setter。</li>
+<li>更为丰富的上下文信息，JS原始的setter、getter是只能知道自己的this对象，而CustomType在运行getter、setter可以知道自己所在的调用时的具体路径</li>
+</ol>
+<p>值得注意的是这里的表达式会比<code>MP.prototype.get/set</code>中的表达式更为强大，因为内置了一些关键字。这里统一讲一下关键字：</p>
+<table>
+<thead>
+<tr>
+<th align="center">关键字</th>
+<th align="center">支持get/set</th>
+<th align="center">支持CustomType的getter/setter</th>
+<th align="center">描述</th>
+<th align="center">备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center">__vm</td>
+<td align="center">√/√</td>
+<td align="center">√/√</td>
+<td align="center">model实例对象本身</td>
+<td align="center"></td>
+</tr>
+<tr>
+<td align="center">__context</td>
+<td align="center">√/√</td>
+<td align="center">√/√</td>
+<td align="center">上下文对象</td>
+<td align="center"></td>
+</tr>
+<tr>
+<td align="center">__global</td>
+<td align="center">√/√</td>
+<td align="center">√/√</td>
+<td align="center">全局对象</td>
+<td align="center">浏览器环境中指向window</td>
+</tr>
+<tr>
+<td align="center">$cur_key</td>
+<td align="center">×/×</td>
+<td align="center">√/√</td>
+<td align="center">当前对象所在this中的key</td>
+<td align="center">a.b.c = CustomType( * , * )，这里指向的就是"c"</td>
+</tr>
+<tr>
+<td align="center">$pre_path_str</td>
+<td align="center">×/×</td>
+<td align="center">√/√</td>
+<td align="center"><em>看备注</em></td>
+<td align="center">上述条件，这里指向"a.b"</td>
+</tr>
+<tr>
+<td align="center">$full_path_str</td>
+<td align="center">×/×</td>
+<td align="center">√/√</td>
+<td align="center"><em>看备注</em></td>
+<td align="center">上述条件，这里指向"a.b.c"</td>
+</tr>
+<tr>
+<td align="center">$cur_value</td>
+<td align="center">×/×</td>
+<td align="center">√/×</td>
+<td align="center">当前缓存值</td>
+<td align="center">初始化是null，每运行一次getter都会被更新</td>
+</tr>
+<tr>
+<td align="center">$new_value</td>
+<td align="center">×/×</td>
+<td align="center">×/√</td>
+<td align="center">setter所要赋予的值</td>
+<td align="center"></td>
+</tr>
+<tr>
+<td align="center">$old_value</td>
+<td align="center">×/×</td>
+<td align="center">×/√</td>
+<td align="center">当前缓存值</td>
+<td align="center">同$cur_value，只是这里只能在setter中使用</td>
+</tr>
+</tbody>
+</table>
+<p>所以围绕这些关键字，来实现一个基础的CustomType对象，就是<code>fullName=firstName lastName</code>。
+实现代码如下：
+<strong>版本1</strong></p>
+<blockquote>
+<p>这个是单纯的getter，简单直观，但是问题在于"me."这个写死在表达式中了，就意味着如果这个数据发生迁移或者复制到其它地方，就会运行出现问题。</p>
+</blockquote>
+<pre><code class="language-js">m.set("me", {
+    firstname: "Gaubee",
+    lastname: "Bangeel",
+    fullname: CustomType("me.firstname+' '+me.lastname")
+});
+</code></pre>
+<p><strong>版本2</strong></p>
+<blockquote>
+<p>这里用到了<code>__vm</code>与<code>$pre_path_str</code>两个关键字，其中<code>$pre_path_str</code>用来替代版本1中的"me."，然后由于使用了<code>$pre_path_str</code>关键字，解析就不会用<code>__vm.get(*)</code>自动包裹这个关键字，所以需要手动添加这段代码，结果如下：</p>
+</blockquote>
+<pre><code class="language-js">m.set("me", {
+    firstname: "Gaubee",
+    lastname: "Bangeel",
+    fullname: CustomType("__vm.get($pre_path_str+'.firstname')+' '+__vm.get($pre_path_str+'.lastname')")
+});
+</code></pre>
+<p><strong>版本3</strong></p>
+<blockquote>
+<p>这里实现了Setter，要值得注意的是，setter的表达式里头，多个语句的分割是<code>,</code>而不是<code>;</code>，因为这个单个表达式，简而言之就是解析是把表达式处理成<code>return *</code>，所以如果使用<code>;</code>就会导致<code>;</code>后面的语句不运行（PS：<strong>不要利用这点来实现局部变量的定义，虽然var声明会自动前置，但是请使用context来声明局部变量，否则如果变量名不在context中，会被直接包裹成<code>__vm.get(key)</code>进行处理</strong>）。另外值得注意的是这里表达式最后返回是<code>null</code>，如果返回<code>null/undefined/false</code>，那么就意味着$new_value最后是存储到默认的缓存中；如果返回的不是空值，那么就会被当成是路径，直接将$new_value赋值到这个路径所指定的对象中。</p>
+</blockquote>
+<pre><code class="language-js">m.set("me", {
+    firstname: "Gaubee",
+    lastname: "Bangeel",
+    fullname: CustomType("__vm.get($pre_path_str+'.firstname')+' '+__vm.get($pre_path_str+'.lastname')",
+        "($new_value=$new_value.split(' ')),\
+        __vm.set($pre_path_str+'.firstname',$new_value[0]),\
+        __vm.set($pre_path_str+'.lastname',$new_value[1]),\
+        null")
+});
+</code></pre>
+<h1>技术实现细节</h1>
+<blockquote>
+<p>这部分是讲到一些效率优化、解析处理等实现细节。</p>
+</blockquote>
+<h2>1</h2>
+<p>因为不是以往的<code>a.b.c</code>这样耿直的用<code>.</code>来分割了，而MP涉及到表达式，即便用了缓存，如果遇到数组<code>a.1</code>~<code>a.1000</code>，那么缓存还有用么？
+这个是在开始做的时候一个难点，最后实现确实我用了缓存，但是不是耿直用。这里缓存的不是<code>路径:函数</code>，而是<code>模式:函数</code>。基于模式的缓存，比如说<code>a.1</code>与<code>a.1000</code>，这两者的模式是一样的，所以只用了同一个模式工厂函数，而后将<code>a.1/1000</code>传入模式工厂函数中，返回一个带着闭包的函数。怎么解释看下面这个实例：</p>
+<pre><code class="language-js">MP.formatKey("a.b[A.B+C-D(E,F)].c");
+/*[ 'a', 'b', 
+function(__vm) {
+    return PLA(matchs[0], __vm, __context) +
+        PLA(matchs[1], __vm, __context) -
+        PLA(matchs[2], __vm, __context)(
+            PLA(matchs[3], __vm, __context),
+            PLA(matchs[4], __vm, __context)
+        )
+}
+, 'c']
+这里返回的数组中的第三个对象，就是模式工厂返回的函数，其中matchs、__context都是处于闭包中，
+所以同样模式的表达式（`@+@-@(@,@)`）可以公用这个模式工厂。
+*/
+</code></pre>
+<p>因为我认为在一个WebApp中，取值路径可能有上万个，但是模式不过那么几种——应用里头的字符串就那些。所以基于模式的匹配是很靠谱的一种解决方案，即便有动态的模式，使用context也能化繁为简，充分利用模式缓存。</p>
+<h2>2</h2>
+<p>另外，看上面那个formatKey返回的数组数据，可以发现其实<code>[ * ]</code>包裹起来的部分其实是会被解析成函数的，所以<code>[ * ]</code>内外是有性能区别的，也因此，能在外部写<code>a.1</code>这种违反JS语法的写法，正常JS写法是<code>a[1]</code>，而为了性能，我建议是使用<code>a.1</code>。上面说到模式，这里说道表达式，就不得不说一下解析：
+这里是提取<code>x.x.x</code>作为<strong>路径单元</strong>，<code>[ * ]</code>作为<strong>模式单元</strong>，所以上述例子里头<code>[A.B+C-D(E,F)]</code>开头的<code>A.B</code>是被会识别成<strong>路径单元</strong>，最后模式才<strong>不是</strong>：<code>@.@+@-@(@,@)</code></p>
+<h2>3</h2>
+<p>动态的赋值。如果一个路径是<code>a.b.c.d</code>，而<code>a</code>属性本身就是空的话，那么在<code>model.set('a.b.c.d',value)</code>的过程中，会动态创建值给<code>a b c d</code>，如果路径某一部分的key是整数，那么动态创建的就会是数组：</p>
+<pre><code class="language-js">m.set("A.B.1.C","ccc");
+console.log(m.get("A"));
+//{ B: [ , { C: 'ccc' } ] }
+</code></pre>
+<hr>
+<p>【<strong>8/21 6:08</strong>】 目前功能有限，但代码就不到400行，接下来会加入动态监听功能，有了这个MP才完整。</p></main></div></div></div></div>
+        <script id="vike_pageContext" type="application/json">{"abortReason":"!undefined","_urlRewrite":null,"_urlRedirect":"!undefined","abortStatusCode":"!undefined","_abortCall":"!undefined","_pageContextInitIsPassedToClient":"!undefined","pageId":"/pages/article/@id","routeParams":{"id":"0027.The-Mind-contract-of-js-IDE-Pact.js-is-a-simple-and-extremely-powerful-Key-Value-manager"},"data":{"article":{"fileEntry":{"path":"/home/runner/work/gaubee.com/gaubee.com/articles/0027.The-Mind-contract-of-js-IDE-Pact.js-is-a-simple-and-extremely-powerful-Key-Value-manager.md","options":{"cwd":"/home/runner/work/gaubee.com/gaubee.com/articles"},"isFile":true,"isDirectory":false},"originMetadata":{"layout":"layouts/article.njk","title":"JS的心灵契约——Mide-Pact.js一个简洁又异常强大的Key-Value管理器","date":"!Date:2016-08-20T21:56:03.000Z","updated":"!Date:2016-10-29T09:24:39.000Z","tags":["javascript","tools"]},"metadata":{"layout":"layouts/article.njk","title":"JS的心灵契约——Mide-Pact.js一个简洁又异常强大的Key-Value管理器","date":"!Date:2016-08-20T21:56:03.000Z","updated":"!Date:2016-10-29T09:24:39.000Z","tags":["javascript","tools"],"id":"0027.The-Mind-contract-of-js-IDE-Pact.js-is-a-simple-and-extremely-powerful-Key-Value-manager","createdAt":"!Date:2016-08-20T21:56:03.000Z","updatedAt":"!Date:2016-10-29T09:24:39.000Z"},"htmlContent":"\u003ch1>前言\u003c/h1>\n\u003cp>\u003ca href=\"https://gist.github.com/Gaubee/e32b0001413d641b224c1f9c9d359161\">mind-pact.js\u003c/a>\n这个东西，以前做过，但是做得不够好，而且是整合在以前开发的MVVM框架里头，作为Model层。\n这两天整理了一下，凝练了核心的思想。\u003c/p>\n\u003cp>这个库，是一个key-value管理器。简单的说就是：\u003c/p>\n\u003cpre>\u003ccode class=\"language-js\">model.set(\"a.b\",1);\nmodel.get(\"a\");//{ b:1 }\n\u003c/code>\u003c/pre>\n\u003cp>\u003cstrong>最重要的特性：支持表达式\u003c/strong>：\u003c/p>\n\u003cpre>\u003ccode class=\"language-js\">model.get(\"a['b']\");//1\n\u003c/code>\u003c/pre>\n\u003cp>但我们知道JS的表达式里头是可以支持函数的定义等等的，这里做了一定的限制，但又不会失去灵活性，具体看如下API描述：\u003c/p>\n\u003ch1>API 文档\u003c/h1>\n\u003ch2>MP(basedata)\u003c/h2>\n\u003cul>\n\u003cli>\u003cstrong>basedata\u003c/strong> (\u003cem>except Primitive values\u003c/em>) : 除了\u003ca href=\"https://developer.mozilla.org/en-US/docs/Web/JavaScript/Data_structures#Primitive_values\">Primitive values\u003c/a> 以外的任意对象\u003c/li>\n\u003c/ul>\n\u003ch2>MP.prototype.set(paths, value, context)\u003c/h2>\n\u003cul>\n\u003cli>\u003cstrong>paths\u003c/strong> (\u003cem>string\u003c/em>) : \u003cdel>懒得描述\u003c/del>\u003c/li>\n\u003cli>\u003cstrong>value\u003c/strong> (\u003cem>any\u003c/em>) : \u003cdel>懒得描述\u003c/del>\u003c/li>\n\u003cli>\u003cstrong>context\u003c/strong> (\u003cem>object | null\u003c/em>) : 表达式的上下文对象，具体怎么用后面描述\u003c/li>\n\u003c/ul>\n\u003ch2>MP.prototype.get(paths, context)\u003c/h2>\n\u003cul>\n\u003cli>\u003cstrong>paths\u003c/strong> (\u003cem>string\u003c/em>) : \u003cdel>懒得描述\u003c/del>\u003c/li>\n\u003cli>\u003cstrong>context\u003c/strong> (\u003cem>object | null\u003c/em>) : 表达式的上下文对象，具体怎么用后面描述\u003c/li>\n\u003c/ul>\n\u003cp>这里说一下这个\u003cstrong>context\u003c/strong>对象的作用把。就是前面说到的“JS的表达式里头是可以支持函数的定义等等的，这里做了一定的限制，但又不会失去灵活性”的一个解决方案，比如说：\u003c/p>\n\u003cpre>\u003ccode class=\"language-js\">// 原始表达式\na+(function(){ return Math.random() })()+b;\n// 提取出function部分后变成：\na+foo()+b\n//context就是提取出来的对象：\ncontext = {\n  foo:function(){ return Math.random() }\n}\n\u003c/code>\u003c/pre>\n\u003cp>如何深入去用我就不多说了\u003c/p>\n\u003ch2>MP.CustomType(getter [, setter])\u003c/h2>\n\u003cblockquote>\n\u003cp>自定义数据类型\u003c/p>\n\u003c/blockquote>\n\u003cul>\n\u003cli>\u003cstrong>getter\u003c/strong> (\u003cem>string| [string,any] | function($cur_key, $pre_path_str, $full_path_str)\u003c/em>) : 支持三种格式：字符串表达式、字符串表达式+上下文，函数\u003c/li>\n\u003cli>\u003cstrong>setter\u003c/strong> (\u003cem>string| [string,any] | function($cur_key, $new_value, $pre_path_str, $full_path_str)\u003c/em>) : \u003cem>此参数可空\u003c/em>\u003c/li>\n\u003c/ul>\n\u003cp>自定义数据类型，为什么不直接使用JS内置的Getter、Setter呢？这个自定义类型的优势如下：\u003c/p>\n\u003col>\n\u003cli>支持字符串，而且是\u003cstrong>鸭子类型\u003c/strong>的数据，这就意味着可以序列化，使用JSON来传递这个动态数据的Getter、Setter。\u003c/li>\n\u003cli>更为丰富的上下文信息，JS原始的setter、getter是只能知道自己的this对象，而CustomType在运行getter、setter可以知道自己所在的调用时的具体路径\u003c/li>\n\u003c/ol>\n\u003cp>值得注意的是这里的表达式会比\u003ccode>MP.prototype.get/set\u003c/code>中的表达式更为强大，因为内置了一些关键字。这里统一讲一下关键字：\u003c/p>\n\u003ctable>\n\u003cthead>\n\u003ctr>\n\u003cth align=\"center\">关键字\u003c/th>\n\u003cth align=\"center\">支持get/set\u003c/th>\n\u003cth align=\"center\">支持CustomType的getter/setter\u003c/th>\n\u003cth align=\"center\">描述\u003c/th>\n\u003cth align=\"center\">备注\u003c/th>\n\u003c/tr>\n\u003c/thead>\n\u003ctbody>\n\u003ctr>\n\u003ctd align=\"center\">__vm\u003c/td>\n\u003ctd align=\"center\">√/√\u003c/td>\n\u003ctd align=\"center\">√/√\u003c/td>\n\u003ctd align=\"center\">model实例对象本身\u003c/td>\n\u003ctd align=\"center\">\u003c/td>\n\u003c/tr>\n\u003ctr>\n\u003ctd align=\"center\">__context\u003c/td>\n\u003ctd align=\"center\">√/√\u003c/td>\n\u003ctd align=\"center\">√/√\u003c/td>\n\u003ctd align=\"center\">上下文对象\u003c/td>\n\u003ctd align=\"center\">\u003c/td>\n\u003c/tr>\n\u003ctr>\n\u003ctd align=\"center\">__global\u003c/td>\n\u003ctd align=\"center\">√/√\u003c/td>\n\u003ctd align=\"center\">√/√\u003c/td>\n\u003ctd align=\"center\">全局对象\u003c/td>\n\u003ctd align=\"center\">浏览器环境中指向window\u003c/td>\n\u003c/tr>\n\u003ctr>\n\u003ctd align=\"center\">$cur_key\u003c/td>\n\u003ctd align=\"center\">×/×\u003c/td>\n\u003ctd align=\"center\">√/√\u003c/td>\n\u003ctd align=\"center\">当前对象所在this中的key\u003c/td>\n\u003ctd align=\"center\">a.b.c = CustomType( * , * )，这里指向的就是\"c\"\u003c/td>\n\u003c/tr>\n\u003ctr>\n\u003ctd align=\"center\">$pre_path_str\u003c/td>\n\u003ctd align=\"center\">×/×\u003c/td>\n\u003ctd align=\"center\">√/√\u003c/td>\n\u003ctd align=\"center\">\u003cem>看备注\u003c/em>\u003c/td>\n\u003ctd align=\"center\">上述条件，这里指向\"a.b\"\u003c/td>\n\u003c/tr>\n\u003ctr>\n\u003ctd align=\"center\">$full_path_str\u003c/td>\n\u003ctd align=\"center\">×/×\u003c/td>\n\u003ctd align=\"center\">√/√\u003c/td>\n\u003ctd align=\"center\">\u003cem>看备注\u003c/em>\u003c/td>\n\u003ctd align=\"center\">上述条件，这里指向\"a.b.c\"\u003c/td>\n\u003c/tr>\n\u003ctr>\n\u003ctd align=\"center\">$cur_value\u003c/td>\n\u003ctd align=\"center\">×/×\u003c/td>\n\u003ctd align=\"center\">√/×\u003c/td>\n\u003ctd align=\"center\">当前缓存值\u003c/td>\n\u003ctd align=\"center\">初始化是null，每运行一次getter都会被更新\u003c/td>\n\u003c/tr>\n\u003ctr>\n\u003ctd align=\"center\">$new_value\u003c/td>\n\u003ctd align=\"center\">×/×\u003c/td>\n\u003ctd align=\"center\">×/√\u003c/td>\n\u003ctd align=\"center\">setter所要赋予的值\u003c/td>\n\u003ctd align=\"center\">\u003c/td>\n\u003c/tr>\n\u003ctr>\n\u003ctd align=\"center\">$old_value\u003c/td>\n\u003ctd align=\"center\">×/×\u003c/td>\n\u003ctd align=\"center\">×/√\u003c/td>\n\u003ctd align=\"center\">当前缓存值\u003c/td>\n\u003ctd align=\"center\">同$cur_value，只是这里只能在setter中使用\u003c/td>\n\u003c/tr>\n\u003c/tbody>\n\u003c/table>\n\u003cp>所以围绕这些关键字，来实现一个基础的CustomType对象，就是\u003ccode>fullName=firstName lastName\u003c/code>。\n实现代码如下：\n\u003cstrong>版本1\u003c/strong>\u003c/p>\n\u003cblockquote>\n\u003cp>这个是单纯的getter，简单直观，但是问题在于\"me.\"这个写死在表达式中了，就意味着如果这个数据发生迁移或者复制到其它地方，就会运行出现问题。\u003c/p>\n\u003c/blockquote>\n\u003cpre>\u003ccode class=\"language-js\">m.set(\"me\", {\n    firstname: \"Gaubee\",\n    lastname: \"Bangeel\",\n    fullname: CustomType(\"me.firstname+' '+me.lastname\")\n});\n\u003c/code>\u003c/pre>\n\u003cp>\u003cstrong>版本2\u003c/strong>\u003c/p>\n\u003cblockquote>\n\u003cp>这里用到了\u003ccode>__vm\u003c/code>与\u003ccode>$pre_path_str\u003c/code>两个关键字，其中\u003ccode>$pre_path_str\u003c/code>用来替代版本1中的\"me.\"，然后由于使用了\u003ccode>$pre_path_str\u003c/code>关键字，解析就不会用\u003ccode>__vm.get(*)\u003c/code>自动包裹这个关键字，所以需要手动添加这段代码，结果如下：\u003c/p>\n\u003c/blockquote>\n\u003cpre>\u003ccode class=\"language-js\">m.set(\"me\", {\n    firstname: \"Gaubee\",\n    lastname: \"Bangeel\",\n    fullname: CustomType(\"__vm.get($pre_path_str+'.firstname')+' '+__vm.get($pre_path_str+'.lastname')\")\n});\n\u003c/code>\u003c/pre>\n\u003cp>\u003cstrong>版本3\u003c/strong>\u003c/p>\n\u003cblockquote>\n\u003cp>这里实现了Setter，要值得注意的是，setter的表达式里头，多个语句的分割是\u003ccode>,\u003c/code>而不是\u003ccode>;\u003c/code>，因为这个单个表达式，简而言之就是解析是把表达式处理成\u003ccode>return *\u003c/code>，所以如果使用\u003ccode>;\u003c/code>就会导致\u003ccode>;\u003c/code>后面的语句不运行（PS：\u003cstrong>不要利用这点来实现局部变量的定义，虽然var声明会自动前置，但是请使用context来声明局部变量，否则如果变量名不在context中，会被直接包裹成\u003ccode>__vm.get(key)\u003c/code>进行处理\u003c/strong>）。另外值得注意的是这里表达式最后返回是\u003ccode>null\u003c/code>，如果返回\u003ccode>null/undefined/false\u003c/code>，那么就意味着$new_value最后是存储到默认的缓存中；如果返回的不是空值，那么就会被当成是路径，直接将$new_value赋值到这个路径所指定的对象中。\u003c/p>\n\u003c/blockquote>\n\u003cpre>\u003ccode class=\"language-js\">m.set(\"me\", {\n    firstname: \"Gaubee\",\n    lastname: \"Bangeel\",\n    fullname: CustomType(\"__vm.get($pre_path_str+'.firstname')+' '+__vm.get($pre_path_str+'.lastname')\",\n        \"($new_value=$new_value.split(' ')),\\\n        __vm.set($pre_path_str+'.firstname',$new_value[0]),\\\n        __vm.set($pre_path_str+'.lastname',$new_value[1]),\\\n        null\")\n});\n\u003c/code>\u003c/pre>\n\u003ch1>技术实现细节\u003c/h1>\n\u003cblockquote>\n\u003cp>这部分是讲到一些效率优化、解析处理等实现细节。\u003c/p>\n\u003c/blockquote>\n\u003ch2>1\u003c/h2>\n\u003cp>因为不是以往的\u003ccode>a.b.c\u003c/code>这样耿直的用\u003ccode>.\u003c/code>来分割了，而MP涉及到表达式，即便用了缓存，如果遇到数组\u003ccode>a.1\u003c/code>~\u003ccode>a.1000\u003c/code>，那么缓存还有用么？\n这个是在开始做的时候一个难点，最后实现确实我用了缓存，但是不是耿直用。这里缓存的不是\u003ccode>路径:函数\u003c/code>，而是\u003ccode>模式:函数\u003c/code>。基于模式的缓存，比如说\u003ccode>a.1\u003c/code>与\u003ccode>a.1000\u003c/code>，这两者的模式是一样的，所以只用了同一个模式工厂函数，而后将\u003ccode>a.1/1000\u003c/code>传入模式工厂函数中，返回一个带着闭包的函数。怎么解释看下面这个实例：\u003c/p>\n\u003cpre>\u003ccode class=\"language-js\">MP.formatKey(\"a.b[A.B+C-D(E,F)].c\");\n/*[ 'a', 'b', \nfunction(__vm) {\n    return PLA(matchs[0], __vm, __context) +\n        PLA(matchs[1], __vm, __context) -\n        PLA(matchs[2], __vm, __context)(\n            PLA(matchs[3], __vm, __context),\n            PLA(matchs[4], __vm, __context)\n        )\n}\n, 'c']\n这里返回的数组中的第三个对象，就是模式工厂返回的函数，其中matchs、__context都是处于闭包中，\n所以同样模式的表达式（`@+@-@(@,@)`）可以公用这个模式工厂。\n*/\n\u003c/code>\u003c/pre>\n\u003cp>因为我认为在一个WebApp中，取值路径可能有上万个，但是模式不过那么几种——应用里头的字符串就那些。所以基于模式的匹配是很靠谱的一种解决方案，即便有动态的模式，使用context也能化繁为简，充分利用模式缓存。\u003c/p>\n\u003ch2>2\u003c/h2>\n\u003cp>另外，看上面那个formatKey返回的数组数据，可以发现其实\u003ccode>[ * ]\u003c/code>包裹起来的部分其实是会被解析成函数的，所以\u003ccode>[ * ]\u003c/code>内外是有性能区别的，也因此，能在外部写\u003ccode>a.1\u003c/code>这种违反JS语法的写法，正常JS写法是\u003ccode>a[1]\u003c/code>，而为了性能，我建议是使用\u003ccode>a.1\u003c/code>。上面说到模式，这里说道表达式，就不得不说一下解析：\n这里是提取\u003ccode>x.x.x\u003c/code>作为\u003cstrong>路径单元\u003c/strong>，\u003ccode>[ * ]\u003c/code>作为\u003cstrong>模式单元\u003c/strong>，所以上述例子里头\u003ccode>[A.B+C-D(E,F)]\u003c/code>开头的\u003ccode>A.B\u003c/code>是被会识别成\u003cstrong>路径单元\u003c/strong>，最后模式才\u003cstrong>不是\u003c/strong>：\u003ccode>@.@+@-@(@,@)\u003c/code>\u003c/p>\n\u003ch2>3\u003c/h2>\n\u003cp>动态的赋值。如果一个路径是\u003ccode>a.b.c.d\u003c/code>，而\u003ccode>a\u003c/code>属性本身就是空的话，那么在\u003ccode>model.set('a.b.c.d',value)\u003c/code>的过程中，会动态创建值给\u003ccode>a b c d\u003c/code>，如果路径某一部分的key是整数，那么动态创建的就会是数组：\u003c/p>\n\u003cpre>\u003ccode class=\"language-js\">m.set(\"A.B.1.C\",\"ccc\");\nconsole.log(m.get(\"A\"));\n//{ B: [ , { C: 'ccc' } ] }\n\u003c/code>\u003c/pre>\n\u003chr>\n\u003cp>【\u003cstrong>8/21 6:08\u003c/strong>】 目前功能有限，但代码就不到400行，接下来会加入动态监听功能，有了这个MP才完整。\u003c/p>","markdownContent":"\n# 前言\n\n[mind-pact.js](https://gist.github.com/Gaubee/e32b0001413d641b224c1f9c9d359161)\n这个东西，以前做过，但是做得不够好，而且是整合在以前开发的MVVM框架里头，作为Model层。\n这两天整理了一下，凝练了核心的思想。\n\n这个库，是一个key-value管理器。简单的说就是：\n\n``` js\nmodel.set(\"a.b\",1);\nmodel.get(\"a\");//{ b:1 }\n```\n\n**最重要的特性：支持表达式**：\n\n``` js\nmodel.get(\"a['b']\");//1\n```\n\n但我们知道JS的表达式里头是可以支持函数的定义等等的，这里做了一定的限制，但又不会失去灵活性，具体看如下API描述：\n# API 文档\n## MP(basedata)\n- **basedata** (_except Primitive values_) : 除了[Primitive values](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Data_structures#Primitive_values) 以外的任意对象\n## MP.prototype.set(paths, value, context)\n- **paths** (_string_) : ~~懒得描述~~\n- **value** (_any_) : ~~懒得描述~~\n- **context** (_object | null_) : 表达式的上下文对象，具体怎么用后面描述\n## MP.prototype.get(paths, context)\n- **paths** (_string_) : ~~懒得描述~~\n- **context** (_object | null_) : 表达式的上下文对象，具体怎么用后面描述\n\n这里说一下这个**context**对象的作用把。就是前面说到的“JS的表达式里头是可以支持函数的定义等等的，这里做了一定的限制，但又不会失去灵活性”的一个解决方案，比如说：\n\n``` js\n// 原始表达式\na+(function(){ return Math.random() })()+b;\n// 提取出function部分后变成：\na+foo()+b\n//context就是提取出来的对象：\ncontext = {\n  foo:function(){ return Math.random() }\n}\n```\n\n如何深入去用我就不多说了\n## MP.CustomType(getter [, setter])\n\n> 自定义数据类型\n- **getter** (_string| [string,any] | function($cur_key, $pre_path_str, $full_path_str)_) : 支持三种格式：字符串表达式、字符串表达式+上下文，函数\n- **setter** (_string| [string,any] | function($cur_key, $new_value, $pre_path_str, $full_path_str)_) : _此参数可空_\n\n自定义数据类型，为什么不直接使用JS内置的Getter、Setter呢？这个自定义类型的优势如下：\n1. 支持字符串，而且是**鸭子类型**的数据，这就意味着可以序列化，使用JSON来传递这个动态数据的Getter、Setter。\n2. 更为丰富的上下文信息，JS原始的setter、getter是只能知道自己的this对象，而CustomType在运行getter、setter可以知道自己所在的调用时的具体路径\n\n值得注意的是这里的表达式会比`MP.prototype.get/set`中的表达式更为强大，因为内置了一些关键字。这里统一讲一下关键字：\n\n| 关键字 | 支持get/set | 支持CustomType的getter/setter | 描述 | 备注 |\n| :-: | :-: | :-: | :-: | :-: |\n| __vm | √/√ | √/√ | model实例对象本身 |  |\n| __context | √/√ | √/√ | 上下文对象 |  |\n| __global | √/√ | √/√ | 全局对象 | 浏览器环境中指向window |\n| $cur_key | ×/× | √/√ | 当前对象所在this中的key | a.b.c = CustomType( \\* , \\* )，这里指向的就是\"c\" |\n| $pre_path_str | ×/× | √/√ | _看备注_ | 上述条件，这里指向\"a.b\" |\n| $full_path_str | ×/× | √/√ | _看备注_ | 上述条件，这里指向\"a.b.c\" |\n| $cur_value | ×/× | √/× | 当前缓存值 | 初始化是null，每运行一次getter都会被更新 |\n| $new_value | ×/× | ×/√ | setter所要赋予的值 |  |\n| $old_value | ×/× | ×/√ | 当前缓存值 | 同$cur_value，只是这里只能在setter中使用 |\n\n所以围绕这些关键字，来实现一个基础的CustomType对象，就是`fullName=firstName lastName`。\n实现代码如下：\n**版本1**\n\n> 这个是单纯的getter，简单直观，但是问题在于\"me.\"这个写死在表达式中了，就意味着如果这个数据发生迁移或者复制到其它地方，就会运行出现问题。\n\n``` js\nm.set(\"me\", {\n    firstname: \"Gaubee\",\n    lastname: \"Bangeel\",\n    fullname: CustomType(\"me.firstname+' '+me.lastname\")\n});\n```\n\n**版本2**\n\n> 这里用到了`__vm`与`$pre_path_str`两个关键字，其中`$pre_path_str`用来替代版本1中的\"me.\"，然后由于使用了`$pre_path_str`关键字，解析就不会用`__vm.get(*)`自动包裹这个关键字，所以需要手动添加这段代码，结果如下：\n\n``` js\nm.set(\"me\", {\n    firstname: \"Gaubee\",\n    lastname: \"Bangeel\",\n    fullname: CustomType(\"__vm.get($pre_path_str+'.firstname')+' '+__vm.get($pre_path_str+'.lastname')\")\n});\n```\n\n**版本3**\n\n> 这里实现了Setter，要值得注意的是，setter的表达式里头，多个语句的分割是`,`而不是`;`，因为这个单个表达式，简而言之就是解析是把表达式处理成`return *`，所以如果使用`;`就会导致`;`后面的语句不运行（PS：**不要利用这点来实现局部变量的定义，虽然var声明会自动前置，但是请使用context来声明局部变量，否则如果变量名不在context中，会被直接包裹成`__vm.get(key)`进行处理**）。另外值得注意的是这里表达式最后返回是`null`，如果返回`null/undefined/false`，那么就意味着$new_value最后是存储到默认的缓存中；如果返回的不是空值，那么就会被当成是路径，直接将$new_value赋值到这个路径所指定的对象中。\n\n``` js\nm.set(\"me\", {\n    firstname: \"Gaubee\",\n    lastname: \"Bangeel\",\n    fullname: CustomType(\"__vm.get($pre_path_str+'.firstname')+' '+__vm.get($pre_path_str+'.lastname')\",\n        \"($new_value=$new_value.split(' ')),\\\n        __vm.set($pre_path_str+'.firstname',$new_value[0]),\\\n        __vm.set($pre_path_str+'.lastname',$new_value[1]),\\\n        null\")\n});\n```\n# 技术实现细节\n\n> 这部分是讲到一些效率优化、解析处理等实现细节。\n## 1\n\n因为不是以往的`a.b.c`这样耿直的用`.`来分割了，而MP涉及到表达式，即便用了缓存，如果遇到数组`a.1`~`a.1000`，那么缓存还有用么？\n这个是在开始做的时候一个难点，最后实现确实我用了缓存，但是不是耿直用。这里缓存的不是`路径:函数`，而是`模式:函数`。基于模式的缓存，比如说`a.1`与`a.1000`，这两者的模式是一样的，所以只用了同一个模式工厂函数，而后将`a.1/1000`传入模式工厂函数中，返回一个带着闭包的函数。怎么解释看下面这个实例：\n\n``` js\nMP.formatKey(\"a.b[A.B+C-D(E,F)].c\");\n/*[ 'a', 'b', \nfunction(__vm) {\n    return PLA(matchs[0], __vm, __context) +\n        PLA(matchs[1], __vm, __context) -\n        PLA(matchs[2], __vm, __context)(\n            PLA(matchs[3], __vm, __context),\n            PLA(matchs[4], __vm, __context)\n        )\n}\n, 'c']\n这里返回的数组中的第三个对象，就是模式工厂返回的函数，其中matchs、__context都是处于闭包中，\n所以同样模式的表达式（`@+@-@(@,@)`）可以公用这个模式工厂。\n*/\n```\n\n因为我认为在一个WebApp中，取值路径可能有上万个，但是模式不过那么几种——应用里头的字符串就那些。所以基于模式的匹配是很靠谱的一种解决方案，即便有动态的模式，使用context也能化繁为简，充分利用模式缓存。\n## 2\n\n另外，看上面那个formatKey返回的数组数据，可以发现其实`[ * ]`包裹起来的部分其实是会被解析成函数的，所以`[ * ]`内外是有性能区别的，也因此，能在外部写`a.1`这种违反JS语法的写法，正常JS写法是`a[1]`，而为了性能，我建议是使用`a.1`。上面说到模式，这里说道表达式，就不得不说一下解析：\n这里是提取`x.x.x`作为**路径单元**，`[ * ]`作为**模式单元**，所以上述例子里头`[A.B+C-D(E,F)]`开头的`A.B`是被会识别成**路径单元**，最后模式才**不是**：`@.@+@-@(@,@)`\n## 3\n\n动态的赋值。如果一个路径是`a.b.c.d`，而`a`属性本身就是空的话，那么在`model.set('a.b.c.d',value)`的过程中，会动态创建值给`a b c d`，如果路径某一部分的key是整数，那么动态创建的就会是数组：\n\n``` js\nm.set(\"A.B.1.C\",\"ccc\");\nconsole.log(m.get(\"A\"));\n//{ B: [ , { C: 'ccc' } ] }\n```\n\n---\n\n【**8/21 6:08**】 目前功能有限，但代码就不到400行，接下来会加入动态监听功能，有了这个MP才完整。\n"}}}</script>
+        <script src="/assets/entries/entry-client-routing.CHhd62G8.js" type="module" async></script>
+        <link rel="modulepreload" href="/assets/entries/pages_article_-id.zKRL1uyc.js" as="script" type="text/javascript">
+        <link rel="modulepreload" href="/assets/chunks/chunk-DcLnoLrn.js" as="script" type="text/javascript">
+        <link rel="modulepreload" href="/assets/chunks/chunk-BMsgTsFr.js" as="script" type="text/javascript">
+      </body>
+    </html>

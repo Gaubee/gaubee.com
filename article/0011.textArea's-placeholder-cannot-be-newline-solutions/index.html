@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <link rel="stylesheet" type="text/css" href="/assets/static/renderer_css_index-e8e12f67.BMrmlmx0.css">
+        <link rel="stylesheet" type="text/css" href="/assets/static/renderer_Layout-031b266d.CEjdw0pU.css">
+        <meta charset="UTF-8" />
+        <link rel="icon" href="/img/head.webp" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="description" content="Gaubee&#039;s Blogs / Events / Projects" />
+        <title>Gaubee&#039;s Site</title>
+      </head>
+      <body>
+        <div id="root"><link rel="preload" as="image" href="/img/head.webp"/><div style="display:flex;max-width:900px;margin:auto"><div style="display:flex;flex-direction:column;justify-content:space-between;max-height:100vh;width:38%;max-width:26em;position:sticky;top:0"><div id="sidebar" style="padding:20px;flex-shrink:0;display:flex;flex-direction:column;line-height:1.8em;border-right:2px solid #eee"><div style="margin-top:20px;margin-bottom:10px"><a href="/"><img src="/img/head.webp" height="64" width="64" alt="logo"/></a></div><a href="/" class="">Timeline</a><a href="/projects" class="">Projects</a><a href="/about" class="">About</a></div><div style="padding:16px"><small>本网站不收集任何访问者的行为与信息，不做任何商业运作，仅仅为个人使用。</small><small style="display:block;margin-top:8px"><a href="https://beian.miit.gov.cn/#/Integrated/recordQuery">闽ICP备17026139号-1</a></small></div></div><div id="page-container"><div id="page-content" style="padding:20px;padding-bottom:50px;min-height:100vh;background-color:#fafafa;color:#333"><style type="text/css">
+          main > p {
+            text-indent: 1em;
+          }
+        </style><h1>textArea的placeholder不能换行的解决方案</h1><main><p><em>JS解决方案当然是最万能的。</em>
+所以这里主要讲的是CSS解决方案，整理自鬼懿IT高级群的讨论 <em>10-11-2013</em>。
+先上一段官方的说辞：</p>
+<blockquote>
+<p>The placeholder attribute represents a short hint (a word or short phrase) intended to aid the user with data entry. A hint could be a sample value or a brief description of the expected format. The attribute, if specified, must have a value that contains no U+000A LINE FEED (LF) or U+000D CARRIAGE RETURN (CR) characters.</p>
+</blockquote>
+<h2>1</h2>
+<p>首先要知道的是HTML属性中的值会原封不动地输出到页面中，所以：</p>
+<pre><code class="language-html">&#x3C;textarea placeholder="line1  \n lin2 &#x3C;br> line3 \A line4 
+line5">&#x3C;/textarea>
+</code></pre>
+<p>是不会其任何作用的（这里line4和line5中的回车写法会被过滤掉，但是title属性就不会）。
+所以就要借用到CSS。</p>
+<h2>2</h2>
+<p>先说webkit浏览器的解决方案：
+首先要知道placeholder属性是可以用css来操作的，设置字体颜色、字体大小等等等。
+（相关文章：<a href="http://davidwalsh.name/html5-placeholder-css">HTML5 Placeholder Styling with CSS</a>）
+所以我们就可以用after伪类来实现把placeholder内容写到CSS中，这样就绕开了HTML属性的渲染方案：</p>
+<pre><code class="language-css">textarea::-webkit-input-placeholder:after{
+  content:"line@ \A line#";/* 这里 \A 形成回车符号  */
+  color:red;
+};
+</code></pre>
+<h2>3</h2>
+<p>在兼容性写法中，不同浏览器的标示要分开来写，否则使解析器混淆CSS语义：</p>
+<pre><code class="language-css">/* 错误写法 */
+input::-webkit-input-placeholder,
+input:-moz-placeholder{  }
+</code></pre>
+<pre><code class="language-css">/* 正确写法 */
+input::-webkit-input-placeholder{}
+
+input:-moz-placeholder{}
+
+</code></pre>
+<h2>4</h2>
+<p>然而群里面还对此提出一个观点，就是不应该在CSS中写应该在HTML中写的内容：</p>
+<blockquote>
+<p>多语言的应用，这样还得连css也加入翻译转换
+(js)不太靠谱，css这东西顺序有关，你知道插哪儿啊</p>
+<blockquote>
+<p>240</p>
+</blockquote>
+</blockquote>
+<p>总之，这种绕着弯子完成的解决方案本身就有缺陷，毕竟没有那么多空子给你转。</p>
+<h2>5</h2>
+<p>另外，通过 <strong>计算空格</strong> 来让placeholder自动换行也是个比较恶心的解决方案。但精力上绝对比较省，需要些一个计算空格的函数，耦合度也不会像上面CSS解决方案那么高。</p>
+<h2>6</h2>
+<p>最后还有一个值得一提的就是下面这种无法生效的写法：</p>
+<pre><code class="language-html">&#x3C;!-- placeholder属性必须存在且非空 -->
+&#x3C;textarea  placeholder=" " data-placeholder="\A  line2">&#x3C;/textarea>
+</code></pre>
+<pre><code class="language-css">textarea::-webkit-input-placeholder:after{
+  content:"line1" attr(data-placeholder) "\A  line3";
+  color:red;
+};
+</code></pre>
+<p>这里无法获取到data-placeholder属性的值，因为双伪类导致<code>:after</code>的对象不是textarea，而是<code>placeholder</code>（shadow DOM）。</p>
+<p>最后给出stackoverflow上<a href="http://stackoverflow.com/questions/7189223/can-you-have-multiline-html5-placeholder-text-in-a-textarea">相关的问题及其解答</a>，涉及到更多详细的内容，值得一读。</p></main></div></div></div></div>
+        <script id="vike_pageContext" type="application/json">{"abortReason":"!undefined","_urlRewrite":null,"_urlRedirect":"!undefined","abortStatusCode":"!undefined","_abortCall":"!undefined","_pageContextInitIsPassedToClient":"!undefined","pageId":"/pages/article/@id","routeParams":{"id":"0011.textArea's-placeholder-cannot-be-newline-solutions"},"data":{"article":{"fileEntry":{"path":"/home/runner/work/gaubee.com/gaubee.com/articles/0011.textArea's-placeholder-cannot-be-newline-solutions.md","options":{"cwd":"/home/runner/work/gaubee.com/gaubee.com/articles"},"isFile":true,"isDirectory":false},"originMetadata":{"layout":"layouts/article.njk","title":"textArea的placeholder不能换行的解决方案","date":"!Date:2013-10-11T12:49:35.000Z","updated":"!Date:2015-01-09T05:08:16.000Z"},"metadata":{"layout":"layouts/article.njk","title":"textArea的placeholder不能换行的解决方案","date":"!Date:2013-10-11T12:49:35.000Z","updated":"!Date:2015-01-09T05:08:16.000Z","id":"0011.textArea's-placeholder-cannot-be-newline-solutions","createdAt":"!Date:2013-10-11T12:49:35.000Z","updatedAt":"!Date:2015-01-09T05:08:16.000Z","tags":[]},"htmlContent":"\u003cp>\u003cem>JS解决方案当然是最万能的。\u003c/em>\n所以这里主要讲的是CSS解决方案，整理自鬼懿IT高级群的讨论 \u003cem>10-11-2013\u003c/em>。\n先上一段官方的说辞：\u003c/p>\n\u003cblockquote>\n\u003cp>The placeholder attribute represents a short hint (a word or short phrase) intended to aid the user with data entry. A hint could be a sample value or a brief description of the expected format. The attribute, if specified, must have a value that contains no U+000A LINE FEED (LF) or U+000D CARRIAGE RETURN (CR) characters.\u003c/p>\n\u003c/blockquote>\n\u003ch2>1\u003c/h2>\n\u003cp>首先要知道的是HTML属性中的值会原封不动地输出到页面中，所以：\u003c/p>\n\u003cpre>\u003ccode class=\"language-html\">&#x3C;textarea placeholder=\"line1  \\n lin2 &#x3C;br> line3 \\A line4 \nline5\">&#x3C;/textarea>\n\u003c/code>\u003c/pre>\n\u003cp>是不会其任何作用的（这里line4和line5中的回车写法会被过滤掉，但是title属性就不会）。\n所以就要借用到CSS。\u003c/p>\n\u003ch2>2\u003c/h2>\n\u003cp>先说webkit浏览器的解决方案：\n首先要知道placeholder属性是可以用css来操作的，设置字体颜色、字体大小等等等。\n（相关文章：\u003ca href=\"http://davidwalsh.name/html5-placeholder-css\">HTML5 Placeholder Styling with CSS\u003c/a>）\n所以我们就可以用after伪类来实现把placeholder内容写到CSS中，这样就绕开了HTML属性的渲染方案：\u003c/p>\n\u003cpre>\u003ccode class=\"language-css\">textarea::-webkit-input-placeholder:after{\n  content:\"line@ \\A line#\";/* 这里 \\A 形成回车符号  */\n  color:red;\n};\n\u003c/code>\u003c/pre>\n\u003ch2>3\u003c/h2>\n\u003cp>在兼容性写法中，不同浏览器的标示要分开来写，否则使解析器混淆CSS语义：\u003c/p>\n\u003cpre>\u003ccode class=\"language-css\">/* 错误写法 */\ninput::-webkit-input-placeholder,\ninput:-moz-placeholder{  }\n\u003c/code>\u003c/pre>\n\u003cpre>\u003ccode class=\"language-css\">/* 正确写法 */\ninput::-webkit-input-placeholder{}\n\ninput:-moz-placeholder{}\n\n\u003c/code>\u003c/pre>\n\u003ch2>4\u003c/h2>\n\u003cp>然而群里面还对此提出一个观点，就是不应该在CSS中写应该在HTML中写的内容：\u003c/p>\n\u003cblockquote>\n\u003cp>多语言的应用，这样还得连css也加入翻译转换\n(js)不太靠谱，css这东西顺序有关，你知道插哪儿啊\u003c/p>\n\u003cblockquote>\n\u003cp>240\u003c/p>\n\u003c/blockquote>\n\u003c/blockquote>\n\u003cp>总之，这种绕着弯子完成的解决方案本身就有缺陷，毕竟没有那么多空子给你转。\u003c/p>\n\u003ch2>5\u003c/h2>\n\u003cp>另外，通过 \u003cstrong>计算空格\u003c/strong> 来让placeholder自动换行也是个比较恶心的解决方案。但精力上绝对比较省，需要些一个计算空格的函数，耦合度也不会像上面CSS解决方案那么高。\u003c/p>\n\u003ch2>6\u003c/h2>\n\u003cp>最后还有一个值得一提的就是下面这种无法生效的写法：\u003c/p>\n\u003cpre>\u003ccode class=\"language-html\">&#x3C;!-- placeholder属性必须存在且非空 -->\n&#x3C;textarea  placeholder=\" \" data-placeholder=\"\\A  line2\">&#x3C;/textarea>\n\u003c/code>\u003c/pre>\n\u003cpre>\u003ccode class=\"language-css\">textarea::-webkit-input-placeholder:after{\n  content:\"line1\" attr(data-placeholder) \"\\A  line3\";\n  color:red;\n};\n\u003c/code>\u003c/pre>\n\u003cp>这里无法获取到data-placeholder属性的值，因为双伪类导致\u003ccode>:after\u003c/code>的对象不是textarea，而是\u003ccode>placeholder\u003c/code>（shadow DOM）。\u003c/p>\n\u003cp>最后给出stackoverflow上\u003ca href=\"http://stackoverflow.com/questions/7189223/can-you-have-multiline-html5-placeholder-text-in-a-textarea\">相关的问题及其解答\u003c/a>，涉及到更多详细的内容，值得一读。\u003c/p>","markdownContent":"\n_JS解决方案当然是最万能的。_\n所以这里主要讲的是CSS解决方案，整理自鬼懿IT高级群的讨论 _10-11-2013_。\n先上一段官方的说辞：\n\n> The placeholder attribute represents a short hint (a word or short phrase) intended to aid the user with data entry. A hint could be a sample value or a brief description of the expected format. The attribute, if specified, must have a value that contains no U+000A LINE FEED (LF) or U+000D CARRIAGE RETURN (CR) characters.\n## 1\n\n首先要知道的是HTML属性中的值会原封不动地输出到页面中，所以：\n\n``` html\n\u003ctextarea placeholder=\"line1  \\n lin2 \u003cbr> line3 \\A line4 \nline5\">\u003c/textarea>\n```\n\n是不会其任何作用的（这里line4和line5中的回车写法会被过滤掉，但是title属性就不会）。\n所以就要借用到CSS。\n## 2\n\n先说webkit浏览器的解决方案：\n首先要知道placeholder属性是可以用css来操作的，设置字体颜色、字体大小等等等。\n（相关文章：[HTML5 Placeholder Styling with CSS](http://davidwalsh.name/html5-placeholder-css)）\n所以我们就可以用after伪类来实现把placeholder内容写到CSS中，这样就绕开了HTML属性的渲染方案：\n\n``` css\ntextarea::-webkit-input-placeholder:after{\n  content:\"line@ \\A line#\";/* 这里 \\A 形成回车符号  */\n  color:red;\n};\n```\n## 3\n\n在兼容性写法中，不同浏览器的标示要分开来写，否则使解析器混淆CSS语义：\n\n``` css\n/* 错误写法 */\ninput::-webkit-input-placeholder,\ninput:-moz-placeholder{  }\n```\n\n``` css\n/* 正确写法 */\ninput::-webkit-input-placeholder{}\n\ninput:-moz-placeholder{}\n\n```\n## 4\n\n然而群里面还对此提出一个观点，就是不应该在CSS中写应该在HTML中写的内容：\n\n> 多语言的应用，这样还得连css也加入翻译转换\n> (js)不太靠谱，css这东西顺序有关，你知道插哪儿啊\n> \n> > 240\n\n总之，这种绕着弯子完成的解决方案本身就有缺陷，毕竟没有那么多空子给你转。\n## 5\n\n另外，通过 **计算空格** 来让placeholder自动换行也是个比较恶心的解决方案。但精力上绝对比较省，需要些一个计算空格的函数，耦合度也不会像上面CSS解决方案那么高。\n## 6\n\n最后还有一个值得一提的就是下面这种无法生效的写法：\n\n``` html\n\u003c!-- placeholder属性必须存在且非空 -->\n\u003ctextarea  placeholder=\" \" data-placeholder=\"\\A  line2\">\u003c/textarea>\n```\n\n``` css\ntextarea::-webkit-input-placeholder:after{\n  content:\"line1\" attr(data-placeholder) \"\\A  line3\";\n  color:red;\n};\n```\n\n这里无法获取到data-placeholder属性的值，因为双伪类导致`:after`的对象不是textarea，而是`placeholder`（shadow DOM）。\n\n最后给出stackoverflow上[相关的问题及其解答](http://stackoverflow.com/questions/7189223/can-you-have-multiline-html5-placeholder-text-in-a-textarea)，涉及到更多详细的内容，值得一读。\n"}}}</script>
+        <script src="/assets/entries/entry-client-routing.CHhd62G8.js" type="module" async></script>
+        <link rel="modulepreload" href="/assets/entries/pages_article_-id.zKRL1uyc.js" as="script" type="text/javascript">
+        <link rel="modulepreload" href="/assets/chunks/chunk-DcLnoLrn.js" as="script" type="text/javascript">
+        <link rel="modulepreload" href="/assets/chunks/chunk-BMsgTsFr.js" as="script" type="text/javascript">
+      </body>
+    </html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <link rel="stylesheet" type="text/css" href="/assets/static/renderer_css_index-e8e12f67.BMrmlmx0.css">
+        <link rel="stylesheet" type="text/css" href="/assets/static/renderer_Layout-031b266d.CEjdw0pU.css">
+        <meta charset="UTF-8" />
+        <link rel="icon" href="/img/head.webp" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="description" content="Gaubee&#039;s Blogs / Events / Projects" />
+        <title>Gaubee&#039;s Site</title>
+      </head>
+      <body>
+        <div id="root"><link rel="preload" as="image" href="/img/head.webp"/><div style="display:flex;max-width:900px;margin:auto"><div style="display:flex;flex-direction:column;justify-content:space-between;max-height:100vh;width:38%;max-width:26em;position:sticky;top:0"><div id="sidebar" style="padding:20px;flex-shrink:0;display:flex;flex-direction:column;line-height:1.8em;border-right:2px solid #eee"><div style="margin-top:20px;margin-bottom:10px"><a href="/"><img src="/img/head.webp" height="64" width="64" alt="logo"/></a></div><a href="/" class="">Timeline</a><a href="/projects" class="">Projects</a><a href="/about" class="">About</a></div><div style="padding:16px"><small>本网站不收集任何访问者的行为与信息，不做任何商业运作，仅仅为个人使用。</small><small style="display:block;margin-top:8px"><a href="https://beian.miit.gov.cn/#/Integrated/recordQuery">闽ICP备17026139号-1</a></small></div></div><div id="page-container"><div id="page-content" style="padding:20px;padding-bottom:50px;min-height:100vh;background-color:#fafafa;color:#333"><style type="text/css">
+          main > p {
+            text-indent: 1em;
+          }
+        </style><h1>关于HTML5的文件类操作入门与实践</h1><main><blockquote>
+<p>文件类的提供使得 JS 能够操作所能获取的各种文件的操作提供支持。
+比如 Ajax 获取的文件，input[type='file']选中的文件，或者是用户自己生成的文件等等……。</p>
+</blockquote>
+<p>推荐阅读：<a href="http://www.zhangxinxu.com/wordpress/2013/10/understand-domstring-document-formdata-blob-file-arraybuffer/">理解 DOMString、Document、FormData、Blob、File、ArrayBuffer 数据类型——张鑫旭</a></p>
+<p>本文针对文件读取以及 Blob 对象的简单使用做一个事例。</p>
+<h2>文件读取</h2>
+<ul>
+<li>readAsText：以文字方式读文档內容，放到 result 属性，默认编码 UTF-8。</li>
+<li>readAsDataURL：读取到的內容会编码成 data URL，放到 result 属性。</li>
+<li>readAsArrayBuffer：result 属性会包含一個 ArrayBuffer 物件。</li>
+<li>readAsBinaryString：以二进制方式读文档內容，放到 result 属性。</li>
+</ul>
+<p>上面所说的 result 属性，指的是<a href="https://developer.mozilla.org/en-US/docs/Web/API/FileReader.result"><code>FileReader.result</code></a>。比如下面代码：</p>
+<pre><code class="language-js">var reader = new FileReader();
+reader.onload = function (e) {
+  e.target === reader;
+
+  reader.result;
+};
+</code></pre>
+<p>javaScript 关于异步 API 其实都差不多一个样子。因为本身就是<strong>事件机制</strong>。所以回调中的第一个属性也是 Event 对象。这边属于<a href="https://developer.mozilla.org/en-US/docs/Web/API/ProgressEvent"><code>ProgressEvent</code></a>。而 e.target，指的就是触发发起者，也就是前面定义的 reader。</p>
+<p>如果你要读取一个文本文件。比如说 XML、js、css 文件等等。直接用<code>readAsText</code>，它会把返回的数据用指定编码或者默认编码进行解析，<code>reader.result</code>等同于 Ajax 返回对象的<code>responseText</code>属性。</p>
+<p>readAsDataURL 的话，就是帮你把二进制转化成<code>base64</code>的格式。为此可以<code>reader.result</code>当成图片的 src 直接用、CSS 的 url 属性用等等。</p>
+<p>readAsArrayBuffer 返回的<a href="https://developer.mozilla.org/en-US/docs/Web/API/ArrayBuffer">ArrayBuffer</a>其实也就是最原始的二进制数据。在所给的链接中的文档说介绍的一样，系统并没有提供什么方法来操作二进制文件，连遍历的方法都没有给。
+因为是底层的产物，可能它所能做的除了存储数据，就是告诉你数据大小了（比如<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Base64_encoding_and_decoding#Appendix.3A_Decode_a_Base64_string_to_Uint8Array_or_ArrayBuffer">base64DecToArr 的使用</a>），当然，它最多的用途就是用来做其它 API 的参数使用，比如 Ajax 异步上传文件。</p>
+<p>而 readAsBinaryString，则将 ArrayBuffer 转化为原生的 String 类型，为此能够操纵文件的具体内容。而不再只是孤零零地盯着 ArrayBuffer 什么也干不了。为此你可以用来做文件的安全性检测，检查文件类型时候正确等等等等，比如说我可以查找一个图片的信息，如果有 PS 处理过的痕迹，可以很清晰地看到想关信息：</p>
+<p><img src="/img/html5-file-api-intro/capture-1.png" alt="image"></p>
+<h2>Blob 对象</h2>
+<p>在文章最前面的<strong>推荐阅读</strong>中就已经很清晰地介绍了 Blob 对象，在我眼中，它就是一个文件。
+为此我得到了<strong>创建一个文件的权限</strong>。
+比如在 Web Worker 中，它需要一个 js 文件地址，而你不想真的用一个文件去记录这些代码，兴许太麻烦了，毕竟不利于压缩什么的各种借口。这时你就可以用 Blob 来实现。（注意：以前你可能看过 BlobBuilder 之类的 API，但已经被废弃，请用标准的 API，类似的 shim 也是有的）</p>
+<p>下面就用一个简单的<strong>综合应用</strong>来展示 Blob 的使用</p>
+<h2>综合应用</h2>
+<p>这代码是来自我的一个项目，因为要用到<strong>字体的上传与预览</strong>，为此在选中字体文件后需要做一个预览字体一样的功能，就像预览图片一样。</p>
+<p>但是不同的是，字体的预览需要动态生成样式表。</p>
+<p>所以你可以使用 Blob 来生成一个新的 css 文件，而后通过<code>&#x3C;link></code>标签引入使用。</p>
+<p>这边介绍直接在 head 中插入 style 标签的方法，思路一样：</p>
+<pre><code class="language-js">//file对象来自input的change事件中event.target.files的元素
+
+var fontInfo = file.name.split(".");
+var postfix = fontInfo.pop().toLowerCase();
+var fontName = fontInfo.pop() + "-" + postfix;
+// 这边支持两种字体格式 ttf 和 woff
+if (postfix === "ttf" || postfix === "woff") {
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    var blob = new Blob([e.target.result], {
+      // type: "application/x-font-" + postfix
+      // type: "font/" + postfix
+      type: "application/octet-stream",
+    });
+    var url = URL.createObjectURL(blob);
+    var tempStyleElement = document.createElement("style"); //w3c
+    tempStyleElement.setAttribute("type", "text/css");
+    document.getElementsByTagName("head")[0].appendChild(tempStyleElement);
+    //样式表内容
+    var formatType = {
+      ttf: "truetype",
+      woff: "woff",
+    };
+    var styleText =
+      "\
+@font-face { \
+    font-family:" +
+      JSON.stringify(fontName) +
+      "; \
+    src: url(" +
+      url +
+      ") format('" +
+      formatType[postfix] +
+      "'); \
+    font-weight: normal; \
+    font-style: normal; \
+} \
+            ";
+    tempStyleElement.textContent = styleText;
+    vm.set("content.layerAttr.fontFamily", fontName);
+    vm.get("$PRIVATE.reDrawLayer")();
+  };
+  reader.readAsBinaryString(file);
+} else {
+  console.warn("只允许字体文件！");
+}
+</code></pre>
+<blockquote>
+<p>补注：reader.readAsDataURL 所生成的 base64 格式是<code>src:url</code>所能直接支持的。但是如果字体文件过大，styleText 也会非常庞大，内存消耗不说，<code>tempStyleElement.textContent = styleText;</code>这段代码就要卡上一两秒。所以需要用 Blob 生成一个 blog-url 来替代庞大的文件数据。</p>
+</blockquote></main></div></div></div></div>
+        <script id="vike_pageContext" type="application/json">{"abortReason":"!undefined","_urlRewrite":null,"_urlRedirect":"!undefined","abortStatusCode":"!undefined","_abortCall":"!undefined","_pageContextInitIsPassedToClient":"!undefined","pageId":"/pages/article/@id","routeParams":{"id":"0016.About-HTML5-file-class-operation-introduction-and-practice"},"data":{"article":{"fileEntry":{"path":"/home/runner/work/gaubee.com/gaubee.com/articles/0016.About-HTML5-file-class-operation-introduction-and-practice.md","options":{"cwd":"/home/runner/work/gaubee.com/gaubee.com/articles"},"isFile":true,"isDirectory":false},"originMetadata":{"layout":"layouts/article.njk","title":"关于HTML5的文件类操作入门与实践","date":"!Date:2014-02-17T14:21:06.000Z","updated":"!Date:2014-02-17T14:21:06.000Z"},"metadata":{"layout":"layouts/article.njk","title":"关于HTML5的文件类操作入门与实践","date":"!Date:2014-02-17T14:21:06.000Z","updated":"!Date:2014-02-17T14:21:06.000Z","id":"0016.About-HTML5-file-class-operation-introduction-and-practice","createdAt":"!Date:2014-02-17T14:21:06.000Z","updatedAt":"!Date:2014-02-17T14:21:06.000Z","tags":[]},"htmlContent":"\u003cblockquote>\n\u003cp>文件类的提供使得 JS 能够操作所能获取的各种文件的操作提供支持。\n比如 Ajax 获取的文件，input[type='file']选中的文件，或者是用户自己生成的文件等等……。\u003c/p>\n\u003c/blockquote>\n\u003cp>推荐阅读：\u003ca href=\"http://www.zhangxinxu.com/wordpress/2013/10/understand-domstring-document-formdata-blob-file-arraybuffer/\">理解 DOMString、Document、FormData、Blob、File、ArrayBuffer 数据类型——张鑫旭\u003c/a>\u003c/p>\n\u003cp>本文针对文件读取以及 Blob 对象的简单使用做一个事例。\u003c/p>\n\u003ch2>文件读取\u003c/h2>\n\u003cul>\n\u003cli>readAsText：以文字方式读文档內容，放到 result 属性，默认编码 UTF-8。\u003c/li>\n\u003cli>readAsDataURL：读取到的內容会编码成 data URL，放到 result 属性。\u003c/li>\n\u003cli>readAsArrayBuffer：result 属性会包含一個 ArrayBuffer 物件。\u003c/li>\n\u003cli>readAsBinaryString：以二进制方式读文档內容，放到 result 属性。\u003c/li>\n\u003c/ul>\n\u003cp>上面所说的 result 属性，指的是\u003ca href=\"https://developer.mozilla.org/en-US/docs/Web/API/FileReader.result\">\u003ccode>FileReader.result\u003c/code>\u003c/a>。比如下面代码：\u003c/p>\n\u003cpre>\u003ccode class=\"language-js\">var reader = new FileReader();\nreader.onload = function (e) {\n  e.target === reader;\n\n  reader.result;\n};\n\u003c/code>\u003c/pre>\n\u003cp>javaScript 关于异步 API 其实都差不多一个样子。因为本身就是\u003cstrong>事件机制\u003c/strong>。所以回调中的第一个属性也是 Event 对象。这边属于\u003ca href=\"https://developer.mozilla.org/en-US/docs/Web/API/ProgressEvent\">\u003ccode>ProgressEvent\u003c/code>\u003c/a>。而 e.target，指的就是触发发起者，也就是前面定义的 reader。\u003c/p>\n\u003cp>如果你要读取一个文本文件。比如说 XML、js、css 文件等等。直接用\u003ccode>readAsText\u003c/code>，它会把返回的数据用指定编码或者默认编码进行解析，\u003ccode>reader.result\u003c/code>等同于 Ajax 返回对象的\u003ccode>responseText\u003c/code>属性。\u003c/p>\n\u003cp>readAsDataURL 的话，就是帮你把二进制转化成\u003ccode>base64\u003c/code>的格式。为此可以\u003ccode>reader.result\u003c/code>当成图片的 src 直接用、CSS 的 url 属性用等等。\u003c/p>\n\u003cp>readAsArrayBuffer 返回的\u003ca href=\"https://developer.mozilla.org/en-US/docs/Web/API/ArrayBuffer\">ArrayBuffer\u003c/a>其实也就是最原始的二进制数据。在所给的链接中的文档说介绍的一样，系统并没有提供什么方法来操作二进制文件，连遍历的方法都没有给。\n因为是底层的产物，可能它所能做的除了存储数据，就是告诉你数据大小了（比如\u003ca href=\"https://developer.mozilla.org/en-US/docs/Web/JavaScript/Base64_encoding_and_decoding#Appendix.3A_Decode_a_Base64_string_to_Uint8Array_or_ArrayBuffer\">base64DecToArr 的使用\u003c/a>），当然，它最多的用途就是用来做其它 API 的参数使用，比如 Ajax 异步上传文件。\u003c/p>\n\u003cp>而 readAsBinaryString，则将 ArrayBuffer 转化为原生的 String 类型，为此能够操纵文件的具体内容。而不再只是孤零零地盯着 ArrayBuffer 什么也干不了。为此你可以用来做文件的安全性检测，检查文件类型时候正确等等等等，比如说我可以查找一个图片的信息，如果有 PS 处理过的痕迹，可以很清晰地看到想关信息：\u003c/p>\n\u003cp>\u003cimg src=\"/img/html5-file-api-intro/capture-1.png\" alt=\"image\">\u003c/p>\n\u003ch2>Blob 对象\u003c/h2>\n\u003cp>在文章最前面的\u003cstrong>推荐阅读\u003c/strong>中就已经很清晰地介绍了 Blob 对象，在我眼中，它就是一个文件。\n为此我得到了\u003cstrong>创建一个文件的权限\u003c/strong>。\n比如在 Web Worker 中，它需要一个 js 文件地址，而你不想真的用一个文件去记录这些代码，兴许太麻烦了，毕竟不利于压缩什么的各种借口。这时你就可以用 Blob 来实现。（注意：以前你可能看过 BlobBuilder 之类的 API，但已经被废弃，请用标准的 API，类似的 shim 也是有的）\u003c/p>\n\u003cp>下面就用一个简单的\u003cstrong>综合应用\u003c/strong>来展示 Blob 的使用\u003c/p>\n\u003ch2>综合应用\u003c/h2>\n\u003cp>这代码是来自我的一个项目，因为要用到\u003cstrong>字体的上传与预览\u003c/strong>，为此在选中字体文件后需要做一个预览字体一样的功能，就像预览图片一样。\u003c/p>\n\u003cp>但是不同的是，字体的预览需要动态生成样式表。\u003c/p>\n\u003cp>所以你可以使用 Blob 来生成一个新的 css 文件，而后通过\u003ccode>&#x3C;link>\u003c/code>标签引入使用。\u003c/p>\n\u003cp>这边介绍直接在 head 中插入 style 标签的方法，思路一样：\u003c/p>\n\u003cpre>\u003ccode class=\"language-js\">//file对象来自input的change事件中event.target.files的元素\n\nvar fontInfo = file.name.split(\".\");\nvar postfix = fontInfo.pop().toLowerCase();\nvar fontName = fontInfo.pop() + \"-\" + postfix;\n// 这边支持两种字体格式 ttf 和 woff\nif (postfix === \"ttf\" || postfix === \"woff\") {\n  var reader = new FileReader();\n  reader.onload = function (e) {\n    var blob = new Blob([e.target.result], {\n      // type: \"application/x-font-\" + postfix\n      // type: \"font/\" + postfix\n      type: \"application/octet-stream\",\n    });\n    var url = URL.createObjectURL(blob);\n    var tempStyleElement = document.createElement(\"style\"); //w3c\n    tempStyleElement.setAttribute(\"type\", \"text/css\");\n    document.getElementsByTagName(\"head\")[0].appendChild(tempStyleElement);\n    //样式表内容\n    var formatType = {\n      ttf: \"truetype\",\n      woff: \"woff\",\n    };\n    var styleText =\n      \"\\\n@font-face { \\\n    font-family:\" +\n      JSON.stringify(fontName) +\n      \"; \\\n    src: url(\" +\n      url +\n      \") format('\" +\n      formatType[postfix] +\n      \"'); \\\n    font-weight: normal; \\\n    font-style: normal; \\\n} \\\n            \";\n    tempStyleElement.textContent = styleText;\n    vm.set(\"content.layerAttr.fontFamily\", fontName);\n    vm.get(\"$PRIVATE.reDrawLayer\")();\n  };\n  reader.readAsBinaryString(file);\n} else {\n  console.warn(\"只允许字体文件！\");\n}\n\u003c/code>\u003c/pre>\n\u003cblockquote>\n\u003cp>补注：reader.readAsDataURL 所生成的 base64 格式是\u003ccode>src:url\u003c/code>所能直接支持的。但是如果字体文件过大，styleText 也会非常庞大，内存消耗不说，\u003ccode>tempStyleElement.textContent = styleText;\u003c/code>这段代码就要卡上一两秒。所以需要用 Blob 生成一个 blog-url 来替代庞大的文件数据。\u003c/p>\n\u003c/blockquote>","markdownContent":"\n> 文件类的提供使得 JS 能够操作所能获取的各种文件的操作提供支持。\n> 比如 Ajax 获取的文件，input[type='file']选中的文件，或者是用户自己生成的文件等等……。\n\n推荐阅读：[理解 DOMString、Document、FormData、Blob、File、ArrayBuffer 数据类型——张鑫旭](http://www.zhangxinxu.com/wordpress/2013/10/understand-domstring-document-formdata-blob-file-arraybuffer/)\n\n本文针对文件读取以及 Blob 对象的简单使用做一个事例。\n\n## 文件读取\n\n- readAsText：以文字方式读文档內容，放到 result 属性，默认编码 UTF-8。\n- readAsDataURL：读取到的內容会编码成 data URL，放到 result 属性。\n- readAsArrayBuffer：result 属性会包含一個 ArrayBuffer 物件。\n- readAsBinaryString：以二进制方式读文档內容，放到 result 属性。\n\n上面所说的 result 属性，指的是[`FileReader.result`](https://developer.mozilla.org/en-US/docs/Web/API/FileReader.result)。比如下面代码：\n\n```js\nvar reader = new FileReader();\nreader.onload = function (e) {\n  e.target === reader;\n\n  reader.result;\n};\n```\n\njavaScript 关于异步 API 其实都差不多一个样子。因为本身就是**事件机制**。所以回调中的第一个属性也是 Event 对象。这边属于[`ProgressEvent`](https://developer.mozilla.org/en-US/docs/Web/API/ProgressEvent)。而 e.target，指的就是触发发起者，也就是前面定义的 reader。\n\n如果你要读取一个文本文件。比如说 XML、js、css 文件等等。直接用`readAsText`，它会把返回的数据用指定编码或者默认编码进行解析，`reader.result`等同于 Ajax 返回对象的`responseText`属性。\n\nreadAsDataURL 的话，就是帮你把二进制转化成`base64`的格式。为此可以`reader.result`当成图片的 src 直接用、CSS 的 url 属性用等等。\n\nreadAsArrayBuffer 返回的[ArrayBuffer](https://developer.mozilla.org/en-US/docs/Web/API/ArrayBuffer)其实也就是最原始的二进制数据。在所给的链接中的文档说介绍的一样，系统并没有提供什么方法来操作二进制文件，连遍历的方法都没有给。\n因为是底层的产物，可能它所能做的除了存储数据，就是告诉你数据大小了（比如[base64DecToArr 的使用](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Base64_encoding_and_decoding#Appendix.3A_Decode_a_Base64_string_to_Uint8Array_or_ArrayBuffer)），当然，它最多的用途就是用来做其它 API 的参数使用，比如 Ajax 异步上传文件。\n\n而 readAsBinaryString，则将 ArrayBuffer 转化为原生的 String 类型，为此能够操纵文件的具体内容。而不再只是孤零零地盯着 ArrayBuffer 什么也干不了。为此你可以用来做文件的安全性检测，检查文件类型时候正确等等等等，比如说我可以查找一个图片的信息，如果有 PS 处理过的痕迹，可以很清晰地看到想关信息：\n\n![image](/img/html5-file-api-intro/capture-1.png)\n\n## Blob 对象\n\n在文章最前面的**推荐阅读**中就已经很清晰地介绍了 Blob 对象，在我眼中，它就是一个文件。\n为此我得到了**创建一个文件的权限**。\n比如在 Web Worker 中，它需要一个 js 文件地址，而你不想真的用一个文件去记录这些代码，兴许太麻烦了，毕竟不利于压缩什么的各种借口。这时你就可以用 Blob 来实现。（注意：以前你可能看过 BlobBuilder 之类的 API，但已经被废弃，请用标准的 API，类似的 shim 也是有的）\n\n下面就用一个简单的**综合应用**来展示 Blob 的使用\n\n## 综合应用\n\n这代码是来自我的一个项目，因为要用到**字体的上传与预览**，为此在选中字体文件后需要做一个预览字体一样的功能，就像预览图片一样。\n\n但是不同的是，字体的预览需要动态生成样式表。\n\n所以你可以使用 Blob 来生成一个新的 css 文件，而后通过`\u003clink>`标签引入使用。\n\n这边介绍直接在 head 中插入 style 标签的方法，思路一样：\n\n```js\n//file对象来自input的change事件中event.target.files的元素\n\nvar fontInfo = file.name.split(\".\");\nvar postfix = fontInfo.pop().toLowerCase();\nvar fontName = fontInfo.pop() + \"-\" + postfix;\n// 这边支持两种字体格式 ttf 和 woff\nif (postfix === \"ttf\" || postfix === \"woff\") {\n  var reader = new FileReader();\n  reader.onload = function (e) {\n    var blob = new Blob([e.target.result], {\n      // type: \"application/x-font-\" + postfix\n      // type: \"font/\" + postfix\n      type: \"application/octet-stream\",\n    });\n    var url = URL.createObjectURL(blob);\n    var tempStyleElement = document.createElement(\"style\"); //w3c\n    tempStyleElement.setAttribute(\"type\", \"text/css\");\n    document.getElementsByTagName(\"head\")[0].appendChild(tempStyleElement);\n    //样式表内容\n    var formatType = {\n      ttf: \"truetype\",\n      woff: \"woff\",\n    };\n    var styleText =\n      \"\\\n@font-face { \\\n    font-family:\" +\n      JSON.stringify(fontName) +\n      \"; \\\n    src: url(\" +\n      url +\n      \") format('\" +\n      formatType[postfix] +\n      \"'); \\\n    font-weight: normal; \\\n    font-style: normal; \\\n} \\\n            \";\n    tempStyleElement.textContent = styleText;\n    vm.set(\"content.layerAttr.fontFamily\", fontName);\n    vm.get(\"$PRIVATE.reDrawLayer\")();\n  };\n  reader.readAsBinaryString(file);\n} else {\n  console.warn(\"只允许字体文件！\");\n}\n```\n\n> 补注：reader.readAsDataURL 所生成的 base64 格式是`src:url`所能直接支持的。但是如果字体文件过大，styleText 也会非常庞大，内存消耗不说，`tempStyleElement.textContent = styleText;`这段代码就要卡上一两秒。所以需要用 Blob 生成一个 blog-url 来替代庞大的文件数据。\n"}}}</script>
+        <script src="/assets/entries/entry-client-routing.CHhd62G8.js" type="module" async></script>
+        <link rel="modulepreload" href="/assets/entries/pages_article_-id.zKRL1uyc.js" as="script" type="text/javascript">
+        <link rel="modulepreload" href="/assets/chunks/chunk-DcLnoLrn.js" as="script" type="text/javascript">
+        <link rel="modulepreload" href="/assets/chunks/chunk-BMsgTsFr.js" as="script" type="text/javascript">
+      </body>
+    </html>
