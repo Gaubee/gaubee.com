@@ -1,7 +1,7 @@
 export { Page };
 
 import { useData } from "../../renderer/useData.ts";
-import { Data } from "./+data.ts";
+import type { Data } from "./+data.ts";
 import { Counter } from "./Counter.tsx";
 
 function Page() {

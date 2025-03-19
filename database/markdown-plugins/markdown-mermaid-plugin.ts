@@ -1,13 +1,23 @@
 /**
  * 参考 @markslides/markdown-it-mermaid 源代码
  */
-import { arr_is_no_empty } from "@gaubee/util";
+import { arr_is_no_empty, func_remember } from "@gaubee/util";
 import { createMermaidRenderer } from "mermaid-isomorphic";
 import { createHash } from "node:crypto";
 import rehypeParse from "rehype-parse";
 import { unified } from "unified";
 import { type Plugins } from "../markdown.helper.ts";
 import { visitAsync } from "./visit-async.ts";
+import { createServer } from "vite";
+import { isDev } from "../../env.ts";
+
+const previewServer = func_remember(async () => {
+  const server = await createServer({ root: process.cwd() });
+  await server.listen();
+  const localhost = server.resolvedUrls?.local[0];
+  console.log("server.resolvedUrls", server.resolvedUrls);
+  return new URL("renderer/css/index.css", localhost);
+});
 
 export const markdownMermaidPlugins: Plugins = {
   rehypePlugins: [
@@ -15,11 +25,12 @@ export const markdownMermaidPlugins: Plugins = {
       const isDarkMode = false;
       const mermaid = createMermaidRenderer();
       const injectStyles = new Set<string>();
-      const css = String.raw;
       const mermaidChart = async (code: string) => {
         const res = (
           await mermaid([code], {
-            css: "http://localhost:3000/renderer/css/index.css",
+            css: isDev
+              ? "http://localhost:3000/renderer/css/index.css"
+              : void 0, // await previewServer()
             mermaidConfig: {
               theme: isDarkMode ? "default" : "dark",
               darkMode: isDarkMode,
@@ -29,7 +40,8 @@ export const markdownMermaidPlugins: Plugins = {
               startOnLoad: true,
               fontSize: 12,
             },
-            prefix: createHash("md5").update(code).digest("hex").slice(0, 6),
+            prefix:
+              "mmd-" + createHash("md5").update(code).digest("hex").slice(0, 6),
           })
         )[0];
         if (res.status === "rejected") {
@@ -40,8 +52,6 @@ export const markdownMermaidPlugins: Plugins = {
           );
           return `<pre>${err instanceof Error ? err.message : err}</pre>`;
         }
-
-        console.log("mermaind parse success:", code, res);
 
         const style = res.value.svg.match(/<style>.+<\/style>/);
         if (style) {

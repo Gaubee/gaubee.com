@@ -1,17 +1,8 @@
 body {
   margin: 0;
 
-  --font-sans-serif: -apple-system, BlinkMacSystemFont, "Segoe UI",
-    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue",
-    Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
-    "Segoe UI Symbol";
-  --font-serif: Georgia, STZhongsong, "Times New Roman", Times, PMingLiu, STSong,
-    SimSun, "WenQuanYi Bitmap Song", "Noto Serif CJK", serif,
-    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  --font-mono: JetBrainsMono, "Source Code Pro", Monaco, Menlo, Consolas,
-    "Courier New", Courier, monospace;
-  font-family: 
-    /* macOS 优先 */ -apple-system, BlinkMacSystemFont,
+  --font-sans-serif:
+  /* macOS 优先 */ -apple-system, BlinkMacSystemFont,
     "Segoe UI",
     /* 苹方（macOS系统默认）[1](@ref) */ /* Windows 优先 */ "HarmonyOS Sans SC",
     /* 华为/荣耀设备首选（需手动安装）[1](@ref) */ /* 国产设备优先 */
@@ -23,6 +14,12 @@ body {
     /* Windows备选 */ "Helvetica Neue", Helvetica, Arial, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
     /* 通用无衬线回退 */ sans-serif;
+  --font-serif: Georgia, STZhongsong, "Times New Roman", Times, PMingLiu, STSong,
+    SimSun, "WenQuanYi Bitmap Song", "Noto Serif CJK", serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  --font-mono: JetBrainsMono, "Source Code Pro", Monaco, Menlo, Consolas,
+    "Courier New", Courier, monospace;
+  font-family: var(--font-sans-serif);
   font-size: 14px;
   line-height: 2;
 }

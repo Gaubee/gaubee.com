@@ -1,7 +1,7 @@
 export { Page };
 
 import { useData } from "../../../renderer/useData.ts";
-import { Data } from "./+data.ts";
+import type { Data } from "./+data.ts";
 const css = String.raw;
 
 function Page() {
@@ -10,9 +10,8 @@ function Page() {
     <>
       <style type="text/css">
         {css`
-          p {
-            text-indent: "2em";
-            line-height: 3;
+          main > p {
+            text-indent: 1em;
           }
         `}
       </style>

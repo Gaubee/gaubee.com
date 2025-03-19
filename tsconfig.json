@@ -14,6 +14,7 @@
     "skipLibCheck": true,
     "esModuleInterop": true
   },
+  "exclude": ["old-app"],
   "ts-node": {
     "transpileOnly": true,
     "esm": true,
