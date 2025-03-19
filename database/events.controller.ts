@@ -2,7 +2,7 @@ import { walkFiles } from "@gaubee/nodekit";
 import { func_remember } from "@gaubee/util";
 import matter from "gray-matter";
 import { rootResolver } from "./common.helper.ts";
-import { md } from "./markdown.helper.ts";
+import { markdownToHtml } from "./markdown.helper.ts";
 
 export const getAllEvents = func_remember(async () => {
   const eventsDirname = rootResolver("./events");
@@ -16,7 +16,9 @@ export const getAllEvents = func_remember(async () => {
         const createdAt = new Date(info.data.date || entry.stats.birthtimeMs);
         return {
           metadata: { ...info.data, createdAt },
-          htmlContent: await md.renderAsync(info.content),
+          htmlContent: await markdownToHtml(info.content, {
+            filepath: entry.path,
+          }),
         };
       })
     )

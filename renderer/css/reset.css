@@ -1,7 +1,18 @@
 body {
   margin: 0;
+
+  --font-sans-serif: -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue",
+    Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol";
+  --font-serif: Georgia, STZhongsong, "Times New Roman", Times, PMingLiu, STSong,
+    SimSun, "WenQuanYi Bitmap Song", "Noto Serif CJK", serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  --font-mono: JetBrainsMono, "Source Code Pro", Monaco, Menlo, Consolas,
+    "Courier New", Courier, monospace;
   font-family: 
-    /* macOS 优先 */ "PingFang SC",
+    /* macOS 优先 */ -apple-system, BlinkMacSystemFont,
+    "Segoe UI",
     /* 苹方（macOS系统默认）[1](@ref) */ /* Windows 优先 */ "HarmonyOS Sans SC",
     /* 华为/荣耀设备首选（需手动安装）[1](@ref) */ /* 国产设备优先 */
       "HONOR Sans SC",
@@ -9,9 +20,18 @@ body {
     /* 小米设备默认字体（MIUI系统）[7](@ref) */ /* 开源兜底 */
       "Source Han Sans SC",
     /* 思源黑体（Adobe/Google开源） */ "Microsoft YaHei",
-    /* Windows备选 */ sans-serif; /* 通用无衬线回退 */
+    /* Windows备选 */ "Helvetica Neue", Helvetica, Arial, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    /* 通用无衬线回退 */ sans-serif;
   font-size: 14px;
   line-height: 2;
+}
+svg {
+  line-height: 1.5;
+}
+svg p {
+  text-indent: 0;
+  line-height: inherit;
 }
 * {
   box-sizing: border-box;

@@ -5,7 +5,7 @@ export type Data = Awaited<ReturnType<typeof data>>;
 import { getAllArticles } from "../../database/articles.controller.ts";
 import { getAllEvents } from "../../database/events.controller.ts";
 import { map_get_or_put } from "@gaubee/util";
-import { md } from "../../database/markdown.helper.ts";
+import { markdownToHtml } from "../../database/markdown.helper.ts";
 
 const data = async () => {
   const articles = await getAllArticles();
@@ -37,8 +37,9 @@ const data = async () => {
       createdAt: article.metadata.createdAt,
       data: {
         ...article.metadata,
-        previewContent: await md.renderAsync(
-          article.markdownContent.split("\n").slice(0, 20).join("\n")
+        previewContent: await markdownToHtml(
+          article.markdownContent.split("\n").slice(0, 20).join("\n"),
+          { filepath: article.fileEntry.path }
         ),
       },
     });
