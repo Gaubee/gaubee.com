@@ -10,18 +10,28 @@ updated: 2025-03-19T03:58:41.753Z
 
 import { YoutubePlayer } from "../components/YoutubePlayer.tsx";
 
-> 参考入门视频：
+> 参考资料:
+>
+> - [Building a simple text editor with iced, a cross-platform GUI library for Rust](https://www.youtube.com/watch?v=gcBJ7cPSALo)
+>   视频的内容是老旧的，但本文写在 2025 年 3 月，已经参考最新版的示例代码和相关文档，做出适配。
+> - [editor/main.rs](https://github.com/iced-rs/iced/blob/9c1edc3/examples/editor/src/main.rs)
+> - [Frequently Asked Questions](https://github.com/iced-rs/book/blob/1176472/src/faq.md)
+> - [Architecture](https://github.com/iced-rs/book/blob/1176472/src/architecture.md)
+> - [First Steps](https://github.com/iced-rs/book/blob/1176472/src/first-steps.md)
 >
 > <YoutubePlayer videoId="gcBJ7cPSALo" />
 
 ## 1. 架构总览：消息驱动的响应式系统
 
-Iced 的核心架构遵循经典的 Elm 架构（The Elm Architecture），这是一种在用户界面开发中自然形成的模式。通过对界面系统的本质分析，我们可以识别出四个核心组件及其职责：
+Iced 的核心架构启发于经典的 Elm 架构（The Elm Architecture）。
+通过对界面系统的本质分析，我们可以识别出四个核心组件及其职责：
 
-- **模型（Model）**：应用的状态容器，以不可变结构体的形式存储数据
-- **消息（Message）**：状态变更的触发器，包含用户交互、系统事件、动画事件、组件之间通讯 等信号
-- **更新逻辑（Update）**：状态转换器，定义如何基于消息更新应用状态
-- **视图逻辑（View）**：界面构建器，将当前状态映射为可视化的界面组件
+- **模型（Model）**：应用程序的状态
+- **消息（Message）**：应用程序的交互（包含用户交互、系统事件、动画事件、组件之间通讯 等信号）
+- **更新逻辑（Update logic）**：定义着消息如何改变状态
+- **视图逻辑（View logic）**：定义着状态如何构建出组件树（官方称为 widgets）
+
+> 此外，不同的平台，通过抽象层（Shell）处理跨平台的窗口系统集成。
 
 ```mermaid
 graph LR
@@ -38,9 +48,11 @@ graph LR
     end
 ```
 
-这种架构建立了一个严格的单向数据流：用户与界面组件（Widget）交互产生消息（Message），消息经由更新逻辑（Update）处理并修改应用状态（Model），状态变更触发视图逻辑（View）重新构建界面组件。这种模式使得状态变更可预测、可追踪，同时通过平台抽象层（Shell）处理跨平台的窗口系统集成。
+这种架构建立了一个严格的**单向数据流**，这种模式使得状态变更可预测、可追踪。
 
-> 值得注意的是，Iced 中的界面组件（Widget）是通用且可重用的基础设施，它们只负责渲染和事件捕获。
+用户与界面组件（Widget）交互产生消息（Message），消息经由更新逻辑（Update）处理并修改应用状态（Model），状态变更触发视图逻辑（View）重新构建界面组件。
+
+> 值得注意的是，Iced 中的界面组件（Widget）是通用且可重用的基础设施，它们只负责渲染和事件捕获（没有副作用）。
 > 而应用的状态结构、消息类型以及它们之间的转换关系则是特定于业务的。
 > 这种分离让开发者能够专注于设计符合业务需求的状态管理逻辑，同时复用框架提供的界面组件能力。
 
