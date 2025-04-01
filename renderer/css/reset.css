@@ -1,19 +1,9 @@
 body {
   margin: 0;
 
-  --font-sans-serif:
-  /* macOS 优先 */ -apple-system, BlinkMacSystemFont,
-    "Segoe UI",
-    /* 苹方（macOS系统默认）[1](@ref) */ /* Windows 优先 */ "HarmonyOS Sans SC",
-    /* 华为/荣耀设备首选（需手动安装）[1](@ref) */ /* 国产设备优先 */
-      "HONOR Sans SC",
-    /* 荣耀设备默认字体（MagicOS系统）[1,2,3,5](@ref) */ "MiSans",
-    /* 小米设备默认字体（MIUI系统）[7](@ref) */ /* 开源兜底 */
-      "Source Han Sans SC",
-    /* 思源黑体（Adobe/Google开源） */ "Microsoft YaHei",
-    /* Windows备选 */ "Helvetica Neue", Helvetica, Arial, sans-serif,
-    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
-    /* 通用无衬线回退 */ sans-serif;
+  --font-sans-serif: -apple-system, BlinkMacSystemFont, "Helvetica Neue",
+    "Segoe UI", "PingFang SC", "HarmonyOS Sans SC", "HONOR Sans SC", MiSans,
+    "Source Han Sans SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --font-serif: Georgia, STZhongsong, "Times New Roman", Times, PMingLiu, STSong,
     SimSun, "WenQuanYi Bitmap Song", "Noto Serif CJK", serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
@@ -36,7 +26,10 @@ svg p {
 /* 网页5、网页9的卡片阴影与标题留白 */
 h1,
 h2,
-h3 {
+h3,
+h4,
+h5,
+h6 {
   margin: 1.5em 0 0.8em;
   font-weight: 600;
   letter-spacing: 0.05em; /* 标题字间距微调 */
@@ -46,4 +39,13 @@ h1 {
   font-size: 2.2rem;
   border-bottom: 2px solid #eee; /* 主标题下划线分隔 */
   padding-bottom: 0.5em;
+}
+ol li li {
+  list-style: lower-roman;
+}
+ol li li li {
+  list-style: lower-alpha;
+}
+ol li li li li {
+  list-style: circle;
 }
