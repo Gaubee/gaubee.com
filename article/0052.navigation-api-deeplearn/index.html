@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <link rel="stylesheet" type="text/css" href="/assets/static/renderer_css_index-e8e12f67.B0ujMgz2.css">
+        <link rel="stylesheet" type="text/css" href="/assets/static/renderer_Layout-031b266d.CEjdw0pU.css">
+        <meta charset="UTF-8" />
+        <link rel="icon" href="/img/head.webp" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="description" content="Gaubee&#039;s Blogs / Events / Projects" />
+        <title>Gaubee&#039;s Site</title>
+      </head>
+      <body>
+        <div id="root"><link rel="preload" as="image" href="/img/head.webp"/><div style="display:flex;max-width:900px;margin:auto"><div style="display:flex;flex-direction:column;justify-content:space-between;max-height:100vh;width:38%;max-width:26em;position:sticky;top:0"><div id="sidebar" style="padding:20px;flex-shrink:0;display:flex;flex-direction:column;line-height:1.8em;border-right:2px solid #eee"><div style="margin-top:20px;margin-bottom:10px"><a href="/"><img src="/img/head.webp" height="64" width="64" alt="logo"/></a></div><a href="/" class="">Timeline</a><a href="/projects" class="">Projects</a><a href="/about" class="">About</a></div><div style="padding:16px"><small>本网站不收集任何访问者的行为与信息，不做任何商业运作，仅仅为个人使用。</small><small style="display:block;margin-top:8px"><a href="https://beian.miit.gov.cn/#/Integrated/recordQuery">闽ICP备17026139号-1</a></small></div></div><div id="page-container"><div id="page-content" style="padding:20px;padding-bottom:50px;min-height:100vh;background-color:#fafafa;color:#333"><style type="text/css">
+          main > p {
+            text-indent: 1em;
+          }
+        </style><h1>深入理解 Navigation API</h1><main><h2>一、 设计哲学 (The "Why")</h2>
+<ol>
+<li><strong>将导航的“语义”交还浏览器：</strong> 传统 SPA 路由（基于 <code>history.pushState</code>/<code>replaceState</code>）本质上是在“欺骗”浏览器。我们只是改变了 URL 和一些历史记录状态，但浏览器本身并不知道一次真正的“导航”正在发生。Navigation API 的核心哲学是<strong>让浏览器真正理解并参与到 SPA 的导航过程中</strong>。它不再仅仅是被动地记录历史条目，而是主动地管理导航生命周期。</li>
+<li><strong>以用户意图为中心，而非技术实现：</strong> <code>pushState</code> 是一个低级、命令式的操作。Navigation API 则更加声明式和事件驱动。它关注的是用户发起的导航意图（如点击链接、前进/后退按钮）或程序触发的导航请求 (<code>navigation.navigate()</code>)，并围绕这个意图提供了一套完整的生命周期事件 (<code>navigate</code>, <code>navigatesuccess</code>, <code>navigateerror</code>, <code>currententrychange</code>)。这使得开发者可以更好地响应和控制导航流程。</li>
+<li><strong>标准化与健壮性：</strong> 在 Navigation API 出现之前，每个前端框架都需要在 <code>history</code> API 之上构建自己复杂的路由管理逻辑，包括处理并发导航、滚动恢复、焦点管理、可访问性（ARIA Live Regions 通知等）。这导致了实现碎片化和潜在的健壮性问题。Navigation API 旨在提供一个<strong>标准化的、更健壮的底层基础</strong>，让框架和开发者能在此之上构建更可靠、更一致的用户体验。</li>
+<li><strong>拥抱异步本质：</strong> 现代 Web 应用的导航往往涉及异步操作（代码分割加载、数据获取）。<code>history</code> API 对此无能为力。Navigation API 通过 <code>NavigateEvent.intercept(handler)</code> 明确地支持了异步导航处理，允许开发者在导航真正完成（URL 变更、DOM 更新）之前执行异步任务，并且可以优雅地处理成功、失败或取消。</li>
+</ol>
+<h4>“导航生命周期”的完整定义：</h4>
+<p>“导航生命周期”在 Navigation API 的语境下，指的是从<strong>用户或程序发起导航意图</strong>开始，到<strong>导航最终完成（成功或失败），并且浏览器状态（URL、历史记录、DOM）更新</strong>为止的整个过程，以及期间由浏览器管理和触发的一系列事件和状态。</p>
+<p>其关键阶段和事件包括：</p>
+<ol>
+<li>
+<p><strong>导航触发 (Initiation):</strong></p>
+<ol>
+<li>用户行为：点击链接 (<code>&#x3C;a></code>)、提交表单（如果未被阻止且目标是当前标签页）、点击浏览器前进/后退/刷新按钮。</li>
+<li>程序化调用：<code>navigation.navigate()</code>, <code>navigation.reload()</code>, <code>navigation.back()</code>, <code>navigation.forward()</code>, <code>navigation.traverseTo()</code>。</li>
+</ol>
+</li>
+<li>
+<p><strong><code>navigate</code> 事件分发 (Intent &#x26; Interception):</strong></p>
+<ol>
+<li>浏览器捕获导航意图，<strong>在任何实际状态改变（URL、History）之前</strong>，在 <code>window.navigation</code> 上触发 <code>navigate</code> 事件。</li>
+<li>该事件 (<code>NavigateEvent</code>) 提供了导航的详细信息（目标 URL、状态、是否用户触发 <code>userInitiated</code> 等），以及控制导航的方法：</li>
+<li><code>canIntercept</code>: 是否可以调用 <code>intercept()</code> (通常对于跨域导航等情况为 false)。</li>
+<li><code>preventDefault()</code>: 同步取消导航。</li>
+<li><code>intercept({ handler })</code>: <strong>核心机制</strong>。声明应用将接管导航处理（通常是异步的，如加载数据、更新 DOM）。浏览器会等待 <code>handler</code> 这个 async 函数关联的 Promise 完成。<code>handler</code> 会接收到一个 <code>AbortSignal</code> (<code>event.signal</code>) 用于处理后续导航触发的取消。</li>
+</ol>
+</li>
+<li>
+<p><strong>处理阶段 (Processing - if intercepted):</strong></p>
+<ol>
+<li>如果调用了 <code>intercept(options)</code>，浏览器等待 <code>options.handler</code> 的 Promise。</li>
+<li>开发者在此 <code>handler</code> 中执行异步操作（fetch 数据、懒加载模块、渲染视图）。</li>
+<li>如果在此期间发生<strong>新的导航</strong>，之前 <code>intercept</code> 的 <code>handler</code> 关联的 <code>AbortSignal</code> 会被触发 (aborted)，开发者应中止当前处理并让 <code>handler</code> 的 Promise reject 或快速 resolve。</li>
+</ol>
+</li>
+<li>
+<p><strong>提交阶段 (Commitment):</strong></p>
+<ol>
+<li><strong>如果未拦截或拦截成功完成 (handler Promise resolves):</strong></li>
+<li>浏览器更新 URL。</li>
+<li>更新 <code>navigation.currentEntry</code>。</li>
+<li>将新的或更新后的 <code>NavigationHistoryEntry</code> 添加/更新到历史记录堆栈中。</li>
+<li>触发 <code>navigatesuccess</code> 事件，表示导航逻辑成功完成。</li>
+<li>更新 DOM（如果是由 <code>intercept</code> handler 负责的）。</li>
+<li>触发 <code>currententrychange</code> 事件，因为 <code>currentEntry</code> 已改变。</li>
+<li>浏览器可能执行默认行为，如滚动恢复、焦点管理、触发无障碍通知。</li>
+<li><strong>如果拦截失败 (handler Promise rejects) 或导航被阻止:</strong></li>
+<li>URL 和历史记录<strong>不</strong>发生改变。</li>
+<li>触发 <code>navigateerror</code> 事件，表示导航逻辑失败。<code>currententrychange</code> <strong>不</strong>触发。</li>
+</ol>
+</li>
+</ol>
+<p>这个完整的生命周期由浏览器原生管理，提供了比 <code>popstate</code> + <code>pushState</code> 更为健壮和可预测的控制流，特别是对于异步操作和并发导航的处理。</p>
+<h2>二、 解决问题的思路 (The "How")</h2>
+<ol>
+<li><strong>显式导航生命周期管理：</strong>
+<ol>
+<li><strong><code>navigate</code> 事件：</strong> 核心入口。导航意图发生时触发。提供信息并允许控制：
+<ol>
+<li>检查目标 (<code>event.destination.url</code>, <code>event.destination.getState()</code>)。</li>
+<li>同步取消 (<code>event.preventDefault()</code>)。</li>
+<li>**关键：**通过 <code>event.intercept({ handler })</code> 声明接管导航，执行异步逻辑。<code>handler</code> (async function) 的 Promise 决定导航结果。浏览器等待此 Promise。</li>
+</ol>
+</li>
+<li><strong><code>navigatesuccess</code> / <code>navigateerror</code> 事件：</strong> 在 <code>intercept</code> 的 <code>handler</code> 成功 resolve 或 reject 后（或无拦截时导航完成后）触发，提供明确的完成/失败信号。</li>
+<li><strong><code>currententrychange</code> 事件：</strong> 当 <code>navigation.currentEntry</code> 发生变化时（导航成功完成、调用 <code>updateCurrentEntry()</code>）触发，响应当前历史条目状态更新。</li>
+</ol>
+</li>
+<li><strong>更精细的历史记录管理：</strong>
+<ol>
+<li><strong><code>NavigationHistoryEntry</code> 对象：</strong> 结构化历史条目，含 <code>key</code> (唯一标识), <code>id</code> (同文档唯一), <code>url</code>, <code>index</code>, 和 <code>getState()</code> 获取关联状态。</li>
+<li><strong><code>navigation.entries()</code>：</strong> 访问整个历史堆栈（只读视图）。</li>
+<li><strong><code>navigation.updateCurrentEntry({ state })</code>：</strong> 在不触发导航的情况下，更新当前历史条目的状态（使用结构化克隆存储）。用于保存页面临时状态（表单、滚动位置等）。</li>
+<li><strong><code>navigation.traverseTo(key)</code>：</strong> 直接导航到历史记录中指定 <code>key</code> 的条目，而非仅相对前进/后退。<strong>不</strong>会丢弃后续历史。</li>
+</ol>
+</li>
+<li><strong>原生处理常见 SPA 痛点：</strong>
+<ol>
+<li><strong>滚动恢复：</strong> API 设计为浏览器实现更可靠的自动滚动恢复提供了基础（具体策略可能由浏览器决定）。开发者也可在 <code>navigate({scroll:"after-transition"|"manual"})</code> 或 <code>navigatesuccess</code> 中手动处理，或利用 <code>history.scrollRestoration</code>。</li>
+<li><strong>焦点管理：</strong> 导航成功后，浏览器可以应用更智能的默认焦点行为（如 <code>autofocus</code> 或聚焦 <code>&#x3C;body></code>）。开发者也可在 <code>navigate({focusReset:"after-transition"|"manual"})</code> 或 <code>navigatesuccess</code> 中手动管理。</li>
+<li><strong>可访问性 (A11y)：</strong> 标准化事件（尤其 <code>navigatesuccess</code>）为 ARIA live regions 或平台辅助技术提供了宣告页面转换的可靠时机。浏览器自身也可能利用此信号发出通知。</li>
+<li><strong>并发处理（关键优势）：</strong> API 内建处理快速连续导航的机制。后续导航意图会通过 <code>AbortSignal</code> (<code>event.signal</code>) <strong>中止</strong>正在进行的 <code>intercept</code> handler，确保响应最新意图，防止竞态条件。
+<blockquote>
+<p>当一个导航被 <code>event.intercept({ handler })</code> 拦截并且 <code>handler</code> 的 Promise 正在进行中时，如果此时发生了<strong>另一次</strong>导航（用户点击、代码调用 <code>navigate()</code> 等），提案和规范对此有明确的处理机制：<strong>不是排队等待，而是后者取代前者 (Superseding)</strong>。具体流程如下：</p>
+</blockquote>
+<ol>
+<li><strong>导航 A 触发:</strong> <code>navigate</code> 事件 A 触发。</li>
+<li><strong>拦截 A:</strong> 代码调用 <code>eventA.intercept({ handler: handlerA })</code>。<code>handlerA</code> (async function) 开始执行。</li>
+<li><strong>导航 B 触发 (在 <code>handlerA</code> 完成前):</strong> 用户点击链接或代码调用 <code>navigation.navigate()</code> 触发了新的导航 B。</li>
+<li><strong>新 <code>navigate</code> 事件:</strong> 浏览器立即为导航 B 触发一个新的 <code>navigate</code> 事件 B。</li>
+<li><strong>中止信号触发:</strong> <strong>关键点：<strong>与</strong>事件 A</strong> 关联的 <code>NavigateEvent</code> (<code>eventA</code>) 上的 <code>signal</code> (<code>eventA.signal</code>) 属性（这是一个 <code>AbortSignal</code>）会立即被浏览器<strong>触发 <code>abort</code></strong>。</li>
+<li><strong>旧 <code>handler</code> 处理中止:</strong>
+<ol>
+<li><code>handlerA</code> 内部的代码<strong>应该</strong>监听这个 <code>eventA.signal</code>。可以通过 <code>eventA.signal.aborted</code> 检查状态，或者使用 <code>eventA.signal.addEventListener('abort', ...)</code>。</li>
+<li>当检测到信号中止时，<code>handlerA</code> <strong>应该</strong>尽快停止其工作（例如，中止进行中的 <code>fetch</code> 请求，取消定时器，停止 DOM 更新）并让其返回的 Promise <strong>reject</strong> (通常使用一个表示中止的特定错误，如 <code>DOMException('AbortError')</code>) 或快速 resolve。</li>
+</ol>
+</li>
+<li><strong>旧导航结果:</strong> 由于 <code>handlerA</code> 的 Promise 通常会因中止而 reject (或者即使 resolve，浏览器也知道它被中止了)，导航 A <strong>不会</strong>进入“提交阶段”。它不会更新 URL，不会触发 <code>navigatesuccess</code>。它可能会（也应该会）触发 <code>navigateerror</code> (如果 Promise reject 了)，但这代表的是被中止的导航 A 的失败，而不是导航 B 的状态。浏览器实质上<strong>抛弃 (discards)</strong> 了被中止的导航 A 的后续流程。</li>
+<li><strong>新导航 B 继续:</strong> 导航 B 的 <code>navigate</code> 事件 (<code>eventB</code>) 现在正常处理。它可以被 <code>preventDefault()</code>, 或者也被 <code>intercept()</code> 等。它接管了导航流程。</li>
+</ol>
+</li>
+</ol>
+</li>
+</ol>
+<h4><code>state</code> vs. <code>searchParams</code> 的使用时机</h4>
+<ol>
+<li>
+<p><strong><code>searchParams</code> (URL 查询参数):</strong></p>
+<ol>
+<li><strong>用途:</strong> 用于表示资源<strong>状态</strong>的关键参数，这些状态应该<strong>反映在 URL 中</strong>。它们定义了“你正在看什么”。</li>
+<li><strong>特点:</strong>
+<ol>
+<li>可见、可编辑（用户可以直接修改 URL）。</li>
+<li>可分享、可收藏。</li>
+<li>通常是字符串键值对。</li>
+<li>搜索引擎可索引。</li>
+<li>改变 <code>searchParams</code> 通常意味着请求<strong>不同或过滤后</strong>的数据子集。</li>
+</ol>
+</li>
+<li><strong>使用场景:</strong>
+<ol>
+<li>分页 (<code>?page=2</code>)</li>
+<li>排序 (<code>?sort=price_desc</code>)</li>
+<li>过滤 (<code>?category=electronics&#x26;brand=xyz</code>)</li>
+<li>搜索词 (<code>?q=navigation+api</code>)</li>
+<li>选项卡或视图切换（如果每个视图代表根本不同的内容切片，如 <code>?tab=details</code>）。</li>
+<li>任何需要<strong>持久化</strong>、<strong>可链接</strong>地表示应用内容状态的情况。</li>
+</ol>
+</li>
+</ol>
+</li>
+<li>
+<p><strong><code>navigation.currentEntry.getState()</code> / <code>navigation.navigate(url, { state: ... })</code> / <code>navigation.updateCurrentEntry({ state: ... })</code>:</strong></p>
+<ol>
+<li><strong>用途:</strong> 用于存储与<strong>特定历史记录条目</strong>相关联的、<strong>非 URL 可见</strong>的应用状态。它更多是关于“当你访问这个 URL 时，当时的 UI 处于什么临时状态”。</li>
+<li><strong>特点:</strong>
+<ol>
+<li>用户不可见，不影响 URL 字符串。</li>
+<li>不可直接分享或收藏（分享 URL 不会带上 <code>state</code>）。</li>
+<li>可以存储更复杂的结构化数据（只要满足结构化克隆算法）。</li>
+<li>与特定历史记录条目 (<code>NavigationHistoryEntry</code>) 绑定，通过 <code>back/forward/traverseTo</code> 导航回该条目时，可以恢复。</li>
+<li>修改 <code>state</code> (通过 <code>updateCurrentEntry</code>) <strong>不</strong>会触发完整的导航生命周期（不触发 <code>navigate</code> 事件），只会触发 <code>currententrychange</code>。</li>
+</ol>
+</li>
+<li><strong>使用场景:</strong>
+<ol>
+<li><strong>滚动位置恢复:</strong> 保存页面的精确滚动位置，以便返回时恢复 (虽然浏览器可能提供默认行为，但 <code>state</code> 可用于更精细的控制)。</li>
+<li><strong>临时 UI 状态:</strong> 例如，模态框是否打开、某个 <code>&#x3C;details></code> 元素是否展开、手风琴面板状态。</li>
+<li><strong>部分填写的表单数据:</strong> 用户填写了一半表单，导航离开又回来，可以恢复输入。</li>
+<li><strong>列表中的高亮项:</strong> 用户在列表页点击一项进入详情，返回时希望之前点击的项仍然高亮。</li>
+<li><strong>特定于访问的状态:</strong> 需要在同一次会话中、通过历史导航恢复的、与 URL 内容本身不直接相关的界面状态。</li>
+</ol>
+</li>
+</ol>
+</li>
+<li>
+<p><strong><code>state</code> 是否被克隆存储?</strong></p>
+<ol>
+<li><strong>是的</strong>。传递给 <code>navigate()</code>, <code>updateCurrentEntry()</code> 或最初与 <code>pushState/replaceState</code> 关联的 <code>state</code> 对象，会被浏览器使用<strong>结构化克隆算法 (Structured Clone Algorithm)</strong> 进行克隆，然后存储。</li>
+<li><strong>Implications:</strong>
+<ol>
+<li><strong>无法存储:</strong> 函数、DOM 节点、Error 对象、某些类的实例（除非它们特殊处理过）、带有循环引用的对象。</li>
+<li><strong>可以存储:</strong> 原始类型、普通对象、数组、<code>Date</code>, <code>RegExp</code>, <code>Blob</code>, <code>File</code>, <code>FileList</code>, <code>ArrayBuffer</code>, <code>ImageData</code>, <code>Map</code>, <code>Set</code> 等。</li>
+<li>性能考虑：存储非常大的对象可能会影响性能。</li>
+<li>由于是克隆，后续修改原始对象不会影响存储的状态，反之亦然。</li>
+</ol>
+</li>
+</ol>
+</li>
+</ol>
+<p><strong>选择依据:</strong>
+问自己：这个状态是否需要体现在 URL 中？是否需要用户能够收藏或分享这个状态？这个状态是定义了资源内容本身，还是仅仅是用户与该资源交互时的临时界面状态？前者用 <code>searchParams</code>，后者用 <code>state</code>。它们可以并存。</p>
+<h2>三、 背后的故事与动机 (The "Context")</h2>
+<p>Navigation API (曾用名 App History API) 的诞生源于 Web 开发者社区和浏览器供应商多年来对 SPA 路由现状的普遍不满。<code>history</code> API 设计于 Web 早期，并未预见到现代复杂单页应用的导航需求。框架作者们（如 React Router, Vue Router, Angular Router）不得不花费大量精力来弥补底层 API 的不足。</p>
+<p>你可以通过提案链接了解到这个提案发展的过程：<a href="https://github.com/WICG/navigation-api">github.com/WICG/navigation-api</a></p>
+<p>也可以通过这个视频快速地了解其背后的故事：<a href="https://www.youtube.com/watch?v=cgKUMRPAliw">The history API is dead. Long live the navigation API | HTTP 203 YouTube</a></p>
+<h2>四、 与其它提案的联动 (Synergies)</h2>
+<ol>
+<li>
+<p><strong>View Transitions API (依然是黄金搭档，但集成方式不同):</strong></p>
+<ol>
+<li>
+<p>Navigation API 定义<strong>导航逻辑和时机</strong>，View Transitions API 处理<strong>视觉状态间的平滑过渡</strong>。</p>
+</li>
+<li>
+<p><strong>集成方式：</strong> 在 Navigation API 的 <code>navigate</code> 事件监听器中：</p>
+</li>
+<li>
+<p>调用 <code>event.intercept({ handler })</code> 来接管导航。</p>
+</li>
+<li>
+<p>在 <code>handler</code> 这个异步函数内部，使用 <code>document.startViewTransition()</code> 包裹你的 DOM 更新和可能的数据获取逻辑。</p>
+<pre><code class="language-javascript">navigation.addEventListener("navigate", (event) => {
+  if (!event.canIntercept) {
+    return;
+  }
+  if (!document.startViewTransition) {
+    // 如果浏览器不支持 View Transitions
+    event.intercept({
+      handler: async () => {
+        /* 直接更新DOM */
+      },
+    });
+    return;
+  }
+
+  // 使用 View Transitions
+  event.intercept({
+    async handler() {
+      // ★ 在 intercept 的 handler 内部调用 startViewTransition
+      const transition = document.startViewTransition(async () => {
+        // 异步加载数据（如果需要）
+        const data = await fetchData(event.destination.url);
+        // 更新 DOM
+        updateTheDOM(data);
+      });
+
+      // 可以选择等待过渡动画完成 (transition.finished)
+      // 或仅等待伪元素创建/DOM更新完成 (transition.updateCallbackDone)
+      // 或甚至不等待，取决于你的逻辑需求
+      try {
+        await transition.updateCallbackDone; // 至少等 DOM 更新完成
+      } catch (e) {
+        // 处理 DOM 更新或数据获取中的错误
+        console.error("DOM update failed:", e);
+        throw e; // 重新抛出，让 navigateerror 触发
+      }
+    },
+  });
+});
+</code></pre>
+</li>
+</ol>
+</li>
+<li>
+<p><strong>其它可能相关的领域 (间接):</strong></p>
+<ol>
+<li><strong>Speculation Rules API:</strong> 标准化的导航流程有助于更准确地触发 prefetch。
+<ol>
+<li>当 Navigation API 的 <code>navigate</code> 事件触发时，如果 Speculation Rules 已经成功 <code>prefetch</code> 了所需的数据或代码块，那么在 <code>intercept</code> handler 中执行的相应 <code>fetch</code> 或动态 <code>import()</code> 调用会显著加快，从而缩短导航的感知时间。</li>
+<li>而 <code>&#x3C;link rel="prefetch"></code> 也可以达到预取效果，但 Speculation Rules 提供了更现代、更灵活、可能更强大的机制来做同样的事情，尤其是在动态识别和管理预取目标方面。</li>
+<li><strong><code>eagerness</code> 控制 (虽然此特性还在演进)：</strong> 意图是允许开发者提示预取的紧迫性（例如，<code>eager</code> 可能意味着在用户悬停时就开始）。（注意：<code>eagerness</code> 的具体实现和行为仍在讨论和标准化中，浏览器可能有自己的策略）。</li>
+<li>参考文章 <a href="https://developer.chrome.com/blog/speculation-rules-improvements">对 Speculation Rules API 的改进</a></li>
+</ol>
+</li>
+<li><strong>Performance Timeline / Reporting API:</strong>
+<code>navigatesuccess</code> 和 <code>navigateerror</code> 为性能监控和错误报告提供了更精确的时间点和上下文。</li>
+</ol>
+</li>
+</ol>
+<h2>五、 关于 Navigation API Polyfill</h2>
+<p>为 Navigation API 编写一个功能完善的 Polyfill 挑战巨大，因为它试图在用户空间模拟浏览器内核级的导航管理（所以完全模拟是不现实的，只能说尽量，而且用户使用的时候要小心一些边缘情况）。</p>
+<blockquote>
+<p>目前市面上比较成熟的 Polyfill 仓库是 <a href="https://github.com/virtualstate/navigation">github.com/virtualstate/navigation</a> （esm-bundle 差不多需要 105kb）</p>
+</blockquote>
+<ol>
+<li>
+<p><strong>Polyfill 实现的核心难点 (普遍性挑战):</strong></p>
+<p>模拟 Navigation API 的行为，尤其是在尝试复刻其所有功能时，会遇到一些根本性的限制，导致 Polyfill 的行为与原生 API 存在开发者和用户都能感知到的差异：</p>
+<ol>
+<li>
+<p><strong>无法真正实现“事前”拦截浏览器历史导航 (<code>popstate</code>)</strong></p>
+<ol>
+<li><strong>挑战:</strong> 这是最核心的差异之一。原生 <code>navigate</code> 事件在浏览器实际更改 URL 或历史记录<strong>之前</strong>触发，允许开发者通过 <code>event.preventDefault()</code> 完全取消导航，或通过 <code>event.intercept()</code> 在状态改变前执行异步逻辑。然而，Polyfill 赖以感知浏览器前进/后退操作的 <code>popstate</code> 事件，是在 URL 和历史指针<strong>已经改变之后</strong>才触发。</li>
+<li><strong>显著差异/局限性:</strong>
+<ol>
+<li><strong>无法阻止 <code>popstate</code> 导航:</strong> Polyfill 无法在 <code>popstate</code> 触发时真正阻止浏览器历史状态的改变。它最多只能在事件触发后，尝试通过 <code>history.pushState</code> 或 <code>history.replaceState</code> 将状态“修正”回来，但这会导致地址栏 URL 短暂闪烁成目标 URL 再变回来，用户可以明显感知。</li>
+<li><strong>无法实现可靠的 <code>popstate</code> 前置校验:</strong> 开发者不能依赖 Polyfill 在用户点击后退按钮时，进行类似“您有未保存的更改，确定要离开吗？”的同步确认（因为状态已变）。原生 API 的 <code>navigate</code> 事件则可以完美支持此场景。</li>
+</ol>
+</li>
+<li><strong>例子:</strong> 用户在表单页点击后退。使用原生 API，<code>navigate</code> 事件可以在 URL 变化前弹出确认框阻止导航。使用 Polyfill，<code>popstate</code> 触发时 URL 已变，Polyfill 尝试修正会引发 URL 闪烁，且阻止逻辑发生在状态改变之后。</li>
+</ol>
+</li>
+<li>
+<p><strong>无法控制浏览器原生 UI 和行为</strong></p>
+<ol>
+<li><strong>挑战:</strong> Polyfill 运行在 JavaScript 用户空间，对浏览器本身的 UI 组件和底层行为控制力为零。</li>
+<li><strong>显著差异/局限性:</strong>
+<ol>
+<li><strong>加载指示器:</strong> Polyfill 无法控制浏览器的标签页加载微调器（spinner）或进度条。在 <code>intercept()</code> 执行异步操作期间，浏览器不会像原生导航那样显示加载状态，除非开发者手动模拟一个加载指示器。用户可能会感觉应用“卡顿”而不是“正在加载”。</li>
+<li><strong>地址栏 URL 显示:</strong> 原生 API 在 <code>intercept()</code> 执行期间，地址栏通常会保持旧 URL，直到导航成功提交才更新。Polyfill 无法控制这一点，尤其是在 <code>popstate</code> 场景下，地址栏内容已经提前改变。</li>
+<li><strong>原生滚动恢复/焦点管理:</strong> Polyfill 无法改变浏览器对 <code>history.scrollRestoration</code> 的处理方式，也无法完全复刻原生导航后复杂的默认焦点管理逻辑（例如 <code>autofocus</code> 属性在导航后的行为）。开发者需要手动实现滚动和焦点逻辑，其效果可能与原生默认行为有细微但可感知的差异。</li>
+<li><strong>无障碍 (A11y) 通知:</strong> Polyfill 无法触发平台原生的导航成功/失败的无障碍通知。开发者必须手动更新 ARIA live regions 来宣告状态变化。</li>
+</ol>
+</li>
+</ol>
+</li>
+<li>
+<p><strong>难以拦截或阻止某些导航触发方式</strong></p>
+<ol>
+<li><strong>挑战:</strong> JavaScript 对某些浏览器内置的导航机制无能为力。</li>
+<li><strong>显著差异/局限性:</strong>
+<ol>
+<li><strong>直接 <code>location</code> API 调用:</strong> 如 <code>location.assign()</code>, <code>location.replace()</code>, <code>location.href = ...</code>。Polyfill <strong>无法</strong>在这些调用实际执行并导致页面跳转或重载<strong>之前</strong>拦截它们。这是 Polyfill 的一个硬性限制，“做不到”阻止这类导航。
+<blockquote>
+<p>web-worker 中的 location 的定义是藏在原型链上的，所以可以覆写 self.location。
+而 main-thread 中的 location 是直接锁定在 window.location 上，同时 location 本身的属性也都锁死在 location 自身的对象上，完全没有使用原型链，所以基本锁死了所有的修改的可能。</p>
+</blockquote>
+</li>
+<li><strong>非 JS 触发的导航:</strong> 如 <code>&#x3C;meta http-equiv="refresh"></code> 或用户通过浏览器扩展触发的导航，Polyfill 基本无法介入。</li>
+</ol>
+</li>
+</ol>
+</li>
+<li>
+<p><strong>状态管理 (<code>getState/state</code>)：跨页面加载的历史上下文恢复挑战</strong></p>
+<ol>
+<li>
+<p><strong>挑战:</strong> 尽管 <code>history.state</code> 支持结构化克隆且能在页面刷新后恢复<strong>当前</strong>条目的状态，但 Polyfill 面临的根本挑战在于<strong>恢复页面刷新前整个导航历史的上下文视图</strong>。页面重载会清除 Polyfill 在 JavaScript 内存中维护的内部历史表示（所有条目的 key, id, url, state 等信息）。为了在刷新后模拟 <code>navigation.entries()</code>、<code>navigation.traverseTo(key)</code> 等 API，Polyfill 必须尝试恢复这些丢失的信息，通常采取以下两种策略，每种策略都有其固有的、显著的局限性：</p>
+</li>
+<li>
+<p><strong>Polyfill 策略 A: 将整个 <code>navigation.entries()</code> 存入当前 <code>history.state</code></strong></p>
+<ol>
+<li><strong>挑战:</strong> 这会导致该 <code>state</code> 对象的大小极易触及并超过浏览器对<strong>单个 <code>history.state</code> 对象的大小限制</strong>（该限制因浏览器而异，通常在几百 KB 到若干 MB）。</li>
+<li><strong>显著差异/局限性:</strong>
+<ol>
+<li><strong>强加的存储限制:</strong> Polyfill 迫使开发者不仅要限制<strong>每个</strong>历史条目的 <code>state</code> 大小，而且应用的<strong>历史记录深度</strong>（<code>navigation.entries()</code> 的长度）本身也成为一个严格的限制因素。随着历史变长，<code>history.state</code> 会迅速达到上限，导致 Polyfill 无法保存新的历史信息或在刷新后恢复完整的上下文，行为变得不可靠或直接失败。这与原生 API（仅受单个条目大小限制，不受历史总长度的直接限制）的行为模式构成显著差异。</li>
+<li><strong>性能开销:</strong> 序列化和反序列化整个大型历史表示对象，在每次导航（更新 <code>state</code>）和页面加载（恢复 <code>state</code>）时都会带来额外的性能开销。</li>
+</ol>
+</li>
+</ol>
+</li>
+<li>
+<p><strong>Polyfill 策略 B: 使用外部存储 (<code>sessionStorage</code> 或者 IndexedDB) 持久化 Polyfill 历史表示</strong></p>
+<ol>
+<li><strong>挑战 (使用 <code>sessionStorage</code>):</strong> 将 Polyfill 的内部历史表示序列化为字符串存入 <code>sessionStorage</code>。</li>
+<li><strong>显著差异/局限性 (使用 <code>sessionStorage</code>):</strong>
+<ol>
+<li><strong>类型限制与序列化复杂性:</strong> <code>sessionStorage</code> 仅能存储字符串。即使底层 <code>history.state</code> 支持结构化克隆，为了存入 <code>sessionStorage</code>，Polyfill 必须进行序列化。为了保持一致性，这里就需要额外引入类似 superjson 这样的库来做自定义的序列化反序列化。</li>
+<li><strong>更严格的大小限制:</strong> <code>sessionStorage</code> 的大小限制（通常 5-10MB）可能比浏览器对单个 <code>history.state</code> 的限制更严格，进一步压缩了 Polyfill 能管理的总历史状态空间。</li>
+<li><strong>同步读写性能:</strong> 在页面加载时同步读取和解析 <code>sessionStorage</code> 数据会阻塞主线程，影响启动性能。</li>
+</ol>
+</li>
+<li><strong>挑战 (使用 IndexedDB):</strong> 将 Polyfill 的历史表示存入容量更大的 IndexedDB。</li>
+<li><strong>显著差异/局限性 (使用 IndexedDB):</strong>
+<ol>
+<li><strong>同步/异步接口冲突:</strong> IndexedDB 是一个<strong>异步</strong> API，而 Navigation API 的核心部分（如 <code>navigation.entries()</code>, <code>navigation.currentEntry</code>, <code>entry.getState()</code>）是<strong>同步</strong>设计的。Polyfill 无法在调用这些同步方法时<strong>同步地</strong>从 IndexedDB 获取所需数据。这意味着：
+<ol>
+<li>刷新后首次调用这些同步 API 可能返回空、不完整或过时的数据，直到异步加载完成后状态才更新，这与原生 API 的即时可用性形成<strong>根本性差异</strong>。</li>
+<li>如果 Polyfill 强制使用异步接口的设计，一方面开发者会感知到 API 行为的不一致，另一方面，应用启动的速度会受到一些影响，甚至会影响启动的正确性。</li>
+</ol>
+</li>
+</ol>
+</li>
+</ol>
+</li>
+</ol>
+</li>
+<li>
+<p><strong>并发导航处理中的可见状态风险 (非精确性导致的可感知问题)</strong></p>
+<ol>
+<li><strong>挑战:</strong> 虽然时序的微小差异本身不易察觉，但 Polyfill 在模拟 <code>AbortSignal</code> 和管理并发状态时若不够健壮，可能导致<strong>可感知的</strong>副作用。</li>
+<li><strong>显著差异/局限性:</strong>
+<ol>
+<li><strong>状态更新冲突:</strong> 如果 Polyfill 未能及时或完全中止前一个 <code>intercept</code> handler（尤其当 handler 代码未良好响应中止信号时），旧 handler 可能在后续导航开始处理后，仍然修改了 DOM 或应用状态，导致界面短暂显示错误内容或数据不一致，用户可能看到“闪烁”或错误的中间状态。</li>
+<li><strong>资源浪费:</strong> 未能中止的操作（如后台请求）会继续运行，消耗用户资源。</li>
+</ol>
+</li>
+</ol>
+</li>
+</ol>
+</li>
+<li>
+<p><strong>使用 Navigation API Polyfill 的关键注意事项 (基于显著差异)</strong></p>
+<ol>
+<li><strong>弥补核心功能差距:</strong> 认识到 Polyfill <strong>无法</strong>真正实现 <code>popstate</code> 的事前拦截（影响离开确认等场景），也无法控制原生 UI（加载指示器、滚动/焦点）或触发平台级无障碍通知。<strong>开发者必须手动实现</strong>这些缺失的 UI 反馈和辅助功能。同时，应规范使用 <code>navigation.navigate()</code>，避免 Polyfill 难拦截的 <code>location</code> API 调用。</li>
+<li><strong>在限制内管理状态与性能:</strong> 由于 Polyfill 跨页面加载恢复历史上下文的挑战（常依赖 <code>sessionStorage</code>），<strong>必须严格限制 <code>state</code> 中存储数据的复杂度和大小</strong>，并注意<strong>控制历史记录深度</strong>，以防超出存储限制或遭遇序列化问题。确保 <code>intercept</code> Handler <strong>健壮地处理 <code>AbortSignal</code></strong> 以应对并发。最后，<strong>优先条件加载</strong> Polyfill，并进行<strong>性能评估</strong>。</li>
+</ol>
+</li>
+</ol></main></div></div></div></div>
+        <script id="vike_pageContext" type="application/json">{"abortReason":"!undefined","_urlRewrite":null,"_urlRedirect":"!undefined","abortStatusCode":"!undefined","_abortCall":"!undefined","_pageContextInitIsPassedToClient":"!undefined","pageId":"/pages/article/@id","routeParams":{"id":"0052.navigation-api-deeplearn"},"data":{"article":{"fileEntry":{"path":"/home/runner/work/gaubee.com/gaubee.com/articles/0052.navigation-api-deeplearn.md","options":{"cwd":"/home/runner/work/gaubee.com/gaubee.com/articles"},"isFile":true,"isDirectory":false},"originMetadata":{"title":"深入理解 Navigation API","date":"!Date:2025-04-01T07:10:07.860Z","updated":"!Date:2025-04-01T12:14:22.256Z"},"metadata":{"title":"深入理解 Navigation API","date":"!Date:2025-04-01T07:10:07.860Z","updated":"!Date:2025-04-01T12:14:22.256Z","id":"0052.navigation-api-deeplearn","createdAt":"!Date:2025-04-01T07:10:07.860Z","updatedAt":"!Date:2025-04-01T12:14:22.256Z","tags":[]},"htmlContent":"\u003ch2>一、 设计哲学 (The \"Why\")\u003c/h2>\n\u003col>\n\u003cli>\u003cstrong>将导航的“语义”交还浏览器：\u003c/strong> 传统 SPA 路由（基于 \u003ccode>history.pushState\u003c/code>/\u003ccode>replaceState\u003c/code>）本质上是在“欺骗”浏览器。我们只是改变了 URL 和一些历史记录状态，但浏览器本身并不知道一次真正的“导航”正在发生。Navigation API 的核心哲学是\u003cstrong>让浏览器真正理解并参与到 SPA 的导航过程中\u003c/strong>。它不再仅仅是被动地记录历史条目，而是主动地管理导航生命周期。\u003c/li>\n\u003cli>\u003cstrong>以用户意图为中心，而非技术实现：\u003c/strong> \u003ccode>pushState\u003c/code> 是一个低级、命令式的操作。Navigation API 则更加声明式和事件驱动。它关注的是用户发起的导航意图（如点击链接、前进/后退按钮）或程序触发的导航请求 (\u003ccode>navigation.navigate()\u003c/code>)，并围绕这个意图提供了一套完整的生命周期事件 (\u003ccode>navigate\u003c/code>, \u003ccode>navigatesuccess\u003c/code>, \u003ccode>navigateerror\u003c/code>, \u003ccode>currententrychange\u003c/code>)。这使得开发者可以更好地响应和控制导航流程。\u003c/li>\n\u003cli>\u003cstrong>标准化与健壮性：\u003c/strong> 在 Navigation API 出现之前，每个前端框架都需要在 \u003ccode>history\u003c/code> API 之上构建自己复杂的路由管理逻辑，包括处理并发导航、滚动恢复、焦点管理、可访问性（ARIA Live Regions 通知等）。这导致了实现碎片化和潜在的健壮性问题。Navigation API 旨在提供一个\u003cstrong>标准化的、更健壮的底层基础\u003c/strong>，让框架和开发者能在此之上构建更可靠、更一致的用户体验。\u003c/li>\n\u003cli>\u003cstrong>拥抱异步本质：\u003c/strong> 现代 Web 应用的导航往往涉及异步操作（代码分割加载、数据获取）。\u003ccode>history\u003c/code> API 对此无能为力。Navigation API 通过 \u003ccode>NavigateEvent.intercept(handler)\u003c/code> 明确地支持了异步导航处理，允许开发者在导航真正完成（URL 变更、DOM 更新）之前执行异步任务，并且可以优雅地处理成功、失败或取消。\u003c/li>\n\u003c/ol>\n\u003ch4>“导航生命周期”的完整定义：\u003c/h4>\n\u003cp>“导航生命周期”在 Navigation API 的语境下，指的是从\u003cstrong>用户或程序发起导航意图\u003c/strong>开始，到\u003cstrong>导航最终完成（成功或失败），并且浏览器状态（URL、历史记录、DOM）更新\u003c/strong>为止的整个过程，以及期间由浏览器管理和触发的一系列事件和状态。\u003c/p>\n\u003cp>其关键阶段和事件包括：\u003c/p>\n\u003col>\n\u003cli>\n\u003cp>\u003cstrong>导航触发 (Initiation):\u003c/strong>\u003c/p>\n\u003col>\n\u003cli>用户行为：点击链接 (\u003ccode>&#x3C;a>\u003c/code>)、提交表单（如果未被阻止且目标是当前标签页）、点击浏览器前进/后退/刷新按钮。\u003c/li>\n\u003cli>程序化调用：\u003ccode>navigation.navigate()\u003c/code>, \u003ccode>navigation.reload()\u003c/code>, \u003ccode>navigation.back()\u003c/code>, \u003ccode>navigation.forward()\u003c/code>, \u003ccode>navigation.traverseTo()\u003c/code>。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\n\u003cp>\u003cstrong>\u003ccode>navigate\u003c/code> 事件分发 (Intent &#x26; Interception):\u003c/strong>\u003c/p>\n\u003col>\n\u003cli>浏览器捕获导航意图，\u003cstrong>在任何实际状态改变（URL、History）之前\u003c/strong>，在 \u003ccode>window.navigation\u003c/code> 上触发 \u003ccode>navigate\u003c/code> 事件。\u003c/li>\n\u003cli>该事件 (\u003ccode>NavigateEvent\u003c/code>) 提供了导航的详细信息（目标 URL、状态、是否用户触发 \u003ccode>userInitiated\u003c/code> 等），以及控制导航的方法：\u003c/li>\n\u003cli>\u003ccode>canIntercept\u003c/code>: 是否可以调用 \u003ccode>intercept()\u003c/code> (通常对于跨域导航等情况为 false)。\u003c/li>\n\u003cli>\u003ccode>preventDefault()\u003c/code>: 同步取消导航。\u003c/li>\n\u003cli>\u003ccode>intercept({ handler })\u003c/code>: \u003cstrong>核心机制\u003c/strong>。声明应用将接管导航处理（通常是异步的，如加载数据、更新 DOM）。浏览器会等待 \u003ccode>handler\u003c/code> 这个 async 函数关联的 Promise 完成。\u003ccode>handler\u003c/code> 会接收到一个 \u003ccode>AbortSignal\u003c/code> (\u003ccode>event.signal\u003c/code>) 用于处理后续导航触发的取消。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\n\u003cp>\u003cstrong>处理阶段 (Processing - if intercepted):\u003c/strong>\u003c/p>\n\u003col>\n\u003cli>如果调用了 \u003ccode>intercept(options)\u003c/code>，浏览器等待 \u003ccode>options.handler\u003c/code> 的 Promise。\u003c/li>\n\u003cli>开发者在此 \u003ccode>handler\u003c/code> 中执行异步操作（fetch 数据、懒加载模块、渲染视图）。\u003c/li>\n\u003cli>如果在此期间发生\u003cstrong>新的导航\u003c/strong>，之前 \u003ccode>intercept\u003c/code> 的 \u003ccode>handler\u003c/code> 关联的 \u003ccode>AbortSignal\u003c/code> 会被触发 (aborted)，开发者应中止当前处理并让 \u003ccode>handler\u003c/code> 的 Promise reject 或快速 resolve。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\n\u003cp>\u003cstrong>提交阶段 (Commitment):\u003c/strong>\u003c/p>\n\u003col>\n\u003cli>\u003cstrong>如果未拦截或拦截成功完成 (handler Promise resolves):\u003c/strong>\u003c/li>\n\u003cli>浏览器更新 URL。\u003c/li>\n\u003cli>更新 \u003ccode>navigation.currentEntry\u003c/code>。\u003c/li>\n\u003cli>将新的或更新后的 \u003ccode>NavigationHistoryEntry\u003c/code> 添加/更新到历史记录堆栈中。\u003c/li>\n\u003cli>触发 \u003ccode>navigatesuccess\u003c/code> 事件，表示导航逻辑成功完成。\u003c/li>\n\u003cli>更新 DOM（如果是由 \u003ccode>intercept\u003c/code> handler 负责的）。\u003c/li>\n\u003cli>触发 \u003ccode>currententrychange\u003c/code> 事件，因为 \u003ccode>currentEntry\u003c/code> 已改变。\u003c/li>\n\u003cli>浏览器可能执行默认行为，如滚动恢复、焦点管理、触发无障碍通知。\u003c/li>\n\u003cli>\u003cstrong>如果拦截失败 (handler Promise rejects) 或导航被阻止:\u003c/strong>\u003c/li>\n\u003cli>URL 和历史记录\u003cstrong>不\u003c/strong>发生改变。\u003c/li>\n\u003cli>触发 \u003ccode>navigateerror\u003c/code> 事件，表示导航逻辑失败。\u003ccode>currententrychange\u003c/code> \u003cstrong>不\u003c/strong>触发。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003c/ol>\n\u003cp>这个完整的生命周期由浏览器原生管理，提供了比 \u003ccode>popstate\u003c/code> + \u003ccode>pushState\u003c/code> 更为健壮和可预测的控制流，特别是对于异步操作和并发导航的处理。\u003c/p>\n\u003ch2>二、 解决问题的思路 (The \"How\")\u003c/h2>\n\u003col>\n\u003cli>\u003cstrong>显式导航生命周期管理：\u003c/strong>\n\u003col>\n\u003cli>\u003cstrong>\u003ccode>navigate\u003c/code> 事件：\u003c/strong> 核心入口。导航意图发生时触发。提供信息并允许控制：\n\u003col>\n\u003cli>检查目标 (\u003ccode>event.destination.url\u003c/code>, \u003ccode>event.destination.getState()\u003c/code>)。\u003c/li>\n\u003cli>同步取消 (\u003ccode>event.preventDefault()\u003c/code>)。\u003c/li>\n\u003cli>**关键：**通过 \u003ccode>event.intercept({ handler })\u003c/code> 声明接管导航，执行异步逻辑。\u003ccode>handler\u003c/code> (async function) 的 Promise 决定导航结果。浏览器等待此 Promise。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\u003cstrong>\u003ccode>navigatesuccess\u003c/code> / \u003ccode>navigateerror\u003c/code> 事件：\u003c/strong> 在 \u003ccode>intercept\u003c/code> 的 \u003ccode>handler\u003c/code> 成功 resolve 或 reject 后（或无拦截时导航完成后）触发，提供明确的完成/失败信号。\u003c/li>\n\u003cli>\u003cstrong>\u003ccode>currententrychange\u003c/code> 事件：\u003c/strong> 当 \u003ccode>navigation.currentEntry\u003c/code> 发生变化时（导航成功完成、调用 \u003ccode>updateCurrentEntry()\u003c/code>）触发，响应当前历史条目状态更新。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\u003cstrong>更精细的历史记录管理：\u003c/strong>\n\u003col>\n\u003cli>\u003cstrong>\u003ccode>NavigationHistoryEntry\u003c/code> 对象：\u003c/strong> 结构化历史条目，含 \u003ccode>key\u003c/code> (唯一标识), \u003ccode>id\u003c/code> (同文档唯一), \u003ccode>url\u003c/code>, \u003ccode>index\u003c/code>, 和 \u003ccode>getState()\u003c/code> 获取关联状态。\u003c/li>\n\u003cli>\u003cstrong>\u003ccode>navigation.entries()\u003c/code>：\u003c/strong> 访问整个历史堆栈（只读视图）。\u003c/li>\n\u003cli>\u003cstrong>\u003ccode>navigation.updateCurrentEntry({ state })\u003c/code>：\u003c/strong> 在不触发导航的情况下，更新当前历史条目的状态（使用结构化克隆存储）。用于保存页面临时状态（表单、滚动位置等）。\u003c/li>\n\u003cli>\u003cstrong>\u003ccode>navigation.traverseTo(key)\u003c/code>：\u003c/strong> 直接导航到历史记录中指定 \u003ccode>key\u003c/code> 的条目，而非仅相对前进/后退。\u003cstrong>不\u003c/strong>会丢弃后续历史。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\u003cstrong>原生处理常见 SPA 痛点：\u003c/strong>\n\u003col>\n\u003cli>\u003cstrong>滚动恢复：\u003c/strong> API 设计为浏览器实现更可靠的自动滚动恢复提供了基础（具体策略可能由浏览器决定）。开发者也可在 \u003ccode>navigate({scroll:\"after-transition\"|\"manual\"})\u003c/code> 或 \u003ccode>navigatesuccess\u003c/code> 中手动处理，或利用 \u003ccode>history.scrollRestoration\u003c/code>。\u003c/li>\n\u003cli>\u003cstrong>焦点管理：\u003c/strong> 导航成功后，浏览器可以应用更智能的默认焦点行为（如 \u003ccode>autofocus\u003c/code> 或聚焦 \u003ccode>&#x3C;body>\u003c/code>）。开发者也可在 \u003ccode>navigate({focusReset:\"after-transition\"|\"manual\"})\u003c/code> 或 \u003ccode>navigatesuccess\u003c/code> 中手动管理。\u003c/li>\n\u003cli>\u003cstrong>可访问性 (A11y)：\u003c/strong> 标准化事件（尤其 \u003ccode>navigatesuccess\u003c/code>）为 ARIA live regions 或平台辅助技术提供了宣告页面转换的可靠时机。浏览器自身也可能利用此信号发出通知。\u003c/li>\n\u003cli>\u003cstrong>并发处理（关键优势）：\u003c/strong> API 内建处理快速连续导航的机制。后续导航意图会通过 \u003ccode>AbortSignal\u003c/code> (\u003ccode>event.signal\u003c/code>) \u003cstrong>中止\u003c/strong>正在进行的 \u003ccode>intercept\u003c/code> handler，确保响应最新意图，防止竞态条件。\n\u003cblockquote>\n\u003cp>当一个导航被 \u003ccode>event.intercept({ handler })\u003c/code> 拦截并且 \u003ccode>handler\u003c/code> 的 Promise 正在进行中时，如果此时发生了\u003cstrong>另一次\u003c/strong>导航（用户点击、代码调用 \u003ccode>navigate()\u003c/code> 等），提案和规范对此有明确的处理机制：\u003cstrong>不是排队等待，而是后者取代前者 (Superseding)\u003c/strong>。具体流程如下：\u003c/p>\n\u003c/blockquote>\n\u003col>\n\u003cli>\u003cstrong>导航 A 触发:\u003c/strong> \u003ccode>navigate\u003c/code> 事件 A 触发。\u003c/li>\n\u003cli>\u003cstrong>拦截 A:\u003c/strong> 代码调用 \u003ccode>eventA.intercept({ handler: handlerA })\u003c/code>。\u003ccode>handlerA\u003c/code> (async function) 开始执行。\u003c/li>\n\u003cli>\u003cstrong>导航 B 触发 (在 \u003ccode>handlerA\u003c/code> 完成前):\u003c/strong> 用户点击链接或代码调用 \u003ccode>navigation.navigate()\u003c/code> 触发了新的导航 B。\u003c/li>\n\u003cli>\u003cstrong>新 \u003ccode>navigate\u003c/code> 事件:\u003c/strong> 浏览器立即为导航 B 触发一个新的 \u003ccode>navigate\u003c/code> 事件 B。\u003c/li>\n\u003cli>\u003cstrong>中止信号触发:\u003c/strong> \u003cstrong>关键点：\u003cstrong>与\u003c/strong>事件 A\u003c/strong> 关联的 \u003ccode>NavigateEvent\u003c/code> (\u003ccode>eventA\u003c/code>) 上的 \u003ccode>signal\u003c/code> (\u003ccode>eventA.signal\u003c/code>) 属性（这是一个 \u003ccode>AbortSignal\u003c/code>）会立即被浏览器\u003cstrong>触发 \u003ccode>abort\u003c/code>\u003c/strong>。\u003c/li>\n\u003cli>\u003cstrong>旧 \u003ccode>handler\u003c/code> 处理中止:\u003c/strong>\n\u003col>\n\u003cli>\u003ccode>handlerA\u003c/code> 内部的代码\u003cstrong>应该\u003c/strong>监听这个 \u003ccode>eventA.signal\u003c/code>。可以通过 \u003ccode>eventA.signal.aborted\u003c/code> 检查状态，或者使用 \u003ccode>eventA.signal.addEventListener('abort', ...)\u003c/code>。\u003c/li>\n\u003cli>当检测到信号中止时，\u003ccode>handlerA\u003c/code> \u003cstrong>应该\u003c/strong>尽快停止其工作（例如，中止进行中的 \u003ccode>fetch\u003c/code> 请求，取消定时器，停止 DOM 更新）并让其返回的 Promise \u003cstrong>reject\u003c/strong> (通常使用一个表示中止的特定错误，如 \u003ccode>DOMException('AbortError')\u003c/code>) 或快速 resolve。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\u003cstrong>旧导航结果:\u003c/strong> 由于 \u003ccode>handlerA\u003c/code> 的 Promise 通常会因中止而 reject (或者即使 resolve，浏览器也知道它被中止了)，导航 A \u003cstrong>不会\u003c/strong>进入“提交阶段”。它不会更新 URL，不会触发 \u003ccode>navigatesuccess\u003c/code>。它可能会（也应该会）触发 \u003ccode>navigateerror\u003c/code> (如果 Promise reject 了)，但这代表的是被中止的导航 A 的失败，而不是导航 B 的状态。浏览器实质上\u003cstrong>抛弃 (discards)\u003c/strong> 了被中止的导航 A 的后续流程。\u003c/li>\n\u003cli>\u003cstrong>新导航 B 继续:\u003c/strong> 导航 B 的 \u003ccode>navigate\u003c/code> 事件 (\u003ccode>eventB\u003c/code>) 现在正常处理。它可以被 \u003ccode>preventDefault()\u003c/code>, 或者也被 \u003ccode>intercept()\u003c/code> 等。它接管了导航流程。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003c/ol>\n\u003ch4>\u003ccode>state\u003c/code> vs. \u003ccode>searchParams\u003c/code> 的使用时机\u003c/h4>\n\u003col>\n\u003cli>\n\u003cp>\u003cstrong>\u003ccode>searchParams\u003c/code> (URL 查询参数):\u003c/strong>\u003c/p>\n\u003col>\n\u003cli>\u003cstrong>用途:\u003c/strong> 用于表示资源\u003cstrong>状态\u003c/strong>的关键参数，这些状态应该\u003cstrong>反映在 URL 中\u003c/strong>。它们定义了“你正在看什么”。\u003c/li>\n\u003cli>\u003cstrong>特点:\u003c/strong>\n\u003col>\n\u003cli>可见、可编辑（用户可以直接修改 URL）。\u003c/li>\n\u003cli>可分享、可收藏。\u003c/li>\n\u003cli>通常是字符串键值对。\u003c/li>\n\u003cli>搜索引擎可索引。\u003c/li>\n\u003cli>改变 \u003ccode>searchParams\u003c/code> 通常意味着请求\u003cstrong>不同或过滤后\u003c/strong>的数据子集。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\u003cstrong>使用场景:\u003c/strong>\n\u003col>\n\u003cli>分页 (\u003ccode>?page=2\u003c/code>)\u003c/li>\n\u003cli>排序 (\u003ccode>?sort=price_desc\u003c/code>)\u003c/li>\n\u003cli>过滤 (\u003ccode>?category=electronics&#x26;brand=xyz\u003c/code>)\u003c/li>\n\u003cli>搜索词 (\u003ccode>?q=navigation+api\u003c/code>)\u003c/li>\n\u003cli>选项卡或视图切换（如果每个视图代表根本不同的内容切片，如 \u003ccode>?tab=details\u003c/code>）。\u003c/li>\n\u003cli>任何需要\u003cstrong>持久化\u003c/strong>、\u003cstrong>可链接\u003c/strong>地表示应用内容状态的情况。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\n\u003cp>\u003cstrong>\u003ccode>navigation.currentEntry.getState()\u003c/code> / \u003ccode>navigation.navigate(url, { state: ... })\u003c/code> / \u003ccode>navigation.updateCurrentEntry({ state: ... })\u003c/code>:\u003c/strong>\u003c/p>\n\u003col>\n\u003cli>\u003cstrong>用途:\u003c/strong> 用于存储与\u003cstrong>特定历史记录条目\u003c/strong>相关联的、\u003cstrong>非 URL 可见\u003c/strong>的应用状态。它更多是关于“当你访问这个 URL 时，当时的 UI 处于什么临时状态”。\u003c/li>\n\u003cli>\u003cstrong>特点:\u003c/strong>\n\u003col>\n\u003cli>用户不可见，不影响 URL 字符串。\u003c/li>\n\u003cli>不可直接分享或收藏（分享 URL 不会带上 \u003ccode>state\u003c/code>）。\u003c/li>\n\u003cli>可以存储更复杂的结构化数据（只要满足结构化克隆算法）。\u003c/li>\n\u003cli>与特定历史记录条目 (\u003ccode>NavigationHistoryEntry\u003c/code>) 绑定，通过 \u003ccode>back/forward/traverseTo\u003c/code> 导航回该条目时，可以恢复。\u003c/li>\n\u003cli>修改 \u003ccode>state\u003c/code> (通过 \u003ccode>updateCurrentEntry\u003c/code>) \u003cstrong>不\u003c/strong>会触发完整的导航生命周期（不触发 \u003ccode>navigate\u003c/code> 事件），只会触发 \u003ccode>currententrychange\u003c/code>。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\u003cstrong>使用场景:\u003c/strong>\n\u003col>\n\u003cli>\u003cstrong>滚动位置恢复:\u003c/strong> 保存页面的精确滚动位置，以便返回时恢复 (虽然浏览器可能提供默认行为，但 \u003ccode>state\u003c/code> 可用于更精细的控制)。\u003c/li>\n\u003cli>\u003cstrong>临时 UI 状态:\u003c/strong> 例如，模态框是否打开、某个 \u003ccode>&#x3C;details>\u003c/code> 元素是否展开、手风琴面板状态。\u003c/li>\n\u003cli>\u003cstrong>部分填写的表单数据:\u003c/strong> 用户填写了一半表单，导航离开又回来，可以恢复输入。\u003c/li>\n\u003cli>\u003cstrong>列表中的高亮项:\u003c/strong> 用户在列表页点击一项进入详情，返回时希望之前点击的项仍然高亮。\u003c/li>\n\u003cli>\u003cstrong>特定于访问的状态:\u003c/strong> 需要在同一次会话中、通过历史导航恢复的、与 URL 内容本身不直接相关的界面状态。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\n\u003cp>\u003cstrong>\u003ccode>state\u003c/code> 是否被克隆存储?\u003c/strong>\u003c/p>\n\u003col>\n\u003cli>\u003cstrong>是的\u003c/strong>。传递给 \u003ccode>navigate()\u003c/code>, \u003ccode>updateCurrentEntry()\u003c/code> 或最初与 \u003ccode>pushState/replaceState\u003c/code> 关联的 \u003ccode>state\u003c/code> 对象，会被浏览器使用\u003cstrong>结构化克隆算法 (Structured Clone Algorithm)\u003c/strong> 进行克隆，然后存储。\u003c/li>\n\u003cli>\u003cstrong>Implications:\u003c/strong>\n\u003col>\n\u003cli>\u003cstrong>无法存储:\u003c/strong> 函数、DOM 节点、Error 对象、某些类的实例（除非它们特殊处理过）、带有循环引用的对象。\u003c/li>\n\u003cli>\u003cstrong>可以存储:\u003c/strong> 原始类型、普通对象、数组、\u003ccode>Date\u003c/code>, \u003ccode>RegExp\u003c/code>, \u003ccode>Blob\u003c/code>, \u003ccode>File\u003c/code>, \u003ccode>FileList\u003c/code>, \u003ccode>ArrayBuffer\u003c/code>, \u003ccode>ImageData\u003c/code>, \u003ccode>Map\u003c/code>, \u003ccode>Set\u003c/code> 等。\u003c/li>\n\u003cli>性能考虑：存储非常大的对象可能会影响性能。\u003c/li>\n\u003cli>由于是克隆，后续修改原始对象不会影响存储的状态，反之亦然。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003c/ol>\n\u003cp>\u003cstrong>选择依据:\u003c/strong>\n问自己：这个状态是否需要体现在 URL 中？是否需要用户能够收藏或分享这个状态？这个状态是定义了资源内容本身，还是仅仅是用户与该资源交互时的临时界面状态？前者用 \u003ccode>searchParams\u003c/code>，后者用 \u003ccode>state\u003c/code>。它们可以并存。\u003c/p>\n\u003ch2>三、 背后的故事与动机 (The \"Context\")\u003c/h2>\n\u003cp>Navigation API (曾用名 App History API) 的诞生源于 Web 开发者社区和浏览器供应商多年来对 SPA 路由现状的普遍不满。\u003ccode>history\u003c/code> API 设计于 Web 早期，并未预见到现代复杂单页应用的导航需求。框架作者们（如 React Router, Vue Router, Angular Router）不得不花费大量精力来弥补底层 API 的不足。\u003c/p>\n\u003cp>你可以通过提案链接了解到这个提案发展的过程：\u003ca href=\"https://github.com/WICG/navigation-api\">github.com/WICG/navigation-api\u003c/a>\u003c/p>\n\u003cp>也可以通过这个视频快速地了解其背后的故事：\u003ca href=\"https://www.youtube.com/watch?v=cgKUMRPAliw\">The history API is dead. Long live the navigation API | HTTP 203 YouTube\u003c/a>\u003c/p>\n\u003ch2>四、 与其它提案的联动 (Synergies)\u003c/h2>\n\u003col>\n\u003cli>\n\u003cp>\u003cstrong>View Transitions API (依然是黄金搭档，但集成方式不同):\u003c/strong>\u003c/p>\n\u003col>\n\u003cli>\n\u003cp>Navigation API 定义\u003cstrong>导航逻辑和时机\u003c/strong>，View Transitions API 处理\u003cstrong>视觉状态间的平滑过渡\u003c/strong>。\u003c/p>\n\u003c/li>\n\u003cli>\n\u003cp>\u003cstrong>集成方式：\u003c/strong> 在 Navigation API 的 \u003ccode>navigate\u003c/code> 事件监听器中：\u003c/p>\n\u003c/li>\n\u003cli>\n\u003cp>调用 \u003ccode>event.intercept({ handler })\u003c/code> 来接管导航。\u003c/p>\n\u003c/li>\n\u003cli>\n\u003cp>在 \u003ccode>handler\u003c/code> 这个异步函数内部，使用 \u003ccode>document.startViewTransition()\u003c/code> 包裹你的 DOM 更新和可能的数据获取逻辑。\u003c/p>\n\u003cpre>\u003ccode class=\"language-javascript\">navigation.addEventListener(\"navigate\", (event) => {\n  if (!event.canIntercept) {\n    return;\n  }\n  if (!document.startViewTransition) {\n    // 如果浏览器不支持 View Transitions\n    event.intercept({\n      handler: async () => {\n        /* 直接更新DOM */\n      },\n    });\n    return;\n  }\n\n  // 使用 View Transitions\n  event.intercept({\n    async handler() {\n      // ★ 在 intercept 的 handler 内部调用 startViewTransition\n      const transition = document.startViewTransition(async () => {\n        // 异步加载数据（如果需要）\n        const data = await fetchData(event.destination.url);\n        // 更新 DOM\n        updateTheDOM(data);\n      });\n\n      // 可以选择等待过渡动画完成 (transition.finished)\n      // 或仅等待伪元素创建/DOM更新完成 (transition.updateCallbackDone)\n      // 或甚至不等待，取决于你的逻辑需求\n      try {\n        await transition.updateCallbackDone; // 至少等 DOM 更新完成\n      } catch (e) {\n        // 处理 DOM 更新或数据获取中的错误\n        console.error(\"DOM update failed:\", e);\n        throw e; // 重新抛出，让 navigateerror 触发\n      }\n    },\n  });\n});\n\u003c/code>\u003c/pre>\n\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\n\u003cp>\u003cstrong>其它可能相关的领域 (间接):\u003c/strong>\u003c/p>\n\u003col>\n\u003cli>\u003cstrong>Speculation Rules API:\u003c/strong> 标准化的导航流程有助于更准确地触发 prefetch。\n\u003col>\n\u003cli>当 Navigation API 的 \u003ccode>navigate\u003c/code> 事件触发时，如果 Speculation Rules 已经成功 \u003ccode>prefetch\u003c/code> 了所需的数据或代码块，那么在 \u003ccode>intercept\u003c/code> handler 中执行的相应 \u003ccode>fetch\u003c/code> 或动态 \u003ccode>import()\u003c/code> 调用会显著加快，从而缩短导航的感知时间。\u003c/li>\n\u003cli>而 \u003ccode>&#x3C;link rel=\"prefetch\">\u003c/code> 也可以达到预取效果，但 Speculation Rules 提供了更现代、更灵活、可能更强大的机制来做同样的事情，尤其是在动态识别和管理预取目标方面。\u003c/li>\n\u003cli>\u003cstrong>\u003ccode>eagerness\u003c/code> 控制 (虽然此特性还在演进)：\u003c/strong> 意图是允许开发者提示预取的紧迫性（例如，\u003ccode>eager\u003c/code> 可能意味着在用户悬停时就开始）。（注意：\u003ccode>eagerness\u003c/code> 的具体实现和行为仍在讨论和标准化中，浏览器可能有自己的策略）。\u003c/li>\n\u003cli>参考文章 \u003ca href=\"https://developer.chrome.com/blog/speculation-rules-improvements\">对 Speculation Rules API 的改进\u003c/a>\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\u003cstrong>Performance Timeline / Reporting API:\u003c/strong>\n\u003ccode>navigatesuccess\u003c/code> 和 \u003ccode>navigateerror\u003c/code> 为性能监控和错误报告提供了更精确的时间点和上下文。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003c/ol>\n\u003ch2>五、 关于 Navigation API Polyfill\u003c/h2>\n\u003cp>为 Navigation API 编写一个功能完善的 Polyfill 挑战巨大，因为它试图在用户空间模拟浏览器内核级的导航管理（所以完全模拟是不现实的，只能说尽量，而且用户使用的时候要小心一些边缘情况）。\u003c/p>\n\u003cblockquote>\n\u003cp>目前市面上比较成熟的 Polyfill 仓库是 \u003ca href=\"https://github.com/virtualstate/navigation\">github.com/virtualstate/navigation\u003c/a> （esm-bundle 差不多需要 105kb）\u003c/p>\n\u003c/blockquote>\n\u003col>\n\u003cli>\n\u003cp>\u003cstrong>Polyfill 实现的核心难点 (普遍性挑战):\u003c/strong>\u003c/p>\n\u003cp>模拟 Navigation API 的行为，尤其是在尝试复刻其所有功能时，会遇到一些根本性的限制，导致 Polyfill 的行为与原生 API 存在开发者和用户都能感知到的差异：\u003c/p>\n\u003col>\n\u003cli>\n\u003cp>\u003cstrong>无法真正实现“事前”拦截浏览器历史导航 (\u003ccode>popstate\u003c/code>)\u003c/strong>\u003c/p>\n\u003col>\n\u003cli>\u003cstrong>挑战:\u003c/strong> 这是最核心的差异之一。原生 \u003ccode>navigate\u003c/code> 事件在浏览器实际更改 URL 或历史记录\u003cstrong>之前\u003c/strong>触发，允许开发者通过 \u003ccode>event.preventDefault()\u003c/code> 完全取消导航，或通过 \u003ccode>event.intercept()\u003c/code> 在状态改变前执行异步逻辑。然而，Polyfill 赖以感知浏览器前进/后退操作的 \u003ccode>popstate\u003c/code> 事件，是在 URL 和历史指针\u003cstrong>已经改变之后\u003c/strong>才触发。\u003c/li>\n\u003cli>\u003cstrong>显著差异/局限性:\u003c/strong>\n\u003col>\n\u003cli>\u003cstrong>无法阻止 \u003ccode>popstate\u003c/code> 导航:\u003c/strong> Polyfill 无法在 \u003ccode>popstate\u003c/code> 触发时真正阻止浏览器历史状态的改变。它最多只能在事件触发后，尝试通过 \u003ccode>history.pushState\u003c/code> 或 \u003ccode>history.replaceState\u003c/code> 将状态“修正”回来，但这会导致地址栏 URL 短暂闪烁成目标 URL 再变回来，用户可以明显感知。\u003c/li>\n\u003cli>\u003cstrong>无法实现可靠的 \u003ccode>popstate\u003c/code> 前置校验:\u003c/strong> 开发者不能依赖 Polyfill 在用户点击后退按钮时，进行类似“您有未保存的更改，确定要离开吗？”的同步确认（因为状态已变）。原生 API 的 \u003ccode>navigate\u003c/code> 事件则可以完美支持此场景。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\u003cstrong>例子:\u003c/strong> 用户在表单页点击后退。使用原生 API，\u003ccode>navigate\u003c/code> 事件可以在 URL 变化前弹出确认框阻止导航。使用 Polyfill，\u003ccode>popstate\u003c/code> 触发时 URL 已变，Polyfill 尝试修正会引发 URL 闪烁，且阻止逻辑发生在状态改变之后。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\n\u003cp>\u003cstrong>无法控制浏览器原生 UI 和行为\u003c/strong>\u003c/p>\n\u003col>\n\u003cli>\u003cstrong>挑战:\u003c/strong> Polyfill 运行在 JavaScript 用户空间，对浏览器本身的 UI 组件和底层行为控制力为零。\u003c/li>\n\u003cli>\u003cstrong>显著差异/局限性:\u003c/strong>\n\u003col>\n\u003cli>\u003cstrong>加载指示器:\u003c/strong> Polyfill 无法控制浏览器的标签页加载微调器（spinner）或进度条。在 \u003ccode>intercept()\u003c/code> 执行异步操作期间，浏览器不会像原生导航那样显示加载状态，除非开发者手动模拟一个加载指示器。用户可能会感觉应用“卡顿”而不是“正在加载”。\u003c/li>\n\u003cli>\u003cstrong>地址栏 URL 显示:\u003c/strong> 原生 API 在 \u003ccode>intercept()\u003c/code> 执行期间，地址栏通常会保持旧 URL，直到导航成功提交才更新。Polyfill 无法控制这一点，尤其是在 \u003ccode>popstate\u003c/code> 场景下，地址栏内容已经提前改变。\u003c/li>\n\u003cli>\u003cstrong>原生滚动恢复/焦点管理:\u003c/strong> Polyfill 无法改变浏览器对 \u003ccode>history.scrollRestoration\u003c/code> 的处理方式，也无法完全复刻原生导航后复杂的默认焦点管理逻辑（例如 \u003ccode>autofocus\u003c/code> 属性在导航后的行为）。开发者需要手动实现滚动和焦点逻辑，其效果可能与原生默认行为有细微但可感知的差异。\u003c/li>\n\u003cli>\u003cstrong>无障碍 (A11y) 通知:\u003c/strong> Polyfill 无法触发平台原生的导航成功/失败的无障碍通知。开发者必须手动更新 ARIA live regions 来宣告状态变化。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\n\u003cp>\u003cstrong>难以拦截或阻止某些导航触发方式\u003c/strong>\u003c/p>\n\u003col>\n\u003cli>\u003cstrong>挑战:\u003c/strong> JavaScript 对某些浏览器内置的导航机制无能为力。\u003c/li>\n\u003cli>\u003cstrong>显著差异/局限性:\u003c/strong>\n\u003col>\n\u003cli>\u003cstrong>直接 \u003ccode>location\u003c/code> API 调用:\u003c/strong> 如 \u003ccode>location.assign()\u003c/code>, \u003ccode>location.replace()\u003c/code>, \u003ccode>location.href = ...\u003c/code>。Polyfill \u003cstrong>无法\u003c/strong>在这些调用实际执行并导致页面跳转或重载\u003cstrong>之前\u003c/strong>拦截它们。这是 Polyfill 的一个硬性限制，“做不到”阻止这类导航。\n\u003cblockquote>\n\u003cp>web-worker 中的 location 的定义是藏在原型链上的，所以可以覆写 self.location。\n而 main-thread 中的 location 是直接锁定在 window.location 上，同时 location 本身的属性也都锁死在 location 自身的对象上，完全没有使用原型链，所以基本锁死了所有的修改的可能。\u003c/p>\n\u003c/blockquote>\n\u003c/li>\n\u003cli>\u003cstrong>非 JS 触发的导航:\u003c/strong> 如 \u003ccode>&#x3C;meta http-equiv=\"refresh\">\u003c/code> 或用户通过浏览器扩展触发的导航，Polyfill 基本无法介入。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\n\u003cp>\u003cstrong>状态管理 (\u003ccode>getState/state\u003c/code>)：跨页面加载的历史上下文恢复挑战\u003c/strong>\u003c/p>\n\u003col>\n\u003cli>\n\u003cp>\u003cstrong>挑战:\u003c/strong> 尽管 \u003ccode>history.state\u003c/code> 支持结构化克隆且能在页面刷新后恢复\u003cstrong>当前\u003c/strong>条目的状态，但 Polyfill 面临的根本挑战在于\u003cstrong>恢复页面刷新前整个导航历史的上下文视图\u003c/strong>。页面重载会清除 Polyfill 在 JavaScript 内存中维护的内部历史表示（所有条目的 key, id, url, state 等信息）。为了在刷新后模拟 \u003ccode>navigation.entries()\u003c/code>、\u003ccode>navigation.traverseTo(key)\u003c/code> 等 API，Polyfill 必须尝试恢复这些丢失的信息，通常采取以下两种策略，每种策略都有其固有的、显著的局限性：\u003c/p>\n\u003c/li>\n\u003cli>\n\u003cp>\u003cstrong>Polyfill 策略 A: 将整个 \u003ccode>navigation.entries()\u003c/code> 存入当前 \u003ccode>history.state\u003c/code>\u003c/strong>\u003c/p>\n\u003col>\n\u003cli>\u003cstrong>挑战:\u003c/strong> 这会导致该 \u003ccode>state\u003c/code> 对象的大小极易触及并超过浏览器对\u003cstrong>单个 \u003ccode>history.state\u003c/code> 对象的大小限制\u003c/strong>（该限制因浏览器而异，通常在几百 KB 到若干 MB）。\u003c/li>\n\u003cli>\u003cstrong>显著差异/局限性:\u003c/strong>\n\u003col>\n\u003cli>\u003cstrong>强加的存储限制:\u003c/strong> Polyfill 迫使开发者不仅要限制\u003cstrong>每个\u003c/strong>历史条目的 \u003ccode>state\u003c/code> 大小，而且应用的\u003cstrong>历史记录深度\u003c/strong>（\u003ccode>navigation.entries()\u003c/code> 的长度）本身也成为一个严格的限制因素。随着历史变长，\u003ccode>history.state\u003c/code> 会迅速达到上限，导致 Polyfill 无法保存新的历史信息或在刷新后恢复完整的上下文，行为变得不可靠或直接失败。这与原生 API（仅受单个条目大小限制，不受历史总长度的直接限制）的行为模式构成显著差异。\u003c/li>\n\u003cli>\u003cstrong>性能开销:\u003c/strong> 序列化和反序列化整个大型历史表示对象，在每次导航（更新 \u003ccode>state\u003c/code>）和页面加载（恢复 \u003ccode>state\u003c/code>）时都会带来额外的性能开销。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\n\u003cp>\u003cstrong>Polyfill 策略 B: 使用外部存储 (\u003ccode>sessionStorage\u003c/code> 或者 IndexedDB) 持久化 Polyfill 历史表示\u003c/strong>\u003c/p>\n\u003col>\n\u003cli>\u003cstrong>挑战 (使用 \u003ccode>sessionStorage\u003c/code>):\u003c/strong> 将 Polyfill 的内部历史表示序列化为字符串存入 \u003ccode>sessionStorage\u003c/code>。\u003c/li>\n\u003cli>\u003cstrong>显著差异/局限性 (使用 \u003ccode>sessionStorage\u003c/code>):\u003c/strong>\n\u003col>\n\u003cli>\u003cstrong>类型限制与序列化复杂性:\u003c/strong> \u003ccode>sessionStorage\u003c/code> 仅能存储字符串。即使底层 \u003ccode>history.state\u003c/code> 支持结构化克隆，为了存入 \u003ccode>sessionStorage\u003c/code>，Polyfill 必须进行序列化。为了保持一致性，这里就需要额外引入类似 superjson 这样的库来做自定义的序列化反序列化。\u003c/li>\n\u003cli>\u003cstrong>更严格的大小限制:\u003c/strong> \u003ccode>sessionStorage\u003c/code> 的大小限制（通常 5-10MB）可能比浏览器对单个 \u003ccode>history.state\u003c/code> 的限制更严格，进一步压缩了 Polyfill 能管理的总历史状态空间。\u003c/li>\n\u003cli>\u003cstrong>同步读写性能:\u003c/strong> 在页面加载时同步读取和解析 \u003ccode>sessionStorage\u003c/code> 数据会阻塞主线程，影响启动性能。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\u003cstrong>挑战 (使用 IndexedDB):\u003c/strong> 将 Polyfill 的历史表示存入容量更大的 IndexedDB。\u003c/li>\n\u003cli>\u003cstrong>显著差异/局限性 (使用 IndexedDB):\u003c/strong>\n\u003col>\n\u003cli>\u003cstrong>同步/异步接口冲突:\u003c/strong> IndexedDB 是一个\u003cstrong>异步\u003c/strong> API，而 Navigation API 的核心部分（如 \u003ccode>navigation.entries()\u003c/code>, \u003ccode>navigation.currentEntry\u003c/code>, \u003ccode>entry.getState()\u003c/code>）是\u003cstrong>同步\u003c/strong>设计的。Polyfill 无法在调用这些同步方法时\u003cstrong>同步地\u003c/strong>从 IndexedDB 获取所需数据。这意味着：\n\u003col>\n\u003cli>刷新后首次调用这些同步 API 可能返回空、不完整或过时的数据，直到异步加载完成后状态才更新，这与原生 API 的即时可用性形成\u003cstrong>根本性差异\u003c/strong>。\u003c/li>\n\u003cli>如果 Polyfill 强制使用异步接口的设计，一方面开发者会感知到 API 行为的不一致，另一方面，应用启动的速度会受到一些影响，甚至会影响启动的正确性。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\n\u003cp>\u003cstrong>并发导航处理中的可见状态风险 (非精确性导致的可感知问题)\u003c/strong>\u003c/p>\n\u003col>\n\u003cli>\u003cstrong>挑战:\u003c/strong> 虽然时序的微小差异本身不易察觉，但 Polyfill 在模拟 \u003ccode>AbortSignal\u003c/code> 和管理并发状态时若不够健壮，可能导致\u003cstrong>可感知的\u003c/strong>副作用。\u003c/li>\n\u003cli>\u003cstrong>显著差异/局限性:\u003c/strong>\n\u003col>\n\u003cli>\u003cstrong>状态更新冲突:\u003c/strong> 如果 Polyfill 未能及时或完全中止前一个 \u003ccode>intercept\u003c/code> handler（尤其当 handler 代码未良好响应中止信号时），旧 handler 可能在后续导航开始处理后，仍然修改了 DOM 或应用状态，导致界面短暂显示错误内容或数据不一致，用户可能看到“闪烁”或错误的中间状态。\u003c/li>\n\u003cli>\u003cstrong>资源浪费:\u003c/strong> 未能中止的操作（如后台请求）会继续运行，消耗用户资源。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003cli>\n\u003cp>\u003cstrong>使用 Navigation API Polyfill 的关键注意事项 (基于显著差异)\u003c/strong>\u003c/p>\n\u003col>\n\u003cli>\u003cstrong>弥补核心功能差距:\u003c/strong> 认识到 Polyfill \u003cstrong>无法\u003c/strong>真正实现 \u003ccode>popstate\u003c/code> 的事前拦截（影响离开确认等场景），也无法控制原生 UI（加载指示器、滚动/焦点）或触发平台级无障碍通知。\u003cstrong>开发者必须手动实现\u003c/strong>这些缺失的 UI 反馈和辅助功能。同时，应规范使用 \u003ccode>navigation.navigate()\u003c/code>，避免 Polyfill 难拦截的 \u003ccode>location\u003c/code> API 调用。\u003c/li>\n\u003cli>\u003cstrong>在限制内管理状态与性能:\u003c/strong> 由于 Polyfill 跨页面加载恢复历史上下文的挑战（常依赖 \u003ccode>sessionStorage\u003c/code>），\u003cstrong>必须严格限制 \u003ccode>state\u003c/code> 中存储数据的复杂度和大小\u003c/strong>，并注意\u003cstrong>控制历史记录深度\u003c/strong>，以防超出存储限制或遭遇序列化问题。确保 \u003ccode>intercept\u003c/code> Handler \u003cstrong>健壮地处理 \u003ccode>AbortSignal\u003c/code>\u003c/strong> 以应对并发。最后，\u003cstrong>优先条件加载\u003c/strong> Polyfill，并进行\u003cstrong>性能评估\u003c/strong>。\u003c/li>\n\u003c/ol>\n\u003c/li>\n\u003c/ol>","markdownContent":"\n## 一、 设计哲学 (The \"Why\")\n\n1. **将导航的“语义”交还浏览器：** 传统 SPA 路由（基于 `history.pushState`/`replaceState`）本质上是在“欺骗”浏览器。我们只是改变了 URL 和一些历史记录状态，但浏览器本身并不知道一次真正的“导航”正在发生。Navigation API 的核心哲学是**让浏览器真正理解并参与到 SPA 的导航过程中**。它不再仅仅是被动地记录历史条目，而是主动地管理导航生命周期。\n1. **以用户意图为中心，而非技术实现：** `pushState` 是一个低级、命令式的操作。Navigation API 则更加声明式和事件驱动。它关注的是用户发起的导航意图（如点击链接、前进/后退按钮）或程序触发的导航请求 (`navigation.navigate()`)，并围绕这个意图提供了一套完整的生命周期事件 (`navigate`, `navigatesuccess`, `navigateerror`, `currententrychange`)。这使得开发者可以更好地响应和控制导航流程。\n1. **标准化与健壮性：** 在 Navigation API 出现之前，每个前端框架都需要在 `history` API 之上构建自己复杂的路由管理逻辑，包括处理并发导航、滚动恢复、焦点管理、可访问性（ARIA Live Regions 通知等）。这导致了实现碎片化和潜在的健壮性问题。Navigation API 旨在提供一个**标准化的、更健壮的底层基础**，让框架和开发者能在此之上构建更可靠、更一致的用户体验。\n1. **拥抱异步本质：** 现代 Web 应用的导航往往涉及异步操作（代码分割加载、数据获取）。`history` API 对此无能为力。Navigation API 通过 `NavigateEvent.intercept(handler)` 明确地支持了异步导航处理，允许开发者在导航真正完成（URL 变更、DOM 更新）之前执行异步任务，并且可以优雅地处理成功、失败或取消。\n\n#### “导航生命周期”的完整定义：\n\n“导航生命周期”在 Navigation API 的语境下，指的是从**用户或程序发起导航意图**开始，到**导航最终完成（成功或失败），并且浏览器状态（URL、历史记录、DOM）更新**为止的整个过程，以及期间由浏览器管理和触发的一系列事件和状态。\n\n其关键阶段和事件包括：\n\n1. **导航触发 (Initiation):**\n\n   1. 用户行为：点击链接 (`\u003ca>`)、提交表单（如果未被阻止且目标是当前标签页）、点击浏览器前进/后退/刷新按钮。\n   1. 程序化调用：`navigation.navigate()`, `navigation.reload()`, `navigation.back()`, `navigation.forward()`, `navigation.traverseTo()`。\n\n2. **`navigate` 事件分发 (Intent & Interception):**\n\n   1. 浏览器捕获导航意图，**在任何实际状态改变（URL、History）之前**，在 `window.navigation` 上触发 `navigate` 事件。\n   1. 该事件 (`NavigateEvent`) 提供了导航的详细信息（目标 URL、状态、是否用户触发 `userInitiated` 等），以及控制导航的方法：\n   1. `canIntercept`: 是否可以调用 `intercept()` (通常对于跨域导航等情况为 false)。\n   1. `preventDefault()`: 同步取消导航。\n   1. `intercept({ handler })`: **核心机制**。声明应用将接管导航处理（通常是异步的，如加载数据、更新 DOM）。浏览器会等待 `handler` 这个 async 函数关联的 Promise 完成。`handler` 会接收到一个 `AbortSignal` (`event.signal`) 用于处理后续导航触发的取消。\n\n3. **处理阶段 (Processing - if intercepted):**\n\n   1. 如果调用了 `intercept(options)`，浏览器等待 `options.handler` 的 Promise。\n   1. 开发者在此 `handler` 中执行异步操作（fetch 数据、懒加载模块、渲染视图）。\n   1. 如果在此期间发生**新的导航**，之前 `intercept` 的 `handler` 关联的 `AbortSignal` 会被触发 (aborted)，开发者应中止当前处理并让 `handler` 的 Promise reject 或快速 resolve。\n\n4. **提交阶段 (Commitment):**\n   1. **如果未拦截或拦截成功完成 (handler Promise resolves):**\n   1. 浏览器更新 URL。\n   1. 更新 `navigation.currentEntry`。\n   1. 将新的或更新后的 `NavigationHistoryEntry` 添加/更新到历史记录堆栈中。\n   1. 触发 `navigatesuccess` 事件，表示导航逻辑成功完成。\n   1. 更新 DOM（如果是由 `intercept` handler 负责的）。\n   1. 触发 `currententrychange` 事件，因为 `currentEntry` 已改变。\n   1. 浏览器可能执行默认行为，如滚动恢复、焦点管理、触发无障碍通知。\n   1. **如果拦截失败 (handler Promise rejects) 或导航被阻止:**\n   1. URL 和历史记录**不**发生改变。\n   1. 触发 `navigateerror` 事件，表示导航逻辑失败。`currententrychange` **不**触发。\n\n这个完整的生命周期由浏览器原生管理，提供了比 `popstate` + `pushState` 更为健壮和可预测的控制流，特别是对于异步操作和并发导航的处理。\n\n## 二、 解决问题的思路 (The \"How\")\n\n1. **显式导航生命周期管理：**\n   1. **`navigate` 事件：** 核心入口。导航意图发生时触发。提供信息并允许控制：\n      1. 检查目标 (`event.destination.url`, `event.destination.getState()`)。\n      1. 同步取消 (`event.preventDefault()`)。\n      1. **关键：**通过 `event.intercept({ handler })` 声明接管导航，执行异步逻辑。`handler` (async function) 的 Promise 决定导航结果。浏览器等待此 Promise。\n   1. **`navigatesuccess` / `navigateerror` 事件：** 在 `intercept` 的 `handler` 成功 resolve 或 reject 后（或无拦截时导航完成后）触发，提供明确的完成/失败信号。\n   1. **`currententrychange` 事件：** 当 `navigation.currentEntry` 发生变化时（导航成功完成、调用 `updateCurrentEntry()`）触发，响应当前历史条目状态更新。\n1. **更精细的历史记录管理：**\n   1. **`NavigationHistoryEntry` 对象：** 结构化历史条目，含 `key` (唯一标识), `id` (同文档唯一), `url`, `index`, 和 `getState()` 获取关联状态。\n   1. **`navigation.entries()`：** 访问整个历史堆栈（只读视图）。\n   1. **`navigation.updateCurrentEntry({ state })`：** 在不触发导航的情况下，更新当前历史条目的状态（使用结构化克隆存储）。用于保存页面临时状态（表单、滚动位置等）。\n   1. **`navigation.traverseTo(key)`：** 直接导航到历史记录中指定 `key` 的条目，而非仅相对前进/后退。**不**会丢弃后续历史。\n1. **原生处理常见 SPA 痛点：**\n   1. **滚动恢复：** API 设计为浏览器实现更可靠的自动滚动恢复提供了基础（具体策略可能由浏览器决定）。开发者也可在 `navigate({scroll:\"after-transition\"|\"manual\"})` 或 `navigatesuccess` 中手动处理，或利用 `history.scrollRestoration`。\n   1. **焦点管理：** 导航成功后，浏览器可以应用更智能的默认焦点行为（如 `autofocus` 或聚焦 `\u003cbody>`）。开发者也可在 `navigate({focusReset:\"after-transition\"|\"manual\"})` 或 `navigatesuccess` 中手动管理。\n   1. **可访问性 (A11y)：** 标准化事件（尤其 `navigatesuccess`）为 ARIA live regions 或平台辅助技术提供了宣告页面转换的可靠时机。浏览器自身也可能利用此信号发出通知。\n   1. **并发处理（关键优势）：** API 内建处理快速连续导航的机制。后续导航意图会通过 `AbortSignal` (`event.signal`) **中止**正在进行的 `intercept` handler，确保响应最新意图，防止竞态条件。\n      > 当一个导航被 `event.intercept({ handler })` 拦截并且 `handler` 的 Promise 正在进行中时，如果此时发生了**另一次**导航（用户点击、代码调用 `navigate()` 等），提案和规范对此有明确的处理机制：**不是排队等待，而是后者取代前者 (Superseding)**。具体流程如下：\n      1. **导航 A 触发:** `navigate` 事件 A 触发。\n      1. **拦截 A:** 代码调用 `eventA.intercept({ handler: handlerA })`。`handlerA` (async function) 开始执行。\n      1. **导航 B 触发 (在 `handlerA` 完成前):** 用户点击链接或代码调用 `navigation.navigate()` 触发了新的导航 B。\n      1. **新 `navigate` 事件:** 浏览器立即为导航 B 触发一个新的 `navigate` 事件 B。\n      1. **中止信号触发:** **关键点：**与**事件 A** 关联的 `NavigateEvent` (`eventA`) 上的 `signal` (`eventA.signal`) 属性（这是一个 `AbortSignal`）会立即被浏览器**触发 `abort`**。\n      1. **旧 `handler` 处理中止:**\n         1. `handlerA` 内部的代码**应该**监听这个 `eventA.signal`。可以通过 `eventA.signal.aborted` 检查状态，或者使用 `eventA.signal.addEventListener('abort', ...)`。\n         1. 当检测到信号中止时，`handlerA` **应该**尽快停止其工作（例如，中止进行中的 `fetch` 请求，取消定时器，停止 DOM 更新）并让其返回的 Promise **reject** (通常使用一个表示中止的特定错误，如 `DOMException('AbortError')`) 或快速 resolve。\n      1. **旧导航结果:** 由于 `handlerA` 的 Promise 通常会因中止而 reject (或者即使 resolve，浏览器也知道它被中止了)，导航 A **不会**进入“提交阶段”。它不会更新 URL，不会触发 `navigatesuccess`。它可能会（也应该会）触发 `navigateerror` (如果 Promise reject 了)，但这代表的是被中止的导航 A 的失败，而不是导航 B 的状态。浏览器实质上**抛弃 (discards)** 了被中止的导航 A 的后续流程。\n      1. **新导航 B 继续:** 导航 B 的 `navigate` 事件 (`eventB`) 现在正常处理。它可以被 `preventDefault()`, 或者也被 `intercept()` 等。它接管了导航流程。\n\n#### `state` vs. `searchParams` 的使用时机\n\n1. **`searchParams` (URL 查询参数):**\n\n   1. **用途:** 用于表示资源**状态**的关键参数，这些状态应该**反映在 URL 中**。它们定义了“你正在看什么”。\n   1. **特点:**\n      1. 可见、可编辑（用户可以直接修改 URL）。\n      1. 可分享、可收藏。\n      1. 通常是字符串键值对。\n      1. 搜索引擎可索引。\n      1. 改变 `searchParams` 通常意味着请求**不同或过滤后**的数据子集。\n   1. **使用场景:**\n      1. 分页 (`?page=2`)\n      1. 排序 (`?sort=price_desc`)\n      1. 过滤 (`?category=electronics&brand=xyz`)\n      1. 搜索词 (`?q=navigation+api`)\n      1. 选项卡或视图切换（如果每个视图代表根本不同的内容切片，如 `?tab=details`）。\n      1. 任何需要**持久化**、**可链接**地表示应用内容状态的情况。\n\n1. **`navigation.currentEntry.getState()` / `navigation.navigate(url, { state: ... })` / `navigation.updateCurrentEntry({ state: ... })`:**\n\n   1. **用途:** 用于存储与**特定历史记录条目**相关联的、**非 URL 可见**的应用状态。它更多是关于“当你访问这个 URL 时，当时的 UI 处于什么临时状态”。\n   1. **特点:**\n      1. 用户不可见，不影响 URL 字符串。\n      1. 不可直接分享或收藏（分享 URL 不会带上 `state`）。\n      1. 可以存储更复杂的结构化数据（只要满足结构化克隆算法）。\n      1. 与特定历史记录条目 (`NavigationHistoryEntry`) 绑定，通过 `back/forward/traverseTo` 导航回该条目时，可以恢复。\n      1. 修改 `state` (通过 `updateCurrentEntry`) **不**会触发完整的导航生命周期（不触发 `navigate` 事件），只会触发 `currententrychange`。\n   1. **使用场景:**\n      1. **滚动位置恢复:** 保存页面的精确滚动位置，以便返回时恢复 (虽然浏览器可能提供默认行为，但 `state` 可用于更精细的控制)。\n      1. **临时 UI 状态:** 例如，模态框是否打开、某个 `\u003cdetails>` 元素是否展开、手风琴面板状态。\n      1. **部分填写的表单数据:** 用户填写了一半表单，导航离开又回来，可以恢复输入。\n      1. **列表中的高亮项:** 用户在列表页点击一项进入详情，返回时希望之前点击的项仍然高亮。\n      1. **特定于访问的状态:** 需要在同一次会话中、通过历史导航恢复的、与 URL 内容本身不直接相关的界面状态。\n\n1. **`state` 是否被克隆存储?**\n   1. **是的**。传递给 `navigate()`, `updateCurrentEntry()` 或最初与 `pushState/replaceState` 关联的 `state` 对象，会被浏览器使用**结构化克隆算法 (Structured Clone Algorithm)** 进行克隆，然后存储。\n   1. **Implications:**\n      1. **无法存储:** 函数、DOM 节点、Error 对象、某些类的实例（除非它们特殊处理过）、带有循环引用的对象。\n      1. **可以存储:** 原始类型、普通对象、数组、`Date`, `RegExp`, `Blob`, `File`, `FileList`, `ArrayBuffer`, `ImageData`, `Map`, `Set` 等。\n      1. 性能考虑：存储非常大的对象可能会影响性能。\n      1. 由于是克隆，后续修改原始对象不会影响存储的状态，反之亦然。\n\n**选择依据:**\n问自己：这个状态是否需要体现在 URL 中？是否需要用户能够收藏或分享这个状态？这个状态是定义了资源内容本身，还是仅仅是用户与该资源交互时的临时界面状态？前者用 `searchParams`，后者用 `state`。它们可以并存。\n\n## 三、 背后的故事与动机 (The \"Context\")\n\nNavigation API (曾用名 App History API) 的诞生源于 Web 开发者社区和浏览器供应商多年来对 SPA 路由现状的普遍不满。`history` API 设计于 Web 早期，并未预见到现代复杂单页应用的导航需求。框架作者们（如 React Router, Vue Router, Angular Router）不得不花费大量精力来弥补底层 API 的不足。\n\n你可以通过提案链接了解到这个提案发展的过程：[github.com/WICG/navigation-api](https://github.com/WICG/navigation-api)\n\n也可以通过这个视频快速地了解其背后的故事：[The history API is dead. Long live the navigation API | HTTP 203 YouTube](https://www.youtube.com/watch?v=cgKUMRPAliw)\n\n## 四、 与其它提案的联动 (Synergies)\n\n1. **View Transitions API (依然是黄金搭档，但集成方式不同):**\n\n   1. Navigation API 定义**导航逻辑和时机**，View Transitions API 处理**视觉状态间的平滑过渡**。\n   1. **集成方式：** 在 Navigation API 的 `navigate` 事件监听器中：\n\n   1. 调用 `event.intercept({ handler })` 来接管导航。\n   1. 在 `handler` 这个异步函数内部，使用 `document.startViewTransition()` 包裹你的 DOM 更新和可能的数据获取逻辑。\n\n      ```javascript\n      navigation.addEventListener(\"navigate\", (event) => {\n        if (!event.canIntercept) {\n          return;\n        }\n        if (!document.startViewTransition) {\n          // 如果浏览器不支持 View Transitions\n          event.intercept({\n            handler: async () => {\n              /* 直接更新DOM */\n            },\n          });\n          return;\n        }\n\n        // 使用 View Transitions\n        event.intercept({\n          async handler() {\n            // ★ 在 intercept 的 handler 内部调用 startViewTransition\n            const transition = document.startViewTransition(async () => {\n              // 异步加载数据（如果需要）\n              const data = await fetchData(event.destination.url);\n              // 更新 DOM\n              updateTheDOM(data);\n            });\n\n            // 可以选择等待过渡动画完成 (transition.finished)\n            // 或仅等待伪元素创建/DOM更新完成 (transition.updateCallbackDone)\n            // 或甚至不等待，取决于你的逻辑需求\n            try {\n              await transition.updateCallbackDone; // 至少等 DOM 更新完成\n            } catch (e) {\n              // 处理 DOM 更新或数据获取中的错误\n              console.error(\"DOM update failed:\", e);\n              throw e; // 重新抛出，让 navigateerror 触发\n            }\n          },\n        });\n      });\n      ```\n\n1. **其它可能相关的领域 (间接):**\n   1. **Speculation Rules API:** 标准化的导航流程有助于更准确地触发 prefetch。\n      1. 当 Navigation API 的 `navigate` 事件触发时，如果 Speculation Rules 已经成功 `prefetch` 了所需的数据或代码块，那么在 `intercept` handler 中执行的相应 `fetch` 或动态 `import()` 调用会显著加快，从而缩短导航的感知时间。\n      1. 而 `\u003clink rel=\"prefetch\">` 也可以达到预取效果，但 Speculation Rules 提供了更现代、更灵活、可能更强大的机制来做同样的事情，尤其是在动态识别和管理预取目标方面。\n      1. **`eagerness` 控制 (虽然此特性还在演进)：** 意图是允许开发者提示预取的紧迫性（例如，`eager` 可能意味着在用户悬停时就开始）。（注意：`eagerness` 的具体实现和行为仍在讨论和标准化中，浏览器可能有自己的策略）。\n      1. 参考文章 [对 Speculation Rules API 的改进](https://developer.chrome.com/blog/speculation-rules-improvements)\n   1. **Performance Timeline / Reporting API:**\n      `navigatesuccess` 和 `navigateerror` 为性能监控和错误报告提供了更精确的时间点和上下文。\n\n## 五、 关于 Navigation API Polyfill\n\n为 Navigation API 编写一个功能完善的 Polyfill 挑战巨大，因为它试图在用户空间模拟浏览器内核级的导航管理（所以完全模拟是不现实的，只能说尽量，而且用户使用的时候要小心一些边缘情况）。\n\n> 目前市面上比较成熟的 Polyfill 仓库是 [github.com/virtualstate/navigation](https://github.com/virtualstate/navigation) （esm-bundle 差不多需要 105kb）\n\n1. **Polyfill 实现的核心难点 (普遍性挑战):**\n\n   模拟 Navigation API 的行为，尤其是在尝试复刻其所有功能时，会遇到一些根本性的限制，导致 Polyfill 的行为与原生 API 存在开发者和用户都能感知到的差异：\n\n   1. **无法真正实现“事前”拦截浏览器历史导航 (`popstate`)**\n\n      1. **挑战:** 这是最核心的差异之一。原生 `navigate` 事件在浏览器实际更改 URL 或历史记录**之前**触发，允许开发者通过 `event.preventDefault()` 完全取消导航，或通过 `event.intercept()` 在状态改变前执行异步逻辑。然而，Polyfill 赖以感知浏览器前进/后退操作的 `popstate` 事件，是在 URL 和历史指针**已经改变之后**才触发。\n      1. **显著差异/局限性:**\n         1. **无法阻止 `popstate` 导航:** Polyfill 无法在 `popstate` 触发时真正阻止浏览器历史状态的改变。它最多只能在事件触发后，尝试通过 `history.pushState` 或 `history.replaceState` 将状态“修正”回来，但这会导致地址栏 URL 短暂闪烁成目标 URL 再变回来，用户可以明显感知。\n         1. **无法实现可靠的 `popstate` 前置校验:** 开发者不能依赖 Polyfill 在用户点击后退按钮时，进行类似“您有未保存的更改，确定要离开吗？”的同步确认（因为状态已变）。原生 API 的 `navigate` 事件则可以完美支持此场景。\n      1. **例子:** 用户在表单页点击后退。使用原生 API，`navigate` 事件可以在 URL 变化前弹出确认框阻止导航。使用 Polyfill，`popstate` 触发时 URL 已变，Polyfill 尝试修正会引发 URL 闪烁，且阻止逻辑发生在状态改变之后。\n\n   1. **无法控制浏览器原生 UI 和行为**\n\n      1. **挑战:** Polyfill 运行在 JavaScript 用户空间，对浏览器本身的 UI 组件和底层行为控制力为零。\n      1. **显著差异/局限性:**\n         1. **加载指示器:** Polyfill 无法控制浏览器的标签页加载微调器（spinner）或进度条。在 `intercept()` 执行异步操作期间，浏览器不会像原生导航那样显示加载状态，除非开发者手动模拟一个加载指示器。用户可能会感觉应用“卡顿”而不是“正在加载”。\n         1. **地址栏 URL 显示:** 原生 API 在 `intercept()` 执行期间，地址栏通常会保持旧 URL，直到导航成功提交才更新。Polyfill 无法控制这一点，尤其是在 `popstate` 场景下，地址栏内容已经提前改变。\n         1. **原生滚动恢复/焦点管理:** Polyfill 无法改变浏览器对 `history.scrollRestoration` 的处理方式，也无法完全复刻原生导航后复杂的默认焦点管理逻辑（例如 `autofocus` 属性在导航后的行为）。开发者需要手动实现滚动和焦点逻辑，其效果可能与原生默认行为有细微但可感知的差异。\n         1. **无障碍 (A11y) 通知:** Polyfill 无法触发平台原生的导航成功/失败的无障碍通知。开发者必须手动更新 ARIA live regions 来宣告状态变化。\n\n   1. **难以拦截或阻止某些导航触发方式**\n\n      1. **挑战:** JavaScript 对某些浏览器内置的导航机制无能为力。\n      1. **显著差异/局限性:**\n         1. **直接 `location` API 调用:** 如 `location.assign()`, `location.replace()`, `location.href = ...`。Polyfill **无法**在这些调用实际执行并导致页面跳转或重载**之前**拦截它们。这是 Polyfill 的一个硬性限制，“做不到”阻止这类导航。\n            > web-worker 中的 location 的定义是藏在原型链上的，所以可以覆写 self.location。\n            > 而 main-thread 中的 location 是直接锁定在 window.location 上，同时 location 本身的属性也都锁死在 location 自身的对象上，完全没有使用原型链，所以基本锁死了所有的修改的可能。\n         1. **非 JS 触发的导航:** 如 `\u003cmeta http-equiv=\"refresh\">` 或用户通过浏览器扩展触发的导航，Polyfill 基本无法介入。\n\n   1. **状态管理 (`getState/state`)：跨页面加载的历史上下文恢复挑战**\n\n      1. **挑战:** 尽管 `history.state` 支持结构化克隆且能在页面刷新后恢复**当前**条目的状态，但 Polyfill 面临的根本挑战在于**恢复页面刷新前整个导航历史的上下文视图**。页面重载会清除 Polyfill 在 JavaScript 内存中维护的内部历史表示（所有条目的 key, id, url, state 等信息）。为了在刷新后模拟 `navigation.entries()`、`navigation.traverseTo(key)` 等 API，Polyfill 必须尝试恢复这些丢失的信息，通常采取以下两种策略，每种策略都有其固有的、显著的局限性：\n      1. **Polyfill 策略 A: 将整个 `navigation.entries()` 存入当前 `history.state`**\n\n         1. **挑战:** 这会导致该 `state` 对象的大小极易触及并超过浏览器对**单个 `history.state` 对象的大小限制**（该限制因浏览器而异，通常在几百 KB 到若干 MB）。\n         1. **显著差异/局限性:**\n            1. **强加的存储限制:** Polyfill 迫使开发者不仅要限制**每个**历史条目的 `state` 大小，而且应用的**历史记录深度**（`navigation.entries()` 的长度）本身也成为一个严格的限制因素。随着历史变长，`history.state` 会迅速达到上限，导致 Polyfill 无法保存新的历史信息或在刷新后恢复完整的上下文，行为变得不可靠或直接失败。这与原生 API（仅受单个条目大小限制，不受历史总长度的直接限制）的行为模式构成显著差异。\n            1. **性能开销:** 序列化和反序列化整个大型历史表示对象，在每次导航（更新 `state`）和页面加载（恢复 `state`）时都会带来额外的性能开销。\n\n      1. **Polyfill 策略 B: 使用外部存储 (`sessionStorage` 或者 IndexedDB) 持久化 Polyfill 历史表示**\n         1. **挑战 (使用 `sessionStorage`):** 将 Polyfill 的内部历史表示序列化为字符串存入 `sessionStorage`。\n         1. **显著差异/局限性 (使用 `sessionStorage`):**\n            1. **类型限制与序列化复杂性:** `sessionStorage` 仅能存储字符串。即使底层 `history.state` 支持结构化克隆，为了存入 `sessionStorage`，Polyfill 必须进行序列化。为了保持一致性，这里就需要额外引入类似 superjson 这样的库来做自定义的序列化反序列化。\n            1. **更严格的大小限制:** `sessionStorage` 的大小限制（通常 5-10MB）可能比浏览器对单个 `history.state` 的限制更严格，进一步压缩了 Polyfill 能管理的总历史状态空间。\n            1. **同步读写性能:** 在页面加载时同步读取和解析 `sessionStorage` 数据会阻塞主线程，影响启动性能。\n         1. **挑战 (使用 IndexedDB):** 将 Polyfill 的历史表示存入容量更大的 IndexedDB。\n         1. **显著差异/局限性 (使用 IndexedDB):**\n            1. **同步/异步接口冲突:** IndexedDB 是一个**异步** API，而 Navigation API 的核心部分（如 `navigation.entries()`, `navigation.currentEntry`, `entry.getState()`）是**同步**设计的。Polyfill 无法在调用这些同步方法时**同步地**从 IndexedDB 获取所需数据。这意味着：\n               1. 刷新后首次调用这些同步 API 可能返回空、不完整或过时的数据，直到异步加载完成后状态才更新，这与原生 API 的即时可用性形成**根本性差异**。\n               1. 如果 Polyfill 强制使用异步接口的设计，一方面开发者会感知到 API 行为的不一致，另一方面，应用启动的速度会受到一些影响，甚至会影响启动的正确性。\n\n   1. **并发导航处理中的可见状态风险 (非精确性导致的可感知问题)**\n\n      1. **挑战:** 虽然时序的微小差异本身不易察觉，但 Polyfill 在模拟 `AbortSignal` 和管理并发状态时若不够健壮，可能导致**可感知的**副作用。\n      1. **显著差异/局限性:**\n         1. **状态更新冲突:** 如果 Polyfill 未能及时或完全中止前一个 `intercept` handler（尤其当 handler 代码未良好响应中止信号时），旧 handler 可能在后续导航开始处理后，仍然修改了 DOM 或应用状态，导致界面短暂显示错误内容或数据不一致，用户可能看到“闪烁”或错误的中间状态。\n         1. **资源浪费:** 未能中止的操作（如后台请求）会继续运行，消耗用户资源。\n\n1. **使用 Navigation API Polyfill 的关键注意事项 (基于显著差异)**\n   1. **弥补核心功能差距:** 认识到 Polyfill **无法**真正实现 `popstate` 的事前拦截（影响离开确认等场景），也无法控制原生 UI（加载指示器、滚动/焦点）或触发平台级无障碍通知。**开发者必须手动实现**这些缺失的 UI 反馈和辅助功能。同时，应规范使用 `navigation.navigate()`，避免 Polyfill 难拦截的 `location` API 调用。\n   1. **在限制内管理状态与性能:** 由于 Polyfill 跨页面加载恢复历史上下文的挑战（常依赖 `sessionStorage`），**必须严格限制 `state` 中存储数据的复杂度和大小**，并注意**控制历史记录深度**，以防超出存储限制或遭遇序列化问题。确保 `intercept` Handler **健壮地处理 `AbortSignal`** 以应对并发。最后，**优先条件加载** Polyfill，并进行**性能评估**。\n"}}}</script>
+        <script src="/assets/entries/entry-client-routing.D4VBVy3c.js" type="module" async></script>
+        <link rel="modulepreload" href="/assets/entries/pages_article_-id.h5JipGsp.js" as="script" type="text/javascript">
+        <link rel="modulepreload" href="/assets/chunks/chunk-vy2czm8u.js" as="script" type="text/javascript">
+        <link rel="modulepreload" href="/assets/chunks/chunk-0HRAW6Xj.js" as="script" type="text/javascript">
+      </body>
+    </html>
