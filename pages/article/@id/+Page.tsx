@@ -13,6 +13,12 @@ function Page() {
           main > p {
             text-indent: 1em;
           }
+
+          main > p > img {
+            max-width: 100%;
+            margin: 0 auto;
+            display: block;
+          }
         `}
       </style>
       <h1>{data.article.metadata.title}</h1>
