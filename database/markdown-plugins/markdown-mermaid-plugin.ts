@@ -83,11 +83,13 @@ export const markdownMermaidPlugins: Plugins = {
               .filter((child) => child.type === "text")
               .map((child) => child.value)
               .join("");
-            const htmlContent = await mermaidChart(codeContent);
-            if (htmlContent) {
-              const hast = rehypeParser.parse(htmlContent);
-              return hast;
-            }
+            try {
+              const htmlContent = await mermaidChart(codeContent);
+              if (htmlContent) {
+                const hast = rehypeParser.parse(htmlContent);
+                return hast;
+              }
+            } catch {}
           }
         );
         if (injectStyles.size) {
