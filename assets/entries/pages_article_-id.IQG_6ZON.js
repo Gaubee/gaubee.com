@@ -2,4 +2,10 @@ import{j as e,i as a,a as r,b as i}from"../chunks/chunk-vy2czm8u.js";import{u as
           main > p {
             text-indent: 1em;
           }
+
+          main > p > img {
+            max-width: 100%;
+            margin: 0 auto;
+            display: block;
+          }
         `}),e.jsx("h1",{children:t.article.metadata.title}),e.jsx("main",{dangerouslySetInnerHTML:{__html:t.article.htmlContent}})]})}const d=Object.freeze(Object.defineProperty({__proto__:null,Page:l},Symbol.toStringTag,{value:"Module"})),h={isClientRuntimeLoaded:{type:"computed",definedAtData:null,valueSerialized:{type:"js-serialized",value:!0}},onBeforeRenderEnv:{type:"computed",definedAtData:null,valueSerialized:{type:"js-serialized",value:null}},dataEnv:{type:"computed",definedAtData:null,valueSerialized:{type:"js-serialized",value:{server:!0}}},onRenderClient:{type:"standard",definedAtData:{filePathToShowToUser:"/renderer/+onRenderClient.tsx",fileExportPathToShowToUser:[]},valueSerialized:{type:"plus-file",exportValues:i}},onPageTransitionStart:{type:"standard",definedAtData:{filePathToShowToUser:"/renderer/+onPageTransitionStart.ts",fileExportPathToShowToUser:[]},valueSerialized:{type:"plus-file",exportValues:r}},onPageTransitionEnd:{type:"standard",definedAtData:{filePathToShowToUser:"/renderer/+onPageTransitionEnd.ts",fileExportPathToShowToUser:[]},valueSerialized:{type:"plus-file",exportValues:a}},Page:{type:"standard",definedAtData:{filePathToShowToUser:"/pages/article/@id/+Page.tsx",fileExportPathToShowToUser:[]},valueSerialized:{type:"plus-file",exportValues:d}},hydrationCanBeAborted:{type:"standard",definedAtData:{filePathToShowToUser:"/renderer/+config.ts",fileExportPathToShowToUser:["default","hydrationCanBeAborted"]},valueSerialized:{type:"js-serialized",value:!0}}};export{h as configValuesSerialized};
