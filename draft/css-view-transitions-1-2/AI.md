@@ -383,7 +383,7 @@ document.documentElement.animate(
 );
 ```
 
-### 讨论 4: chrome-devtools 的主持 bug
+### 讨论 4: chrome-devtools 的 bug
 
 目前 Chrome devtool 的动画面板对它暂停的支持还有 bug。在 Animations 暂停的情况下，但我如果切到浏览器的其它 tab 页面，再切回来，它(`::view-transition`)就不见了。
 或者说，它背后的计时器好像也有点问题，我切到其它应用一会儿，再胡来，它(`::view-transition`)也不见了。
