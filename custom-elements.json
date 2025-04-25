@@ -19,38 +19,6 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/react.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "ComMixBlendModeGradientText"
-        },
-        {
-          "kind": "variable",
-          "name": "ComYoutubePlayer"
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "ComMixBlendModeGradientText",
-          "declaration": {
-            "name": "ComMixBlendModeGradientText",
-            "module": "src/react.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "ComYoutubePlayer",
-          "declaration": {
-            "name": "ComYoutubePlayer",
-            "module": "src/react.ts"
-          }
-        }
-      ]
-    },
-    {
-      "kind": "javascript-module",
       "path": "src/components/mix-blend-mode-gradient-text/mix-blend-mode-gradient-text.ts",
       "declarations": [
         {

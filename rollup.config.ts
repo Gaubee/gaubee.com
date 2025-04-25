@@ -22,7 +22,7 @@ const {getComponentsEntry} = await import('./scripts/custom-elements-metadata.ts
 const inputFiles = getComponentsEntry().map((entry) => entry.dist);
 export default defineConfig((env) => {
   return {
-    input: ['./dist/index.js', './dist/react.js', ...inputFiles],
+    input: ['./dist/index.js', ...inputFiles],
     output: {
       dir: 'bundle',
       format: 'esm',
@@ -74,7 +74,8 @@ export default defineConfig((env) => {
       summary(),
       {
         name: 'generate-react-types',
-        async buildEnd(error) {
+        async buildStart(error) {
+          return;
           const {doWrite} = await import('./scripts/react-generator');
           doWrite(true);
           console.log(green('./src/react.ts generated!!'));
