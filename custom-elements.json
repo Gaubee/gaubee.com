@@ -19,6 +19,88 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/react.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "ComMixBlendModeGradientText"
+        },
+        {
+          "kind": "variable",
+          "name": "ComYoutubePlayer"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ComMixBlendModeGradientText",
+          "declaration": {
+            "name": "ComMixBlendModeGradientText",
+            "module": "src/react.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ComYoutubePlayer",
+          "declaration": {
+            "name": "ComYoutubePlayer",
+            "module": "src/react.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/components/mix-blend-mode-gradient-text/mix-blend-mode-gradient-text.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "ComMixBlendModeGradientTextElement",
+          "members": [
+            {
+              "kind": "field",
+              "name": "demo",
+              "type": {
+                "text": "HTMLDivElement"
+              },
+              "privacy": "private"
+            },
+            {
+              "kind": "field",
+              "name": "bindInputColor",
+              "privacy": "private"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "com-mix-blend-mode-gradient-text",
+          "customElement": true
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ComMixBlendModeGradientTextElement",
+          "declaration": {
+            "name": "ComMixBlendModeGradientTextElement",
+            "module": "src/components/mix-blend-mode-gradient-text/mix-blend-mode-gradient-text.ts"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "com-mix-blend-mode-gradient-text",
+          "declaration": {
+            "name": "ComMixBlendModeGradientTextElement",
+            "module": "src/components/mix-blend-mode-gradient-text/mix-blend-mode-gradient-text.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/components/youtube-player/youtube-player.ts",
       "declarations": [
         {
@@ -47,7 +129,7 @@
               "type": {
                 "text": "number"
               },
-              "default": "400",
+              "default": "600",
               "attribute": "width",
               "reflects": true
             },
@@ -63,7 +145,8 @@
             },
             {
               "kind": "field",
-              "name": "task",
+              "name": "__task",
+              "privacy": "private",
               "default": "new Task( this, async (videoId) => { const YT = await ComYoutubePlayerElement.youtubeApiIniter(); if (!videoId) { return; } // The API will call this function when the video player is ready. function onPlayerReady(event: any) { event.target.playVideo(); } // The API calls this function when the player's state changes. // The function indicates that when playing a video (state=1), // the player should play for six seconds and then stop. let done = false; function onPlayerStateChange(event: any) { if (event.data == YT.PlayerState.PLAYING && !done) { setTimeout(stopVideo, 6000); done = true; } } function stopVideo() { player.stopVideo(); } const player = new YT.Player(this, { height: this.height, width: this.width, videoId: videoId, playerVars: { playsinline: 1, }, events: { onReady: onPlayerReady, onStateChange: onPlayerStateChange, }, }); }, () => [this.videoId] )"
             }
           ],
@@ -81,7 +164,7 @@
               "type": {
                 "text": "number"
               },
-              "default": "400",
+              "default": "600",
               "fieldName": "width"
             },
             {

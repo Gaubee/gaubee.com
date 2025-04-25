@@ -10,7 +10,7 @@ export default function (data: EleventyData): string {
   return root({
     ...data,
     content: html`${header(data, {default: nav(data)})}
-      <div id="event-wrapper">
+      <div id="main-wrapper" class="event-wrapper">
         <main>${data.content}</main>
       </div>
       ${footer(data)}`,

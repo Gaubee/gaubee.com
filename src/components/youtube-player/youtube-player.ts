@@ -25,11 +25,11 @@ export class ComYoutubePlayerElement extends LitElement {
   accessor videoId: string = '';
 
   @property({type: Number, reflect: true, attribute: true})
-  accessor width: number = 400;
+  accessor width: number = 600;
   @property({type: Number, reflect: true, attribute: true})
   accessor height: number = 400;
 
-  task = new Task(
+  private __task = new Task(
     this,
     async (videoId) => {
       const YT = await ComYoutubePlayerElement.youtubeApiIniter();
@@ -71,7 +71,20 @@ export class ComYoutubePlayerElement extends LitElement {
     () => [this.videoId]
   );
   protected override render() {
-    return html`<slot></slot>`;
+    return html`<style>
+        :host {
+          display: block;
+          width: ${this.width}px;
+          height: ${this.height}px;
+        }
+      </style>
+      <slot>
+        ${this.__task.render({
+          pending() {
+            return html`<div>Loading...</div>`;
+          },
+        })}
+      </slot>`;
   }
 }
 

@@ -5,11 +5,12 @@ import syntaxHighlight from '@11ty/eleventy-plugin-syntaxhighlight';
 import EleventyVitePlugin from '@11ty/eleventy-plugin-vite';
 import {func_throttle} from '@gaubee/util';
 import chokidar from 'chokidar';
-import pluginPWA from 'eleventy-plugin-pwa';
+import htmlmin from 'html-minifier-terser';
 import fs from 'node:fs';
 import path from 'node:path';
 import {renderToStaticMarkup} from 'react-dom/server';
 import type {PluginOption, UserConfig as ViteUserConfig} from 'vite';
+
 const resolve = (to: string) => path.resolve(import.meta.dirname, to);
 
 export default function (eleventyConfig: EleventyUserConfig) {
@@ -33,8 +34,23 @@ export default function (eleventyConfig: EleventyUserConfig) {
   });
 
   eleventyConfig.addPlugin(syntaxHighlight);
-  eleventyConfig.addPlugin(pluginPWA);
+  // eleventyConfig.addPlugin(pluginPWA);
 
+  eleventyConfig.addTransform('htmlmin', function (content) {
+    if ((this.page.outputPath || '').endsWith('.html')) {
+      let minified = htmlmin.minify(content, {
+        useShortDoctype: true,
+        removeComments: true,
+        collapseWhitespace: true,
+        minifyCSS:true
+      });
+
+      return minified;
+    }
+
+    // If not an HTML output, return content as-is
+    return content;
+  });
   /// 注意，使用vite编译，就不能使用 setServerPassthroughCopyBehavior('passthrough')，vite要求fs中能看到文件
   eleventyConfig.addPlugin(EleventyVitePlugin, {
     viteOptions: {
@@ -138,13 +154,14 @@ export default function (eleventyConfig: EleventyUserConfig) {
       ],
     } satisfies ViteUserConfig,
   });
+
   eleventyConfig.setServerPassthroughCopyBehavior('copy');
   // eleventyConfig.addPassthroughCopy('bundle');
   eleventyConfig.addPassthroughCopy({'img/head.webp': 'favicon.ico'});
   eleventyConfig.addPassthroughCopy('img');
-  eleventyConfig.addPassthroughCopy('node_modules/prismjs/themes');
+  eleventyConfig.addPassthroughCopy({'node_modules/prismjs/themes': 'prismjs'});
   eleventyConfig.addPassthroughCopy('imgs');
-  eleventyConfig.addPassthroughCopy('node_modules/lit/polyfill-support.js');
+  // eleventyConfig.addPassthroughCopy('node_modules/lit/polyfill-support.js');
   eleventyConfig.addWatchTarget('**/*.md');
   eleventyConfig.addWatchTarget('**/*.mdx');
   eleventyConfig.ignores.add('docs');

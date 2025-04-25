@@ -24,15 +24,19 @@ export default function (data: EleventyData): string {
 
         <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0" />
         <title>${title}</title>
-        <link rel="shortcut icon" href="${safeUrl('/favicon.ico')}" />
-        <link rel="stylesheet" href="${safeUrl('/index.css')}" />
-        ${polyfill} ${scripts?.map((script_src) => html`<script type="module" src=${script_src}></script>`).join('') ?? ''}
+        <link rel="shortcut icon" href="/favicon.ico" />
+        <link rel="stylesheet" href="/index.css" />
+        <link href="${safeUrl('/prismjs/prism-okaidia.css')}" rel="stylesheet" />
+        ${polyfill}
+        <!-- modules -->
+        ${scripts?.map((script_src) => html`<script type="module" src=${script_src}></script>`).join('') ?? ''}
+        <!-- stylesheet -->
         ${links?.map((link_href) => html`<link rel="stylesheet" href=${link_href} />`) ?? ''}
-        ${getComponentsEntry()
+        <!-- ${getComponentsEntry()
           .map((entry) => {
             return html`<script type="module" src="${entry.bundle}"></script>`;
           })
-          .join('\n')}
+          .join('\n')} -->
       </head>
       <body>
         ${content}

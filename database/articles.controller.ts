@@ -44,6 +44,8 @@ export const getAllArticles = Object.assign(
   }
 );
 
+export type ArticleItem = Awaited<ReturnType<typeof getAllArticles>>[number];
+
 // if (isDev) {
 //   const resetCache = func_debounce(() => {
 //     console.log('getAllArticles reseted');

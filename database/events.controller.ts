@@ -39,3 +39,4 @@ export const getAllEvents = func_remember(async () => {
     .filter((it) => it !== undefined)
     .sort((a, b) => b.metadata.createdAt.getTime() - a.metadata.createdAt.getTime() || b.fileEntry.name.localeCompare(a.fileEntry.name));
 });
+export type EventItem = Awaited<ReturnType<typeof getAllEvents>>[number];

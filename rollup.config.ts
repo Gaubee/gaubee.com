@@ -8,11 +8,12 @@ import 'tsx';
 import {iter_map_not_null} from '@gaubee/util';
 import resolve from '@rollup/plugin-node-resolve';
 import replace from '@rollup/plugin-replace';
-import {bold, gray, yellow} from '@std/fmt/colors';
+import {bold, gray, green, yellow} from '@std/fmt/colors';
 import fs from 'node:fs';
 import path from 'node:path';
 import {defineConfig} from 'rollup';
 import {minifyTemplateLiterals} from 'rollup-plugin-minify-template-literals';
+import summary from 'rollup-plugin-summary';
 import {match, P} from 'ts-pattern';
 
 // 这里利用tsx来加载ts文件，但是需要用 await import来让 commonjs 支持 esm 的导入
@@ -21,7 +22,7 @@ const {getComponentsEntry} = await import('./scripts/custom-elements-metadata.ts
 const inputFiles = getComponentsEntry().map((entry) => entry.dist);
 export default defineConfig((env) => {
   return {
-    input: inputFiles,
+    input: ['./dist/index.js', './dist/react.js', ...inputFiles],
     output: {
       dir: 'bundle',
       format: 'esm',
@@ -70,15 +71,15 @@ export default defineConfig((env) => {
       //   },
       // }),
       minifyTemplateLiterals({}),
-      // summary(),
-      // {
-      //   name: "generate-react-types",
-      //   async buildEnd(error) {
-      //     const { doWrite } = await import("./scripts/react-generator");
-      //     doWrite(true);
-      //     console.log(green("./src/react.ts generated!!"));
-      //   },
-      // },
+      summary(),
+      {
+        name: 'generate-react-types',
+        async buildEnd(error) {
+          const {doWrite} = await import('./scripts/react-generator');
+          doWrite(true);
+          console.log(green('./src/react.ts generated!!'));
+        },
+      },
     ],
   };
 });
