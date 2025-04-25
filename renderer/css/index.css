@@ -15,6 +15,12 @@
   margin-bottom: 2em;
   max-width: 40em;
 }
+hr {
+  height: 1px;
+  background: color-mix(in srgb, currentColor, transparent);
+  width: 90%;
+  border: 0;
+}
 .article {
   display: inline-flex;
   flex-direction: column;
