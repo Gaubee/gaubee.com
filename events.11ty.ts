@@ -17,6 +17,7 @@ export default async function (data: EleventyData) {
       </style>
       <nav class="events">
         ${allEvents
+          .slice()
           .reverse()
           .map(
             (event) =>

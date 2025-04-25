@@ -18,6 +18,7 @@ export default async function (data: EleventyData) {
       </style>
       <nav class="articles">
         ${allArticles
+          .slice()
           .reverse()
           .map((article) => html`<li><a href="${article.url}">${article.metadata.title}</a></li>`)
           .join('\n')}
