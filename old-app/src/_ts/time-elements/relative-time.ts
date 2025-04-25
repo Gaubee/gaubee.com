@@ -1,11 +1,4 @@
-import {
-  strftime,
-  makeFormatter,
-  makeRelativeFormat,
-  isDayFirst,
-  isThisYear,
-  isYearSeparator,
-} from "./utils";
+import {isDayFirst, isThisYear, isYearSeparator, makeFormatter, makeRelativeFormat, strftime} from './utils';
 
 export default class RelativeTime {
   date: Date;
@@ -69,27 +62,27 @@ export default class RelativeTime {
     const month = Math.round(day / 30);
     const year = Math.round(month / 12);
     if (ms < 0) {
-      return formatRelativeTime(this.locale, 0, "second");
+      return formatRelativeTime(this.locale, 0, 'second');
     } else if (sec < 10) {
-      return formatRelativeTime(this.locale, 0, "second");
+      return formatRelativeTime(this.locale, 0, 'second');
     } else if (sec < 45) {
-      return formatRelativeTime(this.locale, -sec, "second");
+      return formatRelativeTime(this.locale, -sec, 'second');
     } else if (sec < 90) {
-      return formatRelativeTime(this.locale, -min, "minute");
+      return formatRelativeTime(this.locale, -min, 'minute');
     } else if (min < 45) {
-      return formatRelativeTime(this.locale, -min, "minute");
+      return formatRelativeTime(this.locale, -min, 'minute');
     } else if (min < 90) {
-      return formatRelativeTime(this.locale, -hr, "hour");
+      return formatRelativeTime(this.locale, -hr, 'hour');
     } else if (hr < 24) {
-      return formatRelativeTime(this.locale, -hr, "hour");
+      return formatRelativeTime(this.locale, -hr, 'hour');
     } else if (hr < 36) {
-      return formatRelativeTime(this.locale, -day, "day");
+      return formatRelativeTime(this.locale, -day, 'day');
     } else if (day < 30) {
-      return formatRelativeTime(this.locale, -day, "day");
+      return formatRelativeTime(this.locale, -day, 'day');
     } else if (month < 18) {
-      return formatRelativeTime(this.locale, -month, "month");
+      return formatRelativeTime(this.locale, -month, 'month');
     } else {
-      return formatRelativeTime(this.locale, -year, "year");
+      return formatRelativeTime(this.locale, -year, 'year');
     }
   }
 
@@ -102,7 +95,7 @@ export default class RelativeTime {
     const month = Math.round(day / 30);
     const year = Math.round(month / 12);
     if (min < 1) {
-      return "1m";
+      return '1m';
     } else if (min < 60) {
       return `${min}m`;
     } else if (hr < 24) {
@@ -127,29 +120,29 @@ export default class RelativeTime {
     const month = Math.round(day / 30);
     const year = Math.round(month / 12);
     if (month >= 18) {
-      return formatRelativeTime(this.locale, year, "year");
+      return formatRelativeTime(this.locale, year, 'year');
     } else if (month >= 12) {
-      return formatRelativeTime(this.locale, year, "year");
+      return formatRelativeTime(this.locale, year, 'year');
     } else if (day >= 45) {
-      return formatRelativeTime(this.locale, month, "month");
+      return formatRelativeTime(this.locale, month, 'month');
     } else if (day >= 30) {
-      return formatRelativeTime(this.locale, month, "month");
+      return formatRelativeTime(this.locale, month, 'month');
     } else if (hr >= 36) {
-      return formatRelativeTime(this.locale, day, "day");
+      return formatRelativeTime(this.locale, day, 'day');
     } else if (hr >= 24) {
-      return formatRelativeTime(this.locale, day, "day");
+      return formatRelativeTime(this.locale, day, 'day');
     } else if (min >= 90) {
-      return formatRelativeTime(this.locale, hr, "hour");
+      return formatRelativeTime(this.locale, hr, 'hour');
     } else if (min >= 45) {
-      return formatRelativeTime(this.locale, hr, "hour");
+      return formatRelativeTime(this.locale, hr, 'hour');
     } else if (sec >= 90) {
-      return formatRelativeTime(this.locale, min, "minute");
+      return formatRelativeTime(this.locale, min, 'minute');
     } else if (sec >= 45) {
-      return formatRelativeTime(this.locale, min, "minute");
+      return formatRelativeTime(this.locale, min, 'minute');
     } else if (sec >= 10) {
-      return formatRelativeTime(this.locale, sec, "second");
+      return formatRelativeTime(this.locale, sec, 'second');
     } else {
-      return formatRelativeTime(this.locale, 0, "second");
+      return formatRelativeTime(this.locale, 0, 'second');
     }
   }
 
@@ -170,14 +163,14 @@ export default class RelativeTime {
     } else if (min > 1) {
       return `${min}m`;
     } else {
-      return "1m";
+      return '1m';
     }
   }
 
   formatDate(): string {
-    let format = isDayFirst() ? "%e %b" : "%b %e";
+    let format = isDayFirst() ? '%e %b' : '%b %e';
     if (!isThisYear(this.date)) {
-      format += isYearSeparator() ? ", %Y" : " %Y";
+      format += isYearSeparator() ? ', %Y' : ' %Y';
     }
     return strftime(this.date, format);
   }
@@ -187,17 +180,13 @@ export default class RelativeTime {
     if (formatter) {
       return formatter.format(this.date);
     } else {
-      return strftime(this.date, "%l:%M%P");
+      return strftime(this.date, '%l:%M%P');
     }
   }
 }
 
-function formatRelativeTime(
-  locale: string,
-  value: number,
-  unit: Intl.RelativeTimeFormatUnit
-): string {
-  const formatter = makeRelativeFormat(locale, { numeric: "auto" });
+function formatRelativeTime(locale: string, value: number, unit: Intl.RelativeTimeFormatUnit): string {
+  const formatter = makeRelativeFormat(locale, {numeric: 'auto'});
   if (formatter) {
     return formatter.format(value, unit);
   } else {
@@ -213,69 +202,69 @@ function formatRelativeTime(
 function formatEnRelativeTime(value: number, unit: string): string {
   if (value === 0) {
     switch (unit) {
-      case "year":
-      case "quarter":
-      case "month":
-      case "week":
+      case 'year':
+      case 'quarter':
+      case 'month':
+      case 'week':
         return `this ${unit}`;
-      case "day":
-        return "today";
-      case "hour":
-      case "minute":
+      case 'day':
+        return 'today';
+      case 'hour':
+      case 'minute':
         return `in 0 ${unit}s`;
-      case "second":
-        return "now";
+      case 'second':
+        return 'now';
     }
   } else if (value === 1) {
     switch (unit) {
-      case "year":
-      case "quarter":
-      case "month":
-      case "week":
+      case 'year':
+      case 'quarter':
+      case 'month':
+      case 'week':
         return `next ${unit}`;
-      case "day":
-        return "tomorrow";
-      case "hour":
-      case "minute":
-      case "second":
+      case 'day':
+        return 'tomorrow';
+      case 'hour':
+      case 'minute':
+      case 'second':
         return `in 1 ${unit}`;
     }
   } else if (value === -1) {
     switch (unit) {
-      case "year":
-      case "quarter":
-      case "month":
-      case "week":
+      case 'year':
+      case 'quarter':
+      case 'month':
+      case 'week':
         return `last ${unit}`;
-      case "day":
-        return "yesterday";
-      case "hour":
-      case "minute":
-      case "second":
+      case 'day':
+        return 'yesterday';
+      case 'hour':
+      case 'minute':
+      case 'second':
         return `1 ${unit} ago`;
     }
   } else if (value > 1) {
     switch (unit) {
-      case "year":
-      case "quarter":
-      case "month":
-      case "week":
-      case "day":
-      case "hour":
-      case "minute":
-      case "second":
+      case 'year':
+      case 'quarter':
+      case 'month':
+      case 'week':
+      case 'day':
+      case 'hour':
+      case 'minute':
+      case 'second':
         return `in ${value} ${unit}s`;
     }
   } else if (value < -1) {
     switch (unit) {
-      case "year":
-      case "quarter":
-      case "month":
-      case "week":
-      case "day":
-      case "hour":
-      case "minute":
-      case "second":
+      case 'year':
+      case 'quarter':
+      case 'month':
+      case 'week':
+      case 'day':
+      case 'hour':
+      case 'minute':
+      case 'second':
         return `${-value} ${unit}s ago`;
     }
   }
@@ -283,4 +272,4 @@ function formatEnRelativeTime(value: number, unit: string): string {
   throw new RangeError(`Invalid unit argument for format() '${unit}'`);
 }
 
-const timeFormatter = makeFormatter({ hour: "numeric", minute: "2-digit" });
+const timeFormatter = makeFormatter({hour: 'numeric', minute: '2-digit'});

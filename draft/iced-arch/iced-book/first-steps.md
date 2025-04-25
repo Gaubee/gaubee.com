@@ -1,9 +1,10 @@
 # First Steps
+
 But enough with the theory. It's about time we start writing some code!
 
 iced embraces The Elm Architecture as the most natural approach for architecting interactive applications.
 Therefore, when using iced, we will be dealing with the four main ideas we introduced in the previous chapter:
-__state__, __messages__, __update logic__, and __view logic__.
+**state**, **messages**, **update logic**, and **view logic**.
 
 In the previous chapter, we dissected and studied the classical counter interface. Let's try to
 build it in Rust while leveraging The Elm Architecture.
@@ -13,14 +14,15 @@ build it in Rust while leveraging The Elm Architecture.
 </div>
 
 ## State
-Let's start with the __state__—the underlying data of the application.
+
+Let's start with the **state**—the underlying data of the application.
 
 In Rust, given the ownership and borrowing rules, it is extremely important to think carefully about the data model
 of your application.
 
 > I encourage you to always start by pondering about the data of your application and
-  its different states—not only those that are possible, but also those that must be impossible. Then try to leverage
-  the type system as much as you can to _[Make Impossible States Impossible]_.
+> its different states—not only those that are possible, but also those that must be impossible. Then try to leverage
+> the type system as much as you can to _[Make Impossible States Impossible]_.
 
 For our counter interface, all we need is a counter value. Since we have both increment and decrement interactions,
 the number could potentially be negative. This means we need a signed integer.
@@ -39,9 +41,10 @@ Let's hope that's enough.
 [Make Impossible States Impossible]: https://www.youtube.com/watch?v=IcgmSRJHu_8
 
 ## Messages
-Next, we need to define our __messages__—the interactions of the application.
 
-Our counter interface has two interactions: __increment__ and __decrement__. Technically, we could use a simple boolean to
+Next, we need to define our **messages**—the interactions of the application.
+
+Our counter interface has two interactions: **increment** and **decrement**. Technically, we could use a simple boolean to
 encode these interactions: `true` for increment and `false` for decrement, for instance.
 
 But... we can do better in Rust! Interactions are mutually exclusive—when we have an interaction, what we really have is one
@@ -60,7 +63,8 @@ Simple enough! This also sets us up for the long-term. If we ever wanted to add 
 `Reset` interaction, for instance—we could just introduce additional variants to this type. Enums are very powerful and convenient.
 
 ## Update Logic
-Now, it's time for our __update logic__—how messages change the state of the application.
+
+Now, it's time for our **update logic**—how messages change the state of the application.
 
 Basically, we need to write some logic that given any message can update any state of the application accordingly. The simplest
 and most idiomatic way to express this logic in Rust is by defining a method named `update` in our application state.
@@ -90,7 +94,7 @@ let mut counter = Counter { value: 0 };
 ```
 
 And let's say we wanted to simulate a user playing with our interface for a bit—pressing the increment button twice
-and then the decrement button once. We could easily compute the final state of our counter with our __update logic__:
+and then the decrement button once. We could easily compute the final state of our counter with our **update logic**:
 
 ```rust,ignore
 counter.update(Message::Increment);
@@ -126,11 +130,12 @@ This is one of the main advantages of The Elm Architecture. As we discovered in 
 only fundamental idea of an interface that is reusable in nature. All the parts we have defined so far are application-specific
 and, therefore, do not need to know about the UI library at all!
 
-The Elm Architecture properly embraces the different nature of each part of a user interface—decoupling __state__,
-__messages__, and __update logic__ from __widgets__ and __view logic__.
+The Elm Architecture properly embraces the different nature of each part of a user interface—decoupling **state**,
+**messages**, and **update logic** from **widgets** and **view logic**.
 
 ## View Logic
-Finally, the only part left for us to define is our __view logic__—how state dictates the widgets of the application.
+
+Finally, the only part left for us to define is our **view logic**—how state dictates the widgets of the application.
 
 Here is where the magic happens! In view logic, we bring together the state of the application and its possible interactions
 to produce a visual representation of the user interface that must be displayed to the user.
@@ -143,11 +148,12 @@ As we have already learned, this visual representation is made of widgets—the 
 widgets are not application-specific and they can be abstracted and packaged into reusable libraries. These libraries are
 normally called _widget toolkits_, _GUI frameworks_, or simply _GUI libraries_.
 
-And this is where __iced__ comes in—finally! iced is a cross-platform GUI library for Rust. It packages a fair collection of
+And this is where **iced** comes in—finally! iced is a cross-platform GUI library for Rust. It packages a fair collection of
 ready-to-use widgets; buttons and numbers included. Exactly what we need for our counter.
 
 ### The Buttons
-Our counter interface has two __buttons__. Let's see how we can define them using iced.
+
+Our counter interface has two **buttons**. Let's see how we can define them using iced.
 
 In iced, widgets are independent values. The same way you can have an integer in a variable, you can have a widget as well.
 These values are normally created using a _helper function_ from the `widget` module.
@@ -166,8 +172,8 @@ That's quite simple, isn't it? For now, we have just defined a couple of variabl
 As we can see, widget helpers may take arguments for configuring parts of the widgets to our liking.
 In this case, the `button` function takes a single argument used to describe the contents of the button.
 
-
 ### The Number
+
 We have our buttons sitting nicely in our `increment` and `decrement` variables. How about we do the same
 for our counter value?
 
@@ -184,10 +190,11 @@ Sweet! Like `button`, `text` also takes an argument used to describe its content
 simply hardcode `15` for now.
 
 ### The Layout
+
 Alright! We have our two buttons in `increment` and `decrement`, and our counter value in `counter`. That should be everything, right?
 
-Not so fast! The widgets in our counter interface are displayed in a specific __order__. Given our three widgets, there is a total of
-__six__ different ways to order them. However, the order we want is: `increment`, `counter`, and `decrement`.
+Not so fast! The widgets in our counter interface are displayed in a specific **order**. Given our three widgets, there is a total of
+**six** different ways to order them. However, the order we want is: `increment`, `counter`, and `decrement`.
 
 A very simple way of describing this order is to create a list with our widgets:
 
@@ -195,10 +202,10 @@ A very simple way of describing this order is to create a list with our widgets:
 let interface = vec![increment, counter, decrement];
 ```
 
-But we are still missing something! It's not only the order that is specific, our interface also has a specific visual __layout__.
+But we are still missing something! It's not only the order that is specific, our interface also has a specific visual **layout**.
 
 The widgets are positioned on top of each other, but they could very well be positioned from left to right instead. There is nothing
-in our description so far that talks about the __layout__ of our widgets.
+in our description so far that talks about the **layout** of our widgets.
 
 In iced, layout is described using... well, more widgets! That's right. Not all widgets produce visual results directly; some may simply
 manage the position of existing widgets. And since widgets are just values, they can be nested and composed nicely.
@@ -212,19 +219,20 @@ let interface = column![increment, counter, decrement];
 ```
 
 This is very similar to our previous snippet. iced provides a `column!` macro for creating a `column` out of some widgets in a particular
-__order__—analogous to `vec!`.
+**order**—analogous to `vec!`.
 
 ### The Interactions
+
 At this point, we have in our `interface` variable a `column` representing our counter interface. But if we actually tried to run it,
 we would quickly find out that something is wrong.
 
-Our buttons would be completely disabled. Of course! We have not defined any __interactions__ for them. Notice that we have yet
-to use our `Message` enum in our view logic. How is our user interface supposed to produce __messages__ if we don't specify
+Our buttons would be completely disabled. Of course! We have not defined any **interactions** for them. Notice that we have yet
+to use our `Message` enum in our view logic. How is our user interface supposed to produce **messages** if we don't specify
 them? Let's do that now.
 
 In iced, every widget has a specific type that enables further configuration using simple builder methods. The `button`
 helper returns an instance of [the `Button` type], which has an `on_press` method we can use to define the message it must
-__produce__ when a user presses the button:
+**produce** when a user presses the button:
 
 ```rust,ignore
 use iced::widget::button;
@@ -246,14 +254,14 @@ enum Message {
 }
 ```
 
-In The Elm Architecture, messages represent __events__ that have occurred—made of pure data. As a consequence, it should always be easy
+In The Elm Architecture, messages represent **events** that have occurred—made of pure data. As a consequence, it should always be easy
 to derive `Debug` and `Clone` for our `Message` type.
-
 
 [the `Button` type]: https://docs.rs/iced/0.12.1/iced/widget/struct.Button.html
 
 ### The View
-We are almost there! There is only one thing left to do: connecting our application __state__ to the view logic.
+
+We are almost there! There is only one thing left to do: connecting our application **state** to the view logic.
 
 Let's bring together all the view logic we have written so far:
 
@@ -304,9 +312,9 @@ However, and as you may have noticed, this `view` method is completely useless�
 `interface`, but then... It does nothing with it and throws it away!
 
 > In iced, constructing and configuring widgets has no side effects. There is no "global context" you need to
-  worry about in your view code.
+> worry about in your view code.
 
-Instead of throwing the `interface` away, we need to return it. Remember, the purpose of our __view logic__ is
+Instead of throwing the `interface` away, we need to return it. Remember, the purpose of our **view logic** is
 to dictate the widgets of our user interface; and the content of the `interface` variable is precisely the
 description of the interface we want:
 
@@ -338,7 +346,7 @@ of messages the widget may produce. In this case, it takes our `Message` because
 the column produce messages of this type.
 
 > iced has a strong focus on type safety—leveraging the type system and compile-time guarantees to minimize runtime errors
-  as much as possible.
+> as much as possible.
 
 And well... That's it! Our view logic is done! But wait... It's a bit verbose right now. Since it's such a simple interface,
 let's just inline everything:
@@ -365,4 +373,4 @@ That's much more concise. It even resembles the actual interface! Since creating
 side effects; we can move things around in our view logic without worrying about breaking other stuff. No spooky
 action at a distance!
 
-And that's all there is to our counter interface. I am sure you can't wait to __run__ it. Shall we?
+And that's all there is to our counter interface. I am sure you can't wait to **run** it. Shall we?

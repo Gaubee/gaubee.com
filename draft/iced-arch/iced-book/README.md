@@ -3,9 +3,10 @@
 </div>
 
 # Introduction
+
 [iced] is a cross-platform GUI library for [Rust]. It is inspired by [Elm], a delightful functional language for building web applications.
 
-As a GUI library, iced helps you build *[graphical user interfaces]* for your Rust applications.
+As a GUI library, iced helps you build _[graphical user interfaces]_ for your Rust applications.
 
 iced is strongly focused on **simplicity** and **type-safety**. As a result, iced tries to provide simple building blocks that can be put together with strong typing to reduce the chance of **runtime errors**.
 

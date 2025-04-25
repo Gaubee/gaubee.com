@@ -1,6 +1,6 @@
-import { Octokit } from "@octokit/rest";
+import {Octokit} from '@octokit/rest';
 
-const projectsJsonFilepath = rootResolver("./database/projects.json");
+const projectsJsonFilepath = rootResolver('./database/projects.json');
 
 type RepoContributionCounts = Array<{
   id: number;
@@ -13,27 +13,20 @@ type RepoContributionCounts = Array<{
   commitCount: number;
 }>;
 
-const writeProjectsJson = async (
-  repoContributionCounts: RepoContributionCounts
-) => {
-  await writeFile(
-    projectsJsonFilepath,
-    JSON.stringify(repoContributionCounts, null, 2)
-  );
+const writeProjectsJson = async (repoContributionCounts: RepoContributionCounts) => {
+  await writeFile(projectsJsonFilepath, JSON.stringify(repoContributionCounts, null, 2));
 };
 export const readProjectsJson = async () => {
   // return await import("./projects.json").then(
   //   (r) => r.default as RepoContributionCounts
   // );
-  return JSON.parse(
-    await readFile(projectsJsonFilepath, "utf-8")
-  ) as RepoContributionCounts;
+  return JSON.parse(await readFile(projectsJsonFilepath, 'utf-8')) as RepoContributionCounts;
 };
 
 /**从github上下载所有的项目信息 */
 async function getAllProjects() {
   if (!process.env.GITHUB_TOKEN) {
-    throw new Error("GITHUB_TOKEN is not set!");
+    throw new Error('GITHUB_TOKEN is not set!');
   }
 
   const octokit = new Octokit({
@@ -46,52 +39,40 @@ async function getAllProjects() {
   console.log(`Your GitHub username: ${username}`);
 
   // 2. 获取用户能访问的所有仓库 (保持不变，因为我们需要从这些仓库中筛选)
-  type Repos = Awaited<
-    ReturnType<typeof octokit.rest.repos.listForAuthenticatedUser>
-  >["data"];
+  type Repos = Awaited<ReturnType<typeof octokit.rest.repos.listForAuthenticatedUser>>['data'];
   async function getAllRepos(page = 0): Promise<Repos> {
     const per_page = 100;
-    const repos = await octokit.paginate(
-      octokit.rest.repos.listForAuthenticatedUser,
-      {
-        affiliation: "owner,collaborator,organization_member", //owner,collaborator,organization_member
-        per_page: per_page,
-        page,
-        sort: "updated",
-        direction: "desc",
-      }
-    );
-    return [
-      repos,
-      repos.length === per_page ? await getAllRepos(page + 1) : [],
-    ].flat();
+    const repos = await octokit.paginate(octokit.rest.repos.listForAuthenticatedUser, {
+      affiliation: 'owner,collaborator,organization_member', //owner,collaborator,organization_member
+      per_page: per_page,
+      page,
+      sort: 'updated',
+      direction: 'desc',
+    });
+    return [repos, repos.length === per_page ? await getAllRepos(page + 1) : []].flat();
   }
 
   const repos = await getAllRepos();
-  await writeFile(
-    path.resolve(import.meta.dirname, "repos.json"),
-    JSON.stringify(repos, null, 2)
-  );
+  await writeFile(path.resolve(import.meta.dirname, 'repos.json'), JSON.stringify(repos, null, 2));
 
   const oldRepoContributionCounts = await readProjectsJson();
 
-  const repoContributionCounts: RepoContributionCounts =
-    oldRepoContributionCounts.filter((item) => {
-      const repo = repos.find((repo) => repo.id === item.id);
-      if (repo == null) {
-        return false;
-      }
-      item.id = repo.id;
-      item.name = repo.name;
-      item.url = repo.html_url;
-      item.description = repo.description || "_No description_";
-      item.fullName = repo.full_name;
-      return true;
-    });
+  const repoContributionCounts: RepoContributionCounts = oldRepoContributionCounts.filter((item) => {
+    const repo = repos.find((repo) => repo.id === item.id);
+    if (repo == null) {
+      return false;
+    }
+    item.id = repo.id;
+    item.name = repo.name;
+    item.url = repo.html_url;
+    item.description = repo.description || '_No description_';
+    item.fullName = repo.full_name;
+    return true;
+  });
 
   writeProjectsJson(repoContributionCounts);
 
-  console.log("\nRepositories with your commits (sorted by commit count):");
+  console.log('\nRepositories with your commits (sorted by commit count):');
 
   for (const repo of repos) {
     let userCommitCount = 0;
@@ -112,15 +93,13 @@ async function getAllProjects() {
 
       if (Array.isArray(contributorsStats.data)) {
         // 4. 查找当前用户的贡献信息
-        const userContribution = contributorsStats.data.find(
-          (contributor) => contributor.author?.login === username
-        );
+        const userContribution = contributorsStats.data.find((contributor) => contributor.author?.login === username);
 
         if (userContribution) {
           userCommitCount = userContribution.total;
         }
       }
-      console.log("userContribution", userCommitCount);
+      console.log('userContribution', userCommitCount);
 
       // 5. 获取首次和最后一次 commit 时间 (仍然需要 commits 接口，只获取用户自己的 commit)
       if (userCommitCount > 0) {
@@ -134,9 +113,7 @@ async function getAllProjects() {
 
         if (commits.data.length > 0) {
           if (commits.data[0].commit.committer?.date) {
-            lastCommitTime = new Date(
-              commits.data[0].commit.committer.date
-            ).toString();
+            lastCommitTime = new Date(commits.data[0].commit.committer.date).toString();
           }
         }
       }
@@ -146,15 +123,10 @@ async function getAllProjects() {
       }
       // 针对 404 错误进行处理，表示可能仓库没有 contributors stats 信息 (例如空仓库)
       if ((error as any).status === 404) {
-        console.warn(
-          `Contributors stats not found for repo ${repo.full_name}, skipping stats.`
-        );
+        console.warn(`Contributors stats not found for repo ${repo.full_name}, skipping stats.`);
         userCommitCount = 0; // 视为没有贡献
       } else {
-        console.error(
-          `Error fetching contributor stats for repo ${repo.full_name}:`,
-          error
-        );
+        console.error(`Error fetching contributor stats for repo ${repo.full_name}:`, error);
       }
     }
 
@@ -165,7 +137,7 @@ async function getAllProjects() {
         name: repo.name,
         fullName: repo.full_name,
         url: repo.html_url,
-        description: repo.description || "_No description_",
+        description: repo.description || '_No description_',
         firstCommitTime: firstCommitTime,
         lastCommitTime: lastCommitTime,
         commitCount: userCommitCount,
@@ -192,35 +164,26 @@ async function getAllProjects() {
   return repoContributionCounts;
 }
 
-import { import_meta_ponyfill } from "import-meta-ponyfill";
-import { readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { rootResolver } from "./common.helper.ts";
+import {import_meta_ponyfill} from 'import-meta-ponyfill';
+import {readFile, writeFile} from 'node:fs/promises';
+import path from 'node:path';
+import {rootResolver} from './common.helper.ts';
 
 // node --env-file=.env --env-file=.env.local ./database/projects.controller.ts
 if (import_meta_ponyfill(import.meta).main) {
   (async () => {
     const repoContributionCounts = await getAllProjects().catch((e) => {
-      console.error("QAQ", e);
+      console.error('QAQ', e);
       if (e.status === 403) {
-        console.log(
-          "限速解锁于：",
-          new Date(
-            e.response.headers["x-ratelimit-reset"] * 1000
-          ).toLocaleString()
-        );
+        console.log('限速解锁于：', new Date(e.response.headers['x-ratelimit-reset'] * 1000).toLocaleString());
       }
       return [];
     });
     for (const repoInfo of repoContributionCounts) {
-      console.log(
-        `\nRepository Name: ${repoInfo.name} (Commits: ${repoInfo.commitCount})`
-      );
+      console.log(`\nRepository Name: ${repoInfo.name} (Commits: ${repoInfo.commitCount})`);
       console.log(`URL: ${repoInfo.url}`);
       console.log(`Description: ${repoInfo.description}`);
-      console.log(
-        `First Commit Time (your commit): ${repoInfo.firstCommitTime}`
-      );
+      console.log(`First Commit Time (your commit): ${repoInfo.firstCommitTime}`);
       console.log(`Last Commit Time (your commit): ${repoInfo.lastCommitTime}`);
     }
   })();

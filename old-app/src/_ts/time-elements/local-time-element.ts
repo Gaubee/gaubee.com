@@ -6,14 +6,14 @@ class DateTimeFormatFactory {
   private _cache = new Map<string, DateTimeFormatters>();
   private _genFormatter(locales: string): DateTimeFormatters {
     const textformatter = new Intl.DateTimeFormat(locales, {
-      dateStyle: "full",
-      timeStyle: "short",
+      dateStyle: 'full',
+      timeStyle: 'short',
     });
     const titleformatter = new Intl.DateTimeFormat(locales, {
-      dateStyle: "full",
-      timeStyle: "full",
+      dateStyle: 'full',
+      timeStyle: 'full',
     });
-    return { text: textformatter, title: titleformatter };
+    return {text: textformatter, title: titleformatter};
   }
   getFormatter(locales: string) {
     const key = locales;
@@ -29,16 +29,12 @@ const dateTimeFormatFactory = new DateTimeFormatFactory();
 
 export class LocalTimeElement extends HTMLElement {
   static get observedAttributes() {
-    return ["datetime", "locales"];
+    return ['datetime', 'locales'];
   }
   locales = navigator.language;
   date = new Date();
-  attributeChangedCallback(
-    attrName: string,
-    _oldValue: string,
-    newValue: string
-  ) {
-    if (attrName === "datetime") {
+  attributeChangedCallback(attrName: string, _oldValue: string, newValue: string) {
+    if (attrName === 'datetime') {
       const millis = Date.parse(newValue);
       if (isNaN(millis)) {
         return;
@@ -61,9 +57,9 @@ export class LocalTimeElement extends HTMLElement {
     });
   }
 }
-if (!window.customElements.get("local-time")) {
-  Reflect.set(window, "LocalTimeElement", LocalTimeElement);
-  window.customElements.define("local-time", LocalTimeElement);
+if (!window.customElements.get('local-time')) {
+  Reflect.set(window, 'LocalTimeElement', LocalTimeElement);
+  window.customElements.define('local-time', LocalTimeElement);
 }
 
 declare global {
@@ -71,6 +67,6 @@ declare global {
     LocalTimeElement: typeof LocalTimeElement;
   }
   interface HTMLElementTagNameMap {
-    "local-time": LocalTimeElement;
+    'local-time': LocalTimeElement;
   }
 }

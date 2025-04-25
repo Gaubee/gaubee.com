@@ -92,13 +92,7 @@
           }
         }
         & .body {
-          background-image: repeating-linear-gradient(
-            135deg,
-            #f8bbd0,
-            #f8bbd0 20px,
-            #e1f5fe 20px,
-            #e1f5fe 40px
-          );
+          background-image: repeating-linear-gradient(135deg, #f8bbd0, #f8bbd0 20px, #e1f5fe 20px, #e1f5fe 40px);
           height: 600px;
           margin-top: -40px;
         }
@@ -165,11 +159,9 @@
     </section>
   </body>
   <script>
-    const allButtonGroup = [].slice.call(
-      document.querySelectorAll(".class-names button-group")
-    );
+    const allButtonGroup = [].slice.call(document.querySelectorAll('.class-names button-group'));
     allButtonGroup.forEach((btnGroup) => {
-      btnGroup.addEventListener("change", (e) => {
+      btnGroup.addEventListener('change', (e) => {
         canvas.classList.remove(...btnGroup.options);
         canvas.classList.add(...btnGroup.values);
       });
@@ -177,15 +169,15 @@
     /**
      * @type {HTMLButtonElement}
      */
-    const btnPlay = document.getElementById("btnPlay");
+    const btnPlay = document.getElementById('btnPlay');
     /**
      * @type {HTMLTemplateElement}
      */
-    const tmp = document.getElementById("tmp");
+    const tmp = document.getElementById('tmp');
     /**
      * @type {HTMLDivElement}
      */
-    const canvas = document.getElementById("canvas");
+    const canvas = document.getElementById('canvas');
 
     class ViewTransitionController {
       oldEles;
@@ -201,25 +193,23 @@
        */
       getEles = (root) => {
         /** @type {HTMLElement} */
-        const page = root.querySelector(".page");
+        const page = root.querySelector('.page');
         /** @type {HTMLElement} */
-        const header = root.querySelector("header");
+        const header = root.querySelector('header');
         /** @type {HTMLElement} */
-        const backIcon = root.querySelector(".back-icon");
+        const backIcon = root.querySelector('.back-icon');
         /** @type {HTMLSpanElement} */
-        const backText = root.querySelector(".back-text");
+        const backText = root.querySelector('.back-text');
         /** @type {HTMLSpanElement} */
-        const title = root.querySelector(".title");
+        const title = root.querySelector('.title');
         /** @type {HTMLElement} */
-        const body = root.querySelector(".body");
-        return { page, header, backIcon, backText, title, body };
+        const body = root.querySelector('.body');
+        return {page, header, backIcon, backText, title, body};
       };
       updateText = () => {
-        const { oldEles, newEles } = this;
+        const {oldEles, newEles} = this;
         newEles.backText.textContent = oldEles.title.textContent;
-        newEles.title.textContent = `标题${
-          1 + (parseInt(oldEles.title.textContent.match(/\d+/)) || 0)
-        }`;
+        newEles.title.textContent = `标题${1 + (parseInt(oldEles.title.textContent.match(/\d+/)) || 0)}`;
       };
       beforeStart = () => {
         this.oldEles = this.getEles(canvas);
@@ -230,45 +220,45 @@
 
         canvas.appendChild(newHeader);
 
-        const { oldEles, newEles } = this;
-        oldEles.page.style.viewTransitionName = "old-page";
-        oldEles.header.style.viewTransitionName = "old-header";
-        oldEles.backIcon.style.viewTransitionName = "old-backIcon";
-        oldEles.backText.style.viewTransitionName = "old-backText";
-        oldEles.title.style.viewTransitionName = "old-title";
+        const {oldEles, newEles} = this;
+        oldEles.page.style.viewTransitionName = 'old-page';
+        oldEles.header.style.viewTransitionName = 'old-header';
+        oldEles.backIcon.style.viewTransitionName = 'old-backIcon';
+        oldEles.backText.style.viewTransitionName = 'old-backText';
+        oldEles.title.style.viewTransitionName = 'old-title';
 
-        newEles.page.classList.add("from-right");
-        newEles.page.style.viewTransitionName = "new-page";
-        newEles.header.style.viewTransitionName = "new-header";
-        newEles.backIcon.style.viewTransitionName = "new-backIcon";
-        newEles.backIcon.style.opacity = "0";
-        newEles.backText.style.opacity = "0";
-        newEles.title.style.viewTransitionName = "new-title";
+        newEles.page.classList.add('from-right');
+        newEles.page.style.viewTransitionName = 'new-page';
+        newEles.header.style.viewTransitionName = 'new-header';
+        newEles.backIcon.style.viewTransitionName = 'new-backIcon';
+        newEles.backIcon.style.opacity = '0';
+        newEles.backText.style.opacity = '0';
+        newEles.title.style.viewTransitionName = 'new-title';
       };
       doStart = () => {
-        const { oldEles, newEles } = this;
-        oldEles.page.classList.add("to-left");
-        oldEles.page.style.opacity = "0";
-        oldEles.title.style.viewTransitionName = "";
-        oldEles.title.style.opacity = "0";
-        oldEles.backIcon.style.viewTransitionName = "";
-        oldEles.backIcon.style.opacity = "0";
-        oldEles.backText.style.opacity = "0";
+        const {oldEles, newEles} = this;
+        oldEles.page.classList.add('to-left');
+        oldEles.page.style.opacity = '0';
+        oldEles.title.style.viewTransitionName = '';
+        oldEles.title.style.opacity = '0';
+        oldEles.backIcon.style.viewTransitionName = '';
+        oldEles.backIcon.style.opacity = '0';
+        oldEles.backText.style.opacity = '0';
 
-        newEles.page.classList.remove("from-right");
-        newEles.backIcon.style.viewTransitionName = "old-backIcon";
-        newEles.backIcon.style.opacity = "1";
-        newEles.backText.style.viewTransitionName = "old-title";
-        newEles.backText.style.opacity = "1";
+        newEles.page.classList.remove('from-right');
+        newEles.backIcon.style.viewTransitionName = 'old-backIcon';
+        newEles.backIcon.style.opacity = '1';
+        newEles.backText.style.viewTransitionName = 'old-title';
+        newEles.backText.style.opacity = '1';
       };
       afterFinish = () => {
-        const { oldEles } = this;
+        const {oldEles} = this;
         oldEles.page.remove();
       };
     }
     const vtc = new ViewTransitionController();
 
-    btnPlay.addEventListener("click", async () => {
+    btnPlay.addEventListener('click', async () => {
       vtc.beforeStart();
 
       const vt = document.startViewTransition(vtc.doStart);
@@ -276,17 +266,17 @@
       vtc.afterFinish();
     });
 
-    frameGroup.addEventListener("change", () => {
+    frameGroup.addEventListener('change', () => {
       vtc.init();
       switch (frameGroup.value) {
-        case "beforeStart":
+        case 'beforeStart':
           vtc.beforeStart();
           break;
-        case "doStart":
+        case 'doStart':
           vtc.beforeStart();
           vtc.doStart();
           break;
-        case "afterFinish":
+        case 'afterFinish':
           vtc.beforeStart();
           vtc.doStart();
           vtc.afterFinish();
@@ -376,9 +366,9 @@ document.documentElement.animate(
   },
   {
     duration: 500,
-    easing: "ease-in",
+    easing: 'ease-in',
     // Specify which pseudo-element to animate
-    pseudoElement: "::view-transition-new(progressBarValue)",
+    pseudoElement: '::view-transition-new(progressBarValue)',
   }
 );
 ```

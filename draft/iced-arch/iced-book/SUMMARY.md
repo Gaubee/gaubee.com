@@ -1,7 +1,9 @@
 # Summary
+
 [Introduction](README.md)
 
 # Learning the Basics
+
 - [Architecture](architecture.md)
 - [First Steps](first-steps.md)
 - [The Runtime](the-runtime.md)
@@ -27,5 +29,6 @@
 -->
 
 # Appendix
+
 - [Additional Resources](additional-resources.md)
 - [Frequently Asked Questions](faq.md)

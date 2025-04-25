@@ -1,26 +1,5 @@
-const weekdays = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
-const months = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
+const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 function pad(num: string | number) {
   return `0${num}`.slice(-2);
@@ -38,74 +17,72 @@ export function strftime(time: Date, formatString: string): string {
     let match;
     const modifier = _arg[1];
     switch (modifier) {
-      case "%":
-        return "%";
-      case "a":
+      case '%':
+        return '%';
+      case 'a':
         return weekdays[+day % weekdays.length]!.slice(0, 3);
-      case "A":
+      case 'A':
         return weekdays[+day % weekdays.length]!;
-      case "b":
+      case 'b':
         return months[+month % months.length]!.slice(0, 3);
-      case "B":
+      case 'B':
         return months[+month % months.length]!;
-      case "c":
+      case 'c':
         return time.toString();
-      case "d":
+      case 'd':
         return pad(date);
-      case "e":
+      case 'e':
         return String(date);
-      case "H":
+      case 'H':
         return pad(hour);
-      case "I":
-        return pad(strftime(time, "%l"));
-      case "l":
+      case 'I':
+        return pad(strftime(time, '%l'));
+      case 'l':
         if (hour === 0 || hour === 12) {
           return String(12);
         } else {
           return String((hour + 12) % 12);
         }
-      case "m":
+      case 'm':
         return pad(month + 1);
-      case "M":
+      case 'M':
         return pad(minute);
-      case "p":
+      case 'p':
         if (hour > 11) {
-          return "PM";
+          return 'PM';
         } else {
-          return "AM";
+          return 'AM';
         }
-      case "P":
+      case 'P':
         if (hour > 11) {
-          return "pm";
+          return 'pm';
         } else {
-          return "am";
+          return 'am';
         }
-      case "S":
+      case 'S':
         return pad(second);
-      case "w":
+      case 'w':
         return String(day);
-      case "y":
+      case 'y':
         return pad(year % 100);
-      case "Y":
+      case 'Y':
         return String(year);
-      case "Z":
+      case 'Z':
         match = time.toString().match(/\((\w+)\)$/);
-        return match?.[1] || "";
-      case "z":
+        return match?.[1] || '';
+      case 'z':
         match = time.toString().match(/\w([+-]\d\d\d\d) /);
-        return match?.[1] || "";
+        return match?.[1] || '';
     }
-    return "";
+    return '';
   });
 }
 
-export function makeFormatter(
-  options: Intl.DateTimeFormatOptions
-): () => Intl.DateTimeFormat | undefined {
+export function makeFormatter(options: Intl.DateTimeFormatOptions): () => Intl.DateTimeFormat | undefined {
   let format: Intl.DateTimeFormat | null;
   return function (): Intl.DateTimeFormat | undefined {
     if (format) return format;
-    if ("Intl" in window) {
+    if ('Intl' in window) {
       try {
         format = new Intl.DateTimeFormat(undefined, options);
         return format;
@@ -119,7 +96,7 @@ export function makeFormatter(
 }
 
 let dayFirst: boolean | null = null;
-const dayFirstFormatter = makeFormatter({ day: "numeric", month: "short" });
+const dayFirstFormatter = makeFormatter({day: 'numeric', month: 'short'});
 
 // Private: Determine if the day should be formatted before the month name in
 // the user's current locale. For example, `9 Jun` for en-GB and `Jun 9`
@@ -143,9 +120,9 @@ export function isDayFirst(): boolean {
 
 let yearSeparator: boolean | null = null;
 const yearFormatter = makeFormatter({
-  day: "numeric",
-  month: "short",
-  year: "numeric",
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
 });
 
 // Private: Determine if the year should be separated from the month and day
@@ -177,11 +154,8 @@ export function isThisYear(date: Date): boolean {
   return now.getUTCFullYear() === date.getUTCFullYear();
 }
 
-export function makeRelativeFormat(
-  locale: string,
-  options: Intl.RelativeTimeFormatOptions
-): Intl.RelativeTimeFormat | void {
-  if ("Intl" in window && "RelativeTimeFormat" in window.Intl) {
+export function makeRelativeFormat(locale: string, options: Intl.RelativeTimeFormatOptions): Intl.RelativeTimeFormat | void {
+  if ('Intl' in window && 'RelativeTimeFormat' in window.Intl) {
     try {
       return new Intl.RelativeTimeFormat(locale, options);
     } catch (e) {
@@ -196,9 +170,9 @@ export function makeRelativeFormat(
 //
 // Traverses parents until it finds an explicit `lang` other returns "default".
 export function localeFromElement(el: HTMLElement): string {
-  const container = el.closest("[lang]");
+  const container = el.closest('[lang]');
   if (container instanceof HTMLElement && container.lang) {
     return container.lang;
   }
-  return "default";
+  return 'default';
 }

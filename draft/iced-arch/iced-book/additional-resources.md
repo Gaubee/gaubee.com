@@ -1,4 +1,5 @@
 # Additional Resources
+
 Here are some further resources you can use to learn more about iced while I am still working on this book:
 
 > Keep in mind that some of these resources may be using an older version of iced. However, while the specifics

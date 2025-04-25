@@ -1,4 +1,5 @@
 # 🚦 JavaScript Signals standard proposal🚦
+
 <img align=right src="Signals.svg" alt="Signals logo" width=100>
 
 Stage 1 ([explanation](https://tc39.es/process-document/))
@@ -39,8 +40,8 @@ const setCounter = (value) => {
 };
 
 const isEven = () => (counter & 1) == 0;
-const parity = () => isEven() ? "even" : "odd";
-const render = () => element.innerText = parity();
+const parity = () => (isEven() ? 'even' : 'odd');
+const render = () => (element.innerText = parity());
 
 // Simulate external updates to counter...
 setInterval(() => setCounter(counter + 1), 1000);
@@ -48,21 +49,21 @@ setInterval(() => setCounter(counter + 1), 1000);
 
 This has a number of problems...
 
-* The `counter` setup is noisy and boilerplate-heavy.
-* The `counter` state is tightly coupled to the rendering system.
-* If the `counter` changes but `parity` does not (e.g. counter goes from 2 to 4), then we do unnecessary computation of the parity and unnecessary rendering.
-* What if another part of our UI just wants to render when the `counter` updates?
-* What if another part of our UI is dependent on `isEven` or `parity` alone?
+- The `counter` setup is noisy and boilerplate-heavy.
+- The `counter` state is tightly coupled to the rendering system.
+- If the `counter` changes but `parity` does not (e.g. counter goes from 2 to 4), then we do unnecessary computation of the parity and unnecessary rendering.
+- What if another part of our UI just wants to render when the `counter` updates?
+- What if another part of our UI is dependent on `isEven` or `parity` alone?
 
 Even in this relatively simple scenario, a number of issues arise quickly. We could try to work around these by introducing pub/sub for the `counter`. This would allow additional consumers of the `counter` could subscribe to add their own reactions to state changes.
 
 However, we're still stuck with the following problems:
 
-* The render function, which is only dependent on `parity` must instead "know" that it actually needs to subscribe to `counter`.
-* It isn't possible to update UI based on either `isEven` or `parity` alone, without directly interacting with `counter`.
-* We've increased our boilerplate. Any time you are using something, it's not just a matter of calling a function or reading a variable, but instead subscribing and doing updates there. Managing unsubscription is also especially complicated.
+- The render function, which is only dependent on `parity` must instead "know" that it actually needs to subscribe to `counter`.
+- It isn't possible to update UI based on either `isEven` or `parity` alone, without directly interacting with `counter`.
+- We've increased our boilerplate. Any time you are using something, it's not just a matter of calling a function or reading a variable, but instead subscribing and doing updates there. Managing unsubscription is also especially complicated.
 
-Now, we could solve a couple issues by adding pub/sub not just to `counter` but also to `isEven` and `parity`. We would then have to subscribe `isEven` to `counter`,  `parity` to `isEven`, and `render` to `parity`. Unfortunately, not only has our boilerplate code exploded, but we're stuck with a ton of bookkeeping of subscriptions, and a potential memory leak disaster if we don't properly clean everything up in the right way. So, we've solved some issues but created a whole new category of problems and a lot of code. To make matters worse, we have to go through this entire process for every piece of state in our system.
+Now, we could solve a couple issues by adding pub/sub not just to `counter` but also to `isEven` and `parity`. We would then have to subscribe `isEven` to `counter`, `parity` to `isEven`, and `render` to `parity`. Unfortunately, not only has our boilerplate code exploded, but we're stuck with a ton of bookkeeping of subscriptions, and a potential memory leak disaster if we don't properly clean everything up in the right way. So, we've solved some issues but created a whole new category of problems and a lot of code. To make matters worse, we have to go through this entire process for every piece of state in our system.
 
 ### Introducing Signals
 
@@ -88,17 +89,18 @@ setInterval(() => counter.set(counter.get() + 1), 1000);
 ```
 
 There are a few things we can see right away:
-* We've eliminated the noisy boilerplate around the `counter` variable from our previous example.
-* There is a unified API to handle values, computations, and side effects.
-* There's no circular reference problem or upside down dependencies between `counter` and `render`.
-* There are no manual subscriptions, nor is there any need for bookkeeping.
-* There is a means of controlling side-effect timing/scheduling.
+
+- We've eliminated the noisy boilerplate around the `counter` variable from our previous example.
+- There is a unified API to handle values, computations, and side effects.
+- There's no circular reference problem or upside down dependencies between `counter` and `render`.
+- There are no manual subscriptions, nor is there any need for bookkeeping.
+- There is a means of controlling side-effect timing/scheduling.
 
 Signals give us much more than what can be seen on the surface of the API though:
 
-* **Automatic Dependency Tracking** - A computed Signal automatically discovers any other Signals that it is dependent on, whether those Signals be simple values or other computations.
-* **Lazy Evaluation** - Computations are not eagerly evaluated when they are declared, nor are they immediately evaluated when their dependencies change. They are only evaluated when their value is explicitly requested.
-* **Memoization** - Computed Signals cache their last value so that computations that don't have changes in their dependencies do not need to be re-evaluated, no matter how many times they are accessed.
+- **Automatic Dependency Tracking** - A computed Signal automatically discovers any other Signals that it is dependent on, whether those Signals be simple values or other computations.
+- **Lazy Evaluation** - Computations are not eagerly evaluated when they are declared, nor are they immediately evaluated when their dependencies change. They are only evaluated when their value is explicitly requested.
+- **Memoization** - Computed Signals cache their last value so that computations that don't have changes in their dependencies do not need to be re-evaluated, no matter how many times they are accessed.
 
 ## Motivation for standardizing Signals
 
@@ -119,8 +121,9 @@ The champion group expects to develop various implementations of Signals, and us
 #### DevTools
 
 With existing JS-language Signal libraries, it can be difficult to trace things like:
-* The callstack across a chain of computed Signals, showing the causal chain for an error
-* The reference graph among Signals, when one depends on another -- important when debugging memory usage
+
+- The callstack across a chain of computed Signals, showing the causal chain for an error
+- The reference graph among Signals, when one depends on another -- important when debugging memory usage
 
 Built-in Signals enable JS runtimes and DevTools to potentially have improved support for inspecting Signals, particularly for debugging or performance analysis, whether this is built into browsers or through a shared extension. Existing tools such as the element inspector, performance snapshot, and memory profilers could be updated to specifically highlight Signals in their presentation of information.
 
@@ -139,9 +142,9 @@ Current work in W3C and by browser implementors is seeking to bring native templ
 
 > Note, this integration would be a separate effort to come later, not part of this proposal itself.
 
-##### Ecosystem information exchange (*not* a reason to ship)
+##### Ecosystem information exchange (_not_ a reason to ship)
 
-Standardization efforts can sometimes be helpful just at the "community" level, even without changes in browsers. The Signals effort is bringing together many different framework authors for a deep discussion about the nature of reactivity, algorithms and interoperability. This has already been useful, and does not justify inclusion in JS engines and browsers; Signals should only be added to the JavaScript standard if there are significant benefits *beyond* the ecosystem information exchange enabled.
+Standardization efforts can sometimes be helpful just at the "community" level, even without changes in browsers. The Signals effort is bringing together many different framework authors for a deep discussion about the nature of reactivity, algorithms and interoperability. This has already been useful, and does not justify inclusion in JS engines and browsers; Signals should only be added to the JavaScript standard if there are significant benefits _beyond_ the ecosystem information exchange enabled.
 
 ## Design goals for Signals
 
@@ -149,60 +152,60 @@ It turns out that existing Signal libraries are not all that different from each
 
 ### Core features
 
-* A Signal type which represents state, i.e. writable Signal. This is a value that others can read.
-* A computed/memo/derived Signal type, which depends on others and is lazily calculated and cached.
-    * Computation is lazy, meaning computed Signals aren't calculated again by default when one of their dependencies changes, but rather only run if someone actually reads them.
-    * Computation is "[glitch](https://en.wikipedia.org/wiki/Reactive_programming#Glitches)-free", meaning no unnecessary calculations are ever performed. This implies that, when an application reads a computed Signal, there is a topological sorting of the potentially dirty parts of the graph to run, to eliminate any duplicates.
-    * Computation is cached, meaning that if, after the last time a dependency changes, no dependencies have changed, then the computed Signal is *not* recalculated when accessed.
-    * Custom comparisons are possible for computed Signals as well as state Signals, to note when further computed Signals which depend on them should be updated.
-* Reactions to the condition where a computed Signal has one of its dependencies (or nested dependencies) become "dirty" and change, meaning that the Signal's value might be outdated.
-    * This reaction is meant to schedule more significant work to be performed later.
-    * Effects are implemented in terms of these reactions, plus framework-level scheduling.
-    * Computed signals need the ability to react to whether they are registered as a (nested) dependency of one of these reactions.
-* Enable JS frameworks to do their own scheduling. No Promise-style built-in forced-on scheduling.
-    * Synchronous reactions are needed to enable scheduling later work based on framework logic.
-    * Writes are synchronous and immediately take effect (a framework which batches writes can do that on top).
-    * It is possible to separate checking whether an effect may be "dirty" from actually running the effect (enabling a two-stage effect scheduler).
-* Ability to read Signals *without* triggering dependencies to be recorded (`untrack`)
-* Enable composition of different codebases which use Signals/reactivity, e.g.,
-    * Using multiple frameworks together as far as tracking/reactivity itself goes (modulo omissions, see below)
-    * Framework-independent reactive data structures (e.g., recursively reactive store proxy, reactive Map and Set and Array, etc.)
+- A Signal type which represents state, i.e. writable Signal. This is a value that others can read.
+- A computed/memo/derived Signal type, which depends on others and is lazily calculated and cached.
+  - Computation is lazy, meaning computed Signals aren't calculated again by default when one of their dependencies changes, but rather only run if someone actually reads them.
+  - Computation is "[glitch](https://en.wikipedia.org/wiki/Reactive_programming#Glitches)-free", meaning no unnecessary calculations are ever performed. This implies that, when an application reads a computed Signal, there is a topological sorting of the potentially dirty parts of the graph to run, to eliminate any duplicates.
+  - Computation is cached, meaning that if, after the last time a dependency changes, no dependencies have changed, then the computed Signal is _not_ recalculated when accessed.
+  - Custom comparisons are possible for computed Signals as well as state Signals, to note when further computed Signals which depend on them should be updated.
+- Reactions to the condition where a computed Signal has one of its dependencies (or nested dependencies) become "dirty" and change, meaning that the Signal's value might be outdated.
+  - This reaction is meant to schedule more significant work to be performed later.
+  - Effects are implemented in terms of these reactions, plus framework-level scheduling.
+  - Computed signals need the ability to react to whether they are registered as a (nested) dependency of one of these reactions.
+- Enable JS frameworks to do their own scheduling. No Promise-style built-in forced-on scheduling.
+  - Synchronous reactions are needed to enable scheduling later work based on framework logic.
+  - Writes are synchronous and immediately take effect (a framework which batches writes can do that on top).
+  - It is possible to separate checking whether an effect may be "dirty" from actually running the effect (enabling a two-stage effect scheduler).
+- Ability to read Signals _without_ triggering dependencies to be recorded (`untrack`)
+- Enable composition of different codebases which use Signals/reactivity, e.g.,
+  - Using multiple frameworks together as far as tracking/reactivity itself goes (modulo omissions, see below)
+  - Framework-independent reactive data structures (e.g., recursively reactive store proxy, reactive Map and Set and Array, etc.)
 
 ### Soundness
 
-* Discourage/prohibit naive misuse of synchronous reactions.
-    * Soundness risk: it may expose "[glitches](https://en.wikipedia.org/wiki/Reactive_programming#Glitches)" if improperly used: If rendering is done immediately when a Signal is set, it may expose incomplete application state to the end user. Therefore, this feature should only be used to intelligently schedule work for later, once application logic is finished.
-    * Solution: Disallow reading and writing any Signal from within a synchronous reaction callback
-* Discourage `untrack` and mark its unsound nature
-    * Soundness risk: allows the creation of computed Signals whose value depends on other Signals, but which aren't updated when those Signals change. It should be used when the untracked accesses will not change the result of the computation.
-    * Solution: The API is marked "unsafe" in the name.
-* Note: This proposal does allow signals to be both read and written from computed and effect signals, without restricting writes that come after reads, despite the soundness risk. This decision was taken to preserve flexibility and compatibility in integration with frameworks.
+- Discourage/prohibit naive misuse of synchronous reactions.
+  - Soundness risk: it may expose "[glitches](https://en.wikipedia.org/wiki/Reactive_programming#Glitches)" if improperly used: If rendering is done immediately when a Signal is set, it may expose incomplete application state to the end user. Therefore, this feature should only be used to intelligently schedule work for later, once application logic is finished.
+  - Solution: Disallow reading and writing any Signal from within a synchronous reaction callback
+- Discourage `untrack` and mark its unsound nature
+  - Soundness risk: allows the creation of computed Signals whose value depends on other Signals, but which aren't updated when those Signals change. It should be used when the untracked accesses will not change the result of the computation.
+  - Solution: The API is marked "unsafe" in the name.
+- Note: This proposal does allow signals to be both read and written from computed and effect signals, without restricting writes that come after reads, despite the soundness risk. This decision was taken to preserve flexibility and compatibility in integration with frameworks.
 
 ### Surface API
 
-* Must be a solid base for multiple frameworks to implement their Signals/reactivity mechanisms.
-    * Should be a good base for recursive store proxies, decorator-based class field reactivity, and both `.value` and `[state, setState]`-style APIs.
-    * The semantics are able to express the valid patterns enabled by different frameworks. For example, it should be possible for these Signals to be the basis of either immediately-reflected writes or writes which are batched and applied later.
-* It would be nice if this API is usable directly by JavaScript developers.
-    * If a feature matches with an ecosystem concept, using common vocabulary is good.
-        * However, it is important to not literally shadow the exact same names!
-    * Tension between "usability by JS devs" and "providing all the hooks to frameworks"
-        * Idea: Provide all the hooks, but include errors when misused if possible.
-        * Idea: Put subtle APIs in a `subtle` namespace, similar to [`crypto.subtle`](https://developer.mozilla.org/en-US/docs/Web/API/Crypto/subtle), to mark the line between APIs which are necessary for more advanced usage like implementing a framework or building dev tools versus more everyday application development usage like instantiating signals for use with a framework.
-* Be implementable and usable with good performance -- the surface API doesn't cause too much overhead
-    * Enable subclassing, so that frameworks can add their own methods and fields, including private fields. This is important to avoid the need for additional allocations at the framework level. See "Memory management" below.
+- Must be a solid base for multiple frameworks to implement their Signals/reactivity mechanisms.
+  - Should be a good base for recursive store proxies, decorator-based class field reactivity, and both `.value` and `[state, setState]`-style APIs.
+  - The semantics are able to express the valid patterns enabled by different frameworks. For example, it should be possible for these Signals to be the basis of either immediately-reflected writes or writes which are batched and applied later.
+- It would be nice if this API is usable directly by JavaScript developers.
+  - If a feature matches with an ecosystem concept, using common vocabulary is good.
+    - However, it is important to not literally shadow the exact same names!
+  - Tension between "usability by JS devs" and "providing all the hooks to frameworks"
+    - Idea: Provide all the hooks, but include errors when misused if possible.
+    - Idea: Put subtle APIs in a `subtle` namespace, similar to [`crypto.subtle`](https://developer.mozilla.org/en-US/docs/Web/API/Crypto/subtle), to mark the line between APIs which are necessary for more advanced usage like implementing a framework or building dev tools versus more everyday application development usage like instantiating signals for use with a framework.
+- Be implementable and usable with good performance -- the surface API doesn't cause too much overhead
+  - Enable subclassing, so that frameworks can add their own methods and fields, including private fields. This is important to avoid the need for additional allocations at the framework level. See "Memory management" below.
 
 ### Memory management
 
-* If possible: A computed Signal should be garbage-collectable if nothing live is referencing it for possible future reads, even if it's linked into a broader graph which stays alive (e.g., by reading a state which remains live).
-    * Note that most frameworks today require explicit disposal of computed Signals if they have any reference to or from another Signal graph which remains alive.
-    * This ends up not being so bad when their lifetime is tied to the lifetime of a UI component, and effects need to be disposed of anyway.
-    * If it is too expensive to execute with these semantics, then we should add explicit disposal (or "unlinking") of computed Signals to the API below, which currently lacks it.
-* A separate related goal: Minimize the number of allocations, e.g.,
-    * to make a writable Signal (avoid two separate closures + array)
-    * to implement effects (avoid a closure for every single reaction)
-    * In the API for observing Signal changes, avoid creating additional temporary data structures
-    * Solution: Class-based API enabling reuse of methods and fields defined in subclasses
+- If possible: A computed Signal should be garbage-collectable if nothing live is referencing it for possible future reads, even if it's linked into a broader graph which stays alive (e.g., by reading a state which remains live).
+  - Note that most frameworks today require explicit disposal of computed Signals if they have any reference to or from another Signal graph which remains alive.
+  - This ends up not being so bad when their lifetime is tied to the lifetime of a UI component, and effects need to be disposed of anyway.
+  - If it is too expensive to execute with these semantics, then we should add explicit disposal (or "unlinking") of computed Signals to the API below, which currently lacks it.
+- A separate related goal: Minimize the number of allocations, e.g.,
+  - to make a writable Signal (avoid two separate closures + array)
+  - to implement effects (avoid a closure for every single reaction)
+  - In the API for observing Signal changes, avoid creating additional temporary data structures
+  - Solution: Class-based API enabling reuse of methods and fields defined in subclasses
 
 ## API sketch
 
@@ -210,98 +213,98 @@ An initial idea of a Signal API is below. Note that this is just an early draft,
 
 ```ts
 interface Signal<T> {
-    // Get the value of the signal
-    get(): T;
+  // Get the value of the signal
+  get(): T;
 }
 
 namespace Signal {
-    // A read-write Signal
-    class State<T> implements Signal<T> {
-        // Create a state Signal starting with the value t
-        constructor(t: T, options?: SignalOptions<T>);
+  // A read-write Signal
+  class State<T> implements Signal<T> {
+    // Create a state Signal starting with the value t
+    constructor(t: T, options?: SignalOptions<T>);
 
-        // Get the value of the signal
-        get(): T;
+    // Get the value of the signal
+    get(): T;
 
-        // Set the state Signal value to t
-        set(t: T): void;
+    // Set the state Signal value to t
+    set(t: T): void;
+  }
+
+  // A Signal which is a formula based on other Signals
+  class Computed<T = unknown> implements Signal<T> {
+    // Create a Signal which evaluates to the value returned by the callback.
+    // Callback is called with this signal as the this value.
+    constructor(cb: (this: Computed<T>) => T, options?: SignalOptions<T>);
+
+    // Get the value of the signal
+    get(): T;
+  }
+
+  // This namespace includes "advanced" features that are better to
+  // leave for framework authors rather than application developers.
+  // Analogous to `crypto.subtle`
+  namespace subtle {
+    // Run a callback with all tracking disabled
+    function untrack<T>(cb: () => T): T;
+
+    // Get the current computed signal which is tracking any signal reads, if any
+    function currentComputed(): Computed | null;
+
+    // Returns ordered list of all signals which this one referenced
+    // during the last time it was evaluated.
+    // For a Watcher, lists the set of signals which it is watching.
+    function introspectSources(s: Computed | Watcher): (State | Computed)[];
+
+    // Returns the Watchers that this signal is contained in, plus any
+    // Computed signals which read this signal last time they were evaluated,
+    // if that computed signal is (recursively) watched.
+    function introspectSinks(s: State | Computed): (Computed | Watcher)[];
+
+    // True if this signal is "live", in that it is watched by a Watcher,
+    // or it is read by a Computed signal which is (recursively) live.
+    function hasSinks(s: State | Computed): boolean;
+
+    // True if this element is "reactive", in that it depends
+    // on some other signal. A Computed where hasSources is false
+    // will always return the same constant.
+    function hasSources(s: Computed | Watcher): boolean;
+
+    class Watcher {
+      // When a (recursive) source of Watcher is written to, call this callback,
+      // if it hasn't already been called since the last `watch` call.
+      // No signals may be read or written during the notify.
+      constructor(notify: (this: Watcher) => void);
+
+      // Add these signals to the Watcher's set, and set the watcher to run its
+      // notify callback next time any signal in the set (or one of its dependencies) changes.
+      // Can be called with no arguments just to reset the "notified" state, so that
+      // the notify callback will be invoked again.
+      watch(...s: Signal[]): void;
+
+      // Remove these signals from the watched set (e.g., for an effect which is disposed)
+      unwatch(...s: Signal[]): void;
+
+      // Returns the set of sources in the Watcher's set which are still dirty, or is a computed signal
+      // with a source which is dirty or pending and hasn't yet been re-evaluated
+      getPending(): Signal[];
     }
 
-    // A Signal which is a formula based on other Signals
-    class Computed<T = unknown> implements Signal<T> {
-        // Create a Signal which evaluates to the value returned by the callback.
-        // Callback is called with this signal as the this value.
-        constructor(cb: (this: Computed<T>) => T, options?: SignalOptions<T>);
+    // Hooks to observe being watched or no longer watched
+    var watched: Symbol;
+    var unwatched: Symbol;
+  }
 
-        // Get the value of the signal
-        get(): T;
-    }
+  interface SignalOptions<T> {
+    // Custom comparison function between old and new value. Default: Object.is.
+    // The signal is passed in as the this value for context.
+    equals?: (this: Signal<T>, t: T, t2: T) => boolean;
 
-    // This namespace includes "advanced" features that are better to
-    // leave for framework authors rather than application developers.
-    // Analogous to `crypto.subtle`
-    namespace subtle {
-        // Run a callback with all tracking disabled
-        function untrack<T>(cb: () => T): T;
+    // Callback called when isWatched becomes true, if it was previously false
+    [Signal.subtle.watched]?: (this: Signal<T>) => void;
 
-        // Get the current computed signal which is tracking any signal reads, if any
-        function currentComputed(): Computed | null;
-
-        // Returns ordered list of all signals which this one referenced
-        // during the last time it was evaluated.
-        // For a Watcher, lists the set of signals which it is watching.
-        function introspectSources(s: Computed | Watcher): (State | Computed)[];
-
-        // Returns the Watchers that this signal is contained in, plus any
-        // Computed signals which read this signal last time they were evaluated,
-        // if that computed signal is (recursively) watched.
-        function introspectSinks(s: State | Computed): (Computed | Watcher)[];
-
-        // True if this signal is "live", in that it is watched by a Watcher,
-        // or it is read by a Computed signal which is (recursively) live.
-        function hasSinks(s: State | Computed): boolean;
-
-        // True if this element is "reactive", in that it depends
-        // on some other signal. A Computed where hasSources is false
-        // will always return the same constant.
-        function hasSources(s: Computed | Watcher): boolean;
-
-        class Watcher {
-            // When a (recursive) source of Watcher is written to, call this callback,
-            // if it hasn't already been called since the last `watch` call.
-            // No signals may be read or written during the notify.
-            constructor(notify: (this: Watcher) => void);
-
-            // Add these signals to the Watcher's set, and set the watcher to run its
-            // notify callback next time any signal in the set (or one of its dependencies) changes.
-            // Can be called with no arguments just to reset the "notified" state, so that
-            // the notify callback will be invoked again.
-            watch(...s: Signal[]): void;
-
-            // Remove these signals from the watched set (e.g., for an effect which is disposed)
-            unwatch(...s: Signal[]): void;
-
-            // Returns the set of sources in the Watcher's set which are still dirty, or is a computed signal
-            // with a source which is dirty or pending and hasn't yet been re-evaluated
-            getPending(): Signal[];
-        }
-
-        // Hooks to observe being watched or no longer watched
-        var watched: Symbol;
-        var unwatched: Symbol;
-    }
-
-    interface SignalOptions<T> {
-        // Custom comparison function between old and new value. Default: Object.is.
-        // The signal is passed in as the this value for context.
-        equals?: (this: Signal<T>, t: T, t2: T) => boolean;
-
-        // Callback called when isWatched becomes true, if it was previously false
-        [Signal.subtle.watched]?: (this: Signal<T>) => void;
-
-        // Callback called whenever isWatched becomes false, if it was previously true
-        [Signal.subtle.unwatched]?: (this: Signal<T>) => void;
-    }
+    // Callback called whenever isWatched becomes false, if it was previously true
+    [Signal.subtle.unwatched]?: (this: Signal<T>) => void;
+  }
 }
 ```
 
@@ -320,6 +323,7 @@ Signals feature prominent caching/memoization: both state and computed Signals r
 Computed Signals track their dependencies dynamically--each time they are run, they may end up depending on different things, and that precise dependency set is kept fresh in the Signal graph. This means that if you have a dependency needed on only one branch, and the previous calculation took the other branch, then a change to that temporarily unused value will not cause the computed Signal to be recalculated, even when pulled.
 
 Unlike JavaScript Promises, everything in Signals runs synchronously:
+
 - Setting a Signal to a new value is synchronous, and this is immediately reflected when reading any computed Signal which depends on it afterwards. There is no built-in batching of this mutation.
 - Reading computed Signals is synchronous--their value is always available.
 - The `notify` callback in Watchers, as explained below, runs synchronously, during the `.set()` call which triggered it (but after graph coloring has completed).
@@ -333,16 +337,19 @@ A `Signal` instance represents the capability to read a dynamically changing val
 The API here is designed to match the very rough ecosystem consensus among a large fraction of Signal libraries in the use of names like "signal", "computed" and "state". However, access to Computed and State Signals is through a `.get()` method, which disagrees with all popular Signal APIs, which either use a `.value`-style accessor, or `signal()` call syntax.
 
 The API is designed to reduce the number of allocations, to make Signals suitable for embedding in JavaScript frameworks while reaching same or better performance than existing framework-customized Signals. This implies:
+
 - State Signals are a single writable object, which can be both accessed and set from the same reference. (See implications below in the "Capability separation" section.)
 - Both State and Computed Signals are designed to be subclassable, to facilitate frameworks' ability to add additional properties through public and private class fields (as well as methods for using that state).
 - Various callbacks (e.g., `equals`, the computed callback) are called with the relevant Signal as the `this` value for context, so that a new closure isn't needed per Signal. Instead, context can be saved in extra properties of the signal itself.
 
 Some error conditions enforced by this API:
+
 - It is an error to read a computed recursively.
 - The `notify` callback of a Watcher cannot read or write any signals
 - If a computed Signal's callback throws, then subsequent accesses of the Signal rethrow that cached error, until one of the dependencies changes and it is recalculated.
 
-Some conditions which are *not* enforced:
+Some conditions which are _not_ enforced:
+
 - Computed Signals can write to other Signals, synchronously within their callback
 - Work which is queued by a Watcher's `notify` callback may read or write signals, making it possible to replicate [classic React antipatterns](https://react.dev/learn/you-might-not-need-an-effect) in terms of Signals!
 
@@ -356,24 +363,30 @@ The `Watcher` interface defined above gives the basis for implementing typical J
 let pending = false;
 
 let w = new Signal.subtle.Watcher(() => {
-    if (!pending) {
-        pending = true;
-        queueMicrotask(() => {
-            pending = false;
-            for (let s of w.getPending()) s.get();
-            w.watch();
-        });
-    }
+  if (!pending) {
+    pending = true;
+    queueMicrotask(() => {
+      pending = false;
+      for (let s of w.getPending()) s.get();
+      w.watch();
+    });
+  }
 });
 
 // An effect effect Signal which evaluates to cb, which schedules a read of
 // itself on the microtask queue whenever one of its dependencies might change
 export function effect(cb) {
-    let destructor;
-    let c = new Signal.Computed(() => { destructor?.(); destructor = cb(); });
-    w.watch(c);
-    c.get();
-    return () => { destructor?.(); w.unwatch(c) };
+  let destructor;
+  let c = new Signal.Computed(() => {
+    destructor?.();
+    destructor = cb();
+  });
+  w.watch(c);
+  c.get();
+  return () => {
+    destructor?.();
+    w.unwatch(c);
+  };
 }
 ```
 
@@ -389,7 +402,7 @@ Both computed and state Signals are garbage-collected like any JS values. But Wa
 
 ### An unsound escape hatch
 
-`Signal.subtle.untrack` is an escape hatch allowing reading Signals *without* tracking those reads. This capability is unsafe because it allows the creation of computed Signals whose value depends on other Signals, but which aren't updated when those Signals change. It should be used when the untracked accesses will not change the result of the computation.
+`Signal.subtle.untrack` is an escape hatch allowing reading Signals _without_ tracking those reads. This capability is unsafe because it allows the creation of computed Signals whose value depends on other Signals, but which aren't updated when those Signals change. It should be used when the untracked accesses will not change the result of the computation.
 
 <!--
 TODO: Show example where it's a good idea to use untrack
@@ -411,8 +424,8 @@ TODO: Show how you can "hydrate" a signal from state to computed later, using a 
 
 These features may be added later, but they are not included in the current draft. Their omission is due to the lack of established consensus in the design space among frameworks, as well as the demonstrated ability to work around their absence with mechanisms on top of the Signals notion described in this document. However, unfortunately, the omission limits the potential of interoperability among frameworks. As prototypes of Signals as described in this document are produced, there will be an effort to reexamine whether these omissions were the appropriate decision.
 
-* **Async**: Signals are always synchronously available for evaluation, in this model. However, it is frequently useful to have certain asynchronous processes which lead to a signal being set, and to have an understanding of when a signal is still "loading". One simple way to model the loading state is with exceptions, and the exception-caching behavior of computed signals composes somewhat reasonably with this technique. Improved techniques are discussed in [Issue #30](https://github.com/proposal-signals/proposal-signals/issues/30).
-* **Transactions**: For transitions between views, it is often useful to maintain a live state for both the "from" and "to" states. The "to" state renders in the background, until it is ready to swap over (committing the transaction), while the "from" state remains interactive. Maintaining both states at the same time requires "forking" the state of the signal graph, and it may even be useful to support multiple pending transitions at once. Discussion in [Issue #73](https://github.com/proposal-signals/proposal-signals/issues/73).
+- **Async**: Signals are always synchronously available for evaluation, in this model. However, it is frequently useful to have certain asynchronous processes which lead to a signal being set, and to have an understanding of when a signal is still "loading". One simple way to model the loading state is with exceptions, and the exception-caching behavior of computed signals composes somewhat reasonably with this technique. Improved techniques are discussed in [Issue #30](https://github.com/proposal-signals/proposal-signals/issues/30).
+- **Transactions**: For transitions between views, it is often useful to maintain a live state for both the "from" and "to" states. The "to" state renders in the background, until it is ready to swap over (committing the transaction), while the "from" state remains interactive. Maintaining both states at the same time requires "forking" the state of the signal graph, and it may even be useful to support multiple pending transitions at once. Discussion in [Issue #73](https://github.com/proposal-signals/proposal-signals/issues/73).
 
 Some possible [convenience methods](https://github.com/proposal-signals/proposal-signals/issues/32) are also omitted.
 
@@ -425,6 +438,7 @@ This proposal is on the April 2024 TC39 agenda for Stage 1. It can currently be 
 The collaborators on the Signal proposal want to be especially **conservative** in how we push this proposal forward, so that we don't land in the trap of getting something shipped which we end up regretting and not actually using. Our plan is to do the following extra tasks, not required by the TC39 process, to make sure that this proposal is on track:
 
 Before proposing for Stage 2, we plan to:
+
 - Develop multiple production-grade polyfill implementations which are solid, well-tested (e.g., passing tests from various frameworks as well as test262-style tests), and competitive in terms of performance (as verified with a thorough signal/framework benchmark set).
 - Integrate the proposed Signal API into a large number of JS frameworks that we consider somewhat representative, and some large applications work with this basis. Test that it works efficiently and correctly in these contexts.
 - Have a solid understanding on the space of possible extensions to the API, and have concluded which (if any) should be added into this proposal.
@@ -434,8 +448,9 @@ Before proposing for Stage 2, we plan to:
 This section describes each of the APIs exposed to JavaScript, in terms of the algorithms that they implement. This can be thought of as a proto-specification, and is included at this early point to nail down one possible set of semantics, while being very open to changes.
 
 Some aspects of the algorithm:
+
 - The order of reads of Signals within a computed is significant, and is observable in the order that certain callbacks (which `Watcher` is invoked, `equals`, the first parameter to `new Signal.Computed`, and the `watched`/`unwatched` callbacks) are executed. This means that the sources of a computed Signal must be stored ordered.
-- These four callbacks might all throw exceptions, and these exceptions are propagated in a predictable manner to the calling JS code. The exceptions do *not* halt execution of this algorithm or leave the graph in a half-processed state. For errors thrown in the `notify` callback of a Watcher, that exception is sent to the `.set()` call which triggered it, using an AggregateError if multiple exceptions were thrown. The others (including `watched`/`unwatched`?) are stored in the value of the Signal, to be rethrown when read, and such a rethrowing Signal can be marked `~clean~` just like any other with a normal value.
+- These four callbacks might all throw exceptions, and these exceptions are propagated in a predictable manner to the calling JS code. The exceptions do _not_ halt execution of this algorithm or leave the graph in a half-processed state. For errors thrown in the `notify` callback of a Watcher, that exception is sent to the `.set()` call which triggered it, using an AggregateError if multiple exceptions were thrown. The others (including `watched`/`unwatched`?) are stored in the value of the Signal, to be rethrown when read, and such a rethrowing Signal can be marked `~clean~` just like any other with a normal value.
 - Care is taken to avoid circularities in cases of computed signals which are not "watched" (being observed by any Watcher), so that they can be garbage collected independently from other parts of the signal graph. Internally, this can be implemented with a system of generation numbers which are always collected; note that optimized implementations may also include local per-node generation numbers, or avoid tracking some numbers on watched signals.
 
 ### Hidden global state
@@ -485,10 +500,10 @@ Signal algorithms need to reference certain global state. This state is global f
 1. Set the `state` of all `sinks` of this Signal to (if it is a Computed Signal) `~dirty~` if they were previously clean, or (if it is a Watcher) `~pending~` if it was previously `~watching~`.
 1. Set the `state` of all of the sinks' Computed Signal dependencies (recursively) to `~checked~` if they were previously `~clean~` (that is, leave dirty markings in place), or for Watchers, `~pending~` if previously `~watching~`.
 1. For each previously `~watching~` Watcher encountered in that recursive search, then in depth-first order,
-    1. Set `frozen` to true.
-    1. Calling their `notify` callback (saving aside any exception thrown, but ignoring the return value of `notify`).
-    1. Restore `frozen` to false.
-    1. Set the `state` of the Watcher to `~waiting~`.
+   1. Set `frozen` to true.
+   1. Calling their `notify` callback (saving aside any exception thrown, but ignoring the return value of `notify`).
+   1. Restore `frozen` to false.
+   1. Set the `state` of the Watcher to `~waiting~`.
 1. If any exception was thrown from the `notify` callbacks, propagate it to the caller after all `notify` callbacks have run. If there are multiple exceptions, then package them up together into an AggregateError and throw that.
 1. Return undefined.
 
@@ -538,6 +553,7 @@ The transitions are:
 #### `Signal.Computed` Constructor
 
 The constructor sets
+
 - `callback` to its first parameter
 - `equals` based on options, defaulting to `Object.is` if absent
 - `state` to `~dirty~`
@@ -551,8 +567,8 @@ With [AsyncContext](https://github.com/tc39/proposal-async-context), the callbac
 1. If `computing` is not `null`, add this Signal to `computing`'s `sources` set.
 1. NOTE: We do not add `computing` to this Signal's `sinks` set until/unless it becomes watched by a Watcher.
 1. If this Signal's state is `~dirty~` or `~checked~`: Repeat the following steps until this Signal is `~clean~`:
-    1. Recurse up via `sources` to find the deepest, left-most (i.e. earliest observed) recursive source which is a Computed Signal marked `~dirty~` (cutting off search when hitting a `~clean~` Computed Signal, and including this Computed Signal as the last thing to search).
-    1. Perform the "recalculate dirty computed Signal" algorithm on that Signal.
+   1. Recurse up via `sources` to find the deepest, left-most (i.e. earliest observed) recursive source which is a Computed Signal marked `~dirty~` (cutting off search when hitting a `~clean~` Computed Signal, and including this Computed Signal as the last thing to search).
+   1. Perform the "recalculate dirty computed Signal" algorithm on that Signal.
 1. At this point, this Signal's state will be `~clean~`, and no recursive sources will be `~dirty~` or `~checked~`. Return the Signal's `value`. If the value is an exception, rethrow that exception.
 
 ### The `Signal.subtle.Watcher` class
@@ -596,7 +612,7 @@ The transitions are:
 1. Initialize `signals` as an empty set.
 1. `notifyCallback` is set to the callback parameter.
 
-With [AsyncContext](https://github.com/tc39/proposal-async-context), the callback passed to `new Signal.subtle.Watcher` does *not* close over the snapshot from when the constructor was called, so that contextual information around the write is visible.
+With [AsyncContext](https://github.com/tc39/proposal-async-context), the callback passed to `new Signal.subtle.Watcher` does _not_ close over the snapshot from when the constructor was called, so that contextual information around the write is visible.
 
 #### Method: `Signal.subtle.Watcher.prototype.watch(...signals)`
 
@@ -604,11 +620,11 @@ With [AsyncContext](https://github.com/tc39/proposal-async-context), the callbac
 1. If any of the arguments is not a signal, throw an exception.
 1. Append all arguments to the end of this object's `signals`.
 1. For each newly-watched signal, in left-to-right order,
-    1. Add this watcher as a `sink` to that signal.
-    1. If this was the first sink, then recurse up to sources to add that signal as a sink.
-    1. Set `frozen` to true.
-    1. Call the `watched` callback if it exists.
-    1. Restore `frozen` to false.
+   1. Add this watcher as a `sink` to that signal.
+   1. If this was the first sink, then recurse up to sources to add that signal as a sink.
+   1. Set `frozen` to true.
+   1. Call the `watched` callback if it exists.
+   1. Restore `frozen` to false.
 1. If the Signal's `state` is `~waiting~`, then set it to `~watching~`.
 
 #### Method: `Signal.subtle.Watcher.prototype.unwatch(...signals)`
@@ -616,12 +632,12 @@ With [AsyncContext](https://github.com/tc39/proposal-async-context), the callbac
 1. If `frozen` is true, throw an exception.
 1. If any of the arguments is not a signal, or is not being watched by this watcher, throw an exception.
 1. For each signal in the arguments, in left-to-right order,
-    1. Remove that signal from this Watcher's `signals` set.
-    1. Remove this Watcher from that Signal's `sink` set.
-    1. If that Signal's `sink` set has become empty, remove that Signal as a sink from each of its sources.
-    1. Set `frozen` to true.
-    1. Call the `unwatched` callback if it exists.
-    1. Restore `frozen` to false.
+   1. Remove that signal from this Watcher's `signals` set.
+   1. Remove this Watcher from that Signal's `sink` set.
+   1. If that Signal's `sink` set has become empty, remove that Signal as a sink from each of its sources.
+   1. Set `frozen` to true.
+   1. Call the `unwatched` callback if it exists.
+   1. Restore `frozen` to false.
 1. If the watcher now has no `signals`, and its `state` is `~watching~`, then set it to `~waiting~`.
 
 #### Method: `Signal.subtle.Watcher.prototype.getPending()`
@@ -652,15 +668,15 @@ Note: untrack doesn't get you out of the `frozen` state, which is maintained str
 1. Run this computed Signal's callback, using this Signal as the this value. Save the return value, and if the callback threw an exception, store that for rethrowing.
 1. Restore the previous `computing` value.
 1. Apply the "set Signal value" algorithm to the callback's return value.
-2. Set this Signal's state to `~clean~`.
+1. Set this Signal's state to `~clean~`.
 1. If that algorithm returned `~dirty~`: mark all sinks of this Signal as `~dirty~` (previously, the sinks may have been a mix of checked and dirty). (Or, if this is unwatched, then adopt a new generation number to indicate dirtiness, or something like that.)
 1. Otherwise, that algorithm returned `~clean~`: In this case, for each `~checked~` sink of this Signal, if all of that Signal's sources are now clean, then mark that Signal as `~clean~` as well. Apply this cleanup step to further sinks recursively, to any newly clean Signals which have checked sinks. (Or, if this is unwatched, somehow indicate the same, so that the cleanup can proceed lazily.)
 
 ##### Set Signal value algorithm
 
 1. If this algorithm was passed a value (as opposed to an exception for rethrowing, from the recalculate dirty computed Signal algorithm):
-    1. Call this Signal's `equals` function, passing as parameters the current `value`, the new value, and this Signal. If an exception is thrown, save that exception (for rethrowing when read) as the value of the Signal and continue as if the callback had returned false.
-    1. If that function returned true, return `~clean~`.
+   1. Call this Signal's `equals` function, passing as parameters the current `value`, the new value, and this Signal. If an exception is thrown, save that exception (for rethrowing when read) as the value of the Signal and continue as if the callback had returned false.
+   1. If that function returned true, return `~clean~`.
 1. Set the `value` of this Signal to the parameter.
 1. Return `~dirty~`
 
@@ -709,6 +725,7 @@ Note: untrack doesn't get you out of the `frozen` state, which is maintained str
 **A**: Proxies and Signals are complementary and go well together. Proxies let you intercept shallow object operations and signals coordinate a dependency graph (of cells). Backing a Proxy with Signals is a great way to make a nested reactive structure with great ergonomics.
 
 In this example, we can use a proxy to make the signal have a getter and setter property instead of using the `get` and `set` methods:
+
 ```js
 const a = new Signal.State(0);
 const b = new Proxy(a, {
@@ -733,9 +750,11 @@ const b = new Proxy(a, {
   }}>change</button>
 </template>
 ```
+
 when using a renderer that is optimized for fine-grained reactivity, clicking the button will cause the `b.value` cell to be updated.
 
 See:
+
 - examples of nested reactive structures created with both Signals and Proxies: [signal-utils](https://github.com/NullVoxPopuli/signal-utils/tree/main/src)
 - example prior implementations showing the relationship between reactive data atd proxies: [tracked-built-ins](https://github.com/tracked-tools/tracked-built-ins/tree/master/addon/src/-private)
 - [discussion](https://github.com/proposal-signals/proposal-signals/issues/101#issuecomment-2029802574).

@@ -1,12 +1,13 @@
-"use client";
-import { func_remember } from "@gaubee/util";
-import { type FC } from "react";
+'use client';
+import {func_remember} from '@gaubee/util';
+import React from 'react';
+import {type FC} from 'react';
 
 const youtubeApiIniter = func_remember(() => {
-  const tag = document.createElement("script");
+  const tag = document.createElement('script');
 
-  tag.src = "https://www.youtube.com/iframe_api";
-  const firstScriptTag = document.getElementsByTagName("script")[0];
+  tag.src = 'https://www.youtube.com/iframe_api';
+  const firstScriptTag = document.getElementsByTagName('script')[0];
   document.head.insertBefore(tag, firstScriptTag);
   type YoutubeApi = {
     Player: any;
@@ -23,12 +24,12 @@ export const YoutubePlayer: FC<{
   videoId: string;
   width?: number;
   height?: number;
-}> = ({ videoId, width = 640, height = 390 }) => {
-  "use client";
+}> = ({videoId, width = 640, height = 390}) => {
+  'use client';
   return (
     <div
       ref={(ele) => {
-        console.log("ele", ele);
+        console.log('ele', ele);
         if (ele) {
           (async () => {
             const YT = await youtubeApiIniter();

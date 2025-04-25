@@ -1,5 +1,6 @@
 node_modules/
 dist/
+bundle/
 .DS_Store
 .env.local
 repos.json

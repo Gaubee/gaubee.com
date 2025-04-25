@@ -24,10 +24,10 @@ hard-to-follow callback chains.
 ```js
 // Filtering and mapping:
 element
-	.when('click')
-	.filter((e) => e.target.matches('.foo'))
-	.map((e) => ({ x: e.clientX, y: e.clientY }))
-	.subscribe({ next: handleClickAtPoint });
+  .when('click')
+  .filter((e) => e.target.matches('.foo'))
+  .map((e) => ({x: e.clientX, y: e.clientY}))
+  .subscribe({next: handleClickAtPoint});
 ```
 
 #### Example 2
@@ -51,13 +51,17 @@ await element.when('mousemove')
 ```js
 // Imperative
 const controller = new AbortController();
-element.addEventListener('mousemove', e => {
-  console.log(e);
+element.addEventListener(
+  'mousemove',
+  (e) => {
+    console.log(e);
 
-  element.addEventListener('mouseup', e => {
-    controller.abort();
-  });
-}, { signal: controller.signal });
+    element.addEventListener('mouseup', (e) => {
+      controller.abort();
+    });
+  },
+  {signal: controller.signal}
+);
 ```
 
 </details>
@@ -69,13 +73,13 @@ Tracking all link clicks within a container
 
 ```js
 container
-	.when('click')
-	.filter((e) => e.target.closest('a'))
-	.subscribe({
-		next: (e) => {
-			// …
-		},
-	});
+  .when('click')
+  .filter((e) => e.target.closest('a'))
+  .subscribe({
+    next: (e) => {
+      // …
+    },
+  });
 ```
 
 #### Example 4
@@ -85,10 +89,10 @@ Find the maximum Y coordinate while the mouse is held down
 
 ```js
 const maxY = await element
-	.when('mousemove')
-	.takeUntil(element.when('mouseup'))
-	.map((e) => e.clientY)
-	.reduce((soFar, y) => Math.max(soFar, y), 0);
+  .when('mousemove')
+  .takeUntil(element.when('mouseup'))
+  .map((e) => e.clientY)
+  .reduce((soFar, y) => Math.max(soFar, y), 0);
 ```
 
 #### Example 5
@@ -144,52 +148,52 @@ googController.abort();
 
 ```js
 // Imperative
-function multiplex({ startMsg, stopMsg, match }) {
-	const start = (callback) => {
-		const teardowns = [];
+function multiplex({startMsg, stopMsg, match}) {
+  const start = (callback) => {
+    const teardowns = [];
 
-		if (socket.readyState !== WebSocket.OPEN) {
-			const openHandler = () => start({ startMsg, stopMsg, match })(callback);
-			socket.addEventListener('open', openHandler);
-			teardowns.push(() => {
-				socket.removeEventListener('open', openHandler);
-			});
-		} else {
-			socket.send(JSON.stringify(startMsg));
-			const messageHandler = (e) => {
-				const data = JSON.parse(e.data);
-				if (match(data)) {
-					callback(data);
-				}
-			};
-			socket.addEventListener('message', messageHandler);
-			teardowns.push(() => {
-				socket.send(JSON.stringify(stopMsg));
-				socket.removeEventListener('message', messageHandler);
-			});
-		}
+    if (socket.readyState !== WebSocket.OPEN) {
+      const openHandler = () => start({startMsg, stopMsg, match})(callback);
+      socket.addEventListener('open', openHandler);
+      teardowns.push(() => {
+        socket.removeEventListener('open', openHandler);
+      });
+    } else {
+      socket.send(JSON.stringify(startMsg));
+      const messageHandler = (e) => {
+        const data = JSON.parse(e.data);
+        if (match(data)) {
+          callback(data);
+        }
+      };
+      socket.addEventListener('message', messageHandler);
+      teardowns.push(() => {
+        socket.send(JSON.stringify(stopMsg));
+        socket.removeEventListener('message', messageHandler);
+      });
+    }
 
-		const finalize = () => {
-			teardowns.forEach((t) => t());
-		};
+    const finalize = () => {
+      teardowns.forEach((t) => t());
+    };
 
-		socket.addEventListener('close', finalize);
-		teardowns.push(() => socket.removeEventListener('close', finalize));
-		socket.addEventListener('error', finalize);
-		teardowns.push(() => socket.removeEventListener('error', finalize));
+    socket.addEventListener('close', finalize);
+    teardowns.push(() => socket.removeEventListener('close', finalize));
+    socket.addEventListener('error', finalize);
+    teardowns.push(() => socket.removeEventListener('error', finalize));
 
-		return finalize;
-	};
+    return finalize;
+  };
 
-	return start;
+  return start;
 }
 
 function streamStock(ticker) {
-	return multiplex({
-		startMsg: { ticker, type: 'sub' },
-		stopMsg: { ticker, type: 'unsub' },
-		match: (data) => data.ticker === ticker,
-	});
+  return multiplex({
+    startMsg: {ticker, type: 'sub'},
+    stopMsg: {ticker, type: 'unsub'},
+    match: (data) => data.ticker === ticker,
+  });
 }
 
 const googTrades = streamStock('GOOG');
@@ -212,31 +216,17 @@ Here we're leveraging observables to match a secret code, which is a pattern of
 keys the user might hit while using an app:
 
 ```js
-const pattern = [
-  'ArrowUp',
-  'ArrowUp',
-  'ArrowDown',
-  'ArrowDown',
-  'ArrowLeft',
-  'ArrowRight',
-  'ArrowLeft',
-  'ArrowRight',
-  'b',
-  'a',
-  'Enter',
-];
+const pattern = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a', 'Enter'];
 
-const keys = document.when('keydown').map(e => e.key);
+const keys = document.when('keydown').map((e) => e.key);
 
 keys
-  .flatMap(firstKey => {
+  .flatMap((firstKey) => {
     if (firstKey === pattern[0]) {
-      return keys
-        .take(pattern.length - 1)
-        .every((k, i) => k === pattern[i + 1]);
+      return keys.take(pattern.length - 1).every((k, i) => k === pattern[i + 1]);
     }
   })
-  .filter(matched => matched)
+  .filter((matched) => matched)
   .subscribe(() => console.log('Secret code matched!'));
 ```
 
@@ -300,16 +290,16 @@ via the `next()` callback, optionally followed by a single call to either
 
 ```js
 const observable = new Observable((subscriber) => {
-	let i = 0;
-	setInterval(() => {
-		if (i >= 10) subscriber.complete();
-		else subscriber.next(i++);
-	}, 2000);
+  let i = 0;
+  setInterval(() => {
+    if (i >= 10) subscriber.complete();
+    else subscriber.next(i++);
+  }, 2000);
 });
 
 observable.subscribe({
-	// Print each value the Observable produces.
-	next: console.log,
+  // Print each value the Observable produces.
+  next: console.log,
 });
 ```
 
@@ -578,12 +568,12 @@ integration. Specifically, the following innocent-looking code would not _always
 
 ```js
 element
-	.when('click')
-	.first()
-	.then((e) => {
-		e.preventDefault();
-		// Do something custom...
-	});
+  .when('click')
+  .first()
+  .then((e) => {
+    e.preventDefault();
+    // Do something custom...
+  });
 ```
 
 If `Observable#first()` returns a Promise that resolves when the first event is fired on an
@@ -627,18 +617,18 @@ case where your `e.preventDefault()` might run too late:
 
 ```js
 element
-	.when('click')
-	.map((e) => (e.preventDefault(), e))
-	.first();
+  .when('click')
+  .map((e) => (e.preventDefault(), e))
+  .first();
 ```
 
 ...or if Observable had a `.do()` method (see https://github.com/whatwg/dom/issues/544#issuecomment-351457179):
 
 ```js
 element
-	.when('click')
-	.do((e) => e.preventDefault())
-	.first();
+  .when('click')
+  .do((e) => e.preventDefault())
+  .first();
 ```
 
 ...or by [modifying](https://github.com/whatwg/dom/issues/544#issuecomment-351779661) the semantics of
@@ -646,8 +636,8 @@ element
 
 ```js
 el.when('submit')
-	.first((e) => e.preventDefault())
-	.then(doMoreStuff);
+  .first((e) => e.preventDefault())
+  .then(doMoreStuff);
 ```
 
 Second, this "quirk" already exists in today's thriving Observable ecosystem, and there are no serious
@@ -691,14 +681,14 @@ discussion comments:
 This section bares a collection of web standards and standards positions issues
 used to track the Observable proposal's life outside of this repository.
 
- - [Mozilla standards
-   position](https://github.com/mozilla/standards-positions/issues/945)
- - [WebKit standards
-   position](https://github.com/WebKit/standards-positions/issues/292)
- - [Chrome Status](https://chromestatus.com/feature/5154593776599040)
- - [WinterCG](https://github.com/wintercg/proposal-common-minimum-api/issues/72)
- - [Node.js](https://github.com/nodejs/standards-positions/issues/1)
- - [W3C TAG review](https://github.com/w3ctag/design-reviews/issues/902)
+- [Mozilla standards
+  position](https://github.com/mozilla/standards-positions/issues/945)
+- [WebKit standards
+  position](https://github.com/WebKit/standards-positions/issues/292)
+- [Chrome Status](https://chromestatus.com/feature/5154593776599040)
+- [WinterCG](https://github.com/wintercg/proposal-common-minimum-api/issues/72)
+- [Node.js](https://github.com/nodejs/standards-positions/issues/1)
+- [W3C TAG review](https://github.com/w3ctag/design-reviews/issues/902)
 
 ## User needs
 

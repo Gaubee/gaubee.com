@@ -1,6 +1,6 @@
-import RelativeTime from "./relative-time";
-import ExtendedTimeElement from "./extended-time-element";
-import { localeFromElement } from "./utils";
+import ExtendedTimeElement from './extended-time-element';
+import RelativeTime from './relative-time';
+import {localeFromElement} from './utils';
 
 export class RelativeTimeElement extends ExtendedTimeElement {
   override getFormattedDate(): string | undefined {
@@ -45,7 +45,7 @@ let updateNowElementsId: number | null;
 // minute.
 function updateNowElements() {
   for (const time of nowElements) {
-    time.textContent = time.getFormattedDate() || "";
+    time.textContent = time.getFormattedDate() || '';
   }
 }
 
@@ -54,9 +54,9 @@ function updateNowElements() {
 //   var time = new RelativeTimeElement()
 //   # => <relative-time></relative-time>
 //
-if (!window.customElements.get("relative-time")) {
+if (!window.customElements.get('relative-time')) {
   window.RelativeTimeElement = RelativeTimeElement;
-  window.customElements.define("relative-time", RelativeTimeElement);
+  window.customElements.define('relative-time', RelativeTimeElement);
 }
 
 declare global {
@@ -64,6 +64,6 @@ declare global {
     RelativeTimeElement: typeof RelativeTimeElement;
   }
   interface HTMLElementTagNameMap {
-    "relative-time": RelativeTimeElement;
+    'relative-time': RelativeTimeElement;
   }
 }

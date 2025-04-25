@@ -1,29 +1,16 @@
-import { makeFormatter } from "./utils";
+import {makeFormatter} from './utils';
 
 const datetimes = new WeakMap();
 
 export default class ExtendedTimeElement extends HTMLElement {
   static get observedAttributes(): string[] {
-    return [
-      "datetime",
-      "day",
-      "format",
-      "lang",
-      "hour",
-      "minute",
-      "month",
-      "second",
-      "title",
-      "weekday",
-      "year",
-      "time-zone-name",
-    ];
+    return ['datetime', 'day', 'format', 'lang', 'hour', 'minute', 'month', 'second', 'title', 'weekday', 'year', 'time-zone-name'];
   }
 
   connectedCallback(): void {
     const title = this.getFormattedTitle();
-    if (title && !this.hasAttribute("title")) {
-      this.setAttribute("title", title);
+    if (title && !this.hasAttribute('title')) {
+      this.setAttribute('title', title);
     }
 
     const text = this.getFormattedDate();
@@ -33,13 +20,9 @@ export default class ExtendedTimeElement extends HTMLElement {
   }
 
   // Internal: Refresh the time element's formatted date when an attribute changes.
-  attributeChangedCallback(
-    attrName: string,
-    oldValue: string,
-    newValue: string
-  ): void {
+  attributeChangedCallback(attrName: string, oldValue: string, newValue: string): void {
     const oldTitle = this.getFormattedTitle();
-    if (attrName === "datetime") {
+    if (attrName === 'datetime') {
       const millis = Date.parse(newValue);
       if (isNaN(millis)) {
         datetimes.delete(this);
@@ -49,13 +32,9 @@ export default class ExtendedTimeElement extends HTMLElement {
     }
 
     const title = this.getFormattedTitle();
-    const currentTitle = this.getAttribute("title");
-    if (
-      attrName !== "title" &&
-      title &&
-      (!currentTitle || currentTitle === oldTitle)
-    ) {
-      this.setAttribute("title", title);
+    const currentTitle = this.getAttribute('title');
+    if (attrName !== 'title' && title && (!currentTitle || currentTitle === oldTitle)) {
+      this.setAttribute('title', title);
     }
 
     const text = this.getFormattedDate();
@@ -99,10 +78,10 @@ export default class ExtendedTimeElement extends HTMLElement {
 }
 
 const titleFormatter = makeFormatter({
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-  timeZoneName: "short",
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZoneName: 'short',
 });

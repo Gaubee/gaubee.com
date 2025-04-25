@@ -1,0 +1,124 @@
+{
+  "schemaVersion": "1.0.0",
+  "readme": "",
+  "modules": [
+    {
+      "kind": "javascript-module",
+      "path": "src/index.ts",
+      "declarations": [],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "*",
+          "declaration": {
+            "name": "*",
+            "package": "./components/youtube-player/youtube-player"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/components/youtube-player/youtube-player.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "",
+          "name": "ComYoutubePlayerElement",
+          "members": [
+            {
+              "kind": "field",
+              "name": "youtubeApiIniter",
+              "static": true
+            },
+            {
+              "kind": "field",
+              "name": "videoId",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "attribute": "videoId",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "width",
+              "type": {
+                "text": "number"
+              },
+              "default": "400",
+              "attribute": "width",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "height",
+              "type": {
+                "text": "number"
+              },
+              "default": "400",
+              "attribute": "height",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "task",
+              "default": "new Task( this, async (videoId) => { const YT = await ComYoutubePlayerElement.youtubeApiIniter(); if (!videoId) { return; } // The API will call this function when the video player is ready. function onPlayerReady(event: any) { event.target.playVideo(); } // The API calls this function when the player's state changes. // The function indicates that when playing a video (state=1), // the player should play for six seconds and then stop. let done = false; function onPlayerStateChange(event: any) { if (event.data == YT.PlayerState.PLAYING && !done) { setTimeout(stopVideo, 6000); done = true; } } function stopVideo() { player.stopVideo(); } const player = new YT.Player(this, { height: this.height, width: this.width, videoId: videoId, playerVars: { playsinline: 1, }, events: { onReady: onPlayerReady, onStateChange: onPlayerStateChange, }, }); }, () => [this.videoId] )"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "videoId",
+              "type": {
+                "text": "string"
+              },
+              "default": "''",
+              "fieldName": "videoId"
+            },
+            {
+              "name": "width",
+              "type": {
+                "text": "number"
+              },
+              "default": "400",
+              "fieldName": "width"
+            },
+            {
+              "name": "height",
+              "type": {
+                "text": "number"
+              },
+              "default": "400",
+              "fieldName": "height"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "com-youtube-player",
+          "customElement": true
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ComYoutubePlayerElement",
+          "declaration": {
+            "name": "ComYoutubePlayerElement",
+            "module": "src/components/youtube-player/youtube-player.ts"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "com-youtube-player",
+          "declaration": {
+            "name": "ComYoutubePlayerElement",
+            "module": "src/components/youtube-player/youtube-player.ts"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,28 +1,13 @@
-import type { PromiseMaybe } from "@gaubee/util";
-import type { Node, Parent } from "unist";
+import type {PromiseMaybe} from '@gaubee/util';
+import type {Node, Parent} from 'unist';
 
-type Test<T, O extends T> = (
-  node: T,
-  index?: number,
-  parent?: Parent | undefined
-) => boolean | O | undefined | void | null;
-type AsyncVisitor<T, O = T> = (
-  node: T,
-  index?: number,
-  parent?: Parent | undefined
-) => PromiseMaybe<void | O | O[]>;
+type Test<T, O extends T> = (node: T, index?: number, parent?: Parent | undefined) => boolean | O | undefined | void | null;
+type AsyncVisitor<T, O = T> = (node: T, index?: number, parent?: Parent | undefined) => PromiseMaybe<void | O | O[]>;
 
-export async function visitAsync<T extends Node, N extends T>(
-  tree: T,
-  test: Test<T, N>,
-  visitor: AsyncVisitor<N, T>,
-  reverse?: boolean
-): Promise<void> {
+export async function visitAsync<T extends Node, N extends T>(tree: T, test: Test<T, N>, visitor: AsyncVisitor<N, T>, reverse?: boolean): Promise<void> {
   if (!tree) return;
 
-  const queue: Array<{ node: T; index?: number; parent?: Parent }> = [
-    { node: tree },
-  ];
+  const queue: Array<{node: T; index?: number; parent?: Parent}> = [{node: tree}];
   let index = reverse ? queue.length - 1 : 0;
 
   while (reverse ? index >= 0 : index < queue.length) {
@@ -36,15 +21,11 @@ export async function visitAsync<T extends Node, N extends T>(
       if (newNode && parent && newNode !== node) {
         /// 做一个节点替换
         // item.node = newNode;
-        parent.children.splice(
-          parent.children.indexOf(node),
-          1,
-          ...(Array.isArray(newNode) ? newNode : [newNode])
-        );
+        parent.children.splice(parent.children.indexOf(node), 1, ...(Array.isArray(newNode) ? newNode : [newNode]));
       }
     }
 
-    if ("children" in node && Array.isArray(node.children)) {
+    if ('children' in node && Array.isArray(node.children)) {
       const children = node.children;
       for (let i = 0; i < children.length; i++) {
         queue.push({

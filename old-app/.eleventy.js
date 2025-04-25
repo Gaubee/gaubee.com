@@ -1,17 +1,17 @@
 // @ts-check
-const { DateTime } = require("luxon");
-const he = require("he");
-const markdownIt = require("markdown-it");
-const markdownItAnchor = require("markdown-it-anchor");
+const {DateTime} = require('luxon');
+const he = require('he');
+const markdownIt = require('markdown-it');
+const markdownItAnchor = require('markdown-it-anchor');
 const permalink = markdownItAnchor.default.permalink;
-const markdownItAttrs = require("markdown-it-attrs");
-const markdownItContainer = require("markdown-it-container");
-const markdownItEmbedImage = require("./old-app/md-embed-image.js");
-const markdownItImplicitFigures = require("markdown-it-implicit-figures");
-const markdownItFootnote = require("markdown-it-footnote");
-const markdownItMultiMdTable = require("markdown-it-multimd-table");
-const pluginRss = require("@11ty/eleventy-plugin-rss");
-const pluginSyntaxHighlight = require("@11ty/eleventy-plugin-syntaxhighlight");
+const markdownItAttrs = require('markdown-it-attrs');
+const markdownItContainer = require('markdown-it-container');
+const markdownItEmbedImage = require('./old-app/md-embed-image.js');
+const markdownItImplicitFigures = require('markdown-it-implicit-figures');
+const markdownItFootnote = require('markdown-it-footnote');
+const markdownItMultiMdTable = require('markdown-it-multimd-table');
+const pluginRss = require('@11ty/eleventy-plugin-rss');
+const pluginSyntaxHighlight = require('@11ty/eleventy-plugin-syntaxhighlight');
 
 const markdownItConfig = {
   html: true,
@@ -20,17 +20,17 @@ const markdownItConfig = {
 };
 const markdownItAnchorConfig = {
   permalink: true,
-  permalinkClass: "bookmark",
-  permalinkSymbol: "#",
+  permalinkClass: 'bookmark',
+  permalinkSymbol: '#',
 };
 
 const md = markdownIt(markdownItConfig)
   .use(markdownItFootnote)
   .use(markdownItAttrs)
-  .use(markdownItContainer, "note")
-  .use(markdownItContainer, "table-wrapper")
-  .use(markdownItContainer, "ecmascript-algorithm")
-  .use(markdownItContainer, "figure", {
+  .use(markdownItContainer, 'note')
+  .use(markdownItContainer, 'table-wrapper')
+  .use(markdownItContainer, 'ecmascript-algorithm')
+  .use(markdownItContainer, 'figure', {
     validate(params) {
       return params.trim().match(/^figure\s+(.*)$/);
     },
@@ -39,14 +39,10 @@ const md = markdownIt(markdownItConfig)
       if (tokens[idx].nesting === 1) {
         // Opening tag; save caption for the closing tag.
         this.saved_caption_ = m[1];
-        return "<figure>\n";
+        return '<figure>\n';
       } else {
         // Closing tag.
-        return (
-          "<figcaption>" +
-          md.utils.escapeHtml(this.saved_caption_) +
-          "</figcaption></figure>\n"
-        );
+        return '<figcaption>' + md.utils.escapeHtml(this.saved_caption_) + '</figcaption></figure>\n';
       }
     },
     saved_caption_: null,
@@ -57,7 +53,7 @@ const md = markdownIt(markdownItConfig)
   })
   .use(markdownItAnchor.default, {
     permalink: permalink.headerLink(),
-    class: "bookmark",
+    class: 'bookmark',
   })
   .use(markdownItImplicitFigures, {
     figcaption: true,
@@ -68,11 +64,8 @@ const md = markdownIt(markdownItConfig)
 // Can be removed when (if?) CSS4 is actually implemented in browsers.
 const prevTdRenderer = md.renderer.rules.table_column_open;
 md.renderer.rules.table_column_open = (tokens, idx, options, env, self) => {
-  if (
-    tokens[idx + 1].type === "fence" &&
-    tokens[idx + 2].type === "table_column_close"
-  ) {
-    tokens[idx].attrJoin("class", "td-with-just-pre");
+  if (tokens[idx + 1].type === 'fence' && tokens[idx + 2].type === 'table_column_close') {
+    tokens[idx].attrJoin('class', 'td-with-just-pre');
   }
   if (prevTdRenderer) {
     return prevTdRenderer(tokens, idx, options, env, self);
@@ -92,83 +85,77 @@ module.exports = (eleventyConfig) => {
   // 文件后缀所对应的语言，参考 https://github.com/github/linguist/blob/master/lib/linguist/languages.yml
   eleventyConfig.addPlugin(pluginSyntaxHighlight);
 
-  eleventyConfig.addLayoutAlias("article", "layouts/article.njk");
-  eleventyConfig.addLayoutAlias("event", "layouts/event.njk");
+  eleventyConfig.addLayoutAlias('article', 'article.11ty.ts');
+  eleventyConfig.addLayoutAlias('event', 'event.11ty.ts');
 
-  eleventyConfig.addFilter("relativeTime", (dateObj) => {
+  eleventyConfig.addFilter('relativeTime', (dateObj) => {
     const datetime = DateTime.fromJSDate(dateObj).toISO();
     return `<relative-time datetime="${datetime}">${datetime}</relative-time>`;
   });
 
   // https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#valid-date-string
-  eleventyConfig.addFilter("htmlDateString", (dateObj) => {
+  eleventyConfig.addFilter('htmlDateString', (dateObj) => {
     return DateTime.fromJSDate(dateObj).toLocaleString();
   });
 
-  eleventyConfig.addFilter("localTime", (dateObj) => {
+  eleventyConfig.addFilter('localTime', (dateObj) => {
     const datetime = DateTime.fromJSDate(dateObj).toISO();
     return `<local-time datetime="${datetime}">${datetime}</local-time>`;
   });
 
-  eleventyConfig.addFilter("markdown", (string) => {
+  eleventyConfig.addFilter('markdown', (string) => {
     return md.renderInline(string);
   });
 
-  eleventyConfig.addFilter("decodeHtmlEntities", (string) => {
+  eleventyConfig.addFilter('decodeHtmlEntities', (string) => {
     return he.decode(string);
   });
 
   // Match Firebase’s `cleanUrls` setting.
-  eleventyConfig.addFilter("clean", (path) => {
-    if (path === "/") return path;
-    if (path === "https://gaubee.com/") return path;
-    if (path.endsWith("/")) return path.slice(0, -1);
+  eleventyConfig.addFilter('clean', (path) => {
+    if (path === '/') return path;
+    if (path === 'https://gaubee.com/') return path;
+    if (path.endsWith('/')) return path.slice(0, -1);
     return path;
   });
 
   // Get the first `n` elements of a collection.
-  eleventyConfig.addFilter("head", (array, n) => {
+  eleventyConfig.addFilter('head', (array, n) => {
     return array.slice(0, n);
   });
 
-  eleventyConfig.addFilter("filterBlogPosts", (array) => {
-    return array.filter((post) => post.inputPath.startsWith("./src/blog/"));
+  eleventyConfig.addFilter('filterBlogPosts', (array) => {
+    return array.filter((post) => post.inputPath.startsWith('./src/blog/'));
   });
 
-  eleventyConfig.addFilter("filterFeaturePosts", (array) => {
-    return array.filter((post) => post.inputPath.startsWith("./src/features/"));
+  eleventyConfig.addFilter('filterFeaturePosts', (array) => {
+    return array.filter((post) => post.inputPath.startsWith('./src/features/'));
   });
 
   // Create a collection for blog posts only.
-  eleventyConfig.addCollection("articles", (collection) => {
-    return collection
-      .getFilteredByGlob("src/articles/*.md")
-      .sort((a, b) => b.date - a.date);
+  eleventyConfig.addCollection('articles', (collection) => {
+    return collection.getFilteredByGlob('src/articles/*.md').sort((a, b) => b.date - a.date);
   });
 
   // Create a collection for feature explainers only.
-  eleventyConfig.addCollection("events", (collection) => {
-    return collection
-      .getFilteredByGlob("src/events/*.md")
-      .sort((a, b) => b.date - a.date);
+  eleventyConfig.addCollection('events', (collection) => {
+    return collection.getFilteredByGlob('src/events/*.md').sort((a, b) => b.date - a.date);
   });
 
   // Create a collection with merged blogs and feature explainers.
-  eleventyConfig.addCollection("allPosts", (collection) => {
-    return collection
-      .getFilteredByGlob("src/{articles,events}/*.md")
-      .sort((a, b) => b.date - a.date);
+  eleventyConfig.addCollection('allPosts', (collection) => {
+    return collection.getFilteredByGlob('src/{articles,events}/*.md').sort((a, b) => b.date - a.date);
   });
 
   // Treat `*.md` files as Markdown.
-  eleventyConfig.setLibrary("md", md);
+  eleventyConfig.setLibrary('md', md);
 
-  eleventyConfig.addCollection("tagList", (collection) => {
+  eleventyConfig.addCollection('tagList', (collection) => {
     const set = new Set();
     for (const item of collection.getAllSorted()) {
-      if ("tags" in item.data) {
+      if ('tags' in item.data) {
         const tags = item.data.tags;
-        if (typeof tags === "string") {
+        if (typeof tags === 'string') {
           set.add(tags);
         } else {
           for (const tag of tags) {
@@ -181,29 +168,29 @@ module.exports = (eleventyConfig) => {
   });
 
   // Copy assets that don’t require a build step.
-  eleventyConfig.addPassthroughCopy("src/favicon*.ico");
-  eleventyConfig.addPassthroughCopy("src/robots.txt");
-  eleventyConfig.addPassthroughCopy("src/img");
-  eleventyConfig.addPassthroughCopy({ "src/_css/img": "css/img" });
+  eleventyConfig.addPassthroughCopy('src/favicon*.ico');
+  eleventyConfig.addPassthroughCopy('src/robots.txt');
+  eleventyConfig.addPassthroughCopy('src/img');
+  eleventyConfig.addPassthroughCopy({'src/_css/img': 'css/img'});
 
   // // add ignores
   // eleventyConfig.ignores.add("src/private")
   // eleventyConfig.ignores.add("src/old")
 
   return {
-    templateFormats: ["md", "njk", "html"],
+    templateFormats: ['md', 'njk', 'html'],
 
-    pathPrefix: "/",
+    pathPrefix: '/',
 
-    markdownTemplateEngine: "md",
-    htmlTemplateEngine: "njk",
-    dataTemplateEngine: "njk",
+    markdownTemplateEngine: 'md',
+    htmlTemplateEngine: 'njk',
+    dataTemplateEngine: 'njk',
     passthroughFileCopy: true,
     dir: {
-      input: "src",
-      includes: "_includes",
-      data: "_data",
-      output: "docs",
+      input: 'src',
+      includes: '_includes',
+      data: '_data',
+      output: 'docs',
     },
   };
 };
