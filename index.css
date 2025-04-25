@@ -1,0 +1,222 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: #333;
+  font-family: 'Open Sans', arial, sans-serif;
+  min-width: min-content;
+  min-height: 100vh;
+  font-size: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+@media (max-width: 480px) {
+  body {
+    font-size: 14px;
+  }
+}
+@media (max-width: 680px) {
+  body {
+    font-size: 16px;
+  }
+}
+
+#main-wrapper {
+  flex-grow: 1;
+  border-top: 1px solid #efefef;
+  padding: 32px 0;
+}
+
+main {
+  max-width: min(1024px, 100vw);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+body > header {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  text-wrap: balance;
+  text-align: center;
+  color: white;
+  padding: 24px;
+}
+.bg-ani {
+  position: relative;
+  overflow: hidden;
+}
+.bg-ani::before {
+  content: ' ';
+  display: block;
+  position: absolute;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  backdrop-filter: blur(50px);
+  background-color: rgb(0 0 0 / 0.6);
+}
+.bg-ani::after {
+  content: ' ';
+  display: block;
+  position: absolute;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  background: #8a2387; /* fallback for old browsers */
+  background:
+    linear-gradient(-45deg, #03001e99, #03001e99, #7303c099, #ec38bc99, #ffb623, #7303c099, #03001e99, #03001e99),
+    linear-gradient(45deg, #03001e99, #03001e99, #7303c099, #ec38bc99, #fdeff9, #7303c099, #03001e99, #03001e99); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+  animation: gradient 45s ease infinite;
+  background-size: 400% 400%;
+  pointer-events: none;
+  background-blend-mode: lighten;
+}
+/* body {
+	background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+	background-size: 400% 400%;
+	animation: gradient 15s ease infinite;
+	height: 100vh;
+} */
+
+@keyframes gradient {
+  0% {
+    background-position: 0% 100%;
+  }
+  50% {
+    background-position: 200% 0%;
+  }
+  100% {
+    background-position: 0% 100%;
+  }
+}
+
+body > footer {
+  width: 100%;
+  min-height: 120px;
+  color: white;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+body > footer a {
+  display: inline-block;
+  width: fit-content;
+  height: fit-content;
+  padding: 0.5em;
+  backdrop-filter: brightness(2) contrast(0.5);
+  border-radius: 1em;
+}
+
+h1 {
+  font-size: 2.5em;
+  font-weight: 400;
+}
+
+h2 {
+  font-size: 1.6em;
+  font-weight: 300;
+}
+
+h3 {
+  font-weight: 300;
+}
+
+header h1 {
+  width: auto;
+  font-size: 2.8em;
+  margin: 0;
+}
+
+header h2 {
+  width: auto;
+  margin: 0;
+}
+
+@property --underline-width {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+a {
+  color: #2196f3;
+  text-decoration: none;
+  background-size: 100% 1px;
+  background-repeat: no-repeat;
+  --underline-width: 0%;
+  background-image: linear-gradient(
+    to right,
+    transparent 0%,
+    transparent calc(50% - var(--underline-width) / 2),
+    currentColor calc(50% - var(--underline-width) / 2),
+    currentColor calc(50% + var(--underline-width) / 2),
+    transparent calc(50% + var(--underline-width) / 2),
+    transparent 100%
+  );
+  background-position: 0 bottom;
+
+  transition-property: --underline-width;
+  transition-duration: 300ms;
+  transition-timing-function: ease-out;
+}
+
+a:visited {
+  color: #673ab7;
+}
+a:hover {
+  --underline-width: 100%;
+}
+a:target {
+  --underline-width: 100%;
+}
+a.target {
+  font-weight: bold;
+  --underline-width: 100%;
+}
+
+section pre[class*='language-'] {
+  font-size: 0.8rem;
+}
+main {
+  container-type: inline-size;
+  container-name: main;
+}
+
+section.columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 488px));
+  grid-gap: 48px;
+  justify-content: center;
+}
+section.columns > div {
+  flex: 1;
+}
+
+section.examples h2:first-of-type {
+  margin-top: 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  word-break: break-word;
+}
+th {
+  font-weight: 600;
+}
+
+td,
+th {
+  border: solid 1px #aaa;
+  padding: 4px;
+  text-align: left;
+  vertical-align: top;
+}

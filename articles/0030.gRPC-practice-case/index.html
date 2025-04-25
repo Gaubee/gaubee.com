@@ -1,0 +1,229 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="description" content=""><meta name="keywords" content="Appn, WebComponent, article"><meta name="author" content="Gaubee, gaubeebangeel@gmail.com"><meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=5"><title>gRPC实践案例</title><link rel="shortcut icon" href="/assets/favicon-wB3RD3gX.ico"><link rel="stylesheet" href="/index.css">  <link rel="stylesheet" crossorigin href="/assets/prism-okaidia-D95GE6Gn.css">
+</head><body><header class="bg-ani"><style>.nav{padding:0 2em;border-radius:2em;backdrop-filter:contrast(0.5) brightness(2);width:fit-content;max-width:100%}.nav{display:grid;grid-template-columns:repeat(auto-fit,180px);justify-content:center;gap:12px}.nav>a{display:block;flex:1;font-size:18px;padding:16px;text-align:center}.nav>a{color:#e91e63}@supports (-webkit-background-clip:text){.nav>a{background:-webkit-linear-gradient(#e91e63,#673ab7);color:transparent;-webkit-background-clip:text;-webkit-text-fill-color:transparent}}</style><nav class="nav"><a class="" href="/">Home</a> <a class="target" href="/articles/">Articles</a> <a class="" href="/events/">Events</a> <a class="" href="/timeline/">Timeline</a> <a class="" href="/projects/">Projects</a></nav></header><div id="main-wrapper" class="article-wrapper"><main><h1>gRPC实践案例</h1><p>类似Google这种大公司产出的产品，一般就两种情况，一种是面向小白用户的，如此让G粉簇拥而来找Bug优化产品思路，等到时机成熟再推出正式版或者取消产品，AngularJS就是这一类。还有一种就是Google自己的需求而总结出来的产品，优点什么的我就不吹了，gRPC就是这一类的。</p><h2>序言</h2><blockquote><p>今年年初的时候我就一直想做一款基于RPC实现组件化搭建网站的一款产品。目的就是为了让各种语言的程序员能以最低沟通、学习代价来进行快速、稳定开发产品。而当初做的时候为了速度摸坑，用了Nodejs来进行开发，做出了<a href="https://github.com/gaubee/GQ">GQ</a>这款产品，自己边用边总结，说真的坑是真的多，JSON是不够用的，还有bytes、流数据等等问题。几个月下来，发现这个东西是个史诗大坑，因为要考虑到各种语言的兼容、使用难易、不同类型组件（数据库组件、流文件处理组件等）通用接口等等问题，迟迟没有拿出一套跨语言的规范来。几乎要放弃。这项目被我搁置。 不巧，gRPC出来了。当初心想有搞头，但是当时文档不够健全，让那些爱折腾的人先去探探路吧。 现在我作为第二批吃螃蟹的人，上手一试，心中暗叹：厉害了我的Goggle</p></blockquote><h2>案例简介</h2><p>一套基于路由注册的分发服务。这里使用Nodejs来快速上手。 服务端：注册HTTP端口，以及gRPC基础服务，通过基础服务，可以注册HTTP请求的处理权。 子服务：注册基础服务，实现对HTTP请求的处理。 流程如下：</p><pre><code>HTTP请求---&gt;服务端--/a/b--&gt;子服务1
+　　　　　　　　　|--/a/c--&gt;子服务2
+　　　　　　　　　+--/a/d--&gt;子服务3
+</code></pre><h1>实现流程</h1><blockquote><p>PS:我这里不赘述<strong>XX为什么要这以做</strong>之类的话语，直接上代码，并简单解释代码中的重点。这个案例没有难点。 gRPC的安装省略。 使用Nodejs版本v6.9.1。用到一些ES6的语法，不完全兼容v4.*</p></blockquote><h2>proto文件</h2><pre class="language-protobuf"><code class="language-protobuf"><span class="token keyword">syntax</span> <span class="token operator">=</span> <span class="token string">"proto3"</span><span class="token punctuation">;</span>
+
+<span class="token keyword">option</span> objc_class_prefix <span class="token operator">=</span> <span class="token string">"Gaubee"</span><span class="token punctuation">;</span>
+
+<span class="token keyword">package</span> httpserver<span class="token punctuation">;</span>
+
+<span class="token comment">// HttpServer服务的定义</span>
+<span class="token keyword">service</span> <span class="token class-name">HttpServer</span> <span class="token punctuation">{</span>
+    <span class="token keyword">rpc</span> <span class="token function">BindRoute</span><span class="token punctuation">(</span><span class="token class-name">RouteInfo</span><span class="token punctuation">)</span> <span class="token keyword">returns</span><span class="token punctuation">(</span><span class="token class-name">RequestInfo</span><span class="token punctuation">)</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    <span class="token keyword">rpc</span> <span class="token function">ReturnResponse</span><span class="token punctuation">(</span><span class="token class-name">ResponInfo</span><span class="token punctuation">)</span> <span class="token keyword">returns</span><span class="token punctuation">(</span><span class="token class-name">ResponReply</span><span class="token punctuation">)</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">message</span> <span class="token class-name">RouteInfo</span> <span class="token punctuation">{</span>
+    <span class="token keyword">enum</span> <span class="token class-name">Method</span> <span class="token punctuation">{</span>
+        GET <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        POST <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+        PUT <span class="token operator">=</span> <span class="token number">2</span><span class="token punctuation">;</span>
+        DELETE <span class="token operator">=</span> <span class="token number">3</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    <span class="token comment">// 注册的路由pathname</span>
+    <span class="token builtin">string</span> path <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token positional-class-name class-name">Method</span> method <span class="token operator">=</span> <span class="token number">2</span><span class="token punctuation">;</span>
+    <span class="token comment">// 是否直接解析query到query中</span>
+    <span class="token builtin">bool</span> is_parse_query <span class="token operator">=</span> <span class="token number">3</span><span class="token punctuation">;</span>
+    <span class="token comment">// 是否解析带有Body的请求</span>
+    <span class="token builtin">bool</span> is_parse_body <span class="token operator">=</span> <span class="token number">4</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+<span class="token keyword">message</span> <span class="token class-name">RequestInfo</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 请求的ID，在做响应的时候需要带上</span>
+    <span class="token builtin">string</span> require_id <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token comment">// 请求链接中的数据</span>
+    <span class="token map class-name">map<span class="token punctuation">&lt;</span><span class="token builtin">string</span><span class="token punctuation">,</span> <span class="token builtin">string</span><span class="token punctuation">></span></span> query <span class="token operator">=</span> <span class="token number">2</span><span class="token punctuation">;</span>
+    <span class="token comment">// 请求数据包中的数据</span>
+    <span class="token map class-name">map<span class="token punctuation">&lt;</span><span class="token builtin">string</span><span class="token punctuation">,</span> <span class="token builtin">string</span><span class="token punctuation">></span></span> body <span class="token operator">=</span> <span class="token number">3</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+<span class="token keyword">message</span> <span class="token class-name">ResponInfo</span><span class="token punctuation">{</span>
+    <span class="token builtin">string</span> require_id <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token map class-name">map<span class="token punctuation">&lt;</span><span class="token builtin">string</span><span class="token punctuation">,</span> <span class="token builtin">string</span><span class="token punctuation">></span></span> response_head <span class="token operator">=</span> <span class="token number">2</span><span class="token punctuation">;</span>
+    <span class="token builtin">string</span> response_data <span class="token operator">=</span> <span class="token number">3</span><span class="token punctuation">;</span>
+    <span class="token builtin">int32</span> statusCode <span class="token operator">=</span> <span class="token number">4</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+<span class="token comment">// 返回整个请求的时间信息</span>
+<span class="token keyword">message</span> <span class="token class-name">ResponReply</span><span class="token punctuation">{</span>
+    <span class="token comment">// 收到请求，解析请求query、body花费的时间</span>
+    <span class="token builtin">float</span> route_parsed_time <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token comment">// 传输请求数据花费的时间</span>
+    <span class="token builtin">float</span> route_send_time <span class="token operator">=</span> <span class="token number">2</span><span class="token punctuation">;</span>
+    <span class="token comment">// 处理请求至服务端收到数据花费的时间</span>
+    <span class="token builtin">float</span> responsed_time <span class="token operator">=</span> <span class="token number">3</span><span class="token punctuation">;</span>
+    <span class="token comment">// 返回请求结果给客户花费的时间</span>
+    <span class="token builtin">float</span> responsed_send_time <span class="token operator">=</span> <span class="token number">4</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre><p>以上的proto文件描述了两个接口：</p><ul><li>BindRoute：实现路由绑定把要绑定的路由写道path中，这里为了简单，我只是进行了字符串相等匹配。BindRoute的回调函数不会马上触发。要等到服务端有HTTP请求的时候，匹配到对应的路由，最后再执行返回。</li><li>ReturnResponse：BindRoute收到回调后，意味着子服务开始处理HTTP请求，在处理完成后，需要调用此函数来返回处理结果。</li></ul><p><strong>require_id</strong>是注册基础服务后生成的一次性编号，每一次注册都会生成一个，在收到HTTP请求是，匹配到对应的路由，就要通过这个require_id来发送请求、接受处理结果。</p><h2>服务端</h2><pre class="language-js"><code class="language-js"><span class="token string">"use strict"</span><span class="token punctuation">;</span>
+<span class="token comment">// PROTO文件路径，按需换成自己的文件路径</span>
+<span class="token keyword">const</span> <span class="token constant">PROTO_PATH</span> <span class="token operator">=</span> __dirname <span class="token operator">+</span> <span class="token string">'/../pingpong/http-server.proto'</span><span class="token punctuation">;</span>
+<span class="token keyword">const</span> grpc <span class="token operator">=</span> <span class="token function">require</span><span class="token punctuation">(</span><span class="token string">'grpc'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">const</span> http <span class="token operator">=</span> <span class="token function">require</span><span class="token punctuation">(</span><span class="token string">"http"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">const</span> url <span class="token operator">=</span> <span class="token function">require</span><span class="token punctuation">(</span><span class="token string">"url"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">const</span> querystring <span class="token operator">=</span> <span class="token function">require</span><span class="token punctuation">(</span><span class="token string">"querystring"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 动态加载PROTO文件，生成接口</span>
+<span class="token keyword">const</span> httpserver <span class="token operator">=</span> grpc<span class="token punctuation">.</span><span class="token function">load</span><span class="token punctuation">(</span><span class="token constant">PROTO_PATH</span><span class="token punctuation">)</span><span class="token punctuation">.</span>httpserver<span class="token punctuation">;</span>
+
+<span class="token comment">/** 路由映射表
+ *  结构为：{ [METHOD:GET|POST|PUT|DELETE] : { [PATHNAME] : Array&lt;String>[require_id,...] } }
+ */</span>
+<span class="token keyword">const</span> route_res_list <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+<span class="token comment">/** require_id对应的路由注册信息与回调函数
+ *  结构为：{ args : 路由注册信息, callback: 回调函数，用于通知子服务来处理HTTP请求 }
+ */</span>
+<span class="token keyword">const</span> handleCache <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Map</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">/** require_id对应的HTTP请求
+ *  结构为：{ req : HTTP.Request, res: HTTP.Response }
+ */</span>
+<span class="token keyword">const</span> reqresCache <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Map</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// 初始化路由映射表的结构</span>
+<span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">let</span> method <span class="token keyword">in</span> httpserver<span class="token punctuation">.</span>RouteInfo<span class="token punctuation">.</span>Method<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    route_res_list<span class="token punctuation">[</span>method<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">/** rgRPC服务：绑定路由
+ *
+ */</span>
+<span class="token keyword">function</span> <span class="token function">BindRoute</span><span class="token punctuation">(</span><span class="token parameter">call<span class="token punctuation">,</span> callback</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> args <span class="token operator">=</span> call<span class="token punctuation">.</span>request<span class="token punctuation">;</span>
+    <span class="token keyword">const</span> routes <span class="token operator">=</span> route_res_list<span class="token punctuation">[</span>args<span class="token punctuation">.</span>method<span class="token punctuation">]</span><span class="token punctuation">;</span>
+    <span class="token keyword">var</span> handles <span class="token operator">=</span> routes<span class="token punctuation">[</span>args<span class="token punctuation">.</span>path<span class="token punctuation">]</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>handles<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        handles <span class="token operator">=</span> routes<span class="token punctuation">[</span>args<span class="token punctuation">.</span>path<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Set</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    <span class="token comment">// 生成require_id</span>
+    <span class="token keyword">const</span> require_id <span class="token operator">=</span> Math<span class="token punctuation">.</span><span class="token function">random</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">toString</span><span class="token punctuation">(</span><span class="token number">36</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">substr</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 加入路由映射表</span>
+    handles<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>require_id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 这里不调用callback，而是等待到收到HTTP请求的时候再执行</span>
+    handleCache<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span>require_id<span class="token punctuation">,</span> <span class="token punctuation">{</span>
+        <span class="token literal-property property">args</span><span class="token operator">:</span> args<span class="token punctuation">,</span>
+        callback
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">/** rgRPC服务：响应HTTP请求
+ *
+ */</span>
+<span class="token keyword">function</span> <span class="token function">ReturnResponse</span><span class="token punctuation">(</span><span class="token parameter">call<span class="token punctuation">,</span> callback</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> args <span class="token operator">=</span> call<span class="token punctuation">.</span>request<span class="token punctuation">;</span>
+    <span class="token keyword">const</span> require_id <span class="token operator">=</span> args<span class="token punctuation">.</span>require_id<span class="token punctuation">;</span>
+    <span class="token comment">// 取出缓存中的req、res对象</span>
+    <span class="token keyword">const</span> <span class="token punctuation">{</span>
+        req<span class="token punctuation">,</span>
+        res
+    <span class="token punctuation">}</span> <span class="token operator">=</span> reqresCache<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>require_id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>res<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">return</span> <span class="token function">callback</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">Ref Error:require_id:</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>require_id<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> no ref.</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    <span class="token comment">// 返回数据</span>
+    res<span class="token punctuation">.</span><span class="token function">writeHead</span><span class="token punctuation">(</span>args<span class="token punctuation">.</span>statusCode<span class="token punctuation">,</span> args<span class="token punctuation">.</span>response_head<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    res<span class="token punctuation">.</span><span class="token function">end</span><span class="token punctuation">(</span>args<span class="token punctuation">.</span>response_data<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 清除缓存</span>
+    reqresCache<span class="token punctuation">.</span><span class="token function">delete</span><span class="token punctuation">(</span>require_id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 返回整个流程的消耗时间，这里为了简化代码没有加统计时间的代码</span>
+    <span class="token function">callback</span><span class="token punctuation">(</span><span class="token keyword">null</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>
+        <span class="token literal-property property">route_parsed_time</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">route_send_time</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">responsed_time</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">responsed_send_time</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">function</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> grpc_server <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">grpc<span class="token punctuation">.</span>Server</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    grpc_server<span class="token punctuation">.</span><span class="token function">addProtoService</span><span class="token punctuation">(</span>httpserver<span class="token punctuation">.</span>HttpServer<span class="token punctuation">.</span>service<span class="token punctuation">,</span> <span class="token punctuation">{</span>
+        <span class="token literal-property property">bindRoute</span><span class="token operator">:</span> BindRoute<span class="token punctuation">,</span>
+        <span class="token literal-property property">returnResponse</span><span class="token operator">:</span> ReturnResponse<span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 注册gRPC服务</span>
+    <span class="token function">grpc_server</span><span class="token punctuation">.</span><span class="token function">bind</span><span class="token punctuation">(</span><span class="token string">'0.0.0.0:50051'</span><span class="token punctuation">,</span> grpc<span class="token punctuation">.</span>ServerCredentials<span class="token punctuation">.</span><span class="token function">createInsecure</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    grpc_server<span class="token punctuation">.</span><span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token function">main</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// 注册HTTP服务</span>
+<span class="token keyword">const</span> server <span class="token operator">=</span> http<span class="token punctuation">.</span><span class="token function">createServer</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">req<span class="token punctuation">,</span> res</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> routes <span class="token operator">=</span> route_res_list<span class="token punctuation">[</span>req<span class="token punctuation">.</span>method<span class="token punctuation">]</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>routes<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">const</span> url_info <span class="token operator">=</span> url<span class="token punctuation">.</span><span class="token function">parse</span><span class="token punctuation">(</span>req<span class="token punctuation">.</span>url<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">const</span> handles <span class="token operator">=</span> routes<span class="token punctuation">[</span>url_info<span class="token punctuation">.</span>pathname<span class="token punctuation">]</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>handles <span class="token operator">&amp;&amp;</span> handles<span class="token punctuation">.</span>size<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token keyword">const</span> <span class="token punctuation">{</span>
+                <span class="token literal-property property">value</span><span class="token operator">:</span> require_id<span class="token punctuation">,</span>
+                has_key
+            <span class="token punctuation">}</span> <span class="token operator">=</span> handles<span class="token punctuation">.</span><span class="token function">values</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">next</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>has_key<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">"no handle"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">return</span>
+            <span class="token punctuation">}</span>
+            <span class="token keyword">const</span> handle <span class="token operator">=</span> handleCache<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>require_id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">// 通知客户端处理HTTP请求，并带上HTTP请求的一些数据</span>
+            handle<span class="token punctuation">.</span><span class="token function">callback</span><span class="token punctuation">(</span><span class="token keyword">null</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>
+                require_id<span class="token punctuation">,</span>
+                <span class="token comment">// TODO：headers</span>
+                <span class="token literal-property property">query</span><span class="token operator">:</span> handle<span class="token punctuation">.</span>args<span class="token punctuation">.</span>is_parse_query <span class="token operator">?</span> Object<span class="token punctuation">.</span><span class="token function">assign</span><span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">,</span> querystring<span class="token punctuation">.</span><span class="token function">parse</span><span class="token punctuation">(</span>url_info<span class="token punctuation">.</span>query<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">:</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+                <span class="token comment">// TODO：body应该改用流数据传输</span>
+                <span class="token literal-property property">body</span><span class="token operator">:</span> <span class="token punctuation">(</span>handle<span class="token punctuation">.</span>args<span class="token punctuation">.</span>method <span class="token operator">!==</span> <span class="token string">"GET"</span> <span class="token operator">&amp;&amp;</span> handle<span class="token punctuation">.</span>args<span class="token punctuation">.</span>is_parse_body<span class="token punctuation">)</span> <span class="token operator">?</span> <span class="token punctuation">{</span><span class="token punctuation">}</span> <span class="token operator">:</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+            <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">// 缓存req、res</span>
+            reqresCache<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span>require_id<span class="token punctuation">,</span> <span class="token punctuation">{</span>
+                req<span class="token punctuation">,</span>
+                res
+            <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">// 清除缓存，此require_id已经报废，只用于最后的响应res的处理</span>
+            handleCache<span class="token punctuation">.</span><span class="token function">delete</span><span class="token punctuation">(</span>require_id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            handles<span class="token punctuation">.</span><span class="token function">delete</span><span class="token punctuation">(</span>require_id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+server<span class="token punctuation">.</span><span class="token function">listen</span><span class="token punctuation">(</span><span class="token number">1337</span><span class="token punctuation">,</span> <span class="token string">"0.0.0.0"</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre><h2>子服务</h2><pre class="language-js"><code class="language-js"><span class="token keyword">const</span> <span class="token constant">PROTO_PATH</span> <span class="token operator">=</span> __dirname <span class="token operator">+</span> <span class="token string">'/../pingpong/http-server.proto'</span><span class="token punctuation">;</span>
+<span class="token keyword">const</span> grpc <span class="token operator">=</span> <span class="token function">require</span><span class="token punctuation">(</span><span class="token string">'grpc'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">const</span> http <span class="token operator">=</span> <span class="token function">require</span><span class="token punctuation">(</span><span class="token string">"http"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">const</span> httpserver <span class="token operator">=</span> grpc<span class="token punctuation">.</span><span class="token function">load</span><span class="token punctuation">(</span><span class="token constant">PROTO_PATH</span><span class="token punctuation">)</span><span class="token punctuation">.</span>httpserver<span class="token punctuation">;</span>
+<span class="token keyword">const</span> address <span class="token operator">=</span> <span class="token string">'localhost:50051'</span>
+
+<span class="token keyword">function</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">var</span> client <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">httpserver<span class="token punctuation">.</span>HttpServer</span><span class="token punctuation">(</span>address<span class="token punctuation">,</span> grpc<span class="token punctuation">.</span>credentials<span class="token punctuation">.</span><span class="token function">createInsecure</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 注册路由</span>
+    client<span class="token punctuation">.</span><span class="token function">bindRoute</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+        <span class="token literal-property property">path</span><span class="token operator">:</span> <span class="token string">"/QAQ"</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">method</span><span class="token operator">:</span> httpserver<span class="token punctuation">.</span>RouteInfo<span class="token punctuation">.</span>Method<span class="token punctuation">.</span><span class="token constant">GET</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">is_parse_query</span><span class="token operator">:</span> <span class="token boolean">true</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">is_parse_body</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token keyword">function</span><span class="token punctuation">(</span><span class="token parameter">err<span class="token punctuation">,</span> response</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token comment">// 收到路由请求</span>
+        console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span>err<span class="token punctuation">,</span> response<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 返回路由处理结果</span>
+        client<span class="token punctuation">.</span><span class="token function">returnResponse</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+            <span class="token literal-property property">require_id</span><span class="token operator">:</span> response<span class="token punctuation">.</span>require_id<span class="token punctuation">,</span>
+            <span class="token literal-property property">statusCode</span><span class="token operator">:</span> <span class="token number">200</span><span class="token punctuation">,</span>
+            <span class="token literal-property property">response_head</span><span class="token operator">:</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+            <span class="token literal-property property">response_data</span><span class="token operator">:</span> <span class="token constant">JSON</span><span class="token punctuation">.</span><span class="token function">stringify</span><span class="token punctuation">(</span>response<span class="token punctuation">.</span>query<span class="token punctuation">)</span>
+        <span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token keyword">function</span><span class="token punctuation">(</span><span class="token parameter">err<span class="token punctuation">,</span> response</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token comment">// 收到性能统计</span>
+            console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span>err<span class="token punctuation">,</span> response<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span><span class="token punctuation">)</span>
+
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 模拟发起请求</span>
+    <span class="token function">setTimeout</span><span class="token punctuation">(</span><span class="token keyword">function</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">var</span> req <span class="token operator">=</span> http<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token string">"http://localhost:1337/QAQ?a=a"</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token parameter">res<span class="token punctuation">,</span> socket<span class="token punctuation">,</span> head</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">{</span>
+            <span class="token keyword">var</span> datas <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+            res<span class="token punctuation">.</span><span class="token function">on</span><span class="token punctuation">(</span><span class="token string">"data"</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token parameter">chunk</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">{</span>
+                datas<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span>chunk<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            res<span class="token punctuation">.</span><span class="token function">on</span><span class="token punctuation">(</span><span class="token string">"end"</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">{</span>
+                <span class="token comment">// 打印结果</span>
+                console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">"request res:"</span><span class="token punctuation">,</span> Buffer<span class="token punctuation">.</span><span class="token function">concat</span><span class="token punctuation">(</span>datas<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">toString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token number">200</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span>
+
+<span class="token function">main</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre><hr><h2>总结</h2><p>以上代码流程只是简单的示例，有一点不好的就是路由的注册变成了一次性，这不能说完全不对。但更优的做法应该改为流数据，这就不需要调用callback来结束服务，而是可以通过流不停地发起请求，流的实践参考官方代码：<a href="https://github.com/grpc/grpc/blob/master/examples/node/dynamic_codegen/route_guide/route_guide_server.js">route_guide</a>。</p></main></div><style>footer a{line-height:1}footer nav{display:flex;gap:1rem}</style><footer class="bg-ani"><nav><a target="_blank" href="https://github.com/gaubee/gaubee.com">Github</a> <a target="_blank" href="https://beian.miit.gov.cn/#/Integrated/recordQuery">闽ICP备17026139号-1</a></nav></footer></body></html>

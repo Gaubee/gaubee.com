@@ -1,0 +1,17 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="description" content=""><meta name="keywords" content="Appn, WebComponent, article"><meta name="author" content="Gaubee, gaubeebangeel@gmail.com"><meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=5"><title>QT使用代理在线安装的方法</title><link rel="shortcut icon" href="/assets/favicon-wB3RD3gX.ico"><link rel="stylesheet" href="/index.css">  <link rel="stylesheet" crossorigin href="/assets/prism-okaidia-D95GE6Gn.css">
+</head><body><header class="bg-ani"><style>.nav{padding:0 2em;border-radius:2em;backdrop-filter:contrast(0.5) brightness(2);width:fit-content;max-width:100%}.nav{display:grid;grid-template-columns:repeat(auto-fit,180px);justify-content:center;gap:12px}.nav>a{display:block;flex:1;font-size:18px;padding:16px;text-align:center}.nav>a{color:#e91e63}@supports (-webkit-background-clip:text){.nav>a{background:-webkit-linear-gradient(#e91e63,#673ab7);color:transparent;-webkit-background-clip:text;-webkit-text-fill-color:transparent}}</style><nav class="nav"><a class="" href="/">Home</a> <a class="target" href="/articles/">Articles</a> <a class="" href="/events/">Events</a> <a class="" href="/timeline/">Timeline</a> <a class="" href="/projects/">Projects</a></nav></header><div id="main-wrapper" class="article-wrapper"><main><h1>QT使用代理在线安装的方法</h1><p>QT 离线安装包对于把 Android 编译和 MSVC 编译混在一起搞，非常麻烦。而官方给的 MaintenanceTool.exe 有问题，没法用来增加额外的安装包，所以就必须使用在线安装。</p><p>而关于<a href="http://download.qt.io/online/qtsdkrepository/windows_x86/root/qt/Updates_orig.xml.mirrorlist">在线安装</a>。官方给出的一个完整的包地址，里头的 URL 竟然是绝对路径而且还带 SHA1 校验了。</p><p><img src="/assets/capture-1-CqUsF5b9.png" alt=""></p><p>所以如果你用第三方镜像，会导致解析下载下来的 XML 文件后最后还是由于绝对路径跑到官方的站点下下载，而如果你自己篡改 XML 文件转发到镜像站点，就会发现各种莫名奇妙的问题，什么插件、依赖找不到之类的。</p><h2>解决办法：</h2><p><strong>1.</strong> 修改系统 host 文件：</p><pre><code>127.0.0.1 download.qt.io
+</code></pre><p><code>download.qt.io</code>这个域名不能在 XML 文件改变，那就把这个域名的控制器拿到手</p><p><strong>2.</strong> 然后使用 nginx，加入配置：</p><pre><code>
+    server{
+        listen      80;
+        server_name download.qt.io;
+        location / {
+            proxy_pass http://mirror.bit.edu.cn/qtproject/;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection &quot;upgrade&quot;;
+            proxy_set_header Cookie $http_cookie;
+            proxy_set_header Host $host;
+            proxy_set_header Referer $http_referer;
+            proxy_set_header X-Remote-IP $remote_addr;
+        }
+    }
+</code></pre><p>转发<code>download.qt.io</code>到所需的镜像站点。</p><p><strong>3.</strong> 打开 QT 在线安装程序，自定义库地址：<code>http://download.qt.io/online/qtsdkrepository/windows_x86/root/qt/</code> 官方的默认的是<code>https</code>协议，所以用<code>http</code>还是不同的，程序接受。</p><p><strong>补充</strong>：在<strong>检索阶段</strong>，把 host 文件的 download.qt.io 给注释掉，否则可能会检索不通过，等检索通过后，开始进入下载页面了，再把 host 文件的 download.qt.io 的转发给开启起来。如果已经开始在下载了，那么那几个文件的数据包会因为走 qt 官方的镜像而速度很慢，不要慌，把网络关掉，qt 下载器会报错说连接断开，这时候再把网络连接上去，点击下载器的 retry 按钮，这时候重新解析 dns，就会开始走国内镜像的渠道了。</p></main></div><style>footer a{line-height:1}footer nav{display:flex;gap:1rem}</style><footer class="bg-ani"><nav><a target="_blank" href="https://github.com/gaubee/gaubee.com">Github</a> <a target="_blank" href="https://beian.miit.gov.cn/#/Integrated/recordQuery">闽ICP备17026139号-1</a></nav></footer></body></html>
