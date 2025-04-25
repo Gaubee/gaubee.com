@@ -10,13 +10,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {renderToStaticMarkup} from 'react-dom/server';
 import type {PluginOption, UserConfig as ViteUserConfig} from 'vite';
+import {VitePWA} from 'vite-plugin-pwa';
 
 const resolve = (to: string) => path.resolve(import.meta.dirname, to);
 
 export default function (eleventyConfig: EleventyUserConfig) {
   // const isWatch = process.argv.includes('--watch');
+  fs.rmSync(resolve('.11ty-vite'), {recursive: true, force: true});
   fs.rmSync(resolve('docs'), {recursive: true, force: true});
-  fs.mkdirSync(resolve('docs/public'), {recursive: true});
+  // fs.mkdirSync(resolve('docs/public'), {recursive: true});
 
   eleventyConfig.setTemplateFormats([
     // javascript
@@ -34,7 +36,6 @@ export default function (eleventyConfig: EleventyUserConfig) {
   });
 
   eleventyConfig.addPlugin(syntaxHighlight);
-  // eleventyConfig.addPlugin(pluginPWA);
 
   eleventyConfig.addTransform('htmlmin', function (content) {
     if ((this.page.outputPath || '').endsWith('.html')) {
@@ -42,7 +43,7 @@ export default function (eleventyConfig: EleventyUserConfig) {
         useShortDoctype: true,
         removeComments: true,
         collapseWhitespace: true,
-        minifyCSS:true
+        minifyCSS: true,
       });
 
       return minified;
@@ -71,6 +72,9 @@ export default function (eleventyConfig: EleventyUserConfig) {
         },
       },
       plugins: [
+        VitePWA({
+          registerType: 'autoUpdate',
+        }),
         (() => {
           const bundleDir = resolve('bundle');
           const getModuleId = (bundle_filename: string) => {
@@ -167,7 +171,7 @@ export default function (eleventyConfig: EleventyUserConfig) {
   eleventyConfig.ignores.add('docs');
   eleventyConfig.ignores.add('draft');
   eleventyConfig.ignores.add('src');
-  eleventyConfig.ignores.add('README.md');
+  eleventyConfig.ignores.add('*.md');
   eleventyConfig.ignores.add('old-app');
   eleventyConfig.ignores.add('old-vike');
 

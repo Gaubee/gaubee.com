@@ -48,7 +48,6 @@
     "@types/react-dom": "^19.1.2",
     "@types/unist": "^3.0.3",
     "chokidar": "^4.0.3",
-    "eleventy-plugin-pwa": "^1.0.8",
     "es-escape-html": "^0.1.1",
     "expect-type": "^1.2.1",
     "gray-matter": "^4.0.3",
@@ -76,6 +75,7 @@
     "typescript": "^5.8.3",
     "unified": "^11.0.5",
     "vfile": "^6.0.3",
-    "vite": "^6.3.3"
+    "vite": "^6.3.3",
+    "vite-plugin-pwa": "^1.0.0"
   }
 }
