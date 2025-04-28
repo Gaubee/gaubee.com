@@ -4,7 +4,7 @@ import type {UserConfig as EleventyUserConfig} from '@11ty/eleventy';
 import syntaxHighlight from '@11ty/eleventy-plugin-syntaxhighlight';
 import EleventyVitePlugin from '@11ty/eleventy-plugin-vite';
 import {func_throttle} from '@gaubee/util';
-import chokidar from 'chokidar';
+import chokidar, {FSWatcher} from 'chokidar';
 import htmlmin from 'html-minifier-terser';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -84,23 +84,64 @@ export default function (eleventyConfig: EleventyUserConfig) {
           return {
             enforce: 'pre',
             name: 'bundle-resolver',
-            configureServer(server) {
+            async configureServer(server) {
               const ws = server.ws;
               if (!ws) {
                 return;
               }
-              console.log('start watching', bundleDir);
+              let watcher: FSWatcher | undefined;
 
-              const watcher = chokidar.watch(bundleDir, {
-                persistent: true, // 持续监听
-                ignoreInitial: true, // 忽略初始扫描时的 'add' 和 'addDir' 事件
-                awaitWriteFinish: {
-                  // 等待写入完成，有助于减少因写入不完整而触发的事件
-                  stabilityThreshold: 500, // 文件大小稳定时间 (ms)
-                  pollInterval: 100, // 轮询间隔 (ms)
-                },
-              });
+              const startWatch = async (ignoreInitial = true) => {
+                void watcher?.close();
+
+                watcher = chokidar.watch(
+                  bundleDir,
+
+                  {
+                    persistent: true, // 持续监听
+                    ignoreInitial, // 忽略初始扫描时的 'add' 和 'addDir' 事件
+                    awaitWriteFinish: {
+                      // 等待写入完成，有助于减少因写入不完整而触发的事件
+                      stabilityThreshold: 500, // 文件大小稳定时间 (ms)
+                      pollInterval: 100, // 轮询间隔 (ms)
+                    },
+                  }
+                );
+                watcher.on('all', async (event, bundle_filename) => {
+                  if (event === 'unlinkDir') {
+                    if (bundle_filename === bundleDir) {
+                      startWatch(false);
+                      return;
+                    }
+                  }
+                  if (event === 'unlink' || event === 'unlinkDir') {
+                    return;
+                  }
+
+                  const moduleId = getModuleId(bundle_filename);
+                  const moduleNode = await server.moduleGraph.getModuleById(moduleId);
+                  if (moduleNode) {
+                    server.moduleGraph.invalidateModule(moduleNode, undefined, undefined, true);
+                    ws.send({
+                      type: 'update',
+                      updates: [
+                        {
+                          type: 'js-update',
+                          path: moduleNode.url,
+                          acceptedPath: moduleNode.url,
+                          timestamp: Date.now(),
+                        },
+                      ],
+                    });
+                    reload();
+                  }
+                });
+                console.log('start watching', bundleDir);
+              };
+              startWatch();
+
               const reload = func_throttle(() => {
+                console.log('page reload!');
                 ws.send({
                   type: 'full-reload',
                   // path: '*' 告诉 Vite 客户端重新加载整个页面
@@ -108,30 +149,9 @@ export default function (eleventyConfig: EleventyUserConfig) {
                   path: '*',
                 });
               }, 200);
-              watcher.on('all', async (event, bundle_filename, state) => {
-                if (event == 'unlink') {
-                  return;
-                }
-                const moduleId = getModuleId(bundle_filename);
-                const moduleNode = await server.moduleGraph.getModuleById(moduleId);
-                if (moduleNode) {
-                  server.moduleGraph.invalidateModule(moduleNode, undefined, undefined, true);
-                  ws.send({
-                    type: 'update',
-                    updates: [
-                      {
-                        type: 'js-update',
-                        path: moduleNode.url,
-                        acceptedPath: moduleNode.url,
-                        timestamp: Date.now(),
-                      },
-                    ],
-                  });
-                  reload();
-                }
-              });
+
               ws.on('close', () => {
-                return watcher.close();
+                return watcher?.close();
               });
             },
             resolveId(source, importer, options) {
