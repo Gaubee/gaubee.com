@@ -13,6 +13,7 @@
     "analyze": "cem analyze --litelement --globs \"src/**/*.ts\"",
     "analyze:watch": "cem analyze --litelement --globs \"src/**/*.ts\" --watch",
     "build": "pnpm dist --noCheck && pnpm analyze && pnpm bundle && pnpm 11ty",
+    "rename": "tsx ./scripts/rename.ts",
     "test": ""
   },
   "dependencies": {

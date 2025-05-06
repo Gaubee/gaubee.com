@@ -18,9 +18,10 @@ export const getAllEvents = func_remember(async () => {
         const createdAt = new Date(info.data.date || entry.stats.birthtimeMs);
         const tags = Array.isArray(info.data.tags) ? (info.data.tags as string[]) : [];
         const name = path.parse(entry.name).name;
+        console.log(entry.name,name)
         const title = match(info.data.title)
           .with(P.string.minLength(1), (title) => title)
-          .otherwise(() => name.split('.')[1].replaceAll('-', ' '));
+          .otherwise(() => name.split('.').at(-1)!.replaceAll('-', ' '));
         return {
           url: `/events/${name}/`,
           fileEntry: entry,
