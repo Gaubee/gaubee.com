@@ -1,11 +1,1 @@
-src/react.ts
 node_modules/
-dist/
-bundle/
-.DS_Store
-.env.local
-repos.json
-node_modules
-private
-old
-docs

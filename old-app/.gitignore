@@ -1,7 +1,0 @@
-node_modules
-private
-old
-docs
-.DS_Store
-.env.local
-vike-app/database/repos.json
