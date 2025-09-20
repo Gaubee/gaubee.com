@@ -1,13 +1,31 @@
 ---
+export interface Props {
+    tags: string[];
+}
+
+const { tags = [] } = Astro.props;
 ---
 <div class="sidebar-container">
     <div class="search-module">
         <input type="search" placeholder="搜索..." />
     </div>
-    <div class="tags-module">
-        <h3>分类导航</h3>
-        <p>(年份、月份、标签等功能将在此处实现)</p>
-    </div>
+
+    {tags.length > 0 && (
+        <div class="tags-module">
+            <h3>标签</h3>
+            <div class="tag-list">
+                {tags.map(tag => {
+                    const isRoot = Astro.url.pathname === '/';
+                    const link = isRoot ? `tags/${tag}.html` : `../${tag}.html`;
+                    return (
+                        <a href={link} class="tag-item">
+                            {tag}
+                        </a>
+                    );
+                })}
+            </div>
+        </div>
+    )}
 </div>
 
 <style>
@@ -32,8 +50,23 @@
         margin-top: 0;
         font-size: 1.25rem;
     }
-    p {
+    .tag-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+    .tag-item {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        background-color: #f0f0f0;
+        border-radius: 0.25rem;
+        text-decoration: none;
+        color: var(--c-text);
         font-size: 0.875rem;
-        color: #555;
+        transition: background-color 0.2s ease-in-out;
+    }
+    .tag-item:hover {
+        background-color: #e0e0e0;
     }
 </style>

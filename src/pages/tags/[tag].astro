@@ -1,0 +1,79 @@
+---
+import { getCollection } from 'astro:content';
+import HomeLayout from '../../layouts/HomeLayout.astro';
+import LeftSidebar from '../../components/LeftSidebar.astro';
+import RightSidebar from '../../components/RightSidebar.astro';
+import Card from '../../components/Card.tsx';
+
+export async function getStaticPaths() {
+  const articles = await getCollection('articles');
+  const events = await getCollection('events');
+  const allPosts = [...articles, ...events];
+  const allTags = [...new Set(allPosts.flatMap(post => post.data.tags || []))];
+
+  return allTags.map(tag => ({
+    params: { tag },
+  }));
+}
+
+const { tag } = Astro.params;
+
+// Re-fetch data for the component rendering scope
+const articles = await getCollection('articles');
+const events = await getCollection('events');
+const allPosts = [...articles, ...events];
+const allTags = [...new Set(allPosts.flatMap(post => post.data.tags || []))];
+
+const filteredPosts = allPosts.filter(post => post.data.tags?.includes(tag as string));
+---
+<HomeLayout title={`Tagged: ${tag}`}>
+    <div slot="left-sidebar">
+        <LeftSidebar />
+    </div>
+
+    <div slot="main-content">
+        <h1>Tagged: <span>{tag}</span></h1>
+        <p><a href="/">&larr; Back to all posts</a></p>
+
+        <div class="feed-container">
+            {filteredPosts.map(post => (
+                <Card
+                    href={`/${post.collection}/${post.slug}/`}
+                    title={post.data.title || post.slug}
+                    date={post.data.date}
+                    type={post.collection as 'article' | 'event'}
+                />
+            ))}
+        </div>
+    </div>
+
+    <div slot="right-sidebar">
+        <RightSidebar tags={allTags} />
+    </div>
+</HomeLayout>
+
+<style>
+	.feed-container {
+		display: flex;
+        flex-direction: column;
+		gap: 0;
+        border-left: 1px solid var(--c-border);
+        border-right: 1px solid var(--c-border);
+	}
+    h1 {
+        padding: 0 1rem;
+    }
+    h1 span {
+        color: rgb(var(--accent-dark));
+    }
+    p {
+        padding: 0 1rem;
+    }
+    p a {
+        color: var(--c-text);
+        text-decoration: none;
+    }
+    p a:hover {
+        text-decoration: underline;
+    }
+</style>
