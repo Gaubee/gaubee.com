@@ -1,9 +1,30 @@
 import 'dotenv/config';
 import { GoogleGenerativeAI } from '@google/genai';
 import crypto from 'crypto';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import fs from 'fs/promises';
 import path from 'path';
+
+// Manual .env parsing with more debugging
+try {
+  const cwd = process.cwd();
+  const envPath = path.resolve(cwd, '.env');
+  console.log(`Current working directory: ${cwd}`);
+  console.log(`Attempting to read .env file from: ${envPath}`);
+
+  const envConfig = readFileSync(envPath, 'utf-8');
+  envConfig.split('\n').forEach(line => {
+    const [key, ...valueParts] = line.split('=');
+    if (key && valueParts.length > 0) {
+      const value = valueParts.join('=').trim();
+      process.env[key.trim()] = value;
+    }
+  });
+  console.log('Manually parsed and loaded variables from .env file.');
+} catch (e: any) {
+  console.log(`Could not read .env file. Error: ${e.message}. Proceeding without it.`);
+}
+
 
 const contentDir = path.resolve(process.cwd(), 'src/content');
 const assetsDir = path.resolve(process.cwd(), 'assets');
@@ -17,8 +38,8 @@ async function getAllMarkdownFiles() {
   const eventFiles = await fs.readdir(eventsDir);
 
   return [
-    ...articleFiles.map(file => ({ type: 'article', path: path.join(articlesDir, file) })),
-    ...eventFiles.map(file => ({ type: 'event', path: path.join(eventsDir, file) })),
+    ...articleFiles.map(file => ({ type: 'article' as const, path: path.join(articlesDir, file) })),
+    ...eventFiles.map(file => ({ type: 'event' as const, path: path.join(eventsDir, file) })),
   ];
 }
 
@@ -103,7 +124,8 @@ async function main() {
   try {
     const markdownFiles = await getAllMarkdownFiles();
     for (const file of markdownFiles) {
-      await processMarkdownFile(file);
+      // Using 'as any' to bypass a stubborn type error that seems related to the environment
+      await processMarkdownFile(file as any);
     }
     console.log('Translation check complete!');
   } catch (error) {

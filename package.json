@@ -4,8 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsx scripts/build.ts && vite build",
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
     "translate": "tsx scripts/translate.ts"
   },
   "keywords": [],
@@ -13,10 +15,16 @@
   "license": "ISC",
   "packageManager": "pnpm@10.13.1",
   "dependencies": {
+    "@astrojs/react": "^4.3.1",
     "@google/genai": "^1.19.0",
     "@lit/task": "^1.0.3",
     "@octokit/rest": "^22.0.0",
-    "lit": "^3.3.1"
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "astro": "^5.13.9",
+    "lit": "^3.3.1",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
   },
   "devDependencies": {
     "@types/marked": "^6.0.0",

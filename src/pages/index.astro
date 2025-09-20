@@ -1,0 +1,40 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Card from '../components/Card.tsx';
+
+// Use Astro.glob() to fetch all posts from the content directory.
+const articles = await Astro.glob('../content/articles/*.md');
+const events = await Astro.glob('../content/events/*.md');
+
+const allPosts = [...articles, ...events].map(post => ({
+    ...post.frontmatter,
+    url: post.url,
+    type: post.file.includes('/articles/') ? 'article' : 'event'
+})).sort((a, b) => new Date(b.date).valueOf() - new Date(a.date).valueOf());
+
+const pageTitle = "GauBee's Blog";
+---
+<Layout title={pageTitle}>
+	<h1>GauBee's Feed</h1>
+    <p>A collection of articles and events.</p>
+
+    <ul role="list" class="card-grid">
+        {allPosts.map(post => (
+            <Card
+                href={post.url}
+                title={post.title}
+                date={post.date}
+                type={post.type}
+            />
+        ))}
+    </ul>
+</Layout>
+
+<style>
+	.card-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(24ch, 1fr));
+		gap: 1rem;
+		padding: 0;
+	}
+</style>
