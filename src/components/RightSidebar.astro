@@ -15,8 +15,7 @@ const { tags = [] } = Astro.props;
             <h3>标签</h3>
             <div class="tag-list">
                 {tags.map(tag => {
-                    const isRoot = Astro.url.pathname === '/';
-                    const link = isRoot ? `tags/${tag}.html` : `../${tag}.html`;
+                    const link = `/tags/${tag}.html`;
                     return (
                         <a href={link} class="tag-item">
                             {tag}
