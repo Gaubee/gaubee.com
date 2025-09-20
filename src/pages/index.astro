@@ -1,0 +1,43 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Card from '../components/Card.tsx';
+import { getCollection } from 'astro:content';
+
+// Use getCollection to fetch all posts from the content directory.
+const articles = await getCollection('articles');
+const events = await getCollection('events');
+
+// Combine and sort all posts, creating a unified structure for the cards.
+const allPosts = [...articles, ...events].map(post => ({
+    title: post.data.title || post.slug, // Use slug as a fallback title for events
+    date: post.data.date,
+    url: `/${post.collection}/${post.slug}/`, // Construct the URL based on collection and slug
+    type: post.collection as 'article' | 'event'
+})).sort((a, b) => new Date(b.date).valueOf() - new Date(a.date).valueOf());
+
+const pageTitle = "GauBee's Blog";
+---
+<Layout title={pageTitle}>
+	<h1>GauBee's Feed</h1>
+    <p>A collection of articles and events.</p>
+
+    <ul role="list" class="card-grid">
+        {allPosts.map(post => (
+            <Card
+                href={post.url}
+                title={post.title}
+                date={post.date}
+                type={post.type}
+            />
+        ))}
+    </ul>
+</Layout>
+
+<style>
+	.card-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(24ch, 1fr));
+		gap: 1rem;
+		padding: 0;
+	}
+</style>
