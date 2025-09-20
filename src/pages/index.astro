@@ -1,15 +1,18 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import Card from '../components/Card.tsx';
+import { getCollection } from 'astro:content';
 
-// Use Astro.glob() to fetch all posts from the content directory.
-const articles = await Astro.glob('../content/articles/*.md');
-const events = await Astro.glob('../content/events/*.md');
+// Use getCollection to fetch all posts from the content directory.
+const articles = await getCollection('articles');
+const events = await getCollection('events');
 
+// Combine and sort all posts, creating a unified structure for the cards.
 const allPosts = [...articles, ...events].map(post => ({
-    ...post.frontmatter,
-    url: post.url,
-    type: post.file.includes('/articles/') ? 'article' : 'event'
+    title: post.data.title || post.slug, // Use slug as a fallback title for events
+    date: post.data.date,
+    url: `/${post.collection}/${post.slug}/`, // Construct the URL based on collection and slug
+    type: post.collection as 'article' | 'event'
 })).sort((a, b) => new Date(b.date).valueOf() - new Date(a.date).valueOf());
 
 const pageTitle = "GauBee's Blog";
