@@ -1,9 +1,26 @@
 ---
+import { getCollection } from 'astro:content';
+
 export interface Props {
     tags: string[];
 }
 
 const { tags = [] } = Astro.props;
+
+const articles = await getCollection('articles');
+const events = await getCollection('events');
+const allPosts = [...articles, ...events].sort((a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime());
+
+const postsByMonth = allPosts.reduce((acc, post) => {
+    const year = post.data.date.getFullYear();
+    const month = (post.data.date.getMonth() + 1).toString().padStart(2, '0');
+    const key = `${year}-${month}`;
+    if (!acc[key]) {
+        acc[key] = 0;
+    }
+    acc[key]++;
+    return acc;
+}, {} as Record<string, number>);
 ---
 <div class="sidebar-container">
     <div class="search-module">
@@ -19,6 +36,23 @@ const { tags = [] } = Astro.props;
                     return (
                         <a href={link} class="tag-item">
                             {tag}
+                        </a>
+                    );
+                })}
+            </div>
+        </div>
+    )}
+
+    {Object.keys(postsByMonth).length > 0 && (
+        <div class="archive-module">
+            <h3>归档</h3>
+            <div class="archive-list">
+                {Object.entries(postsByMonth).map(([month, count]) => {
+                    const [year, monthNum] = month.split('-');
+                    const link = `/archive/${year}/${monthNum}`;
+                    return (
+                        <a href={link} class="archive-item">
+                            {year}年{monthNum}月 ({count})
                         </a>
                     );
                 })}
@@ -67,5 +101,26 @@ const { tags = [] } = Astro.props;
     }
     .tag-item:hover {
         background-color: #e0e0e0;
+    }
+
+    .archive-module {
+        margin-top: 1.5rem;
+    }
+
+    .archive-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+
+    .archive-item {
+        text-decoration: none;
+        color: var(--c-text);
+        font-size: 0.95rem;
+    }
+
+    .archive-item:hover {
+        text-decoration: underline;
     }
 </style>

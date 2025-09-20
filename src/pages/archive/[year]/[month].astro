@@ -1,39 +1,51 @@
 ---
 import { getCollection } from 'astro:content';
-import HomeLayout from '../../layouts/HomeLayout.astro';
-import LeftSidebar from '../../components/LeftSidebar.astro';
-import RightSidebar from '../../components/RightSidebar.astro';
-import Card from '../../components/Card.tsx';
+import HomeLayout from '../../../layouts/HomeLayout.astro';
+import LeftSidebar from '../../../components/LeftSidebar.astro';
+import RightSidebar from '../../../components/RightSidebar.astro';
+import Card from '../../../components/Card.tsx';
 
 export async function getStaticPaths() {
-  const articles = await getCollection('articles');
-  const events = await getCollection('events');
-  const allPosts = [...articles, ...events];
-  const allTags = [...new Set(allPosts.flatMap(post => post.data.tags || []))];
+    const articles = await getCollection('articles');
+    const events = await getCollection('events');
+    const allPosts = [...articles, ...events];
 
-  return allTags.map(tag => ({
-    params: { tag },
-  }));
+    const postsByMonth = allPosts.reduce((acc, post) => {
+        const year = post.data.date.getFullYear().toString();
+        const month = (post.data.date.getMonth() + 1).toString().padStart(2, '0');
+        const key = `${year}-${month}`;
+        if (!acc.has(key)) {
+            acc.set(key, { year, month });
+        }
+        return acc;
+    }, new Map<string, { year: string; month: string }>());
+
+    return Array.from(postsByMonth.values()).map(params => ({
+        params,
+    }));
 }
 
-const { tag } = Astro.params;
+const { year, month } = Astro.params;
 
-// Re-fetch data for the component rendering scope
 const articles = await getCollection('articles');
 const events = await getCollection('events');
 const allPosts = [...articles, ...events];
 const allTags = [...new Set(allPosts.flatMap(post => post.data.tags || []))];
 
-const filteredPosts = allPosts.filter(post => post.data.tags?.includes(tag as string));
+const filteredPosts = allPosts.filter(post => {
+    const postYear = post.data.date.getFullYear().toString();
+    const postMonth = (post.data.date.getMonth() + 1).toString().padStart(2, '0');
+    return postYear === year && postMonth === month;
+});
 ---
-<HomeLayout title={`Tagged: ${tag}`}>
+<HomeLayout title={`Archive: ${year}-${month}`}>
     <div slot="left-sidebar">
         <LeftSidebar />
     </div>
 
     <div slot="main-content">
         <div class="heading-container">
-            <h1>Tagged: <span>{tag}</span></h1>
+            <h1>Archive: <span>{year}年{month}月</span></h1>
             <p><a href="/">&larr; Back to all posts</a></p>
         </div>
 
