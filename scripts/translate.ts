@@ -1,4 +1,5 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import 'dotenv/config';
+import { GoogleGenerativeAI } from '@google/genai';
 import crypto from 'crypto';
 import { existsSync } from 'fs';
 import fs from 'fs/promises';
@@ -71,7 +72,7 @@ async function processMarkdownFile(file: { type: 'article' | 'event', path: stri
     console.log('  - GOOGLE_API_KEY not set, skipping actual translation.');
     return;
   }
-  // (To be implemented)
+
   const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
   const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
@@ -87,7 +88,7 @@ async function processMarkdownFile(file: { type: 'article' | 'event', path: stri
   let newFilename = fileInfo.name;
   if (/^\d+$/.test(fileInfo.name.split('.')[0])) {
     const filenamePrompt = `Generate a descriptive, URL-friendly filename (kebab-case) for the following markdown content. The filename should be in English and should not include the file extension.`;
-    const filenameResult = await model.generateContent(`${filenamePrompt}\n\n${translatedContent}`);
+    const filenameResult = await model.generateContent(`${prompt}\n\n${translatedContent}`);
     newFilename = filenameResult.response.text().trim();
   }
 

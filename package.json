@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsx scripts/build.ts && vite build",
     "translate": "tsx scripts/translate.ts"
   },
   "keywords": [],
@@ -13,11 +14,16 @@
   "packageManager": "pnpm@10.13.1",
   "dependencies": {
     "@google/genai": "^1.19.0",
+    "@lit/task": "^1.0.3",
     "@octokit/rest": "^22.0.0",
     "lit": "^3.3.1"
   },
   "devDependencies": {
+    "@types/marked": "^6.0.0",
     "@types/node": "^24.5.0",
+    "dotenv": "^17.2.2",
+    "gray-matter": "^4.0.3",
+    "marked": "^16.3.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vite": "^7.1.5",
