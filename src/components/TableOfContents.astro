@@ -1,0 +1,75 @@
+---
+import type { MarkdownHeading } from 'astro';
+
+export interface Props {
+  headings: MarkdownHeading[];
+}
+
+const { headings } = Astro.props;
+
+// Filter to only include h2 and h3 headings for a cleaner ToC
+const filteredHeadings = headings.filter(h => h.depth === 2 || h.depth === 3);
+---
+
+<div class="toc-container">
+  <h3>目录</h3>
+  <ul class="toc-list">
+    {filteredHeadings.map(heading => (
+      <li class={`toc-item depth-${heading.depth}`}>
+        <a href={`#${heading.slug}`}>{heading.text}</a>
+      </li>
+    ))}
+  </ul>
+</div>
+
+<style>
+  .toc-container {
+    padding: 1rem;
+    background-color: #ffffff;
+    border-radius: 0.5rem;
+    border: 1px solid var(--c-border);
+  }
+  h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+  }
+  .toc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .toc-item a {
+    display: block;
+    color: #555;
+    text-decoration: none;
+    padding: 0.4rem 0;
+    font-size: 0.9rem;
+    transition: color 0.2s ease-in-out;
+  }
+  .toc-item a:hover {
+    color: var(--c-text);
+  }
+  .toc-item.depth-3 a {
+    padding-left: 1.5rem;
+  }
+</style>
+<script>
+  // Client-side script for smooth scrolling
+  document.addEventListener('DOMContentLoaded', () => {
+    const links = document.querySelectorAll('.toc-item a');
+
+    for (const link of links) {
+      link.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        const href = (ev.target as HTMLAnchorElement).getAttribute('href');
+        if (href) {
+            const targetElement = document.querySelector(href);
+            if (targetElement) {
+                targetElement.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+      });
+    }
+  });
+</script>

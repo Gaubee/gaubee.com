@@ -1,5 +1,7 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import HomeLayout from '../layouts/HomeLayout.astro';
+import LeftSidebar from '../components/LeftSidebar.astro';
+import RightSidebar from '../components/RightSidebar.astro';
 import Card from '../components/Card.tsx';
 import { getCollection } from 'astro:content';
 
@@ -17,27 +19,41 @@ const allPosts = [...articles, ...events].map(post => ({
 
 const pageTitle = "GauBee's Blog";
 ---
-<Layout title={pageTitle}>
-	<h1>GauBee's Feed</h1>
-    <p>A collection of articles and events.</p>
+<HomeLayout title={pageTitle}>
+    <div slot="left-sidebar">
+        <LeftSidebar />
+    </div>
 
-    <ul role="list" class="card-grid">
-        {allPosts.map(post => (
-            <Card
-                href={post.url}
-                title={post.title}
-                date={post.date}
-                type={post.type}
-            />
-        ))}
-    </ul>
-</Layout>
+    <div slot="main-content">
+        <h1>GauBee's Feed</h1>
+        <p>A collection of articles and events.</p>
+
+        <div class="feed-container">
+            {allPosts.map(post => (
+                <Card
+                    href={post.url}
+                    title={post.title}
+                    date={post.data.date}
+                    type={post.type}
+                />
+            ))}
+        </div>
+    </div>
+
+    <div slot="right-sidebar">
+        <RightSidebar />
+    </div>
+</HomeLayout>
 
 <style>
-	.card-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(24ch, 1fr));
-		gap: 1rem;
-		padding: 0;
+	.feed-container {
+		display: flex;
+        flex-direction: column;
+		gap: 0; /* Remove gap, handle spacing with borders */
+        border-left: 1px solid var(--c-border);
+        border-right: 1px solid var(--c-border);
 	}
+    h1, p {
+        padding: 0 1rem;
+    }
 </style>

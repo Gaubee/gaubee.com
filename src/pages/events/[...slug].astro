@@ -15,11 +15,40 @@ const post = Astro.props;
 const { Content } = await post.render();
 ---
 
-<Layout title={post.data.title}>
-	<article>
-		<h1>{post.data.title}</h1>
-        <p>Published on: {new Date(post.data.date).toLocaleDateString()}</p>
-		<hr />
-		<Content />
-	</article>
+<Layout title={post.data.title || post.slug}>
+    <div class="event-container">
+        <a href="/" class="home-link">← 返回主页</a>
+        <article>
+            <h1>{post.data.title || post.slug}</h1>
+            <p class="meta">Published on: {new Date(post.data.date).toLocaleDateString()}</p>
+            <hr />
+            <Content />
+        </article>
+    </div>
 </Layout>
+<style>
+    .event-container {
+        max-width: 75ch;
+        margin: auto;
+        padding: 2rem;
+    }
+    .home-link {
+        display: block;
+        margin-bottom: 1rem;
+        color: var(--c-text);
+        text-decoration: none;
+        font-weight: 500;
+    }
+    .home-link:hover {
+        text-decoration: underline;
+    }
+    article {
+        background-color: #ffffff;
+        border: 1px solid var(--c-border);
+        border-radius: 0.5rem;
+        padding: 2rem 3rem;
+    }
+    .meta {
+        color: #555;
+    }
+</style>
