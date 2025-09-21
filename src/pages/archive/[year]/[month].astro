@@ -52,8 +52,8 @@ const filteredPosts = allPosts.filter(post => {
         <div class="feed-container">
             {filteredPosts.map(post => (
                 <Card
-                    href={`/${post.collection}/${post.slug}/`}
-                    title={post.data.title || post.slug}
+                    href={`/${post.collection}/${post.id}/`}
+                    title={post.data.title || post.id}
                     date={post.data.date}
                     type={post.collection as 'article' | 'event'}
                 />

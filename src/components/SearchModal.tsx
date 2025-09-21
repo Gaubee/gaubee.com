@@ -25,13 +25,14 @@ interface SearchResultData {
   id: string;
   title: string;
   description?: string;
-  slug: string;
+  collection: string;
 }
 interface SearchResult extends MiniSearchResult {
   match: Record<string, string[]>;
   title: string;
-  slug: string;
+  id: string;
   description?: string;
+  collection: string;
 }
 
 // A component to highlight matched terms in a text
@@ -86,7 +87,7 @@ const SearchModal: React.FC = () => {
       const searchIndexText = await indexResponse.text();
       miniSearch.current = MiniSearch.loadJSON(searchIndexText, {
         fields: ["title", "description", "tags", "content"],
-        storeFields: ["title", "description", "slug"],
+        storeFields: ["title", "description", "collection", "id"],
         idField: "id",
       });
       console.log("Search index loaded and initialized.");
@@ -191,7 +192,10 @@ const SearchModal: React.FC = () => {
                   className="rounded-lg"
                   gradientColor="var(--color-text-base)"
                 >
-                  <a href={`/${result.slug}.html`} className="block p-4">
+                  <a
+                    href={`/${result.collection}/${result.id}/`}
+                    className="block p-4"
+                  >
                     <h3 className="font-semibold text-lg text-foreground mb-1">
                       <Highlight text={result.title} terms={allMatchedTerms} />
                     </h3>

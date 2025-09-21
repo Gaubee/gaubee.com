@@ -1,25 +1,25 @@
 ---
-import { type CollectionEntry, getCollection } from 'astro:content';
+import { type CollectionEntry, getCollection, render } from 'astro:content';
 import Layout from '../../layouts/Layout.astro';
 
 export async function getStaticPaths() {
   const posts = await getCollection('events');
   return posts.map(post => ({
-    params: { slug: post.slug },
+    params: { slug: post.id },
     props: post,
   }));
 }
 type Props = CollectionEntry<'events'>;
 
 const post = Astro.props;
-const { Content } = await post.render();
+const { Content } = await render(post);
 ---
 
-<Layout title={post.data.title || post.slug}>
+<Layout title={post.data.title || post.id}>
     <div class="event-container">
         <a href="/" class="home-link">← 返回主页</a>
         <article>
-            <h1>{post.data.title || post.slug}</h1>
+            <h1>{post.data.title || post.id}</h1>
             <p class="meta">Published on: {new Date(post.data.date).toLocaleDateString()}</p>
             <hr />
             <Content />

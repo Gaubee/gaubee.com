@@ -11,7 +11,7 @@ interface Document {
   description: string;
   tags: string[];
   content: string;
-  slug: string;
+  collection: string;
 }
 
 async function generateSearchIndex() {
@@ -20,7 +20,7 @@ async function generateSearchIndex() {
   // 1. Initialize MiniSearch
   const miniSearch = new MiniSearch<Document>({
     fields: ["title", "description", "tags", "content"], // Fields to index for searching
-    storeFields: ["title", "description", "slug"], // Fields to store and return with search results
+    storeFields: ["title", "description", "collection", "id"], // Fields to store and return with search results
     idField: "id",
   });
 
@@ -43,16 +43,18 @@ async function generateSearchIndex() {
       }
 
       // Determine slug from file path
-      const type = filePath.includes("/articles/") ? "articles" : "events";
-      const slug = `${type}/${path.basename(filePath, ".md")}`;
+      const collection = filePath.includes("/articles/")
+        ? "articles"
+        : "events";
+      const id = path.basename(filePath, ".md");
 
       const doc: Document = {
-        id: slug,
-        slug: slug,
+        id: id,
         title: data.title,
         description: data.description || content.substring(0, 150), // Use description or excerpt
         tags: data.tags || [],
         content: content, // The full text content for searching
+        collection: collection,
       };
 
       await miniSearch.add(doc);
