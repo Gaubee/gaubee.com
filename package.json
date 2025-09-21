@@ -19,6 +19,10 @@
   "keywords": [],
   "author": "Gaubee",
   "license": "ISC",
+  "repository": {
+    "url": "https://github.com/gaubee/gaubee.com.git"
+  },
+  "homepage": "https://gaubee.com/",
   "packageManager": "pnpm@10.17.0",
   "dependencies": {
     "@astrojs/react": "^4.3.1",
