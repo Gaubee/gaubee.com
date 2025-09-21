@@ -129,4 +129,9 @@ const { title } = Astro.props;
   .main-content h3 {
     scroll-margin-top: 2rem; /* Offset for smooth scrolling */
   }
+
+  /* Fix for grid blowout issue where wide content (like code blocks) stretches the layout */
+  .container > div:first-child {
+    min-width: 0;
+  }
 </style>
