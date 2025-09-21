@@ -1,0 +1,123 @@
+---
+import { cn } from "@/lib/utils";
+import RightSidebar from "./RightSidebar.astro";
+import type { MarkdownHeading } from "astro";
+
+interface Props {
+  headings: MarkdownHeading[];
+  title?: string;
+  className?: string;
+}
+
+const { headings, title = "", className } = Astro.props;
+---
+
+<div
+  id="mobile-topbar"
+  class={cn(
+    "sticky top-0 z-50 flex h-14 items-center justify-between border-b border-zinc-200 bg-white/80 px-4 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/80",
+    className,
+  )}
+>
+  <button id="back-button" aria-label="Go back">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="lucide lucide-arrow-left"
+      ><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg
+    >
+  </button>
+  <div
+    class="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-zinc-700 dark:text-zinc-300"
+  >
+    {title}
+  </div>
+  <button id="menu-button" aria-label="Open menu">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="lucide lucide-menu"
+      ><line x1="4" x2="20" y1="12" y2="12"></line><line
+        x1="4"
+        x2="20"
+        y1="6"
+        y2="6"></line><line x1="4" x2="20" y1="18" y2="18"></line></svg
+    >
+  </button>
+</div>
+
+<div
+  id="drawer-overlay"
+  class="fixed inset-0 z-40 hidden bg-black/40 lg:hidden"
+>
+</div>
+
+<div
+  id="drawer-menu"
+  class="fixed top-0 right-0 z-50 h-full w-80 max-w-[calc(100%-4rem)] translate-x-full transform bg-white shadow-lg transition-transform duration-300 ease-in-out lg:hidden dark:bg-zinc-900"
+>
+  <div class="h-full overflow-y-auto p-4">
+    <RightSidebar headings={headings} />
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const menuButton = document.getElementById("menu-button");
+    const backButton = document.getElementById("back-button");
+    const drawerMenu = document.getElementById("drawer-menu");
+    const drawerOverlay = document.getElementById("drawer-overlay");
+
+    const openMenu = () => {
+      drawerMenu?.classList.remove("translate-x-full");
+      drawerOverlay?.classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+    };
+
+    const closeMenu = () => {
+      drawerMenu?.classList.add("translate-x-full");
+      drawerOverlay?.classList.add("hidden");
+      document.body.style.overflow = "";
+    };
+
+    menuButton?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isClosed = drawerMenu?.classList.contains("translate-x-full");
+      if (isClosed) {
+        openMenu();
+      } else {
+        closeMenu();
+      }
+    });
+
+    backButton?.addEventListener("click", () => {
+      window.history.back();
+    });
+
+    drawerOverlay?.addEventListener("click", closeMenu);
+
+    // Close menu on escape key
+    document.addEventListener("keydown", (e) => {
+      if (
+        e.key === "Escape" &&
+        !drawerMenu?.classList.contains("translate-x-full")
+      ) {
+        closeMenu();
+      }
+    });
+  });
+</script>

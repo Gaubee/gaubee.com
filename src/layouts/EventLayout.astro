@@ -3,12 +3,16 @@ import "../tailwind.css";
 import { ClientRouter } from "astro:transitions";
 import "../components/com-youtube-player.ts";
 import "../components/com-mix-blend-mode-gradient-text.ts";
+import BackToTop from "../components/BackToTop.astro";
+import MobileTopbar from "@/components/MobileTopbar.astro";
+import type { MarkdownHeading } from "astro";
 
 interface Props {
   title: string;
+  headings: MarkdownHeading[];
 }
 
-const { title } = Astro.props;
+const { title, headings } = Astro.props;
 ---
 
 <!doctype html>
@@ -23,9 +27,10 @@ const { title } = Astro.props;
     <ClientRouter />
   </head>
   <body>
-    <div class="container">
+    <MobileTopbar headings={headings} className="lg:hidden" />
+    <div class="mx-auto grid max-w-4xl grid-cols-1 gap-6 p-4 pb-24">
       <div>
-        <a href="/" class="home-link">← 返回主页</a>
+        <a href="/" class="home-link max-lg:hidden">← 返回主页</a>
         <main class="main-content">
           <slot name="main-content" />
         </main>
@@ -34,6 +39,7 @@ const { title } = Astro.props;
         <slot name="right-sidebar" />
       </aside>
     </div>
+    <BackToTop />
   </body>
 </html>
 <style is:global>

@@ -1,18 +1,20 @@
 ---
 import { getCollection } from "astro:content";
-import SearchModal from "./SearchModal";
+import TableOfContents from "./TableOfContents.astro";
+import type { MarkdownHeading } from "astro";
 import { Button } from "@/components/ui/button";
 
-export interface Props {
-  tags: string[];
+interface Props {
+  headings?: MarkdownHeading[];
+  tags?: string[];
 }
 
-const { tags = [] } = Astro.props;
+const { headings, tags } = Astro.props;
 
 const articles = await getCollection("articles");
 const events = await getCollection("events");
 const allPosts = [...articles, ...events].sort(
-  (a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime()
+  (a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime(),
 );
 
 const postsByMonth = allPosts.reduce(
@@ -26,111 +28,44 @@ const postsByMonth = allPosts.reduce(
     acc[key]++;
     return acc;
   },
-  {} as Record<string, number>
+  {} as Record<string, number>,
 );
 ---
 
-<div class="sidebar-container">
-  <div class="search-module">
-    <SearchModal client:load />
-  </div>
+<div class="flex flex-col gap-8">
+  {headings && headings.length > 0 && <TableOfContents headings={headings} />}
 
   {
-    tags.length > 0 && (
-      <div class="tags-module">
-        <h3>标签</h3>
-        <div class="tag-list">
-          {tags.map((tag) => {
-            const link = `/tags/${tag}.html`;
-            return (
-              <a href={link}>
-                <Button>{tag}</Button>
+    tags && (
+      <>
+        <div class="tags-module">
+          <h3 class="mb-4 text-lg font-bold">标签</h3>
+          <div class="flex flex-wrap gap-2">
+            {tags.map((tag) => (
+              <a href={`/tags/${tag}`}>
+                <Button variant="outline">{tag}</Button>
               </a>
-            );
-          })}
+            ))}
+          </div>
         </div>
-      </div>
-    )
-  }
 
-  {
-    Object.keys(postsByMonth).length > 0 && (
-      <div class="archive-module">
-        <h3>归档</h3>
-        <div class="archive-list">
-          {Object.entries(postsByMonth).map(([month, count]) => {
-            const [year, monthNum] = month.split("-");
-            const link = `/archive/${year}/${monthNum}`;
-            return (
-              <a href={link} class="archive-item">
-                <Button>
-                  {year}年{monthNum}月 ({count})
-                </Button>
-              </a>
-            );
-          })}
+        <div class="archive-module">
+          <h3 class="mb-4 text-lg font-bold">归档</h3>
+          <div class="flex flex-col gap-2">
+            {Object.entries(postsByMonth).map(([month, count]) => {
+              const [year, monthNum] = month.split("-");
+              const link = `/archive/${year}/${monthNum}`;
+              return (
+                <a href={link}>
+                  <Button variant="ghost" className="w-full justify-start">
+                    {year}年{monthNum}月 ({count})
+                  </Button>
+                </a>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      </>
     )
   }
 </div>
-
-
-<style>
-  .sidebar-container {
-    padding: 1rem;
-    background-color: #ffffff;
-    border-radius: 0.5rem;
-    border: 1px solid var(--c-border);
-  }
-  .search-module {
-    /* The SearchModal now handles its own trigger button */
-  }
-  .tags-module {
-    margin-top: 1.5rem;
-  }
-  h3 {
-    margin-top: 0;
-    font-size: 1.25rem;
-  }
-  .tag-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
-  }
-  .tag-item {
-    display: inline-block;
-    padding: 0.25rem 0.75rem;
-    background-color: #f0f0f0;
-    border-radius: 0.25rem;
-    text-decoration: none;
-    color: var(--c-text);
-    font-size: 0.875rem;
-    transition: background-color 0.2s ease-in-out;
-  }
-  .tag-item:hover {
-    background-color: #e0e0e0;
-  }
-
-  .archive-module {
-    margin-top: 1.5rem;
-  }
-
-  .archive-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
-  }
-
-  .archive-item {
-    text-decoration: none;
-    color: var(--c-text);
-    font-size: 0.95rem;
-  }
-
-  .archive-item:hover {
-    text-decoration: underline;
-  }
-</style>

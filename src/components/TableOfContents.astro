@@ -53,23 +53,78 @@ const filteredHeadings = headings.filter(h => h.depth === 2 || h.depth === 3);
   .toc-item.depth-3 a {
     padding-left: 1.5rem;
   }
+  .toc-item a.active {
+    color: hsl(var(--primary));
+    font-weight: 600;
+  }
 </style>
 <script>
-  // Client-side script for smooth scrolling
   document.addEventListener('DOMContentLoaded', () => {
-    const links = document.querySelectorAll('.toc-item a');
+    const tocLinks = Array.from(document.querySelectorAll('.toc-item a')) as HTMLAnchorElement[];
+    const headings = tocLinks.map(link => {
+      const id = link.getAttribute('href')?.slice(1);
+      return id ? document.getElementById(id) : null;
+    }).filter(Boolean) as HTMLElement[];
 
-    for (const link of links) {
+    if (headings.length === 0) return;
+
+    // Smooth scroll logic
+    tocLinks.forEach(link => {
       link.addEventListener('click', (ev) => {
         ev.preventDefault();
-        const href = (ev.target as HTMLAnchorElement).getAttribute('href');
+        const href = link.getAttribute('href');
         if (href) {
-            const targetElement = document.querySelector(href);
-            if (targetElement) {
-                targetElement.scrollIntoView({ behavior: 'smooth' });
-            }
+          const targetElement = document.querySelector(href);
+          if (targetElement) {
+            targetElement.scrollIntoView({ behavior: 'smooth' });
+          }
         }
       });
-    }
+    });
+
+    // Scroll-spy logic
+    let activeHeadingId = '';
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        const id = entry.target.getAttribute('id');
+        const tocLink = tocLinks.find(a => a.getAttribute('href') === `#${id}`);
+        if (entry.isIntersecting) {
+          tocLink?.classList.add('active');
+        } else {
+          tocLink?.classList.remove('active');
+        }
+      });
+
+      // Determine which active link is the "current" one (highest on screen)
+      const activeLinks = document.querySelectorAll('.toc-item a.active');
+      let highestVisibleLink = null;
+      let minTop = Infinity;
+
+      activeLinks.forEach(link => {
+        const id = link.getAttribute('href')?.slice(1);
+        const heading = document.getElementById(id!);
+        if (heading) {
+          const rect = heading.getBoundingClientRect();
+          if (rect.top >= 0 && rect.top < minTop) {
+            minTop = rect.top;
+            highestVisibleLink = link;
+          }
+        }
+      });
+
+      tocLinks.forEach(link => link.classList.remove('active'));
+      if (highestVisibleLink) {
+        (highestVisibleLink as HTMLElement).classList.add('active');
+      }
+
+    }, {
+      rootMargin: '0px 0px -80% 0px',
+      threshold: 0
+    });
+
+    headings.forEach(heading => {
+      observer.observe(heading);
+    });
   });
 </script>

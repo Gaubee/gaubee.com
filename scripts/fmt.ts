@@ -25,14 +25,16 @@ function gitChangedFiles(): string[] {
     .split(/\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean)
-    .filter((filename) => /\.(ts|tsx|mts|cts|css|html|json)/.test(filename));
+    .filter((filename) =>
+      /\.(ts|tsx|mts|cts|css|html|json|astro)/.test(filename),
+    );
 }
 
 function run(cmd: string, args: string[]): void {
   console.log(
     green(
-      `Running: ${cmd} ${args.slice(0, args.indexOf("--experimental-cli"))}`
-    )
+      `Running: ${cmd} ${args.slice(0, args.indexOf("--experimental-cli"))}`,
+    ),
   );
   const child = $(cmd, args, {
     stdio: "inherit",

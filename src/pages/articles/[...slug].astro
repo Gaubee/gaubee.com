@@ -1,7 +1,6 @@
 ---
 import { type CollectionEntry, getCollection, render } from 'astro:content';
 import ArticleLayout from '../../layouts/ArticleLayout.astro';
-import TableOfContents from '../../components/TableOfContents.astro';
 
 export async function getStaticPaths() {
   const posts = await getCollection('articles');
@@ -16,15 +15,11 @@ const post = Astro.props;
 const { Content, headings } = await render(post);
 ---
 
-<ArticleLayout title={post.data.title}>
+<ArticleLayout title={post.data.title} headings={headings}>
 	<article slot="main-content">
 		<h1>{post.data.title}</h1>
         <p>Published on: {new Date(post.data.date).toLocaleDateString()}</p>
 		<hr />
 		<Content />
 	</article>
-
-    <div slot="right-sidebar">
-        <TableOfContents headings={headings} />
-    </div>
 </ArticleLayout>

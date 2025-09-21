@@ -1,0 +1,48 @@
+---
+
+---
+
+<button
+  id="back-to-top"
+  aria-label="Back to top"
+  class="fixed right-8 bottom-8 z-50 !hidden flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900/20 text-white shadow-lg backdrop-blur-sm backdrop-saturate-200 transition-opacity duration-300 hover:bg-zinc-700 dark:bg-zinc-100/20 dark:text-zinc-900 dark:hover:bg-zinc-300"
+>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    class="lucide lucide-arrow-up"
+    ><path d="m5 12 7-7 7 7"></path><path d="M12 19V5"></path></svg
+  >
+</button>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const backToTopButton = document.getElementById("back-to-top");
+
+    if (backToTopButton) {
+      // Show button when scrolling down
+      window.addEventListener("scroll", () => {
+        if (window.scrollY > 200) {
+          backToTopButton.classList.remove("!hidden");
+        } else {
+          backToTopButton.classList.add("!hidden");
+        }
+      });
+
+      // Scroll to top on click
+      backToTopButton.addEventListener("click", () => {
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+      });
+    }
+  });
+</script>
