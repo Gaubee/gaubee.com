@@ -21,3 +21,9 @@ jules-scratch/
 .vscode/
 *.swp
 *.swo
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
