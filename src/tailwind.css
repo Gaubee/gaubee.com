@@ -118,4 +118,12 @@
   body {
     @apply bg-background text-foreground;
   }
+  mark {
+    @apply rounded-sm px-0.5 py-0;
+    background-color: oklch(0.95 0.15 90);
+    color: oklch(0.4 0.15 90);
+  }
+  .dark mark {
+    background-color: oklch(0.95 0.15 90 / 25%);
+  }
 }

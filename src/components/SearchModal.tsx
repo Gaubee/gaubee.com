@@ -1,32 +1,52 @@
-import React, { useState, useEffect } from "react";
-import type { SearchResult } from "minisearch";
+import React, { useState, useEffect, useMemo, Fragment } from "react";
+import type { SearchResult as MiniSearchResult } from "minisearch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
-// Simple styles for the modal, can be improved later
-const modalStyles: React.CSSProperties = {
-  position: "fixed",
-  top: "50%",
-  left: "50%",
-  transform: "translate(-50%, -50%)",
-  backgroundColor: "white",
-  padding: "2rem",
-  borderRadius: "8px",
-  boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-  zIndex: 1000,
-  width: "90%",
-  maxWidth: "600px",
-  maxHeight: "80vh",
-  overflowY: "auto",
-  color: "#333", // Ensuring text is visible
-};
+// Define a more specific type for our search results, including the match data
+interface SearchResult extends MiniSearchResult {
+  match: Record<string, string[]>;
+  title: string;
+  slug: string;
+  description?: string;
+}
 
-const overlayStyles: React.CSSProperties = {
-  position: "fixed",
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: "rgba(0, 0, 0, 0.5)",
-  zIndex: 999,
+// A component to highlight matched terms in a text
+const Highlight: React.FC<{ text: string; terms: string[] }> = ({
+  text,
+  terms,
+}) => {
+  if (!terms.length || !text) {
+    return <>{text}</>;
+  }
+
+  // Create a single regex to find any of the terms
+  const regex = new RegExp(
+    `(${terms
+      .map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("|")})`,
+    "gi",
+  );
+  const parts = text.split(regex);
+
+  return (
+    <>
+      {parts.map((part, i) =>
+        terms.some(
+          (term) => part.toLowerCase() === term.toLowerCase(),
+        ) ? (
+          <mark key={i}>{part}</mark>
+        ) : (
+          <Fragment key={i}>{part}</Fragment>
+        ),
+      )}
+    </>
+  );
 };
 
 const SearchModal: React.FC = () => {
@@ -41,74 +61,78 @@ const SearchModal: React.FC = () => {
       setIsOpen(true);
     };
 
-    const handleClose = () => setIsOpen(false);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setIsOpen((open) => !open);
+      }
+    };
 
     document.addEventListener(
       "show-search-results",
       handleShowResults as EventListener,
     );
-    document.body.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") {
-        handleClose();
-      }
-    });
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
       document.removeEventListener(
         "show-search-results",
         handleShowResults as EventListener,
       );
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
 
-  if (!isOpen) {
-    return null;
-  }
+  const allMatchedTerms = useMemo(() => {
+    if (!results.length) return [];
+    const terms = new Set<string>();
+    results.forEach((result) => {
+      Object.values(result.match).forEach((fieldMatches) => {
+        fieldMatches.forEach((term) => terms.add(term));
+      });
+    });
+    return Array.from(terms);
+  }, [results]);
 
   return (
-    <>
-      <div style={overlayStyles} onClick={() => setIsOpen(false)} />
-      <div style={modalStyles}>
-        <button
-          onClick={() => setIsOpen(false)}
-          style={{
-            position: "absolute",
-            top: "1rem",
-            right: "1rem",
-            cursor: "pointer",
-          }}
-        >
-          &times;
-        </button>
-        <h2>搜索结果: "{query}"</h2>
-        {results.length > 0 ? (
-          <ul style={{ listStyle: "none", padding: 0 }}>
-            {results.map((result) => (
-              <li
-                key={result.id}
-                style={{
-                  marginBottom: "1rem",
-                  borderBottom: "1px solid #eee",
-                  paddingBottom: "1rem",
-                }}
-              >
-                <a
-                  href={`/${result.slug}.html`}
-                  style={{ textDecoration: "none", color: "#007bff" }}
-                >
-                  <h3 style={{ margin: "0 0 0.5rem 0" }}>{result.title}</h3>
-                  <p style={{ margin: 0, color: "#555" }}>
-                    {result.description}
-                  </p>
-                </a>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>没有找到与 "{query}" 相关的内容。</p>
-        )}
-      </div>
-    </>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogContent className="sm:max-w-[650px] bg-background/80 backdrop-blur-sm">
+        <DialogHeader>
+          <DialogTitle>搜索结果: "{query}"</DialogTitle>
+          <DialogDescription>
+            {results.length > 0
+              ? `找到了 ${results.length} 个结果。`
+              : `没有找到与 "${query}" 相关的内容。`}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="max-h-[60vh] overflow-y-auto pr-4 -mr-4">
+          {results.length > 0 && (
+            <ul className="list-none p-0">
+              {results.map((result) => (
+                <li key={result.id} className="mb-2 last:mb-0">
+                  <a
+                    href={`/${result.slug}.html`}
+                    className="block p-4 rounded-lg transition-colors hover:bg-muted/50"
+                  >
+                    <h3 className="font-semibold text-lg text-foreground mb-1">
+                      <Highlight text={result.title} terms={allMatchedTerms} />
+                    </h3>
+                    {result.description && (
+                      <p className="text-muted-foreground text-sm">
+                        <Highlight
+                          text={result.description}
+                          terms={allMatchedTerms}
+                        />
+                      </p>
+                    )}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
