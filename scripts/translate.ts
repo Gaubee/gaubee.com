@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { GoogleGenerativeAI } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import crypto from "crypto";
 import { existsSync, readFileSync } from "fs";
 import fs from "fs/promises";
@@ -23,7 +23,7 @@ try {
   console.log("Manually parsed and loaded variables from .env file.");
 } catch (e: any) {
   console.log(
-    `Could not read .env file. Error: ${e.message}. Proceeding without it.`,
+    `Could not read .env file. Error: ${e.message}. Proceeding without it.`
   );
 }
 
@@ -104,27 +104,33 @@ async function processMarkdownFile(file: {
     return;
   }
 
-  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
-  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-
-  const { totalTokens } = await model.countTokens(fileContent);
+  const genAI = new GoogleGenAI({
+    apiKey: process.env.GOOGLE_API_KEY!,
+  });
+  const model = "gemini-2.5-flash";
+  const { totalTokens } = await genAI.models.countTokens({
+    model,
+    contents: fileContent,
+  });
   console.log(`  - Token count: ${totalTokens}`);
 
   // Translate content
   const contentPrompt = `Translate the following markdown content to English. Keep the original markdown formatting. Frontmatter should also be translated.`;
-  const contentResult = await model.generateContent(
-    `${contentPrompt}\n\n${fileContent}`,
-  );
-  const translatedContent = contentResult.response.text();
+  const contentResult = await genAI.models.generateContent({
+    model,
+    contents: `${contentPrompt}\n\n${fileContent}`,
+  });
+  const translatedContent = contentResult.text ?? "";
 
   // Generate filename if needed
   let newFilename = fileInfo.name;
   if (/^\d+$/.test(fileInfo.name.split(".")[0])) {
     const filenamePrompt = `Generate a descriptive, URL-friendly filename (kebab-case) for the following markdown content. The filename should be in English and should not include the file extension.`;
-    const filenameResult = await model.generateContent(
-      `${prompt}\n\n${translatedContent}`,
-    );
-    newFilename = filenameResult.response.text().trim();
+    const filenameResult = await genAI.models.generateContent({
+      model,
+      contents: `${filenamePrompt}\n\n${translatedContent}`,
+    });
+    newFilename = filenameResult.text?.trim() ?? fileInfo.name;
   }
 
   // Save the new file

@@ -4,6 +4,11 @@
 - `AI_COLLABORATION_GUIDE.md` 是我们的协作方式。
 - `TODO.md` 是我们的代办任务。
 
+## 快速开始
+
+- 使用 `pnpm dev` 可以启动http服务
+- 使用 `pnpm ts` 来获取ts类型检查，使用`pnpm ts --watch`可以实时监控
+
 ## 提交规范
 
 1. git-commit-message 的提交规范的格式为：

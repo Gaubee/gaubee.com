@@ -5,6 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "ts": "astro check",
     "dev": "astro dev",
     "fmt": "tsx scripts/fmt.ts",
     "start": "astro dev",
@@ -46,6 +47,7 @@
     "tw-animate-css": "^1.3.8"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.4",
     "@tailwindcss/vite": "^4.1.13",
     "@types/marked": "^6.0.0",
     "@types/node": "^24.5.0",

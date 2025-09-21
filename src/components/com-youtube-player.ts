@@ -57,11 +57,11 @@ export class ComYoutubePlayerElement extends LitElement {
           events: {
             onReady: onPlayerReady,
           },
-        },
+        }
       );
       return player;
     },
-    () => [this.videoId],
+    () => [this.videoId]
   );
 
   protected override render() {
@@ -88,6 +88,6 @@ export class ComYoutubePlayerElement extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "com-youtube-player": any;
+    "com-youtube-player": ComYoutubePlayerElement;
   }
 }
