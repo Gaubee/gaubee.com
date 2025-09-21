@@ -24,10 +24,10 @@ hard-to-follow callback chains.
 ```js
 // Filtering and mapping:
 element
-  .when('click')
-  .filter((e) => e.target.matches('.foo'))
-  .map((e) => ({x: e.clientX, y: e.clientY}))
-  .subscribe({next: handleClickAtPoint});
+  .when("click")
+  .filter((e) => e.target.matches(".foo"))
+  .map((e) => ({ x: e.clientX, y: e.clientY }))
+  .subscribe({ next: handleClickAtPoint });
 ```
 
 #### Example 2
@@ -52,15 +52,15 @@ await element.when('mousemove')
 // Imperative
 const controller = new AbortController();
 element.addEventListener(
-  'mousemove',
+  "mousemove",
   (e) => {
     console.log(e);
 
-    element.addEventListener('mouseup', (e) => {
+    element.addEventListener("mouseup", (e) => {
       controller.abort();
     });
   },
-  {signal: controller.signal}
+  { signal: controller.signal },
 );
 ```
 
@@ -73,8 +73,8 @@ Tracking all link clicks within a container
 
 ```js
 container
-  .when('click')
-  .filter((e) => e.target.closest('a'))
+  .when("click")
+  .filter((e) => e.target.closest("a"))
   .subscribe({
     next: (e) => {
       // …
@@ -89,8 +89,8 @@ Find the maximum Y coordinate while the mouse is held down
 
 ```js
 const maxY = await element
-  .when('mousemove')
-  .takeUntil(element.when('mouseup'))
+  .when("mousemove")
+  .takeUntil(element.when("mouseup"))
   .map((e) => e.clientY)
   .reduce((soFar, y) => Math.max(soFar, y), 0);
 ```
@@ -148,15 +148,15 @@ googController.abort();
 
 ```js
 // Imperative
-function multiplex({startMsg, stopMsg, match}) {
+function multiplex({ startMsg, stopMsg, match }) {
   const start = (callback) => {
     const teardowns = [];
 
     if (socket.readyState !== WebSocket.OPEN) {
-      const openHandler = () => start({startMsg, stopMsg, match})(callback);
-      socket.addEventListener('open', openHandler);
+      const openHandler = () => start({ startMsg, stopMsg, match })(callback);
+      socket.addEventListener("open", openHandler);
       teardowns.push(() => {
-        socket.removeEventListener('open', openHandler);
+        socket.removeEventListener("open", openHandler);
       });
     } else {
       socket.send(JSON.stringify(startMsg));
@@ -166,10 +166,10 @@ function multiplex({startMsg, stopMsg, match}) {
           callback(data);
         }
       };
-      socket.addEventListener('message', messageHandler);
+      socket.addEventListener("message", messageHandler);
       teardowns.push(() => {
         socket.send(JSON.stringify(stopMsg));
-        socket.removeEventListener('message', messageHandler);
+        socket.removeEventListener("message", messageHandler);
       });
     }
 
@@ -177,10 +177,10 @@ function multiplex({startMsg, stopMsg, match}) {
       teardowns.forEach((t) => t());
     };
 
-    socket.addEventListener('close', finalize);
-    teardowns.push(() => socket.removeEventListener('close', finalize));
-    socket.addEventListener('error', finalize);
-    teardowns.push(() => socket.removeEventListener('error', finalize));
+    socket.addEventListener("close", finalize);
+    teardowns.push(() => socket.removeEventListener("close", finalize));
+    socket.addEventListener("error", finalize);
+    teardowns.push(() => socket.removeEventListener("error", finalize));
 
     return finalize;
   };
@@ -190,14 +190,14 @@ function multiplex({startMsg, stopMsg, match}) {
 
 function streamStock(ticker) {
   return multiplex({
-    startMsg: {ticker, type: 'sub'},
-    stopMsg: {ticker, type: 'unsub'},
+    startMsg: { ticker, type: "sub" },
+    stopMsg: { ticker, type: "unsub" },
     match: (data) => data.ticker === ticker,
   });
 }
 
-const googTrades = streamStock('GOOG');
-const nflxTrades = streamStock('NFLX');
+const googTrades = streamStock("GOOG");
+const nflxTrades = streamStock("NFLX");
 
 const unsubGoogTrades = googTrades(updateView);
 const unsubNflxTrades = nflxTrades(updateView);
@@ -216,18 +216,32 @@ Here we're leveraging observables to match a secret code, which is a pattern of
 keys the user might hit while using an app:
 
 ```js
-const pattern = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a', 'Enter'];
+const pattern = [
+  "ArrowUp",
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowLeft",
+  "ArrowRight",
+  "b",
+  "a",
+  "Enter",
+];
 
-const keys = document.when('keydown').map((e) => e.key);
+const keys = document.when("keydown").map((e) => e.key);
 
 keys
   .flatMap((firstKey) => {
     if (firstKey === pattern[0]) {
-      return keys.take(pattern.length - 1).every((k, i) => k === pattern[i + 1]);
+      return keys
+        .take(pattern.length - 1)
+        .every((k, i) => k === pattern[i + 1]);
     }
   })
   .filter((matched) => matched)
-  .subscribe(() => console.log('Secret code matched!'));
+  .subscribe(() => console.log("Secret code matched!"));
 ```
 
 <details>
@@ -568,7 +582,7 @@ integration. Specifically, the following innocent-looking code would not _always
 
 ```js
 element
-  .when('click')
+  .when("click")
   .first()
   .then((e) => {
     e.preventDefault();
@@ -617,7 +631,7 @@ case where your `e.preventDefault()` might run too late:
 
 ```js
 element
-  .when('click')
+  .when("click")
   .map((e) => (e.preventDefault(), e))
   .first();
 ```
@@ -626,7 +640,7 @@ element
 
 ```js
 element
-  .when('click')
+  .when("click")
   .do((e) => e.preventDefault())
   .first();
 ```
@@ -635,7 +649,7 @@ element
 `first()` to take a callback that produces a value that the returned Promise resolves to:
 
 ```js
-el.when('submit')
+el.when("submit")
   .first((e) => e.preventDefault())
   .then(doMoreStuff);
 ```

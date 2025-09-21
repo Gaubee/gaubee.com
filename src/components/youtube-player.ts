@@ -1,14 +1,14 @@
-import { func_remember } from '../utils/func_remember.js';
-import { Task } from '@lit/task';
-import { html, LitElement } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { func_remember } from "../utils/func_remember.js";
+import { Task } from "@lit/task";
+import { html, LitElement } from "lit";
+import { customElement, property } from "lit/decorators.js";
 
-@customElement('com-youtube-player')
+@customElement("com-youtube-player")
 export class ComYoutubePlayerElement extends LitElement {
   static youtubeApiIniter = func_remember(() => {
-    const tag = document.createElement('script');
-    tag.src = 'https://www.youtube.com/iframe_api';
-    const firstScriptTag = document.getElementsByTagName('script')[0];
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    const firstScriptTag = document.getElementsByTagName("script")[0];
     // Ensure the script tag is inserted in the head, even if the component is in the body.
     document.head.insertBefore(tag, firstScriptTag);
 
@@ -25,8 +25,8 @@ export class ComYoutubePlayerElement extends LitElement {
     });
   });
 
-  @property({ type: String, reflect: true, attribute: 'videoId' })
-  videoId: string = '';
+  @property({ type: String, reflect: true, attribute: "videoId" })
+  videoId: string = "";
 
   @property({ type: Number, reflect: true })
   width: number = 600;
@@ -48,20 +48,23 @@ export class ComYoutubePlayerElement extends LitElement {
         // event.target.playVideo();
       }
 
-      const player = new YT.Player(this.renderRoot.querySelector('#player-container'), {
-        height: this.height,
-        width: this.width,
-        videoId: videoId,
-        playerVars: {
-          playsinline: 1,
+      const player = new YT.Player(
+        this.renderRoot.querySelector("#player-container"),
+        {
+          height: this.height,
+          width: this.width,
+          videoId: videoId,
+          playerVars: {
+            playsinline: 1,
+          },
+          events: {
+            onReady: onPlayerReady,
+          },
         },
-        events: {
-          onReady: onPlayerReady,
-        },
-      });
+      );
       return player;
     },
-    () => [this.videoId]
+    () => [this.videoId],
   );
 
   protected override render() {
@@ -88,6 +91,6 @@ export class ComYoutubePlayerElement extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    'com-youtube-player': ComYoutubePlayerElement;
+    "com-youtube-player": ComYoutubePlayerElement;
   }
 }

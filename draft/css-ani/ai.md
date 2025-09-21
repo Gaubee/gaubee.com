@@ -135,10 +135,10 @@
     </section>
   </body>
   <script>
-    btnPause.addEventListener('click', () => {
-      block.classList.toggle('ani-pause');
+    btnPause.addEventListener("click", () => {
+      block.classList.toggle("ani-pause");
     });
-    btnClass.addEventListener('click', () => {
+    btnClass.addEventListener("click", () => {
       for (let i = 0; i < aniOpts.length; i++) {
         block.classList.remove(aniOpts[i].value);
       }
@@ -146,20 +146,20 @@
         block.classList.add(aniOpts.selectedOptions[i].value);
       }
     });
-    btnKeyframes.addEventListener('click', () => {
-      if (aniNormalStyle.type === 'text/css') {
-        aniNormalStyle.type = 'template/css';
-        aniReverseStyle.type = 'text/css';
+    btnKeyframes.addEventListener("click", () => {
+      if (aniNormalStyle.type === "text/css") {
+        aniNormalStyle.type = "template/css";
+        aniReverseStyle.type = "text/css";
       } else {
-        aniNormalStyle.type = 'text/css';
-        aniReverseStyle.type = 'template/css';
+        aniNormalStyle.type = "text/css";
+        aniReverseStyle.type = "template/css";
       }
     });
     new MutationObserver(() => {
       block.innerHTML = block.className;
     }).observe(block, {
       attributes: true,
-      attributeFilter: ['class'],
+      attributeFilter: ["class"],
     });
   </script>
 </html>
@@ -215,7 +215,11 @@
         flex-wrap: wrap;
         align-items: flex-start;
         border-radius: 1em;
-        background-color: color-mix(in srgb, purple 10%, canvas); /* 匹配强调色 */ /* Matched accent */
+        background-color: color-mix(
+          in srgb,
+          purple 10%,
+          canvas
+        ); /* 匹配强调色 */ /* Matched accent */
       }
       .controllers * {
         font-size: 16px;
@@ -317,63 +321,63 @@
     </section>
   </body>
   <script>
-    const block = document.getElementById('block');
-    const btnTarget200 = document.getElementById('btnTarget200');
-    const btnTarget0 = document.getElementById('btnTarget0');
-    const btnDuration = document.getElementById('btnDuration');
-    const btnTiming = document.getElementById('btnTiming');
-    const btnPause = document.getElementById('btnPause');
+    const block = document.getElementById("block");
+    const btnTarget200 = document.getElementById("btnTarget200");
+    const btnTarget0 = document.getElementById("btnTarget0");
+    const btnDuration = document.getElementById("btnDuration");
+    const btnTiming = document.getElementById("btnTiming");
+    const btnPause = document.getElementById("btnPause");
 
     let isPaused = false; // 标记是否暂停
-    let pausedTranslate = ''; // 存储暂停时的 translate 值
+    let pausedTranslate = ""; // 存储暂停时的 translate 值
 
     // --- 目标控制 ---
-    btnTarget200.addEventListener('click', () => {
+    btnTarget200.addEventListener("click", () => {
       if (isPaused) return; // 暂停时不允许改变目标
-      block.classList.remove('target-0');
-      block.classList.add('target-200');
+      block.classList.remove("target-0");
+      block.classList.add("target-200");
       updateButtonStates();
     });
 
-    btnTarget0.addEventListener('click', () => {
+    btnTarget0.addEventListener("click", () => {
       if (isPaused) return; // 暂停时不允许改变目标
-      block.classList.remove('target-200');
-      block.classList.add('target-0'); // 为清晰起见，显式添加 target-0，尽管移除 target-200 就足够了
+      block.classList.remove("target-200");
+      block.classList.add("target-0"); // 为清晰起见，显式添加 target-0，尽管移除 target-200 就足够了
       updateButtonStates();
     });
 
     // --- 修饰符控制 ---
-    btnDuration.addEventListener('click', () => {
-      block.classList.toggle('slow-duration');
+    btnDuration.addEventListener("click", () => {
+      block.classList.toggle("slow-duration");
       updateButtonStates();
     });
 
-    btnTiming.addEventListener('click', () => {
-      block.classList.toggle('ease-timing');
+    btnTiming.addEventListener("click", () => {
+      block.classList.toggle("ease-timing");
       updateButtonStates();
     });
 
     // --- 暂停/继续 控制 ---
-    btnPause.addEventListener('click', () => {
+    btnPause.addEventListener("click", () => {
       isPaused = !isPaused; // 切换暂停状态
-      block.classList.toggle('paused', isPaused); // 同步 .paused 类
+      block.classList.toggle("paused", isPaused); // 同步 .paused 类
 
       if (isPaused) {
         // 暂停: 获取当前计算出的 translate 值并设置为内联样式
         // 这会在视觉上冻结元素，并覆盖基于类的过渡目标
         pausedTranslate = getComputedStyle(block).translate;
         block.style.translate = pausedTranslate;
-        btnPause.textContent = '继续'; // Resume
-        btnPause.classList.add('active');
+        btnPause.textContent = "继续"; // Resume
+        btnPause.classList.add("active");
 
         // 可选: 防止在暂停期间更改计时函数时出现闪烁
         // block.style.transitionProperty = 'none';
       } else {
         // 继续: 移除内联样式，让基于类的过渡接管
-        block.style.translate = ''; // 移除内联覆盖
-        btnPause.textContent = '暂停'; // Pause
-        btnPause.classList.remove('active');
-        pausedTranslate = '';
+        block.style.translate = ""; // 移除内联覆盖
+        btnPause.textContent = "暂停"; // Pause
+        btnPause.classList.remove("active");
+        pausedTranslate = "";
 
         // 可选: 如果之前禁用了 transition-property，则恢复它
         // block.style.transitionProperty = '';
@@ -406,7 +410,7 @@
     });
     observer.observe(block, {
       attributes: true,
-      attributeFilter: ['class', 'style'], // 也观察 style 的变化以用于暂停/继续
+      attributeFilter: ["class", "style"], // 也观察 style 的变化以用于暂停/继续
     });
 
     // 用于在按钮上直观指示活动修饰符状态的辅助函数
@@ -416,14 +420,26 @@
       btnTarget0.disabled = isPaused;
 
       // 更新按钮的 .active 类
-      btnTarget200.classList.toggle('active', block.classList.contains('target-200'));
+      btnTarget200.classList.toggle(
+        "active",
+        block.classList.contains("target-200"),
+      );
       btnTarget0.classList.toggle(
-        'active',
-        block.classList.contains('target-0') || (!block.classList.contains('target-200') && !block.classList.contains('target-0') && block.style.translate === '')
+        "active",
+        block.classList.contains("target-0") ||
+          (!block.classList.contains("target-200") &&
+            !block.classList.contains("target-0") &&
+            block.style.translate === ""),
       ); // 如果显式设置或处于默认状态，则为活动状态
-      btnDuration.classList.toggle('active', block.classList.contains('slow-duration'));
-      btnTiming.classList.toggle('active', block.classList.contains('ease-timing'));
-      btnPause.classList.toggle('active', isPaused); // 确保暂停按钮反映状态
+      btnDuration.classList.toggle(
+        "active",
+        block.classList.contains("slow-duration"),
+      );
+      btnTiming.classList.toggle(
+        "active",
+        block.classList.contains("ease-timing"),
+      );
+      btnPause.classList.toggle("active", isPaused); // 确保暂停按钮反映状态
 
       // 初始更新或在没有突变时调用
       updateBlockContent();

@@ -1,24 +1,27 @@
-import {html, LitElement, type PropertyValues} from 'lit';
-import {customElement} from 'lit/decorators.js';
+import { html, LitElement, type PropertyValues } from "lit";
+import { customElement } from "lit/decorators.js";
 
-@customElement('com-mix-blend-mode-gradient-text')
+@customElement("com-mix-blend-mode-gradient-text")
 export class ComMixBlendModeGradientTextElement extends LitElement {
-
   private demo!: HTMLDivElement;
 
-  private bindInputColor = (selector: string, cssProperty: string, defaultValue: string) => {
+  private bindInputColor = (
+    selector: string,
+    cssProperty: string,
+    defaultValue: string,
+  ) => {
     const ele = this.shadowRoot!.querySelector<HTMLInputElement>(selector)!;
     ele.oninput = () => this.demo.style.setProperty(cssProperty, ele.value);
     ele.value = defaultValue;
-    ele.dispatchEvent(new Event('input'));
+    ele.dispatchEvent(new Event("input"));
   };
 
   protected override firstUpdated(_changedProperties: PropertyValues): void {
     super.firstUpdated(_changedProperties);
-    this.demo = this.shadowRoot!.querySelector<HTMLDivElement>('#demo')!;
-    this.bindInputColor('#bg-color', '--background-color', '#ffffff');
-    this.bindInputColor('#start-color', '--gradient-color-start', '#1f00ff');
-    this.bindInputColor('#end-color', '--gradient-color-end', '#ff0000');
+    this.demo = this.shadowRoot!.querySelector<HTMLDivElement>("#demo")!;
+    this.bindInputColor("#bg-color", "--background-color", "#ffffff");
+    this.bindInputColor("#start-color", "--gradient-color-start", "#1f00ff");
+    this.bindInputColor("#end-color", "--gradient-color-end", "#ff0000");
   }
 
   protected override render() {
@@ -62,7 +65,11 @@ export class ComMixBlendModeGradientTextElement extends LitElement {
           align-items: center;
         }
         #text-container {
-          --gradient-color: linear-gradient(45deg, var(--gradient-color-start), var(--gradient-color-end));
+          --gradient-color: linear-gradient(
+            45deg,
+            var(--gradient-color-start),
+            var(--gradient-color-end)
+          );
           background-color: var(--background-color);
           font-size: 3em;
           font-weight: bold;
@@ -79,7 +86,7 @@ export class ComMixBlendModeGradientTextElement extends LitElement {
           mix-blend-mode: difference;
         }
         #text-container .gradient-text::before {
-          content: ' ';
+          content: " ";
           display: block;
           position: absolute;
           top: 0;
@@ -109,6 +116,6 @@ export class ComMixBlendModeGradientTextElement extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    'com-mix-blend-mode-gradient-text': any;
+    "com-mix-blend-mode-gradient-text": any;
   }
 }

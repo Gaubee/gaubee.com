@@ -80,7 +80,7 @@ export const getFineTunedPrompt = (
     isConnected: boolean;
     hasSelectedProject: boolean;
     credentials?: { anonKey?: string; supabaseUrl?: string };
-  }
+  },
 ) => `
 You are Bolt, an expert AI assistant and exceptional senior software developer with vast knowledge across multiple programming languages, frameworks, and best practices, created by StackBlitz.
 
@@ -144,8 +144,8 @@ The year is 2025.
       ? !supabase.isConnected
         ? 'You are not connected to Supabase. Remind the user to "connect to Supabase in the chat box before proceeding with database operations".'
         : !supabase.hasSelectedProject
-        ? 'Remind the user "You are connected to Supabase but no project is selected. Remind the user to select a project in the chat box before proceeding with database operations".'
-        : ""
+          ? 'Remind the user "You are connected to Supabase but no project is selected. Remind the user to select a project in the chat box before proceeding with database operations".'
+          : ""
       : ""
   } 
     IMPORTANT: Create a .env file if it doesnt exist${
@@ -831,8 +831,8 @@ You are Bolt, an expert AI assistant and exceptional senior software developer w
       ? !supabase.isConnected
         ? 'You are not connected to Supabase. Remind the user to "connect to Supabase in the chat box before proceeding with database operations".'
         : !supabase.hasSelectedProject
-        ? 'Remind the user "You are connected to Supabase but no project is selected. Remind the user to select a project in the chat box before proceeding with database operations".'
-        : ""
+          ? 'Remind the user "You are connected to Supabase but no project is selected. Remind the user to select a project in the chat box before proceeding with database operations".'
+          : ""
       : ""
   } 
   IMPORTANT: Create a .env file if it doesnt exist and include the following variables:
@@ -1379,7 +1379,7 @@ export const getSystemPrompt = (
     isConnected: boolean;
     hasSelectedProject: boolean;
     credentials?: { anonKey?: string; supabaseUrl?: string };
-  }
+  },
 ) => `
 You are Bolt, an expert AI assistant and exceptional senior software developer with vast knowledge across multiple programming languages, frameworks, and best practices.
 
@@ -1451,8 +1451,8 @@ You are Bolt, an expert AI assistant and exceptional senior software developer w
       ? !supabase.isConnected
         ? 'You are not connected to Supabase. Remind the user to "connect to Supabase in the chat box before proceeding with database operations".'
         : !supabase.hasSelectedProject
-        ? 'Remind the user "You are connected to Supabase but no project is selected. Remind the user to select a project in the chat box before proceeding with database operations".'
-        : ""
+          ? 'Remind the user "You are connected to Supabase but no project is selected. Remind the user to select a project in the chat box before proceeding with database operations".'
+          : ""
       : ""
   } 
     IMPORTANT: Create a .env file if it doesnt exist${

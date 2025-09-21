@@ -1,11 +1,11 @@
-import React from 'react';
-import './Card.css';
+import React from "react";
+import "./Card.css";
 
 interface Props {
   href: string;
   title: string;
   date: string;
-  type: 'article' | 'event';
+  type: "article" | "event";
 }
 
 const Card: React.FC<Props> = ({ href, title, date, type }) => {
@@ -18,11 +18,13 @@ const Card: React.FC<Props> = ({ href, title, date, type }) => {
         </h2>
         <div className="card-meta">
           <p>
-            <time dateTime={date}>{new Date(date).toLocaleDateString('en-us', {
-						year: 'numeric',
-						month: 'short',
-						day: 'numeric',
-					})}</time>
+            <time dateTime={date}>
+              {new Date(date).toLocaleDateString("en-us", {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
+            </time>
           </p>
           <p className={`card-type ${type}`}>{type}</p>
         </div>

@@ -55,7 +55,7 @@ let zero = 0
 const ZERO = 0
 
 fn main {
-  //! const ZERO = 0 
+  //! const ZERO = 0
   let mut i = 10
   i = 20
   println(i + zero + ZERO)
@@ -63,6 +63,7 @@ fn main {
 ```
 
 #### NOTE
+
 A top level variable binding
 
 - requires **explicit** type annotation (unless defined using literals such as string, byte or numbers)
@@ -135,7 +136,6 @@ test "test_name" {
 The following contents will use `test` block and `main` function to demonstrate the execution result,
 and we assume that all the `test` blocks pass unless stated otherwise.
 
-
 # Fundamentals
 
 ## Built-in Data Structures
@@ -157,7 +157,7 @@ let e = not(a)
 MoonBit have integer type and floating point type:
 
 | type     | description                                       | example                    |
-|----------|---------------------------------------------------|----------------------------|
+| -------- | ------------------------------------------------- | -------------------------- |
 | `Int`    | 32-bit signed integer                             | `42`                       |
 | `Int64`  | 64-bit signed integer                             | `1000L`                    |
 | `UInt`   | 32-bit unsigned integer                           | `14U`                      |
@@ -173,6 +173,7 @@ To improve readability, you may place underscores in the middle of numeric liter
 - Decimal numbers can have underscore between the numbers.
 
   By default, an int literal is signed 32-bit number. For unsigned numbers, a postfix `U` is needed; for 64-bit numbers, a postfix `L` is needed.
+
   ```moonbit
   let a = 1234
   let b : Int = 1_000_000 + a
@@ -180,6 +181,7 @@ To improve readability, you may place underscores in the middle of numeric liter
   let large_num          : Int64  = 9_223_372_036_854_775_807L
   let unsigned_large_num : UInt64 = 18_446_744_073_709_551_615UL
   ```
+
 - A binary number has a leading zero followed by a letter “B”, i.e. `0b`/`0B`.
   Note that the digits after `0b`/`0B` must be `0` or `1`.
   ```moonbit
@@ -199,6 +201,7 @@ To improve readability, you may place underscores in the middle of numeric liter
   let another_hex = 0xA_B_C
   ```
 - A floating-point number literal is 64-bit floating-point number. To define a float, type annotation is needed.
+
   ```moonbit
   let double = 3.14 // Double
   let float : Float = 3.14
@@ -206,6 +209,7 @@ To improve readability, you may place underscores in the middle of numeric liter
   ```
 
   A 64-bit floating-point number can also be defined using hexadecimal format:
+
   ```moonbit
   let hex_double = 0x1.2P3 // (1.0 + 2 / 16) * 2^(+3) == 9
   ```
@@ -249,7 +253,7 @@ println(b)
 In double quotes string, a backslash followed by certain special characters forms an escape sequence:
 
 | escape sequences     | description                                          |
-|----------------------|------------------------------------------------------|
+| -------------------- | ---------------------------------------------------- |
 | `\n`,`\r`,`\t`,`\b`  | New line, Carriage return, Horizontal tab, Backspace |
 | `\\`                 | Backslash                                            |
 | `\x41`               | Hexadecimal escape sequence                          |
@@ -430,6 +434,7 @@ There are `Array[T]` and `FixedArray[T]`:
 - `FixedArray[T]` has a fixed size, thus it needs to be created with initial value.
 
 #### WARNING
+
 A common pitfall is creating `FixedArray` with the same initial value:
 
 ```moonbit
@@ -445,7 +450,7 @@ This is because all the cells reference to the same object (the `FixedArray[Int]
 ```moonbit
 test {
   let two_dimension_array = FixedArray::makei(
-    10, 
+    10,
     fn (_i) { FixedArray::make(10, 0) }
   )
   two_dimension_array[0][5] = 10
@@ -548,7 +553,7 @@ let extract : (Int?, Int) -> Int = fn {
 }
 ```
 
-Functions, whether named or anonymous, are *lexical closures*: any identifiers without a local binding must refer to bindings from a surrounding lexical scope. For example:
+Functions, whether named or anonymous, are _lexical closures_: any identifiers without a local binding must refer to bindings from a surrounding lexical scope. For example:
 
 ```moonbit
 let global_y = 3
@@ -1118,6 +1123,7 @@ test {
 ```
 
 #### WARNING
+
 Currently in `loop exprs { ... }`, `exprs` is nonempty list, while `for { ... }` is accepted for infinite loop.
 
 ## Iterator
@@ -1127,8 +1133,8 @@ to its elements. Traditional OO languages like Java’s `Iterator<T>` use `next(
 `hasNext()` to step through the iteration process, whereas functional languages
 (JavaScript’s `forEach`, Lisp’s `mapcar`) provides a high-order function which
 takes an operation and a sequence then consumes the sequence with that operation
-being applied to the sequence. The former is called *external iterator* (visible
-to user) and the latter is called *internal iterator* (invisible to user).
+being applied to the sequence. The former is called _external iterator_ (visible
+to user) and the latter is called _internal iterator_ (invisible to user).
 
 The built-in type `Iter[T]` is MoonBit’s internal iterator implementation.
 Almost all built-in sequential data structures have implemented `Iter`:
@@ -1153,13 +1159,13 @@ Commonly used methods include:
 - `each`: Iterates over each element in the iterator, applying some function to each element.
 - `fold`: Folds the elements of the iterator using the given function, starting with the given initial value.
 - `collect`: Collects the elements of the iterator into an array.
-- `filter`: *lazy* Filters the elements of the iterator based on a predicate function.
-- `map`: *lazy* Transforms the elements of the iterator using a mapping function.
-- `concat`: *lazy* Combines two iterators into one by appending the elements of the second iterator to the first.
+- `filter`: _lazy_ Filters the elements of the iterator based on a predicate function.
+- `map`: _lazy_ Transforms the elements of the iterator using a mapping function.
+- `concat`: _lazy_ Combines two iterators into one by appending the elements of the second iterator to the first.
 
 Methods like `filter` `map` are very common on a sequence object e.g. Array.
 But what makes `Iter` special is that any method that constructs a new `Iter` is
-*lazy* (i.e. iteration doesn’t start on call because it’s wrapped inside a
+_lazy_ (i.e. iteration doesn’t start on call because it’s wrapped inside a
 function), as a result of no allocation for intermediate value. That’s what
 makes `Iter` superior for traversing through sequence: no extra cost. MoonBit
 encourages user to pass an `Iter` across functions instead of the sequence
@@ -1305,7 +1311,7 @@ enum Relation {
 /// compare the ordering relation between two integers
 fn compare_int(x : Int, y : Int) -> Relation {
   if x < y {
-    // when creating an enum, if the target type is known, 
+    // when creating an enum, if the target type is known,
     // you can write the constructor name directly
     Smaller
   } else if x > y {
@@ -1321,10 +1327,10 @@ fn compare_int(x : Int, y : Int) -> Relation {
 fn print_relation(r : Relation) -> Unit {
   // use pattern matching to decide which case `r` belongs to
   match r {
-    // during pattern matching, if the type is known, 
+    // during pattern matching, if the type is known,
     // writing the name of constructor is sufficient
     Smaller => println("smaller!")
-    // but you can use the `TypeName::Constructor` syntax 
+    // but you can use the `TypeName::Constructor` syntax
     // for pattern matching as well
     Relation::Greater => println("greater!")
     Equal => println("equal!")
@@ -1363,7 +1369,7 @@ enum List {
 // Here's a function that decides if a list contains only one element
 fn is_singleton(l : List) -> Bool {
   match l {
-    // This branch only matches values of shape `Cons(_, Nil)`, 
+    // This branch only matches values of shape `Cons(_, Nil)`,
     // i.e. lists of length 1
     Cons(_, Nil) => true
     // Use `_` to match everything else
@@ -1377,9 +1383,9 @@ fn print_list(l : List) -> Unit {
   // you can extract the payload data inside that case
   match l {
     Nil => println("nil")
-    // Here `x` and `xs` are defining new variables 
+    // Here `x` and `xs` are defining new variables
     // instead of referring to existing variables,
-    // if `l` is a `Cons`, then the payload of `Cons` 
+    // if `l` is a `Cons`, then the payload of `Cons`
     // (the first element and the rest of the list)
     // will be bind to `x` and `xs
     Cons(x, xs) => {
@@ -1546,9 +1552,9 @@ fn Tree::insert[X : Compare](
 MoonBit supports a special kind of enum called newtype:
 
 ```moonbit
-// `UserId` is a fresh new type different from `Int`, 
+// `UserId` is a fresh new type different from `Int`,
 // and you can define new methods for `UserId`, etc.
-// But at the same time, the internal representation of `UserId` 
+// But at the same time, the internal representation of `UserId`
 // is exactly the same as `Int`
 type UserId Int
 
@@ -1875,7 +1881,6 @@ fn todo_in_func() -> Int {
 }
 ```
 
-
 # Method and Trait
 
 ## Method system
@@ -2031,25 +2036,25 @@ fn main {
 
 Currently, the following operators can be overloaded:
 
-| Operator Name         | Method Name   |
-|-----------------------|---------------|
-| `+`                   | `op_add`      |
-| `-`                   | `op_sub`      |
-| `*`                   | `op_mul`      |
-| `/`                   | `op_div`      |
-| `%`                   | `op_mod`      |
-| `=`                   | `op_equal`    |
-| `<<`                  | `op_shl`      |
-| `>>`                  | `op_shr`      |
-| `-` (unary)           | `op_neg`      |
-| `_[_]` (get item)     | `op_get`      |
-| `_[_] = _` (set item) | `op_set`      |
-| `_[_:_]` (view)       | `op_as_view`  |
-| `&`                   | `land`        |
-| `|`                   | `lor`         |
-| `^`                   | `lxor`        |
-| `<<`                  | `op_shl`      |
-| `>>`                  | `op_shr`      |
+| Operator Name         | Method Name  |
+| --------------------- | ------------ | ----- |
+| `+`                   | `op_add`     |
+| `-`                   | `op_sub`     |
+| `*`                   | `op_mul`     |
+| `/`                   | `op_div`     |
+| `%`                   | `op_mod`     |
+| `=`                   | `op_equal`   |
+| `<<`                  | `op_shl`     |
+| `>>`                  | `op_shr`     |
+| `-` (unary)           | `op_neg`     |
+| `_[_]` (get item)     | `op_get`     |
+| `_[_] = _` (set item) | `op_set`     |
+| `_[_:_]` (view)       | `op_as_view` |
+| `&`                   | `land`       |
+| `                     | `            | `lor` |
+| `^`                   | `lxor`       |
+| `<<`                  | `op_shl`     |
+| `>>`                  | `op_shr`     |
 
 By implementing `op_as_view` method, you can create a view for a user-defined type. Here is an example:
 
@@ -2319,6 +2324,7 @@ impl[A : CanLog, B : CanLog] CanLog for (A, B) with log(self, logger) {
 MoonBit provides the following useful builtin traits:
 
 <!-- MANUAL CHECK https://github.com/moonbitlang/core/blob/80cf250d22a5d5eff4a2a1b9a6720026f2fe8e38/builtin/traits.mbt -->
+
 ```moonbit
 trait Eq {
   op_equal(Self, Self) -> Bool
@@ -2364,7 +2370,6 @@ test {
 }
 ```
 
-
 # Managing Projects with Packages
 
 When developing projects at large scale, the project usually needs to be divided into smaller modular unit that depends on each other.
@@ -2383,9 +2388,7 @@ Then it is possible to use `@pkg` to access the imported entities, where `pkg` i
 
 ```json
 {
-    "import": [
-        "moonbit-community/language/packages/pkgA"
-    ]
+  "import": ["moonbit-community/language/packages/pkgA"]
 }
 ```
 
@@ -2397,7 +2400,7 @@ pub fn add1(x : Int) -> Int {
 
 ## Access Control
 
-By default, all function definitions and variable bindings are *invisible* to other packages.
+By default, all function definitions and variable bindings are _invisible_ to other packages.
 You can use the `pub` modifier before toplevel `let`/`fn` to make them public.
 
 There are four different kinds of visibility for types in MoonBit:
@@ -2409,6 +2412,7 @@ There are four different kinds of visibility for types in MoonBit:
 - fully public types, declared with `pub(all)`. The outside world can freely construct, modify and read values of these types
 
 #### WARNING
+
 Currently, the semantic of `pub` is `pub(all)`. But in the future, the meaning of `pub` will be ported to `pub(readonly)`.
 
 In addition to the visibility of the type itself, the fields of a public `struct` can be annotated with `priv`,
@@ -2419,6 +2423,7 @@ but you can update the public fields using the functional struct update syntax.
 Readonly types is a very useful feature, inspired by [private types](https://v2.ocaml.org/manual/privatetypes.html) in OCaml. In short, values of `pub(readonly)` types can be destructed by pattern matching and the dot syntax, but cannot be constructed or mutated in other packages. Note that there is no restriction within the same package where `pub(readonly)` types are defined.
 
 <!-- MANUAL CHECK -->
+
 ```moonbit
 // Package A
 pub(readonly) struct RO {
@@ -2444,6 +2449,7 @@ test {
 Access control in MoonBit adheres to the principle that a `pub` type, function, or variable cannot be defined in terms of a private type. This is because the private type may not be accessible everywhere that the `pub` entity is used. MoonBit incorporates sanity checks to prevent the occurrence of use cases that violate this principle.
 
 <!-- MANUAL CHECK -->
+
 ```moonbit
 pub(all) type T1
 pub(all) type T2
@@ -2471,8 +2477,8 @@ To make the trait system coherent (i.e. there is a globally unique implementatio
 and prevent third-party packages from modifying behavior of existing programs by accident,
 MoonBit employs the following restrictions on who can define methods/implement traits for types:
 
-- *only the package that defines a type can define methods for it*. So one cannot define new methods or override old methods for builtin and foreign types.
-- *only the package of the type or the package of the trait can define an implementation*.
+- _only the package that defines a type can define methods for it_. So one cannot define new methods or override old methods for builtin and foreign types.
+- _only the package of the type or the package of the trait can define an implementation_.
   For example, only `@pkg1` and `@pkg2` are allowed to write `impl @pkg1.Trait for @pkg2.Type`.
 
 The second rule above allows one to add new functionality to a foreign type by defining a new trait and implementing it.
@@ -2487,6 +2493,7 @@ Readonly traits are declared with `pub(readonly) trait`, their methods can be in
 Finally, fully public traits are declared with `pub(open) trait`, they are open to new implementations outside current package, and their methods can be freely used.
 
 #### WARNING
+
 Currently, `pub trait` defaults to `pub(open) trait`. But in the future, the semantic of `pub trait` will be ported to `pub(readonly)`.
 
 Abstract and readonly traits are sealed, because only the package defining the trait can implement them.
@@ -2498,6 +2505,7 @@ Implementations with only regular method and default implementations will not be
 Here’s an example of abstract trait:
 
 <!-- MANUAL CHECK -->
+
 ```moonbit
 trait Number {
  op_add(Self, Self) -> Self
@@ -2533,7 +2541,6 @@ impl Number for Double
 
 The author of `Number` can make use of the fact that only `Int` and `Double` can ever implement `Number`,
 because new implementations are not allowed outside.
-
 
 # Writing Tests
 
@@ -2655,5 +2662,3 @@ When developing libraries, it is important to verify if the user can use it corr
 The WhiteBox test files (`_wbtest.mbt`) imports the packages defined in the `import` and `wbtest-import` sections of the package configuration (`moon.pkg.json`).
 
 The BlackBox test files (`_test.mbt`) imports the current package and the packages defined in the `import` and `test-import` sections of the package configuration (`moon.pkg.json`).
-
-

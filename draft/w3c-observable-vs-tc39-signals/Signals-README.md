@@ -40,7 +40,7 @@ const setCounter = (value) => {
 };
 
 const isEven = () => (counter & 1) == 0;
-const parity = () => (isEven() ? 'even' : 'odd');
+const parity = () => (isEven() ? "even" : "odd");
 const render = () => (element.innerText = parity());
 
 // Simulate external updates to counter...
