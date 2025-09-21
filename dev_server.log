@@ -2,20 +2,3 @@
 > app@1.0.0 dev /app
 > astro dev
 
-16:18:12 [types] Generated 1ms
-
-Auto-generating collections for folders in "src/content/" that are not defined as collections.
-This is deprecated, so you should define these collections yourself in "src/content.config.ts".
-The following collections have been auto-generated: articles, events
-
-16:18:12 [content] Syncing content
-16:18:13 [content] Synced content
-16:18:13 [vite] Re-optimizing dependencies because vite config has changed
-16:18:13 [vite] Port 4321 is in use, trying another one...
-
- astro  v5.13.9 ready in 912 ms
-
-┃ Local    http://localhost:4322/
-┃ Network  use --host to expose
-
-16:18:13 watching for file changes...

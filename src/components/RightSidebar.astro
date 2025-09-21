@@ -1,5 +1,6 @@
 ---
 import { getCollection } from 'astro:content';
+import SearchModal from './SearchModal';
 
 export interface Props {
     tags: string[];
@@ -24,8 +25,9 @@ const postsByMonth = allPosts.reduce((acc, post) => {
 ---
 <div class="sidebar-container">
     <div class="search-module">
-        <input type="search" placeholder="搜索..." />
+        <input type="search" id="search-input" placeholder="搜索..." />
     </div>
+    <SearchModal client:load />
 
     {tags.length > 0 && (
         <div class="tags-module">
@@ -60,6 +62,82 @@ const postsByMonth = allPosts.reduce((acc, post) => {
         </div>
     )}
 </div>
+
+<script>
+    import MiniSearch from 'minisearch';
+
+    const searchInput = document.getElementById('search-input') as HTMLInputElement;
+
+    let miniSearch: MiniSearch | null = null;
+    let isIndexLoaded = false;
+
+    async function initSearch() {
+        if (isIndexLoaded) return;
+
+        try {
+            const [indexResponse, MiniSearchModule] = await Promise.all([
+                fetch('/search-index.json'),
+                import('minisearch'),
+            ]);
+
+            if (!indexResponse.ok) {
+                console.error('Failed to fetch search index');
+                return;
+            }
+
+            const searchIndexText = await indexResponse.text();
+            miniSearch = MiniSearch.loadJSON(searchIndexText, {
+                fields: ['title', 'description', 'tags', 'content'],
+                storeFields: ['title', 'description', 'slug'],
+                idField: 'id',
+            });
+            isIndexLoaded = true;
+            console.log('Search index loaded and initialized.');
+        } catch (e) {
+            console.error('Error initializing search:', e);
+        }
+    }
+
+    async function performSearch(query: string) {
+        if (!query) return;
+        await initSearch();
+        if (!miniSearch) return;
+
+        const results = miniSearch.search(query, { prefix: true, fuzzy: 0.2 });
+
+        document.dispatchEvent(new CustomEvent('show-search-results', {
+            detail: { results, query }
+        }));
+    }
+
+    function debounce(func: Function, timeout = 300) {
+        let timer: NodeJS.Timeout;
+        return (...args: any[]) => {
+            clearTimeout(timer);
+            timer = setTimeout(() => {
+                func.apply(this, args);
+            }, timeout);
+        };
+    }
+
+    searchInput.addEventListener('input', debounce((e: Event) => {
+        const query = (e.target as HTMLInputElement).value;
+        performSearch(query);
+    }, 250));
+
+    // Also allow starting search by pressing Enter
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const query = (e.target as HTMLInputElement).value;
+            performSearch(query);
+        }
+    });
+
+    // Preload on focus for better perceived performance
+    searchInput.addEventListener('focus', initSearch);
+
+</script>
 
 <style>
     .sidebar-container {
