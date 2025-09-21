@@ -25,13 +25,16 @@
 3. 开发流程
    - **Commit Message 规范**: 所有的 Git 提交信息（Commit Message）都必须使用中文书写，清晰地描述本次提交的内容。
    - **提交前检查**: 在执行 `submit` 操作之前，必须完成以下检查：
-   1. **运行类型检查**: 执行 `pnpm run build` 或 `pnpm run check`（如果可用）来确保没有 TypeScript 类型错误。
-   2. **运行测试**: 如果项目中有自动化测试，必须全部运行并通过。
-   3. **代码审查**: 调用 `request_code_review()` 工具来获取代码变更的反馈。
+     1. **运行类型检查**: 执行 `pnpm ts` 来确保没有 TypeScript 类型错误。
+     2. **运行测试**: 如果项目中有自动化测试，必须全部运行并通过。
+     3. **代码审查**: 调用 `request_code_review()` 工具来获取代码变更的反馈。
    - **前端验证**: 如果进行了任何前端 UI 相关的更改，必须在提交前执行 `frontend_verification_instructions` 并遵循其指示完成验证。
    - **最佳实践**: 在`jules-scratch`文件夹下，使用 Playwright 脚本 + 截图的方式进行验证。这套流程（启动服务 -> 编写/运行脚本 -> 生成截图 -> 分析截图 -> 修复 -> 再次验证）被证明是定位和解决布局等视觉问题的有效方法。
-   - **单元测试**: 在`tests`文件夹下开发 Playwright 脚本，用来做一些基础的功能的可用性可靠性验证
-   - **Playwright**: 我们的开发环境中已经安装了 `npm:playwright` 的相关依赖了。因此优先建议使用ts来编写vitest+playwright 来开发 技术验证、单元测试 的脚本
+   - **单元测试**: 在`tests`文件夹下开发 Playwright 脚本，用来做一些基础的功能的可用性可靠性验证。
+   - **注意**：tests文件夹是存放长期有价值的测试，如果只是为了验证本次开发而做的截图测试，应该在jules-scratch文件夹中去写临时的测试代码。
+     1. 使用 `pnpm test` 来执行 playwright 测试脚本
+     1. 使用 `pnpm vitest --run` 来执行 vitest 测试脚本
+   - **Playwright**: 我们的开发环境中已经安装了 `npm:playwright`、`npm:vitest` 的相关依赖了。方便 AI 使用 vitest/playwright 来编写测试代码。
 4. 分支与提交
    - **分支命名**: 功能开发分支应使用 `feat/` 前缀，例如 `feat/redesign-ui`。修复 bug 的分支应使用 `fix/` 前缀。
    - **提交**: 当所有工作完成并通过检查后，使用 `submit` 工具提交代码。

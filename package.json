@@ -10,7 +10,7 @@
     "fmt": "tsx scripts/fmt.ts",
     "start": "astro dev",
     "ui": "pnpm dlx shadcn@latest",
-    "test": "playwright test",
+    "test": "playwright test --reporter list",
     "build:index": "tsx scripts/build-search-index.ts",
     "build": "pnpm run build:index && astro build",
     "preview": "astro preview",
