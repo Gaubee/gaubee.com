@@ -1,0 +1,3 @@
+- `TARGET.md` 是我们的开发目标。
+- `AI_COLLABORATION_GUIDE.md` 是我们的协作方式。
+- `TODO.md` 是我们的代办任务。
