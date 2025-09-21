@@ -1,0 +1,46 @@
+---
+import { getCollection } from 'astro:content';
+
+interface Props {
+  currentSlug: string;
+}
+
+const { currentSlug } = Astro.props;
+
+// 1. Get all events and sort them by date
+const allEvents = await getCollection('events');
+const sortedEvents = allEvents.sort((a, b) => a.data.date.valueOf() - b.data.date.valueOf());
+
+// 2. Find the index of the current event
+const currentIndex = sortedEvents.findIndex(event => event.id === currentSlug);
+
+// 3. Determine previous and next events
+const prevEvent = currentIndex > 0 ? sortedEvents[currentIndex - 1] : null;
+const nextEvent = currentIndex < sortedEvents.length - 1 ? sortedEvents[currentIndex + 1] : null;
+---
+
+<div class="border border-gray-200 rounded-lg p-4 bg-white">
+  <h3 class="mt-0 text-lg border-b border-gray-200 pb-2 mb-4">导航</h3>
+  <ul class="list-none p-0 m-0 flex flex-col gap-4">
+    {prevEvent ? (
+      <li>
+        <a href={`/events/${prevEvent.id}`} class="no-underline text-gray-800 block p-2 rounded-md hover:bg-gray-50">
+          <strong class="block font-medium mb-1 text-gray-600">上一篇:</strong>
+          <span class="text-sm">{prevEvent.data.title || prevEvent.id}</span>
+        </a>
+      </li>
+    ) : (
+      <li class="p-2 text-sm text-gray-500"><span>这是第一篇</span></li>
+    )}
+    {nextEvent ? (
+      <li>
+        <a href={`/events/${nextEvent.id}`} class="no-underline text-gray-800 block p-2 rounded-md hover:bg-gray-50">
+          <strong class="block font-medium mb-1 text-gray-600">下一篇:</strong>
+          <span class="text-sm">{nextEvent.data.title || nextEvent.id}</span>
+        </a>
+      </li>
+    ) : (
+      <li class="p-2 text-sm text-gray-500"><span>这是最后一篇</span></li>
+    )}
+  </ul>
+</div>
