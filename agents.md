@@ -21,6 +21,7 @@
    1. shadcn/ui
    1. magic/ui
    1. astro v4
+   1. lucide-react
 3. 开发流程
    - **Commit Message 规范**: 所有的 Git 提交信息（Commit Message）都必须使用中文书写，清晰地描述本次提交的内容。
    - **提交前检查**: 在执行 `submit` 操作之前，必须完成以下检查：
