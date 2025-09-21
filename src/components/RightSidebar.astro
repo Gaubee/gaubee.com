@@ -32,14 +32,8 @@ const postsByMonth = allPosts.reduce(
 
 <div class="sidebar-container">
   <div class="search-module">
-    <input
-      type="search"
-      id="search-input"
-      placeholder="搜索..."
-      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
-    />
+    <SearchModal client:load />
   </div>
-  <SearchModal client:load />
 
   {
     tags.length > 0 && (
@@ -81,76 +75,6 @@ const postsByMonth = allPosts.reduce(
   }
 </div>
 
-<script>
-  import MiniSearch from "minisearch";
-  import {func_debounce} from '@gaubee/util'
-
-  const searchInput = document.getElementById(
-    "search-input"
-  ) as HTMLInputElement;
-
-  let miniSearch: MiniSearch | null = null;
-  let isIndexLoaded = false;
-
-  async function initSearch() {
-    if (isIndexLoaded) return;
-
-    try {
-      const indexResponse = await fetch("/search-index.json");
-
-      if (!indexResponse.ok) {
-        console.error("Failed to fetch search index");
-        return;
-      }
-
-      const searchIndexText = await indexResponse.text();
-      miniSearch = MiniSearch.loadJSON(searchIndexText, {
-        fields: ["title", "description", "tags", "content"],
-        storeFields: ["title", "description", "slug"],
-        idField: "id",
-      });
-      isIndexLoaded = true;
-      console.log("Search index loaded and initialized.");
-    } catch (e) {
-      console.error("Error initializing search:", e);
-    }
-  }
-
-  async function performSearch(query: string) {
-    if (!query) return;
-    await initSearch();
-    if (!miniSearch) return;
-
-    const results = miniSearch.search(query, { prefix: true, fuzzy: 0.2 });
-
-    document.dispatchEvent(
-      new CustomEvent("show-search-results", {
-        detail: { results, query },
-      })
-    );
-  }
-
-
-  searchInput.addEventListener(
-    "input",
-    func_debounce((e: Event) => {
-      const query = (e.target as HTMLInputElement).value;
-      performSearch(query);
-    }, 250)
-  );
-
-  // Also allow starting search by pressing Enter
-  searchInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const query = (e.target as HTMLInputElement).value;
-      performSearch(query);
-    }
-  });
-
-  // Preload on focus for better perceived performance
-  searchInput.addEventListener("focus", initSearch);
-</script>
 
 <style>
   .sidebar-container {
@@ -159,13 +83,8 @@ const postsByMonth = allPosts.reduce(
     border-radius: 0.5rem;
     border: 1px solid var(--c-border);
   }
-  .search-module input {
-    width: 100%;
-    padding: 0.75rem;
-    border-radius: 999px;
-    border: 1px solid var(--c-border);
-    font-size: 1rem;
-    box-sizing: border-box;
+  .search-module {
+    /* The SearchModal now handles its own trigger button */
   }
   .tags-module {
     margin-top: 1.5rem;

@@ -1,14 +1,32 @@
-import React, { useState, useEffect, useMemo, Fragment } from "react";
-import type { SearchResult as MiniSearchResult } from "minisearch";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  Fragment,
+  useCallback,
+  useRef,
+} from "react";
+import MiniSearch, { type SearchResult as MiniSearchResult } from "minisearch";
 import {
   Dialog,
+  DialogTrigger,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Search } from "lucide-react";
+import { MagicCard } from "./ui/magic-card";
 
 // Define a more specific type for our search results, including the match data
+interface SearchResultData {
+  id: string;
+  title: string;
+  description?: string;
+  slug: string;
+}
 interface SearchResult extends MiniSearchResult {
   match: Record<string, string[]>;
   title: string;
@@ -53,14 +71,67 @@ const SearchModal: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [query, setQuery] = useState("");
+  const miniSearch = useRef<MiniSearch<SearchResultData> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const initSearch = useCallback(async () => {
+    if (miniSearch.current) return;
+
+    try {
+      const indexResponse = await fetch("/search-index.json");
+      if (!indexResponse.ok) {
+        console.error("Failed to fetch search index");
+        return;
+      }
+      const searchIndexText = await indexResponse.text();
+      miniSearch.current = MiniSearch.loadJSON(searchIndexText, {
+        fields: ["title", "description", "tags", "content"],
+        storeFields: ["title", "description", "slug"],
+        idField: "id",
+      });
+      console.log("Search index loaded and initialized.");
+    } catch (e) {
+      console.error("Error initializing search:", e);
+    }
+  }, []);
+
+  // This useEffect handles the debounced search.
+  // It runs whenever the 'query' state changes.
+  useEffect(() => {
+    // If the query is empty, clear the results immediately.
+    if (!query) {
+      setResults([]);
+      return;
+    }
+
+    // Set up a timer for the debounce effect.
+    const debounceTimer = setTimeout(() => {
+      if (!miniSearch.current) {
+        // If search isn't initialized, do nothing.
+        // initSearch should have been called when the modal opened.
+        return;
+      }
+      const searchResults = miniSearch.current.search(query, {
+        prefix: true,
+        fuzzy: 0.2,
+      }) as SearchResult[];
+      setResults(searchResults);
+    }, 250); // 250ms debounce delay
+
+    // Cleanup function: this is called when the component unmounts
+    // or when the 'query' dependency changes.
+    return () => clearTimeout(debounceTimer);
+  }, [query]); // Dependency array ensures this runs only when query changes.
 
   useEffect(() => {
-    const handleShowResults = (event: CustomEvent) => {
-      setResults(event.detail.results);
-      setQuery(event.detail.query);
-      setIsOpen(true);
-    };
+    if (isOpen) {
+      // Focus the input when the dialog opens. A small delay is needed for the dialog animation.
+      setTimeout(() => inputRef.current?.focus(), 100);
+      initSearch(); // Preload index when modal opens
+    }
+  }, [isOpen]);
 
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
@@ -68,17 +139,9 @@ const SearchModal: React.FC = () => {
       }
     };
 
-    document.addEventListener(
-      "show-search-results",
-      handleShowResults as EventListener,
-    );
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.removeEventListener(
-        "show-search-results",
-        handleShowResults as EventListener,
-      );
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
@@ -96,24 +159,39 @@ const SearchModal: React.FC = () => {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button
+          variant="outline"
+          className="w-full justify-start text-muted-foreground"
+        >
+          <Search className="w-4 h-4 mr-2" />
+          搜索...
+        </Button>
+      </DialogTrigger>
       <DialogContent className="sm:max-w-[650px] bg-background/80 backdrop-blur-sm">
         <DialogHeader>
-          <DialogTitle>搜索结果: "{query}"</DialogTitle>
+          <DialogTitle>搜索</DialogTitle>
           <DialogDescription>
-            {results.length > 0
-              ? `找到了 ${results.length} 个结果。`
-              : `没有找到与 "${query}" 相关的内容。`}
+            输入关键词搜索文章、短评等内容。
           </DialogDescription>
         </DialogHeader>
+        <Input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="搜索..."
+          className="my-4"
+        />
         <div className="max-h-[60vh] overflow-y-auto pr-4 -mr-4">
           {results.length > 0 && (
-            <ul className="list-none p-0">
+            <ul className="list-none p-0 space-y-2">
               {results.map((result) => (
-                <li key={result.id} className="mb-2 last:mb-0">
-                  <a
-                    href={`/${result.slug}.html`}
-                    className="block p-4 rounded-lg transition-colors hover:bg-muted/50"
-                  >
+                <MagicCard
+                  key={result.id}
+                  className="rounded-lg"
+                  gradientColor="var(--color-text-base)"
+                >
+                  <a href={`/${result.slug}.html`} className="block p-4">
                     <h3 className="font-semibold text-lg text-foreground mb-1">
                       <Highlight text={result.title} terms={allMatchedTerms} />
                     </h3>
@@ -126,7 +204,7 @@ const SearchModal: React.FC = () => {
                       </p>
                     )}
                   </a>
-                </li>
+                </MagicCard>
               ))}
             </ul>
           )}
