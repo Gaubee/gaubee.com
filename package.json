@@ -19,7 +19,7 @@
   "keywords": [],
   "author": "Gaubee",
   "license": "ISC",
-  "packageManager": "pnpm@10.13.1",
+  "packageManager": "pnpm@10.17.0",
   "dependencies": {
     "@astrojs/react": "^4.3.1",
     "@gaubee/nodekit": "^0.12.0",
