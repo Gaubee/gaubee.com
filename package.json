@@ -28,7 +28,7 @@
     "@astrojs/react": "^4.3.1",
     "@gaubee/nodekit": "^0.12.0",
     "@gaubee/util": "^0.35.1",
-    "@google/genai": "^1.19.0",
+    "@google/genai": "^1.20.0",
     "@lit/task": "^1.0.3",
     "@octokit/rest": "^22.0.0",
     "@radix-ui/react-dialog": "^1.1.15",
@@ -60,16 +60,22 @@
     "@playwright/test": "^1.55.0",
     "@tailwindcss/vite": "^4.1.13",
     "@types/marked": "^6.0.0",
-    "@types/node": "^24.5.0",
+    "@types/node": "^24.5.2",
     "dotenv": "^17.2.2",
     "execa": "^9.6.0",
     "gray-matter": "^4.0.3",
     "marked": "^16.3.0",
     "prettier": "^3.6.2",
-    "tailwindcss": "^4.0.0",
+    "tailwindcss": "^4.1.13",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
-    "vite": "^7.1.5",
-    "vite-plugin-pwa": "^1.0.3"
+    "vite": "^7.1.6",
+    "vite-plugin-pwa": "^1.0.3",
+    "vitest": "^3.2.4"
+  },
+  "pnpm": {
+    "overrides": {
+      "vite": "^7.0.0"
+    }
   }
 }

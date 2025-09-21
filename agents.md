@@ -13,7 +13,15 @@
    - **中文沟通**: 我们之间的所有沟通都将使用中文。
    - **明确计划**: 在开始任何实质性的编码工作之前，AI 需要提供一份清晰、分步的执行计划。计划需要获得我的批准后才能开始执行。
    - **任务追踪**: 使用根目录下的 `TODO.md` 文件来追踪项目的宏观任务和未来规划。
-2. 开发流程
+2. 开发技术栈：
+   1. react
+   1. vite
+   1. vitest
+   1. tailwindcss v4
+   1. shadcn/ui
+   1. magic/ui
+   1. astro v4
+3. 开发流程
    - **Commit Message 规范**: 所有的 Git 提交信息（Commit Message）都必须使用中文书写，清晰地描述本次提交的内容。
    - **提交前检查**: 在执行 `submit` 操作之前，必须完成以下检查：
    1. **运行类型检查**: 执行 `pnpm run build` 或 `pnpm run check`（如果可用）来确保没有 TypeScript 类型错误。
@@ -22,8 +30,8 @@
    - **前端验证**: 如果进行了任何前端 UI 相关的更改，必须在提交前执行 `frontend_verification_instructions` 并遵循其指示完成验证。
    - **最佳实践**: 在`jules-scratch`文件夹下，使用 Playwright 脚本 + 截图的方式进行验证。这套流程（启动服务 -> 编写/运行脚本 -> 生成截图 -> 分析截图 -> 修复 -> 再次验证）被证明是定位和解决布局等视觉问题的有效方法。
    - **单元测试**: 在`tests`文件夹下开发 Playwright 脚本，用来做一些基础的功能的可用性可靠性验证
-   - **Playwright**: 我们的开发环境中已经安装了 `npm:playwright` 的相关依赖了。因此优先建议使用ts来编写 playwright 技术验证与单元测试的脚本
-3. 分支与提交
+   - **Playwright**: 我们的开发环境中已经安装了 `npm:playwright` 的相关依赖了。因此优先建议使用ts来编写vitest+playwright 来开发 技术验证、单元测试 的脚本
+4. 分支与提交
    - **分支命名**: 功能开发分支应使用 `feat/` 前缀，例如 `feat/redesign-ui`。修复 bug 的分支应使用 `fix/` 前缀。
    - **提交**: 当所有工作完成并通过检查后，使用 `submit` 工具提交代码。
 
