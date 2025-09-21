@@ -1,0 +1,13 @@
+---
+import AdminLayout from '../../components/admin/AdminLayout.astro';
+import TokenManager from '../../components/admin/TokenManager.tsx';
+import AdminView from '../../components/admin/AdminView.tsx';
+---
+<AdminLayout title="后台管理">
+  <div class="p-8">
+    <h1 class="text-2xl font-bold mb-4">后台管理系统</h1>
+    <TokenManager client:load />
+    <hr class="my-4" />
+    <AdminView client:load />
+  </div>
+</AdminLayout>
