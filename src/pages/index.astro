@@ -1,9 +1,16 @@
 ---
 import ContentLayout from "../layouts/ContentLayout.astro";
-import MarkdownPreviewCard from "../components/cards/MarkdownPreviewCard.tsx";
+import PreviewCard from "../components/cards/PreviewCard.tsx";
+import MarkdownRenderer from "../components/MarkdownRenderer.tsx";
 import { getSiteData } from "@/lib/getSiteData";
 
 const { allPosts } = await getSiteData();
+
+function getGridColsClass(count: number): string {
+  if (count === 1) return "grid-cols-1";
+  if (count <= 4) return "grid-cols-2";
+  return "grid-cols-3";
+}
 
 const pageTitle = "GauBee's Blog";
 ---
@@ -16,16 +23,53 @@ const pageTitle = "GauBee's Blog";
     </p>
   </div>
 
-  <div
-    class="mt-8 flex flex-col border-r border-l border-zinc-200 dark:border-zinc-700"
-  >
+  <div class="mt-8 flex flex-col divide-y divide-zinc-200 dark:divide-zinc-700">
     {
       allPosts.map((post) => (
-        <MarkdownPreviewCard
-          client:visible
-          content={post}
-          preview={post.preview}
-        />
+        <div class="py-4">
+          <PreviewCard
+            client:visible
+            header={
+              <div class="flex flex-col gap-2">
+                <div class="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+                  <span class="capitalize">{post.collection}</span>
+                  <span>·</span>
+                  <time dateTime={post.data.date.toISOString()}>
+                    {new Date(post.data.date).toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </time>
+                </div>
+                <a href={`/${post.collection}/${post.id.replace(/\.mdx?$/, "")}`} class="contents">
+                  <h2 class="text-xl font-bold text-zinc-800 dark:text-zinc-100">
+                    {post.data.title}
+                  </h2>
+                </a>
+                {post.images && post.images.length > 0 && (
+                  <div
+                    class:list={[
+                      "grid",
+                      "gap-2",
+                      getGridColsClass(post.images.length),
+                    ]}
+                  >
+                    {post.images.slice(0, 9).map((src) => (
+                      <img
+                        src={src}
+                        alt={`preview image for ${post.data.title}`}
+                        class="w-full h-auto object-cover rounded-md"
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            }
+          >
+            <MarkdownRenderer client:visible markdown={post.body} />
+          </PreviewCard>
+        </div>
       ))
     }
   </div>

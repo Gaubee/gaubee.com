@@ -127,10 +127,3 @@
     background-color: oklch(0.95 0.15 90 / 25%);
   }
 }
-
-@layer utilities {
-  .mask-fade-bottom {
-    mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
-  }
-}
