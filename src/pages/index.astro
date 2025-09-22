@@ -6,12 +6,6 @@ import { getSiteData } from "@/lib/getSiteData";
 
 const { allPosts } = await getSiteData();
 
-function getGridColsClass(count: number): string {
-  if (count === 1) return "grid-cols-1";
-  if (count <= 4) return "grid-cols-2";
-  return "grid-cols-3";
-}
-
 const pageTitle = "GauBee's Blog";
 ---
 
@@ -23,51 +17,19 @@ const pageTitle = "GauBee's Blog";
     </p>
   </div>
 
-  <div class="mt-8 flex flex-col divide-y divide-zinc-200 dark:divide-zinc-700">
+  <div class="mt-8 flex flex-col">
     {
       allPosts.map((post) => (
         <div class="py-4">
           <PreviewCard
             client:visible
-            header={
-              <div class="flex flex-col gap-2">
-                <div class="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-                  <span class="capitalize">{post.collection}</span>
-                  <span>·</span>
-                  <time dateTime={post.data.date.toISOString()}>
-                    {new Date(post.data.date).toLocaleDateString(undefined, {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </time>
-                </div>
-                <a href={`/${post.collection}/${post.id.replace(/\.mdx?$/, "")}`} class="contents">
-                  <h2 class="text-xl font-bold text-zinc-800 dark:text-zinc-100">
-                    {post.data.title}
-                  </h2>
-                </a>
-                {post.images && post.images.length > 0 && (
-                  <div
-                    class:list={[
-                      "grid",
-                      "gap-2",
-                      getGridColsClass(post.images.length),
-                    ]}
-                  >
-                    {post.images.slice(0, 9).map((src) => (
-                      <img
-                        src={src}
-                        alt={`preview image for ${post.data.title}`}
-                        class="w-full h-auto object-cover rounded-md"
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            }
+            href={`/${post.collection}/${post.id}`}
+            collection={post.collection}
+            images={post.images}
+            title={post.title}
+            datetime={post.data.datetime}
           >
-            <MarkdownRenderer client:visible markdown={post.body} />
+            <MarkdownRenderer client:only markdown={post.previewBody} />
           </PreviewCard>
         </div>
       ))

@@ -1,5 +1,9 @@
 import { getCollection } from "astro:content";
-import { extractImagesFromMarkdown } from "./markdownUtils";
+import {
+  extractImagesFromMarkdown,
+  getPreviewBody,
+  getMdTitle,
+} from "./markdownUtils";
 
 export async function getSiteData() {
   const articles_raw = await getCollection("articles");
@@ -7,12 +11,20 @@ export async function getSiteData() {
 
   const articles = articles_raw.map((p) => ({
     ...p,
-    images: extractImagesFromMarkdown(p.body),
+    images:
+      p.rendered?.metadata?.imagePaths ??
+      extractImagesFromMarkdown(p.body ?? ""),
+    previewBody: getPreviewBody(p.body),
+    title: getMdTitle(p.data.title, p.body),
   }));
 
   const events = events_raw.map((p) => ({
     ...p,
-    images: extractImagesFromMarkdown(p.body),
+    images:
+      p.rendered?.metadata?.imagePaths ??
+      extractImagesFromMarkdown(p.body ?? ""),
+    previewBody: getPreviewBody(p.body),
+    title: getMdTitle(p.data.title, p.body),
   }));
 
   const allPosts = [...articles, ...events].sort(

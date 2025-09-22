@@ -2,6 +2,7 @@
 import { getCollection, render } from "astro:content";
 import ContentLayout from "../../layouts/ContentLayout.astro";
 import PrevNextEvent from "../../components/PrevNextEvent.tsx";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 
 export async function getStaticPaths() {
   const posts = await getCollection("events");
@@ -44,7 +45,22 @@ const nextEvent = next
 
 <ContentLayout title={post.data.title} headings={headings}>
   <article class="prose dark:prose-invert max-w-none">
-    <Content />
+    <!-- 1. 只在客户端渲染 -->
+    <MarkdownRenderer
+      client:only
+      className="md-renderer"
+      markdown={post.body}
+    />
+    <!-- 2. 无 JS 时的回退 -->
+    <div class="fallback-content">
+      <Content />
+    </div>
   </article>
-  <PrevNextEvent client:idle prevEvent={prevEvent} nextEvent={nextEvent} />
 </ContentLayout>
+
+<style>
+  /* 3. 有 JS 时隐藏 fallback */
+  :global(astro-island:has(.md-renderer) ~ .fallback-content) {
+    display: none;
+  }
+</style>
