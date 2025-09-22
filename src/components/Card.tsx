@@ -15,7 +15,10 @@ const Card: React.FC<Props> = ({ href, title, date, type }) => {
 
   return (
     <li className="list-none flex border-b border-gray-200 dark:border-gray-700 transition-colors duration-200 ease-in-out hover:bg-gray-50 dark:hover:bg-gray-800/50">
-      <a href={href} className="w-full no-underline leading-normal p-4 sm:p-6 text-zinc-900 dark:text-zinc-50">
+      <a
+        href={href}
+        className="w-full no-underline leading-normal p-4 sm:p-6 text-zinc-900 dark:text-zinc-50"
+      >
         <h2 className="m-0 text-lg flex justify-between font-semibold">
           {title}
         </h2>
@@ -29,7 +32,9 @@ const Card: React.FC<Props> = ({ href, title, date, type }) => {
               })}
             </time>
           </p>
-          <p className={`font-bold capitalize text-xs ${typeClasses[type]}`}>{type}</p>
+          <p className={`font-bold capitalize text-xs ${typeClasses[type]}`}>
+            {type}
+          </p>
         </div>
       </a>
     </li>

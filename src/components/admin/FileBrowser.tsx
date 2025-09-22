@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react';
-import { getRepoContents } from '../../lib/github';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Folder, File, Trash2, ArrowUp } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowUp, File, Folder, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { getRepoContents } from "../../lib/github";
 
 type RepoContent = {
   name: string;
   path: string;
-  type: 'file' | 'dir';
+  type: "file" | "dir";
 };
 
 interface Props {
@@ -17,7 +17,7 @@ interface Props {
 
 export default function FileBrowser({ onFileSelect, onFileDelete }: Props) {
   const [contents, setContents] = useState<RepoContent[]>([]);
-  const [currentPath, setCurrentPath] = useState('src/content');
+  const [currentPath, setCurrentPath] = useState("src/content");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,14 +27,16 @@ export default function FileBrowser({ onFileSelect, onFileDelete }: Props) {
         setLoading(true);
         setError(null);
         const items = await getRepoContents(currentPath);
-        const simplifiedItems = items.map(item => ({
-          name: item.name,
-          path: item.path,
-          type: item.type as 'file' | 'dir',
-        })).sort((a, b) => {
-          if (a.type === b.type) return a.name.localeCompare(b.name);
-          return a.type === 'dir' ? -1 : 1;
-        });
+        const simplifiedItems = items
+          .map((item) => ({
+            name: item.name,
+            path: item.path,
+            type: item.type as "file" | "dir",
+          }))
+          .sort((a, b) => {
+            if (a.type === b.type) return a.name.localeCompare(b.name);
+            return a.type === "dir" ? -1 : 1;
+          });
         setContents(simplifiedItems);
       } catch (e: any) {
         setError(e.message);
@@ -47,7 +49,7 @@ export default function FileBrowser({ onFileSelect, onFileDelete }: Props) {
   }, [currentPath]);
 
   const handleItemClick = (item: RepoContent) => {
-    if (item.type === 'dir') {
+    if (item.type === "dir") {
       setCurrentPath(item.path);
     } else {
       onFileSelect(item.path);
@@ -62,17 +64,17 @@ export default function FileBrowser({ onFileSelect, onFileDelete }: Props) {
   };
 
   const handleGoUp = () => {
-    if (currentPath === 'src/content') return; // Don't go above the content root
-    const pathParts = currentPath.split('/').filter(p => p);
+    if (currentPath === "src/content") return; // Don't go above the content root
+    const pathParts = currentPath.split("/").filter((p) => p);
     pathParts.pop();
-    setCurrentPath(pathParts.join('/'));
+    setCurrentPath(pathParts.join("/"));
   };
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle>File Browser</CardTitle>
-        {currentPath !== 'src/content' && (
+        {currentPath !== "src/content" && (
           <Button variant="outline" size="sm" onClick={handleGoUp}>
             <ArrowUp className="mr-2 h-4 w-4" /> Up
           </Button>
@@ -91,10 +93,14 @@ export default function FileBrowser({ onFileSelect, onFileDelete }: Props) {
                 onClick={() => handleItemClick(item)}
               >
                 <div className="flex-grow flex items-center truncate">
-                  {item.type === 'dir' ? <Folder className="mr-2 h-4 w-4" /> : <File className="mr-2 h-4 w-4" />}
+                  {item.type === "dir" ? (
+                    <Folder className="mr-2 h-4 w-4" />
+                  ) : (
+                    <File className="mr-2 h-4 w-4" />
+                  )}
                   <span className="truncate">{item.name}</span>
                 </div>
-                {item.type === 'file' && (
+                {item.type === "file" && (
                   <Button
                     variant="ghost"
                     size="icon"

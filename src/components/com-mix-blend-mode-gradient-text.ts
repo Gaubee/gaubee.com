@@ -8,7 +8,7 @@ export class ComMixBlendModeGradientTextElement extends LitElement {
   private bindInputColor = (
     selector: string,
     cssProperty: string,
-    defaultValue: string
+    defaultValue: string,
   ) => {
     const ele = this.shadowRoot!.querySelector<HTMLInputElement>(selector)!;
     ele.oninput = () => this.demo.style.setProperty(cssProperty, ele.value);

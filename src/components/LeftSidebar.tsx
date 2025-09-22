@@ -1,9 +1,9 @@
-import React from 'react';
-import { Home, Rss } from 'lucide-react';
+import { Home, Rss } from "lucide-react";
+import React from "react";
 
 const links = [
-  { href: '/', label: '主页', icon: Home },
-  { href: '/events', label: '时事快讯', icon: Rss },
+  { href: "/", label: "主页", icon: Home },
+  { href: "/events", label: "时事快讯", icon: Rss },
   // Add more links as needed
 ];
 

@@ -1,21 +1,21 @@
-import { openDB, type DBSchema } from 'idb';
+import { openDB, type DBSchema } from "idb";
 
-const DB_NAME = 'GaubeeAdminDB';
-const STORE_NAME = 'stagedChanges';
+const DB_NAME = "GaubeeAdminDB";
+const STORE_NAME = "stagedChanges";
 const DB_VERSION = 1;
 
 export interface StagedChange {
   path: string; // This will be the primary key
   content?: string; // Content is optional for 'deleted' status
   originalContent?: string; // Original content for diffing 'updated' status
-  status: 'created' | 'updated' | 'deleted';
+  status: "created" | "updated" | "deleted";
 }
 
 interface MyDB extends DBSchema {
   [STORE_NAME]: {
     key: string;
     value: StagedChange;
-    indexes: { 'by-status': string };
+    indexes: { "by-status": string };
   };
 }
 
@@ -23,9 +23,9 @@ async function getDb() {
   return openDB<MyDB>(DB_NAME, DB_VERSION, {
     upgrade(db) {
       const store = db.createObjectStore(STORE_NAME, {
-        keyPath: 'path',
+        keyPath: "path",
       });
-      store.createIndex('by-status', 'status');
+      store.createIndex("by-status", "status");
     },
   });
 }

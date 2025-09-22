@@ -1,23 +1,23 @@
-import React, {
-  useState,
-  useEffect,
-  useMemo,
-  Fragment,
-  useCallback,
-  useRef,
-} from "react";
-import MiniSearch, { type SearchResult as MiniSearchResult } from "minisearch";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogTrigger,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
+import MiniSearch, { type SearchResult as MiniSearchResult } from "minisearch";
+import React, {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { MagicCard } from "./ui/magic-card";
 
 // Define a more specific type for our search results, including the match data
@@ -56,9 +56,7 @@ const Highlight: React.FC<{ text: string; terms: string[] }> = ({
   return (
     <>
       {parts.map((part, i) =>
-        terms.some(
-          (term) => part.toLowerCase() === term.toLowerCase(),
-        ) ? (
+        terms.some((term) => part.toLowerCase() === term.toLowerCase()) ? (
           <mark key={i}>{part}</mark>
         ) : (
           <Fragment key={i}>{part}</Fragment>

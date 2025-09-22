@@ -65,3 +65,6 @@
 - [x] 实现文件操作（创建、编辑、删除）。
 - [x] 使用 GitHub API 在前端实现 Git 操作（commit, push）。
 - [x] 集成一个高质量的 Markdown 编辑器。
+- [x] **优化 Markdown 编辑器体验**:
+  - [x] 为元数据（Frontmatter）提供专门的表单编辑 UI。
+  - [x] 支持在可视化和原始 Markdown 模式之间切换。
