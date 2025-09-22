@@ -1,14 +1,9 @@
 ---
 import ContentLayout from "../layouts/ContentLayout.astro";
-import Card from "../components/Card.tsx";
-import { getCollection } from "astro:content";
+import MarkdownPreviewCard from "../components/cards/MarkdownPreviewCard.tsx";
+import { getSiteData } from "@/lib/getSiteData";
 
-const articles = await getCollection("articles");
-const events = await getCollection("events");
-const allPosts = [...articles, ...events];
-const sortedPosts = allPosts.sort(
-  (a, b) => new Date(b.data.date).valueOf() - new Date(a.data.date).valueOf(),
-);
+const { allPosts } = await getSiteData();
 
 const pageTitle = "GauBee's Blog";
 ---
@@ -25,13 +20,11 @@ const pageTitle = "GauBee's Blog";
     class="mt-8 flex flex-col border-r border-l border-zinc-200 dark:border-zinc-700"
   >
     {
-      sortedPosts.map((post) => (
-        <Card
+      allPosts.map((post) => (
+        <MarkdownPreviewCard
           client:visible
-          href={`/${post.collection}/${post.id}/`}
-          title={post.data.title || post.id}
-          date={post.data.date.toISOString()}
-          type={post.collection}
+          content={post}
+          preview={post.preview}
         />
       ))
     }
