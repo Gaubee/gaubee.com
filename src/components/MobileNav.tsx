@@ -15,7 +15,6 @@ export default function MobileNav({ title, children }: Props) {
       <MobileTopbar
         title={title}
         onMenuClick={() => {
-          console.log("qqq");
           setIsOpen(true);
         }}
       />
