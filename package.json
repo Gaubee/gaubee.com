@@ -76,6 +76,7 @@
     "@types/dom-navigation": "^1.0.6",
     "@types/marked": "^6.0.0",
     "@types/node": "^24.5.2",
+    "@vite-pwa/astro": "^1.1.0",
     "dotenv": "^17.2.2",
     "execa": "^9.6.0",
     "gray-matter": "^4.0.3",
@@ -88,8 +89,8 @@
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vite": "^7.1.6",
-    "vite-plugin-pwa": "^1.0.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "workbox-window": "^7.3.0"
   },
   "pnpm": {
     "overrides": {
