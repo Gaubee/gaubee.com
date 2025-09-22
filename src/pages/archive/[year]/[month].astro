@@ -1,98 +1,66 @@
 ---
-import { getCollection } from 'astro:content';
-import HomeLayout from '../../../layouts/HomeLayout.astro';
-import LeftSidebar from '../../../components/LeftSidebar.astro';
-import RightSidebar from '../../../components/RightSidebar.astro';
-import Card from '../../../components/Card.tsx';
+import { getCollection } from "astro:content";
+import ContentLayout from "../../../layouts/ContentLayout.astro";
+import Card from "../../../components/Card.tsx";
 
 export async function getStaticPaths() {
-    const articles = await getCollection('articles');
-    const events = await getCollection('events');
-    const allPosts = [...articles, ...events];
+  const articles = await getCollection("articles");
+  const events = await getCollection("events");
+  const allPosts = [...articles, ...events];
 
-    const postsByMonth = allPosts.reduce((acc, post) => {
-        const year = post.data.date.getFullYear().toString();
-        const month = (post.data.date.getMonth() + 1).toString().padStart(2, '0');
-        const key = `${year}-${month}`;
-        if (!acc.has(key)) {
-            acc.set(key, { year, month });
-        }
-        return acc;
-    }, new Map<string, { year: string; month: string }>());
+  const postsByMonth = allPosts.reduce((acc, post) => {
+    const year = post.data.date.getFullYear().toString();
+    const month = (post.data.date.getMonth() + 1).toString().padStart(2, "0");
+    const key = `${year}-${month}`;
+    if (!acc.has(key)) {
+      acc.set(key, { year, month });
+    }
+    return acc;
+  }, new Map<string, { year: string; month: string }>());
 
-    return Array.from(postsByMonth.values()).map(params => ({
-        params,
-    }));
+  return Array.from(postsByMonth.values()).map((params) => ({
+    params,
+    props: { allPosts }, // Pass allPosts
+  }));
 }
 
 const { year, month } = Astro.params;
+const { allPosts } = Astro.props;
 
-const articles = await getCollection('articles');
-const events = await getCollection('events');
-const allPosts = [...articles, ...events];
-const allTags = [...new Set(allPosts.flatMap(post => post.data.tags || []))];
-
-const filteredPosts = allPosts.filter(post => {
-    const postYear = post.data.date.getFullYear().toString();
-    const postMonth = (post.data.date.getMonth() + 1).toString().padStart(2, '0');
-    return postYear === year && postMonth === month;
+const filteredPosts = allPosts.filter((post) => {
+  const postYear = post.data.date.getFullYear().toString();
+  const postMonth = (post.data.date.getMonth() + 1).toString().padStart(2, "0");
+  return postYear === year && postMonth === month;
 });
 ---
-<HomeLayout title={`Archive: ${year}-${month}`}>
-    <div slot="left-sidebar">
-        <LeftSidebar />
-    </div>
 
-    <div slot="main-content">
-        <div class="heading-container">
-            <h1>Archive: <span>{year}年{month}月</span></h1>
-            <p><a href="/">&larr; Back to all posts</a></p>
-        </div>
+<ContentLayout title={`Archive: ${year}-${month}`}>
+  <div class="border-b border-zinc-200 px-4 pb-4 dark:border-zinc-700">
+    <h1 class="text-3xl font-bold">
+      Archive: <span class="text-sky-600 dark:text-sky-400"
+        >{year}年{month}月</span
+      >
+    </h1>
+    <a
+      href="/"
+      class="mt-2 inline-block text-zinc-600 hover:underline dark:text-zinc-400"
+      >&larr; Back to all posts</a
+    >
+  </div>
 
-        <div class="feed-container">
-            {filteredPosts.map(post => (
-                <Card
-                    href={`/${post.collection}/${post.id}/`}
-                    title={post.data.title || post.id}
-                    date={post.data.date}
-                    type={post.collection as 'article' | 'event'}
-                />
-            ))}
-        </div>
-    </div>
-
-    <div slot="right-sidebar">
-        <RightSidebar tags={allTags} />
-    </div>
-</HomeLayout>
-
-<style>
-	.feed-container {
-		display: flex;
-        flex-direction: column;
-		gap: 0;
-        border-left: 1px solid var(--c-border);
-        border-right: 1px solid var(--c-border);
-	}
-    .heading-container {
-        padding: 1rem;
-        border-bottom: 1px solid var(--c-border);
+  <div
+    class="mt-8 flex flex-col border-r border-l border-zinc-200 dark:border-zinc-700"
+  >
+    {
+      filteredPosts.map((post) => (
+        <Card
+          client:visible
+          href={`/${post.collection}/${post.id}/`}
+          title={post.data.title || post.id}
+          date={post.data.date.toISOString()}
+          type={post.collection}
+        />
+      ))
     }
-    h1 {
-        margin: 0;
-        font-size: 1.8rem;
-    }
-    h1 span {
-        color: rgb(var(--accent-dark));
-    }
-    p {
-        padding: 0 1rem;
-    }
-    p a {
-        color: var(--c-text);
-        text-decoration: none;
-    }
-    p a:hover {
-        text-decoration: underline;
-    }
-</style>
+  </div>
+</ContentLayout>

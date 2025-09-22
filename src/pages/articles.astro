@@ -4,9 +4,7 @@ import Card from "../components/Card.tsx";
 import { getCollection } from "astro:content";
 
 const articles = await getCollection("articles");
-const events = await getCollection("events");
-const allPosts = [...articles, ...events];
-const sortedPosts = allPosts.sort(
+const sortedArticles = articles.sort(
   (a, b) => new Date(b.data.date).valueOf() - new Date(a.data.date).valueOf(),
 );
 
@@ -25,7 +23,7 @@ const pageTitle = "GauBee's Blog";
     class="mt-8 flex flex-col border-r border-l border-zinc-200 dark:border-zinc-700"
   >
     {
-      sortedPosts.map((post) => (
+      sortedArticles.map((post) => (
         <Card
           client:visible
           href={`/${post.collection}/${post.id}/`}

@@ -13,7 +13,7 @@
     "emitDecoratorMetadata": true
   },
   "include": [
-    ".astro/types.d.ts",
+    ".astro/*",
     "src/**/*"
   ],
   "exclude": [

@@ -53,6 +53,11 @@
     > 还有，卡片的时间展示，应该有本地化的时间风格。现在是固定的英语时间，这不对。
 - [ ] 使用 Lucide React 来统一所有的图标需求。
 
+- [ ] **代码质量重构**:
+  - [x] 将 `RightSidebar.tsx` 拆分为独立的、可复用的卡片组件 (`TableOfContentsCard`, `TagsCard`, `ArchiveCard`)。
+  - [x] 重构 `MobileTopbar.tsx`，将其与 `Sheet` 组件解耦，提升其复用性。
+  - [x] 将 `AppLayout.astro` 重命名为 `ContentLayout.astro`，使其名称更准确地反映其用途。
+
 ## 第四阶段：后台管理功能 (已完成)
 
 - [x] 调研纯前端的 Git 客户端和基于 IndexedDB 的文件系统解决方案。

@@ -1,0 +1,31 @@
+---
+import "../tailwind.css";
+import { ClientRouter } from "astro:transitions";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/jetbrains-mono";
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = "GauBee's personal blog" } = Astro.props;
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/png" href="/icon-192x192.png" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <ClientRouter />
+  </head>
+  <body
+    class="bg-white text-zinc-900 transition-colors duration-300 dark:bg-zinc-900 dark:text-zinc-50"
+  >
+    <slot />
+  </body>
+</html>

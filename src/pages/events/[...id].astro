@@ -1,0 +1,50 @@
+---
+import { getCollection, render } from "astro:content";
+import ContentLayout from "../../layouts/ContentLayout.astro";
+import PrevNextEvent from "../../components/PrevNextEvent.tsx";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("events");
+  return posts.map((post) => ({
+    params: { id: post.id },
+  }));
+}
+
+const { id } = Astro.params;
+if (id === undefined) {
+  throw new Error("event-id is required");
+}
+const posts = await getCollection("events");
+const post = posts.find((p) => p.id === id);
+
+if (!post) {
+  return new Response(null, { status: 404 });
+}
+
+if (!post) {
+  return new Response(null, { status: 404 });
+}
+
+const { Content, headings } = await render(post);
+
+// Manually find prev/next for this page
+const allEvents = (await getCollection("events")).sort(
+  (a, b) => a.data.date.valueOf() - b.data.date.valueOf(),
+);
+const currentIndex = allEvents.findIndex((p) => p.id === id);
+const prev = allEvents[currentIndex - 1];
+const next = allEvents[currentIndex + 1];
+const prevEvent = prev
+  ? { slug: prev.id, data: { title: prev.data.title } }
+  : null;
+const nextEvent = next
+  ? { slug: next.id, data: { title: next.data.title } }
+  : null;
+---
+
+<ContentLayout title={post.data.title} headings={headings}>
+  <article class="prose dark:prose-invert max-w-none">
+    <Content />
+  </article>
+  <PrevNextEvent client:idle prevEvent={prevEvent} nextEvent={nextEvent} />
+</ContentLayout>
