@@ -54,9 +54,9 @@
 - [x] **页脚**: 将页脚重构为 React 组件，并优化了样式，集成了 `lucide-react` 图标。
 - [ ] 使用 Lucide React 来统一所有的图标需求。
 
-- [ ] **代码质量重构**:
+- [x] **代码质量重构**:
   - [x] 将 `RightSidebar.tsx` 拆分为独立的、可复用的卡片组件 (`TableOfContentsCard`, `TagsCard`, `ArchiveCard`)。
-  - [x] 重构 `MobileTopbar.tsx`，将其与 `Sheet` 组件解耦，提升其复用性。
+  - [x] 引入 `Scaffold` 架构，重构 `MobileTopbar` 为通用的 `AppBar`，统一了移动端和桌面端的导航栏体验，并为全局设置等功能提供了入口。
   - [x] 将 `AppLayout.astro` 重命名为 `ContentLayout.astro`，使其名称更准确地反映其用途。
 
 ## 第四阶段：后台管理功能 (已完成)

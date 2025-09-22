@@ -2,13 +2,20 @@
 import RootLayout from "./RootLayout.astro";
 import LeftSidebar from "../components/LeftSidebar.tsx";
 import BackToTop from "../components/BackToTop.tsx";
-import MobileNav from "../components/MobileNav.tsx";
 import Footer from "../components/Footer.tsx";
 import TableOfContentsCard from "@/components/cards/TableOfContentsCard.tsx";
 import TagsCard from "@/components/cards/TagsCard.tsx";
 import ArchiveCard from "@/components/cards/ArchiveCard.tsx";
 import { getSiteData } from "@/lib/getSiteData.ts";
 import type { MarkdownHeading } from "astro";
+
+// New Scaffold-based components
+import Scaffold from "@/components/Scaffold.tsx";
+import AppBar from "@/components/AppBar.tsx";
+import Drawer from "@/components/Drawer.tsx";
+import SettingsPanel from "@/components/SettingsPanel.tsx";
+import { Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface Props {
   title: string;
@@ -25,19 +32,35 @@ const { postsByMonth, allTags } = await getSiteData();
       <LeftSidebar />
     </aside>
 
-    <main class="flex-1 min-w-0">
-      <MobileNav client:load title={title}>
-        <div class="space-y-4">
-          <TableOfContentsCard client:load headings={headings} />
-          <!-- <TagsCard client:load tags={allTags} />
-          <ArchiveCard client:load postsByMonth={postsByMonth} /> -->
+    <Scaffold
+      client:load
+      appBar={
+        <AppBar
+          title={title}
+          showMenuButton={true}
+          actions={
+            <SettingsPanel>
+              <Button variant="ghost" size="icon" aria-label="Settings">
+                <Settings size={20} />
+              </Button>
+            </SettingsPanel>
+          }
+        />
+      }
+      drawer={
+        <Drawer>
+          <TableOfContentsCard headings={headings} />
+          <TagsCard tags={allTags} />
+          <ArchiveCard postsByMonth={postsByMonth} />
+        </Drawer>
+      }
+    >
+      <main class="flex-1 min-w-0">
+        <div class="p-6">
+          <slot />
         </div>
-      </MobileNav>
-
-      <div class="p-6">
-        <slot />
-      </div>
-    </main>
+      </main>
+    </Scaffold>
 
     <aside class="hidden lg:block sticky top-0 h-screen w-64 flex-shrink-0 py-8 pl-8">
       <div class="space-y-4">
