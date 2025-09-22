@@ -3,6 +3,7 @@ import RootLayout from "./RootLayout.astro";
 import LeftSidebar from "../components/LeftSidebar.tsx";
 import BackToTop from "../components/BackToTop.tsx";
 import MobileNav from "../components/MobileNav.tsx";
+import Footer from "../components/Footer.tsx";
 import TableOfContentsCard from "@/components/cards/TableOfContentsCard.tsx";
 import TagsCard from "@/components/cards/TagsCard.tsx";
 import ArchiveCard from "@/components/cards/ArchiveCard.tsx";
@@ -47,5 +48,6 @@ const { postsByMonth, allTags } = await getSiteData();
     </aside>
   </div>
 
+  <Footer client:load />
   <BackToTop client:load />
 </RootLayout>
