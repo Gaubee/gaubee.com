@@ -1,14 +1,10 @@
 ---
 import ContentLayout from "../layouts/ContentLayout.astro";
-import Card from "../components/Card.tsx";
-import { getCollection } from "astro:content";
+import PreviewCard from "../components/cards/PreviewCard.tsx";
+import MarkdownRenderer from "../components/MarkdownRenderer.tsx";
+import { getSiteData } from "@/lib/getSiteData";
 
-const articles = await getCollection("articles");
-const events = await getCollection("events");
-const allPosts = [...articles, ...events];
-const sortedPosts = allPosts.sort(
-  (a, b) => new Date(b.data.date).valueOf() - new Date(a.data.date).valueOf(),
-);
+const { allPosts } = await getSiteData();
 
 const pageTitle = "Gaubee's Blog";
 ---
@@ -21,18 +17,21 @@ const pageTitle = "Gaubee's Blog";
     </p>
   </div>
 
-  <div
-    class="mt-8 flex flex-col border-r border-l border-zinc-200 dark:border-zinc-700"
-  >
+  <div class="mt-8 flex flex-col">
     {
-      sortedPosts.map((post) => (
-        <Card
-          client:visible
-          href={`/${post.collection}/${post.id}/`}
-          title={post.data.title || post.id}
-          date={post.data.date.toISOString()}
-          type={post.collection}
-        />
+      allPosts.map((post) => (
+        <div class="py-4">
+          <PreviewCard
+            client:visible
+            href={`/${post.collection}/${post.id}`}
+            collection={post.collection}
+            images={post.images}
+            title={post.title}
+            datetime={post.data.datetime}
+          >
+            <MarkdownRenderer client:only markdown={post.previewBody} />
+          </PreviewCard>
+        </div>
       ))
     }
   </div>
