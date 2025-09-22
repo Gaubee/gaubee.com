@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from "react";
 
-const GITHUB_TOKEN_KEY = 'github_token';
+const GITHUB_TOKEN_KEY = "github_token";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -8,7 +8,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const token = localStorage.getItem(GITHUB_TOKEN_KEY);
     if (!token) {
-      window.location.href = '/gaubee/login';
+      window.location.href = "/admin/login";
     } else {
       setIsAuthorized(true);
     }
@@ -20,5 +20,5 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  return <>{children}</>;
+  return children;
 }

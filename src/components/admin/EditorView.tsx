@@ -25,7 +25,7 @@ export default function EditorView() {
         const filename = prompt(`Enter the filename for the new ${type} (e.g., my-new-post.md):`);
         if (!filename || !filename.endsWith('.md')) {
             alert('Invalid filename. Must end with .md');
-            window.location.href = '/gaubee'; // Go back if invalid
+            window.location.href = '/admin'; // Go back if invalid
             return;
         }
         const newPath = `src/content/${type}s/${filename}`;
@@ -38,7 +38,7 @@ export default function EditorView() {
         setIsLoadingContent(false);
     } else {
         // No path or new file type, redirect to file browser
-        window.location.href = '/gaubee';
+        window.location.href = '/admin';
     }
   }, []);
 
@@ -70,7 +70,7 @@ export default function EditorView() {
       });
       alert(`Changes for ${path} have been staged.`);
       // After staging, go back to the file browser view
-      window.location.href = '/gaubee';
+      window.location.href = '/admin';
     } catch (error) {
       console.error('Failed to stage changes:', error);
       alert('Error staging changes. See console for details.');
@@ -90,7 +90,7 @@ export default function EditorView() {
   return (
     <div className="p-4 md:p-8 space-y-4">
         <header className="flex flex-wrap gap-4 justify-between items-center">
-            <Button variant="outline" onClick={() => window.location.href = '/gaubee'}>
+            <Button variant="outline" onClick={() => window.location.href = '/admin'}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 <span className="hidden sm:inline">Back to Files</span>
             </Button>

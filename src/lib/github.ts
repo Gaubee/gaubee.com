@@ -1,13 +1,14 @@
-import { Octokit } from '@octokit/rest';
-import type { StagedChange } from './db';
+import { str_to_base64_binary } from "@gaubee/util";
+import { Octokit } from "@octokit/rest";
+import type { StagedChange } from "./db";
 
-const GITHUB_TOKEN_KEY = 'github_token';
+const GITHUB_TOKEN_KEY = "github_token";
 
 let octokitInstance: Octokit | null = null;
 
 // This function allows tests to inject a mock instance.
 export function __setOctokitInstance(instance: Octokit | null) {
-    octokitInstance = instance;
+  octokitInstance = instance;
 }
 
 function getOctokit(tokenOverride?: string) {
@@ -15,9 +16,13 @@ function getOctokit(tokenOverride?: string) {
     return octokitInstance;
   }
 
-  const token = tokenOverride || (typeof window !== 'undefined' ? localStorage.getItem(GITHUB_TOKEN_KEY) : null);
+  const token =
+    tokenOverride ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem(GITHUB_TOKEN_KEY)
+      : null);
   if (!token) {
-    console.warn('GitHub token not found.');
+    console.warn("GitHub token not found.");
     return null;
   }
 
@@ -25,24 +30,24 @@ function getOctokit(tokenOverride?: string) {
 }
 
 export async function validateToken(token: string) {
-    const octokit = getOctokit(token);
-    if (!octokit) return false;
-    try {
-        await octokit.users.getAuthenticated();
-        return true;
-    } catch (error) {
-        console.error("Token validation failed:", error);
-        return false;
-    }
+  const octokit = getOctokit(token);
+  if (!octokit) return false;
+  try {
+    await octokit.users.getAuthenticated();
+    return true;
+  } catch (error) {
+    console.error("Token validation failed:", error);
+    return false;
+  }
 }
 
-const OWNER = 'gaubee';
-const REPO = 'gaubee.com';
+const OWNER = "gaubee";
+const REPO = "gaubee.com";
 
 export async function getFileContent(path: string): Promise<string> {
   const octokit = getOctokit();
   if (!octokit) {
-    throw new Error('GitHub client not initialized. Is the token set?');
+    throw new Error("GitHub client not initialized. Is the token set?");
   }
 
   try {
@@ -51,15 +56,20 @@ export async function getFileContent(path: string): Promise<string> {
       repo: REPO,
       path,
     });
-
-    // @ts-ignore
-    if (response.data.encoding === 'base64') {
-        const encoded = response.data.content;
-        const buff = Buffer.from(encoded, 'base64');
-        const decoder = new TextDecoder('utf-8');
-        return decoder.decode(buff);
+    debugger;
+    if (
+      "type" in response.data &&
+      response.data.type == "file" &&
+      response.data.encoding === "base64"
+    ) {
+      const encoded = response.data.content;
+      const buff = str_to_base64_binary(encoded);
+      const decoder = new TextDecoder("utf-8");
+      return decoder.decode(buff);
     } else {
-      throw new Error(`Could not get content for path: ${path}. Unexpected encoding.`);
+      throw new Error(
+        `Could not get content for path: ${path}. Unexpected encoding.`,
+      );
     }
   } catch (error) {
     console.error(`Error fetching file content for path "${path}":`, error);
@@ -67,7 +77,7 @@ export async function getFileContent(path: string): Promise<string> {
   }
 }
 
-export async function getRepoContents(path: string = '') {
+export async function getRepoContents(path: string = "") {
   const octokit = getOctokit();
   if (!octokit) {
     return [];
@@ -90,10 +100,14 @@ export async function getRepoContents(path: string = '') {
   }
 }
 
-export async function commitChanges(message: string, changes: StagedChange[], branch: string = 'main') {
+export async function commitChanges(
+  message: string,
+  changes: StagedChange[],
+  branch: string = "main",
+) {
   const octokit = getOctokit();
   if (!octokit) {
-    throw new Error('GitHub client not initialized.');
+    throw new Error("GitHub client not initialized.");
   }
 
   const { data: refData } = await octokit.git.getRef({
@@ -111,31 +125,33 @@ export async function commitChanges(message: string, changes: StagedChange[], br
   const baseTreeSha = commitData.tree.sha;
 
   const blobCreationPromises = changes
-    .filter(change => change.status === 'created' || change.status === 'updated')
+    .filter(
+      (change) => change.status === "created" || change.status === "updated",
+    )
     .map(async (change) => {
       const { data: blobData } = await octokit.git.createBlob({
         owner: OWNER,
         repo: REPO,
         content: change.content!,
-        encoding: 'utf-8',
+        encoding: "utf-8",
       });
       return {
         path: change.path,
         sha: blobData.sha,
-        mode: '100644' as const,
-        type: 'blob' as const,
+        mode: "100644" as const,
+        type: "blob" as const,
       };
     });
 
   const createdOrUpdatedBlobs = await Promise.all(blobCreationPromises);
 
   const deletedFiles = changes
-    .filter(change => change.status === 'deleted')
-    .map(change => ({
+    .filter((change) => change.status === "deleted")
+    .map((change) => ({
       path: change.path,
       sha: null,
-      mode: '100644' as const,
-      type: 'blob' as const,
+      mode: "100644" as const,
+      type: "blob" as const,
     }));
 
   const { data: newTree } = await octokit.git.createTree({

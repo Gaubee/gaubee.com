@@ -6,11 +6,11 @@ import { upsertChange } from '@/lib/db';
 
 export default function AdminView() {
   const handleNewFile = (type: 'article' | 'event') => {
-    window.location.href = `/gaubee/editor?new=${type}`;
+    window.location.href = `/admin/editor?new=${type}`;
   };
 
   const handleFileSelect = (path: string) => {
-    window.location.href = `/gaubee/editor?path=${path}`;
+    window.location.href = `/admin/editor?path=${path}`;
   };
 
   const handleFileDelete = async (path: string) => {

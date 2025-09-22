@@ -15,6 +15,7 @@
     "types": [
       "dom-navigation"
     ],
+    "allowImportingTsExtensions": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true
   },
