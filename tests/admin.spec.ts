@@ -1,138 +1,134 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Admin Panel', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => {
-      const githubApiMock = {
-        repos: {
-          async getContent({ path }: { path: string }) {
-            console.log('MOCK getContent called with path:', path);
-            if (path === 'src/content') {
-              return {
-                data: [
-                  { name: 'articles', path: 'src/content/articles', type: 'dir' },
-                  { name: 'README.md', path: 'src/content/README.md', type: 'file' },
-                  { name: 'test.md', path: 'src/content/test.md', type: 'file' },
-                ],
-              };
-            }
-            if (path === 'src/content/README.md') {
-              return {
-                data: {
-                  content: Buffer.from('# Hello README').toString('base64'),
-                  encoding: 'base64',
-                },
-              };
-            }
-             if (path === 'src/content/test.md') {
-              return {
-                data: {
-                  content: Buffer.from('# Original Content').toString('base64'),
-                  encoding: 'base64',
-                },
-              };
-            }
-            return { data: [] };
-          },
+// This beforeEach hook sets up a mock of the GitHub API for all tests in this file.
+test.beforeEach(async ({ page }) => {
+  // By using addInitScript, this mock will be in place before any of the page's
+  // JavaScript runs. This is crucial for ensuring our components use the mock.
+  await page.addInitScript(() => {
+    // This is a browser-side mock of the Octokit instance.
+    const githubApiMock = {
+      repos: {
+        async getContent({ path }: { path: string }) {
+          if (path === 'src/content') {
+            return {
+              data: [
+                { name: 'articles', path: 'src/content/articles', type: 'dir' },
+                { name: 'README.md', path: 'src/content/README.md', type: 'file' },
+                { name: 'test.md', path: 'src/content/test.md', type: 'file' },
+              ],
+            };
+          }
+          if (path === 'src/content/README.md') {
+            return { data: { content: btoa('# Hello README'), encoding: 'base64' } };
+          }
+           if (path === 'src/content/test.md') {
+            return { data: { content: btoa('# Original Content'), encoding: 'base64' } };
+          }
+          return { data: [] };
         },
-        git: {
-          async getRef() { return { data: { object: { sha: 'abc' } } }; },
-          async getCommit() { return { data: { tree: { sha: 'def' } } }; },
-          async createBlob() { return { data: { sha: 'ghi' } }; },
-          async createTree() { return { data: { sha: 'jkl' } }; },
-          async createCommit() { return { data: { sha: 'mno' } }; },
-          async updateRef() { return { data: {} }; },
-        }
-      };
-      // @ts-ignore
-      window.__setOctokitInstance(githubApiMock);
-    });
+      },
+      git: {
+        async getRef() { return { data: { object: { sha: 'abc' } } }; },
+        async getCommit() { return { data: { tree: { sha: 'def' } } }; },
+        async createBlob() { return { data: { sha: 'ghi' } }; },
+        async createTree() { return { data: { sha: 'jkl' } }; },
+        async createCommit() { return { data: { sha: 'mno' } } },
+        async updateRef() { return { data: {} }; },
+      },
+      users: {
+          async getAuthenticated() { return { data: { login: 'test-user' } }; }
+      }
+    };
+    // @ts-ignore
+    window.__setOctokitInstance(githubApiMock);
   });
+});
 
 
-  test('should display file browser and load file content', async ({ page }) => {
-    await page.goto('/gaubee');
+test.describe('Admin Panel', () => {
+    test('should login successfully and see file browser', async ({ page }) => {
+        await page.goto('/gaubee/login');
+        await page.getByPlaceholder('ghp_...').fill('test-token');
+        await page.getByRole('button', { name: 'Save and Continue' }).click();
+        await page.waitForURL('**/gaubee');
 
-    await expect(page.getByText('articles')).toBeVisible();
-    await expect(page.getByText('README.md')).toBeVisible();
-
-    await page.getByText('README.md').click();
-
-    const editor = page.locator('.ProseMirror');
-    await expect(editor).toBeVisible();
-    await expect(editor).toHaveText('Hello README');
-  });
-
-
-  test('should stage a new file and show it in the staged list', async ({ page }) => {
-    await page.goto('/gaubee');
-
-    page.on('dialog', dialog => dialog.accept('my-new-article.md'));
-    await page.getByRole('button', { name: 'New Article' }).click();
-
-    const editor = page.locator('.ProseMirror');
-    await expect(editor).toBeVisible();
-    await expect(editor).toHaveText('New article: my-new-article.mdStart writing...');
-
-    await editor.fill('This is the new content.');
-
-    await page.getByRole('button', { name: 'Stage Changes' }).click();
-
-    const stagedChangesList = page.locator('div:has-text("Staged Changes")');
-    await expect(stagedChangesList.getByText('articles/my-new-article.md')).toBeVisible();
-    await expect(stagedChangesList.getByText('created')).toBeVisible();
-  });
-
-
-  test('should show diff view for an updated file', async ({ page }) => {
-    await page.goto('/gaubee');
-
-    await page.getByText('test.md').click();
-
-    const editor = page.locator('.ProseMirror');
-    await expect(editor).toBeVisible();
-    await editor.fill('# Updated Content');
-
-    await page.getByRole('button', { name: 'Stage Changes' }).click();
-
-    await page.locator('div:has-text("Staged Changes")').getByText('test.md').click();
-
-    const diffViewer = page.locator('.diff-viewer');
-    await expect(diffViewer).toBeVisible();
-
-    await expect(diffViewer.getByText('Original Content')).toBeVisible();
-    await expect(diffViewer.getByText('Updated Content')).toBeVisible();
-
-    await page.screenshot({ path: 'jules-scratch/diff-view.png' });
-  });
-
-
-  test('should commit a change successfully', async ({ page }) => {
-    await page.goto('/gaubee');
-
-    await page.evaluate(async () => {
-      return new Promise<void>(resolve => {
-        const request = indexedDB.open('GaubeeAdminDB');
-        request.onsuccess = (event: any) => {
-          const db = event.target.result;
-          const transaction = db.transaction('stagedChanges', 'readwrite');
-          const store = transaction.objectStore('stagedChanges');
-          store.put({ path: 'test.md', status: 'updated', content: '# test', originalContent: '' });
-          transaction.oncomplete = () => resolve();
-        };
-      });
+        await expect(page.getByText('File Management')).toBeVisible();
+        await expect(page.getByText('articles')).toBeVisible();
+        await expect(page.getByText('README.md')).toBeVisible();
     });
 
-    await page.reload();
+    test('should navigate to editor, edit, and stage a change', async ({ page }) => {
+        await page.goto('/gaubee/login');
+        await page.getByPlaceholder('ghp_...').fill('test-token');
+        await page.getByRole('button', { name: 'Save and Continue' }).click();
+        await page.waitForURL('**/gaubee');
 
-    page.on('dialog', dialog => {
-      expect(dialog.message()).toBe('Commit successful!');
-      dialog.accept();
+        await page.getByText('test.md').click();
+        await page.waitForURL('**/gaubee/editor?path=src/content/test.md');
+
+        const editor = page.locator('.ProseMirror');
+        await expect(editor).toBeVisible();
+        await editor.fill('# Updated Content');
+
+        await page.getByRole('button', { name: 'Stage Changes' }).click();
+        await page.waitForURL('**/gaubee');
+
+        const stagedChangesList = page.locator('div:has-text("Staged Changes")');
+        await expect(stagedChangesList.getByText('test.md')).toBeVisible();
+        await expect(stagedChangesList.getByText('updated')).toBeVisible();
     });
 
-    await page.getByPlaceholder('Enter your commit message...').fill('Test commit');
-    await page.getByRole('button', { name: 'Commit Changes' }).click();
+    test('should show diff view for an updated file', async ({ page }) => {
+        await page.goto('/gaubee/login');
+        await page.getByPlaceholder('ghp_...').fill('test-token');
+        await page.getByRole('button', { name: 'Save and Continue' }).click();
+        await page.waitForURL('**/gaubee');
 
-    await expect(page.getByText('No changes have been staged.')).toBeVisible();
-  });
+        await page.getByText('test.md').click();
+        await page.waitForURL('**/gaubee/editor?path=src/content/test.md');
+
+        await page.locator('.ProseMirror').fill('# Updated Content');
+        await page.getByRole('button', { name: 'Stage Changes' }).click();
+        await page.waitForURL('**/gaubee');
+
+        await page.locator('div:has-text("Staged Changes")').getByText('test.md').click();
+
+        const diffViewer = page.locator('.diff-viewer');
+        await expect(diffViewer).toBeVisible();
+        await expect(diffViewer.getByText('Original Content')).toBeVisible();
+        await expect(diffViewer.getByText('Updated Content')).toBeVisible();
+    });
+
+    test('should commit a change successfully', async ({ page }) => {
+        await page.goto('/gaubee/login');
+        await page.getByPlaceholder('ghp_...').fill('test-token');
+        await page.getByRole('button', { name: 'Save and Continue' }).click();
+        await page.waitForURL('**/gaubee');
+
+        await page.evaluate(async () => {
+          return new Promise<void>(resolve => {
+            const request = indexedDB.open('GaubeeAdminDB');
+            request.onsuccess = (event: any) => {
+              const db = event.target.result;
+              const transaction = db.transaction('stagedChanges', 'readwrite');
+              const store = transaction.objectStore('stagedChanges');
+              store.put({ path: 'test.md', status: 'updated', content: '# test', originalContent: '' });
+              transaction.oncomplete = () => resolve();
+            };
+          });
+        });
+
+        await page.reload();
+        await page.waitForURL('**/gaubee');
+
+        const dialogPromise = page.waitForEvent('dialog');
+        await page.getByPlaceholder('Enter your commit message...').fill('Test commit');
+        await page.getByRole('button', { name: 'Commit Changes' }).click();
+
+        const dialog = await dialogPromise;
+        expect(dialog.message()).toBe('Commit successful!');
+        await dialog.accept();
+
+        await expect(page.getByText('No changes have been staged.')).toBeVisible();
+    });
 });

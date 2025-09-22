@@ -10,19 +10,30 @@ export function __setOctokitInstance(instance: Octokit | null) {
     octokitInstance = instance;
 }
 
-function getOctokit() {
+function getOctokit(tokenOverride?: string) {
   if (octokitInstance) {
     return octokitInstance;
   }
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem(GITHUB_TOKEN_KEY) : null;
+  const token = tokenOverride || (typeof window !== 'undefined' ? localStorage.getItem(GITHUB_TOKEN_KEY) : null);
   if (!token) {
-    console.warn('GitHub token not found. Please set it in the admin panel.');
+    console.warn('GitHub token not found.');
     return null;
   }
 
-  octokitInstance = new Octokit({ auth: token });
-  return octokitInstance;
+  return new Octokit({ auth: token });
+}
+
+export async function validateToken(token: string) {
+    const octokit = getOctokit(token);
+    if (!octokit) return false;
+    try {
+        await octokit.users.getAuthenticated();
+        return true;
+    } catch (error) {
+        console.error("Token validation failed:", error);
+        return false;
+    }
 }
 
 const OWNER = 'gaubee';
@@ -42,28 +53,24 @@ export async function getFileContent(path: string): Promise<string> {
     });
 
     // @ts-ignore
-    if ('content' in response.data && 'encoding' in response.data && response.data.encoding === 'base64') {
-      // @ts-ignore
-      if (typeof window !== 'undefined') {
-        // @ts-ignore
-        return window.atob(response.data.content);
-      } else {
-        // @ts-ignore
-        return Buffer.from(response.data.content, 'base64').toString('utf-8');
-      }
+    if (response.data.encoding === 'base64') {
+        const encoded = response.data.content;
+        const buff = Buffer.from(encoded, 'base64');
+        const decoder = new TextDecoder('utf-8');
+        return decoder.decode(buff);
     } else {
-      throw new Error(`Could not get content for path: ${path}. Response was not a file or had unexpected encoding.`);
+      throw new Error(`Could not get content for path: ${path}. Unexpected encoding.`);
     }
   } catch (error) {
     console.error(`Error fetching file content for path "${path}":`, error);
-    throw error; // Re-throw to be handled by the caller
+    throw error;
   }
 }
 
 export async function getRepoContents(path: string = '') {
   const octokit = getOctokit();
   if (!octokit) {
-    return []; // Return empty array if octokit is not initialized
+    return [];
   }
 
   try {
@@ -89,7 +96,6 @@ export async function commitChanges(message: string, changes: StagedChange[], br
     throw new Error('GitHub client not initialized.');
   }
 
-  // 1. Get the latest commit SHA of the branch
   const { data: refData } = await octokit.git.getRef({
     owner: OWNER,
     repo: REPO,
@@ -97,7 +103,6 @@ export async function commitChanges(message: string, changes: StagedChange[], br
   });
   const latestCommitSha = refData.object.sha;
 
-  // 2. Get the tree of the latest commit
   const { data: commitData } = await octokit.git.getCommit({
     owner: OWNER,
     repo: REPO,
@@ -105,7 +110,6 @@ export async function commitChanges(message: string, changes: StagedChange[], br
   });
   const baseTreeSha = commitData.tree.sha;
 
-  // 3. Create blobs for new/updated files
   const blobCreationPromises = changes
     .filter(change => change.status === 'created' || change.status === 'updated')
     .map(async (change) => {
@@ -125,7 +129,6 @@ export async function commitChanges(message: string, changes: StagedChange[], br
 
   const createdOrUpdatedBlobs = await Promise.all(blobCreationPromises);
 
-  // 4. Create the tree object for deleted files
   const deletedFiles = changes
     .filter(change => change.status === 'deleted')
     .map(change => ({
@@ -135,7 +138,6 @@ export async function commitChanges(message: string, changes: StagedChange[], br
       type: 'blob' as const,
     }));
 
-  // 5. Create a new tree
   const { data: newTree } = await octokit.git.createTree({
     owner: OWNER,
     repo: REPO,
@@ -143,7 +145,6 @@ export async function commitChanges(message: string, changes: StagedChange[], br
     tree: [...createdOrUpdatedBlobs, ...deletedFiles],
   });
 
-  // 6. Create a new commit
   const { data: newCommit } = await octokit.git.createCommit({
     owner: OWNER,
     repo: REPO,
@@ -152,7 +153,6 @@ export async function commitChanges(message: string, changes: StagedChange[], br
     parents: [latestCommitSha],
   });
 
-  // 7. Update the branch reference (push)
   await octokit.git.updateRef({
     owner: OWNER,
     repo: REPO,

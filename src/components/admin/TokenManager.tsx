@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { KeyRound } from 'lucide-react';
+import { KeyRound, Loader2 } from 'lucide-react';
+import { validateToken } from '@/lib/github';
 
 const GITHUB_TOKEN_KEY = 'github_token';
 
 export default function TokenManager() {
   const [token, setToken] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const storedToken = localStorage.getItem(GITHUB_TOKEN_KEY);
@@ -16,19 +19,29 @@ export default function TokenManager() {
     }
   }, []);
 
-  const handleSave = () => {
-    localStorage.setItem(GITHUB_TOKEN_KEY, token);
-    alert('Token saved!');
+  const handleSaveAndValidate = async () => {
+    setIsLoading(true);
+    setError(null);
+    const isValid = await validateToken(token);
+    setIsLoading(false);
+
+    if (isValid) {
+      localStorage.setItem(GITHUB_TOKEN_KEY, token);
+      window.location.href = '/gaubee'; // Redirect to the main admin page
+    } else {
+      setError('Invalid token. Please check your token and try again.');
+      localStorage.removeItem(GITHUB_TOKEN_KEY); // Clear invalid token
+    }
   };
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center">
-            <KeyRound className="mr-2" /> GitHub Access Token
+            <KeyRound className="mr-2" /> Enter Your Access Token
         </CardTitle>
         <CardDescription>
-            Your GitHub Personal Access Token is stored securely in your browser's local storage.
+            To use the admin panel, please provide a GitHub Personal Access Token with repository access.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -36,10 +49,12 @@ export default function TokenManager() {
             type="password"
             value={token}
             onChange={(e) => setToken(e.target.value)}
-            placeholder="Enter your GitHub PAT"
+            placeholder="ghp_..."
+            onKeyDown={(e) => e.key === 'Enter' && handleSaveAndValidate()}
         />
-        <Button onClick={handleSave} className="w-full">
-            Save Token
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <Button onClick={handleSaveAndValidate} disabled={isLoading} className="w-full">
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Save and Continue'}
         </Button>
       </CardContent>
     </Card>

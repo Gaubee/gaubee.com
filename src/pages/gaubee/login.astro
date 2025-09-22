@@ -1,0 +1,11 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import TokenManager from '@/components/admin/TokenManager.tsx';
+---
+<Layout title="Admin Login">
+  <div class="flex items-center justify-center min-h-screen bg-muted">
+    <div class="w-full max-w-md p-4">
+        <TokenManager client:load />
+    </div>
+  </div>
+</Layout>
