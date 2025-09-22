@@ -1,0 +1,214 @@
+<!DOCTYPE html><html lang="zh-CN"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width"><link rel="icon" type="image/png" href="/icon-192x192.png"><meta name="generator" content="Astro v5.13.9"><title>View Transitions API (Level-1 single-document) 进阶</title><meta name="description" content="GauBee's personal blog"><meta name="astro-view-transitions-enabled" content="true"><meta name="astro-view-transitions-fallback" content="animate"><script type="module" src="/_astro/ClientRouter.astro_astro_type_script_index_0_lang.B3vRBseb.js"></script><link rel="stylesheet" href="/_astro/editor.ByX6VvEs.css"></head> <body class="bg-white text-zinc-900 transition-colors duration-300 dark:bg-zinc-900 dark:text-zinc-50">  <div class="flex max-w-7xl mx-auto"> <aside class="hidden lg:block sticky top-0 h-screen w-64 flex-shrink-0 py-8 pr-8"> <aside class="w-64 p-4 pr-8"><nav class="flex flex-col space-y-2"><a href="/" class="flex items-center gap-4 py-3 px-6 text-lg font-semibold no-underline text-zinc-900 dark:text-zinc-100 rounded-full transition-colors duration-200 ease-in-out hover:bg-gray-200 dark:hover:bg-zinc-800"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-house" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"></path><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg><span>主页</span></a><a href="/events" class="flex items-center gap-4 py-3 px-6 text-lg font-semibold no-underline text-zinc-900 dark:text-zinc-100 rounded-full transition-colors duration-200 ease-in-out hover:bg-gray-200 dark:hover:bg-zinc-800"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rss" aria-hidden="true"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg><span>时事快讯</span></a></nav></aside> </aside> <main class="flex-1 min-w-0"> <style>astro-island,astro-slot,astro-static-slot{display:contents}</style><script>(()=>{var e=async t=>{await(await t())()};(self.Astro||(self.Astro={})).load=e;window.dispatchEvent(new Event("astro:load"));})();</script><script>(()=>{var A=Object.defineProperty;var g=(i,o,a)=>o in i?A(i,o,{enumerable:!0,configurable:!0,writable:!0,value:a}):i[o]=a;var d=(i,o,a)=>g(i,typeof o!="symbol"?o+"":o,a);{let i={0:t=>m(t),1:t=>a(t),2:t=>new RegExp(t),3:t=>new Date(t),4:t=>new Map(a(t)),5:t=>new Set(a(t)),6:t=>BigInt(t),7:t=>new URL(t),8:t=>new Uint8Array(t),9:t=>new Uint16Array(t),10:t=>new Uint32Array(t),11:t=>1/0*t},o=t=>{let[l,e]=t;return l in i?i[l](e):void 0},a=t=>t.map(o),m=t=>typeof t!="object"||t===null?t:Object.fromEntries(Object.entries(t).map(([l,e])=>[l,o(e)]));class y extends HTMLElement{constructor(){super(...arguments);d(this,"Component");d(this,"hydrator");d(this,"hydrate",async()=>{var b;if(!this.hydrator||!this.isConnected)return;let e=(b=this.parentElement)==null?void 0:b.closest("astro-island[ssr]");if(e){e.addEventListener("astro:hydrate",this.hydrate,{once:!0});return}let c=this.querySelectorAll("astro-slot"),n={},h=this.querySelectorAll("template[data-astro-template]");for(let r of h){let s=r.closest(this.tagName);s!=null&&s.isSameNode(this)&&(n[r.getAttribute("data-astro-template")||"default"]=r.innerHTML,r.remove())}for(let r of c){let s=r.closest(this.tagName);s!=null&&s.isSameNode(this)&&(n[r.getAttribute("name")||"default"]=r.innerHTML)}let p;try{p=this.hasAttribute("props")?m(JSON.parse(this.getAttribute("props"))):{}}catch(r){let s=this.getAttribute("component-url")||"<unknown>",v=this.getAttribute("component-export");throw v&&(s+=` (export ${v})`),console.error(`[hydrate] Error parsing props for component ${s}`,this.getAttribute("props"),r),r}let u;await this.hydrator(this)(this.Component,p,n,{client:this.getAttribute("client")}),this.removeAttribute("ssr"),this.dispatchEvent(new CustomEvent("astro:hydrate"))});d(this,"unmount",()=>{this.isConnected||this.dispatchEvent(new CustomEvent("astro:unmount"))})}disconnectedCallback(){document.removeEventListener("astro:after-swap",this.unmount),document.addEventListener("astro:after-swap",this.unmount,{once:!0})}connectedCallback(){if(!this.hasAttribute("await-children")||document.readyState==="interactive"||document.readyState==="complete")this.childrenConnectedCallback();else{let e=()=>{document.removeEventListener("DOMContentLoaded",e),c.disconnect(),this.childrenConnectedCallback()},c=new MutationObserver(()=>{var n;((n=this.lastChild)==null?void 0:n.nodeType)===Node.COMMENT_NODE&&this.lastChild.nodeValue==="astro:end"&&(this.lastChild.remove(),e())});c.observe(this,{childList:!0}),document.addEventListener("DOMContentLoaded",e)}}async childrenConnectedCallback(){let e=this.getAttribute("before-hydration-url");e&&await import(e),this.start()}async start(){let e=JSON.parse(this.getAttribute("opts")),c=this.getAttribute("client");if(Astro[c]===void 0){window.addEventListener(`astro:${c}`,()=>this.start(),{once:!0});return}try{await Astro[c](async()=>{let n=this.getAttribute("renderer-url"),[h,{default:p}]=await Promise.all([import(this.getAttribute("component-url")),n?import(n):()=>()=>{}]),u=this.getAttribute("component-export")||"default";if(!u.includes("."))this.Component=h[u];else{this.Component=h;for(let f of u.split("."))this.Component=this.Component[f]}return this.hydrator=p,this.hydrate},e,this)}catch(n){console.error(`[astro-island] Error hydrating ${this.getAttribute("component-url")}`,n)}}attributeChangedCallback(){this.hydrate()}}d(y,"observedAttributes",["props"]),customElements.get("astro-island")||customElements.define("astro-island",y)}})();</script><astro-island uid="wKiSI" prefix="r13" component-url="/_astro/MobileNav.DnXM_NFf.js" component-export="default" renderer-url="/_astro/client.6DCnCeAt.js" props="{&quot;title&quot;:[0,&quot;View Transitions API (Level-1 single-document) 进阶&quot;]}" ssr client="load" opts="{&quot;name&quot;:&quot;MobileNav&quot;,&quot;value&quot;:true}" await-children><div id="mobile-topbar" class="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-zinc-200 bg-white/80 px-4 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/80 lg:hidden"><div class="w-6"></div><div class="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">View Transitions API (Level-1 single-document) 进阶</div><button type="button" aria-label="Open menu"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-menu" aria-hidden="true"><path d="M4 5h16"></path><path d="M4 12h16"></path><path d="M4 19h16"></path></svg></button></div><template data-astro-template> <div class="space-y-4"> <astro-island uid="ZK6QOD" prefix="r7" component-url="/_astro/TableOfContentsCard.CsCJMAN2.js" component-export="default" renderer-url="/_astro/client.6DCnCeAt.js" props="{&quot;headings&quot;:[1,[[0,{&quot;depth&quot;:[0,2],&quot;slug&quot;:[0,&quot;一spa-导航模拟看起来很美做起来费心&quot;],&quot;text&quot;:[0,&quot;一、SPA 导航模拟：看起来很美，做起来费心&quot;]}],[0,{&quot;depth&quot;:[0,2],&quot;slug&quot;:[0,&quot;二深入-view-transitions-的限制与脾气&quot;],&quot;text&quot;:[0,&quot;二、深入 View Transitions 的限制与“脾气”&quot;]}],[0,{&quot;depth&quot;:[0,2],&quot;slug&quot;:[0,&quot;三view-transitions-的适用场景与挑战&quot;],&quot;text&quot;:[0,&quot;三、View Transitions 的适用场景与挑战&quot;]}],[0,{&quot;depth&quot;:[0,2],&quot;slug&quot;:[0,&quot;总结与思考&quot;],&quot;text&quot;:[0,&quot;总结与思考&quot;]}]]]}" ssr client="load" opts="{&quot;name&quot;:&quot;TableOfContentsCard&quot;,&quot;value&quot;:true}" await-children><div class="rounded-xl border bg-card text-card-foreground shadow"><div class="p-6 pt-0"><ul><li><a href="#一spa-导航模拟看起来很美做起来费心">一、SPA 导航模拟：看起来很美，做起来费心</a></li><li><a href="#二深入-view-transitions-的限制与脾气">二、深入 View Transitions 的限制与“脾气”</a></li><li><a href="#三view-transitions-的适用场景与挑战">三、View Transitions 的适用场景与挑战</a></li><li><a href="#总结与思考">总结与思考</a></li></ul></div></div><!--astro:end--></astro-island> <!-- <TagsCard client:load tags={allTags} />
+          <ArchiveCard client:load postsByMonth={postsByMonth} /> --> </div> </template><!--astro:end--></astro-island> <div class="p-6">  <article class="prose dark:prose-invert max-w-none"> <p>上次咱们聊了 View Transitions 的基础，那感觉就像发现新大陆，丝滑得不行。但真正在复杂的 SPA（单页应用）场景里用起来，尤其是想模拟原生 App 那种细腻的转场效果时，你可能会发现，这“丝滑”背后，可能藏着一些“蛋疼”的细节。</p>
+<p><strong>核心矛盾点</strong>：<code>View Transitions Level 1</code> 的设计哲学是<strong>针对单个文档内 DOM 状态变化的视觉过渡</strong>。而 SPA 的常见模式是在<strong>单个文档里模拟多个“页面”的导航切换</strong>。这种模式上的错位，是许多复杂问题的根源。Level 1 并没有“页面”或“路由”的概念，它只关心“变化前”和“变化后”的 DOM 快照。</p>
+<p>接下来，咱们通过一些实践案例，深入探讨在 SPA 中应用 View Transitions 的复杂性、局限性以及特定场景下的思考。</p>
+<h2 id="一spa-导航模拟看起来很美做起来费心">一、SPA 导航模拟：看起来很美，做起来费心</h2>
+<blockquote>
+<p>首先给出 DEMO 链接: <a href="https://appn.dwewb.com/examples/kitchen-sink/view-transition-demo-ios-navigation/">ios-navigation demo by view-transition</a></p>
+</blockquote>
+<p>咱们来看一个常见的需求：在 SPA 里模拟类似 iOS 的导航栏切换效果。这个效果细节不少：</p>
+<ol>
+<li><strong>页面整体</strong>：新页面从右侧滑入，覆盖旧页面。</li>
+<li><strong>返回按钮图标 (backIcon)</strong>：在切换过程中，位置保持不动（视觉上像钉在那里）。</li>
+<li><strong>返回按钮文字 (backText)</strong>：由旧页面的标题 (title) “变形”而来。它不是简单地淡入淡出，而是从旧标题的位置平滑移动并变成返回文字。</li>
+<li><strong>新页面标题 (title)</strong>：随着新页面整体从右侧滑入。</li>
+</ol>
+<p>听起来用 View Transitions 的 <code>view-transition-name</code> 标记一下对应元素，浏览器就该自动搞定了吧？比如 Compose 或 SwiftUI 里的 <code>sharedElement</code> / <code>matchedGeometryEffect</code>，声明一下就完事儿了。</p>
+<p><strong>然而，在 View Transitions Level 1 里，事情没那么简单。</strong></p>
+<p>因为我们是在<strong>同一个文档</strong>里操作，当你触发 <code>startViewTransition</code> 时，浏览器需要拍“旧状态”和“新状态”两张快照。如果你在拍快照 <em>之前</em>，新旧两个“页面”的对应元素（比如两个标题）都设置了<strong>相同的</strong> <code>view-transition-name</code> (例如都叫 <code>title</code>)，那么在拍快照的那个瞬间，DOM 里就存在了两个叫 <code>title</code> 的元素。浏览器：“？？？这名字重了，过渡搞不了！”——于是整个 View Transition 会失败（但你的 DOM 更新回调还是会执行）。</p>
+<p><strong>Compose/SwiftUI 为何简单？</strong> 因为它们的 <code>sharedElement</code> 通常是和导航库/页面生命周期<strong>耦合</strong>的。框架知道你正在从 Page A 导航到 Page B，它能清晰地识别“哪个是旧的 <code>title</code>，哪个是新的 <code>title</code>”，并自动处理它们之间的过渡。</p>
+<p><strong>View Transitions Level 1 怎么做？</strong> 它不耦合导航，只认 DOM 变化。所以，为了让它正确配对，我们必须手动“导演” <code>view-transition-name</code> 的变化过程，通常分三步：</p>
+<ol>
+<li>
+<p><strong><code>startViewTransition</code> 调用前</strong>:</p>
+<ul>
+<li>旧页面的元素标记为 <code>old-name</code> (e.g., <code>old-title</code>)。</li>
+<li>新页面的元素（此时可能还未插入 DOM，或插入了但暂时隐藏/移出屏幕）标记为 <code>new-name</code> (e.g., <code>new-title</code>)，或者干脆先不加 <code>view-transition-name</code>。</li>
+<li>在这个例子里，还需要特殊处理：旧标题 <code>old-title</code> 需要过渡到新页面的返回文字 <code>new-backText</code>，旧返回图标 <code>old-backIcon</code> 要过渡到新返回图标 <code>new-backIcon</code>。这涉及到更复杂的名字配对。</li>
+</ul>
+</li>
+<li>
+<p><strong><code>startViewTransition</code> 的回调函数内 (DOM 更新时)</strong>:</p>
+<ul>
+<li>这是最关键的一步，我们要“告诉”浏览器新旧元素的对应关系。</li>
+<li>旧页面的元素可能要移除 <code>view-transition-name</code>，或者设置一个仅用于“离开动画”的名字。</li>
+<li>新页面的元素，此时要正式赋予那个我们希望它<strong>从旧状态过渡而来</strong>的名字。
+<ul>
+<li>例如，在回调里，把旧标题的 <code>view-transition-name</code> 移除（或者让它准备滑走），同时把新页面的 <em>返回按钮文字</em> (<code>backText</code>) 的 <code>view-transition-name</code> 设置为 <code>old-title</code>（这样它就会从旧标题的位置过渡过来）。</li>
+<li>把旧返回图标 (<code>backIcon</code>) 的 <code>view-transition-name</code> 移除（可能伴随透明度变化），同时把新页面的 <code>backIcon</code> 的 <code>view-transition-name</code> 设置为 <code>old-backIcon</code>（让它看起来像是同一个元素）。</li>
+<li>新页面的标题 (<code>title</code>) 则保持 <code>new-title</code>，它会执行自己的“进入”动画（比如从右滑入）。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>过渡结束后 (<code>transition.finished</code>)</strong>:</p>
+<ul>
+<li>清理工作。移除不再需要的旧页面 DOM。可能还需要清理掉临时设置的 <code>view-transition-name</code> 或样式。</li>
+</ul>
+</li>
+</ol>
+<p>看下面这个简化的 JS 逻辑示意（完整代码参考你提供的链接）：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#6A737D">// 简化示意逻辑</span></span>
+<span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> ViewTransitionController</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#6A737D">  // ... (省略获取元素等)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  beforeStart</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#6A737D">    // 1. 准备阶段：获取新旧元素引用，准备新页面内容</span></span>
+<span class="line"><span style="color:#6A737D">    // ...</span></span>
+<span class="line"><span style="color:#79B8FF">    this</span><span style="color:#E1E4E8">.oldEles </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">getEles</span><span style="color:#E1E4E8">(canvas.</span><span style="color:#B392F0">querySelector</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">".page"</span><span style="color:#E1E4E8">));</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> newPageContent</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> tmp.content.</span><span style="color:#B392F0">cloneNode</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#79B8FF">    this</span><span style="color:#E1E4E8">.newEles </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">getEles</span><span style="color:#E1E4E8">(newPageContent);</span></span>
+<span class="line"><span style="color:#79B8FF">    this</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">updateText</span><span style="color:#E1E4E8">(); </span><span style="color:#6A737D">// 更新新页面的标题和返回文字内容</span></span>
+<span class="line"><span style="color:#E1E4E8">    canvas.</span><span style="color:#B392F0">appendChild</span><span style="color:#E1E4E8">(newPageContent); </span><span style="color:#6A737D">// 将新页面添加到 DOM (可能先放在屏幕外)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // --- 关键：设置初始名字 ---</span></span>
+<span class="line"><span style="color:#79B8FF">    this</span><span style="color:#E1E4E8">.oldEles.page.style.viewTransitionName </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "page-old"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#79B8FF">    this</span><span style="color:#E1E4E8">.oldEles.title.style.viewTransitionName </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "title-old"</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">// 旧标题</span></span>
+<span class="line"><span style="color:#79B8FF">    this</span><span style="color:#E1E4E8">.oldEles.backIcon.style.viewTransitionName </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "backIcon-old"</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">// 旧图标</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF">    this</span><span style="color:#E1E4E8">.newEles.page.style.viewTransitionName </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "page-new"</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">// 新页面整体</span></span>
+<span class="line"><span style="color:#79B8FF">    this</span><span style="color:#E1E4E8">.newEles.title.style.viewTransitionName </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "title-new"</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">// 新标题</span></span>
+<span class="line"><span style="color:#6A737D">    // 新返回图标和文字先不给名字，或者给个临时的，避免冲突</span></span>
+<span class="line"><span style="color:#79B8FF">    this</span><span style="color:#E1E4E8">.newEles.page.classList.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"from-right"</span><span style="color:#E1E4E8">); </span><span style="color:#6A737D">// 先放右边</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  doStart</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#6A737D">    // 2. DOM 更新回调：在这里“重新配对”名字</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#E1E4E8"> { </span><span style="color:#79B8FF">oldEles</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">newEles</span><span style="color:#E1E4E8"> } </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // 旧元素处理（准备离开）</span></span>
+<span class="line"><span style="color:#E1E4E8">    oldEles.page.classList.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"to-left"</span><span style="color:#E1E4E8">); </span><span style="color:#6A737D">// 旧页面整体左滑</span></span>
+<span class="line"><span style="color:#E1E4E8">    oldEles.title.style.viewTransitionName </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> ""</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">// 旧标题不再参与共享过渡，准备淡出或滑出</span></span>
+<span class="line"><span style="color:#E1E4E8">    oldEles.backIcon.style.viewTransitionName </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> ""</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">// 旧图标也类似</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // 新元素处理（准备进入和变形）</span></span>
+<span class="line"><span style="color:#E1E4E8">    newEles.page.classList.</span><span style="color:#B392F0">remove</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"from-right"</span><span style="color:#E1E4E8">); </span><span style="color:#6A737D">// 新页面移动到位置</span></span>
+<span class="line"><span style="color:#E1E4E8">    newEles.backIcon.style.viewTransitionName </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "backIcon-old"</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">// 新图标继承旧图标的名字，实现“不动”效果</span></span>
+<span class="line"><span style="color:#E1E4E8">    newEles.backText.style.viewTransitionName </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "title-old"</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">// 新返回文字继承旧标题的名字，实现“变形”效果</span></span>
+<span class="line"><span style="color:#6A737D">    // newEles.title 保持 'title-new'，执行自己的进入动画</span></span>
+<span class="line"><span style="color:#6A737D">    // 可能还需要配合 opacity 等样式变化</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  afterFinish</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#6A737D">    // 3. 清理阶段</span></span>
+<span class="line"><span style="color:#79B8FF">    this</span><span style="color:#E1E4E8">.oldEles.page.</span><span style="color:#B392F0">remove</span><span style="color:#E1E4E8">(); </span><span style="color:#6A737D">// 移除旧页面 DOM</span></span>
+<span class="line"><span style="color:#6A737D">    // 可能还需要清理新元素上临时的 viewTransitionName</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// 使用</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> vtc</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> ViewTransitionController</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">btnPlay.</span><span style="color:#B392F0">addEventListener</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"click"</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">async</span><span style="color:#E1E4E8"> () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  vtc.</span><span style="color:#B392F0">beforeStart</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> vt</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> document.</span><span style="color:#B392F0">startViewTransition</span><span style="color:#E1E4E8">(vtc.doStart);</span></span>
+<span class="line"><span style="color:#F97583">  await</span><span style="color:#E1E4E8"> vt.finished;</span></span>
+<span class="line"><span style="color:#E1E4E8">  vtc.</span><span style="color:#B392F0">afterFinish</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+<p><strong>小结</strong>：在 SPA 中用 Level 1 实现复杂的多元素协调过渡，需要开发者手动管理 <code>view-transition-name</code> 的生命周期，模拟出跨“页面”共享元素的效果。这比声明式 UI 框架的写法要繁琐得多，心智负担也更重。</p>
+<h2 id="二深入-view-transitions-的限制与脾气">二、深入 View Transitions 的限制与“脾气”</h2>
+<p>除了 SPA 模拟带来的复杂性，View Transitions 本身也有一些特性或限制需要注意：</p>
+<ol>
+<li>
+<p><strong>渲染抑制 (Rendering Suppression)</strong></p>
+<ul>
+<li><strong>现象</strong>：在 <code>startViewTransition</code> 被调用、快照生成后，直到过渡动画完成（<code>transition.finished</code> resolve），整个原始文档（除了 <code>::view-transition</code> 伪元素树）在视觉上是<strong>不可见且不可交互</strong>的。浏览器会暂停渲染常规内容，只渲染那个特殊的过渡层。</li>
+<li><strong>影响</strong>：这意味着如果你的过渡动画时间较长，用户会有一段时间无法与页面进行任何交互（点击、滚动等）。即便你尝试用 <code>clip-path</code> 裁剪 <code>::view-transition</code> 伪元素，露出来的也不是底下的原始文档，而是一片空白（或浏览器的背景色）。</li>
+<li><strong>结论</strong>：目前无法绕过渲染抑制。因此，View Transitions <strong>不适合做长时间运行的动画</strong>，否则会严重影响用户体验。动画时长应尽量控制在用户可接受的范围内（通常几百毫秒）。</li>
+</ul>
+</li>
+<li>
+<p><strong>快照与元素上下文</strong></p>
+<ul>
+<li><strong>现象</strong>：当一个元素被赋予 <code>view-transition-name</code> 后，浏览器为它拍快照时，可以理解为是把它暂时“抠”了出来。这个快照包含了元素自身及其子元素的渲染结果，但它在某种程度上<strong>脱离了原始的布局上下文</strong>。</li>
+<li><strong>影响</strong>：
+<ul>
+<li><strong><code>overflow: hidden</code> 失效</strong>：如果一个带名字的元素原本被父元素的 <code>overflow: hidden</code> 或 <code>clip-path</code> 裁剪了，在过渡动画中，这个裁剪效果可能会丢失，导致元素完整地显示出来，因为它被渲染在了更高层级的 <code>::view-transition-group</code> 中。你可能需要手动在 <code>::view-transition-group(name)</code> 或对应的 <code>old/new</code> 伪元素上重新应用 <code>clip-path</code> 来模拟裁剪，但这在元素平移时计算会变得复杂。</li>
+<li><strong>其他上下文相关的样式</strong>：某些依赖于父级或兄弟元素的样式（比如特定的混合模式应用）可能在过渡中表现不一致。</li>
+</ul>
+</li>
+<li><strong>建议</strong>：为带名字的元素添加 <code>contain: layout;</code> 或类似属性（如 <code>contain: paint;</code>, <code>contain: strict;</code>, <code>content-visibility: hidden;</code>），可以帮助浏览器优化并减少意外情况，但不能完全解决上下文脱离的问题。</li>
+</ul>
+</li>
+<li>
+<p><strong>CSS 自定义属性 (Custom Properties) 的作用域</strong></p>
+<ul>
+<li><strong>现象</strong>：<code>::view-transition</code> 及其子伪元素位于一个非常高的渲染层级，并且它们的样式似乎与常规 DOM 的级联关系有些微妙。直接在 <code>:root</code> 或 <code>html</code>/<code>body</code> 上通过 <code>style.setProperty('--my-var', value)</code> 设置的自定义属性，<strong>可能无法</strong>直接在 <code>::view-transition-group(*)</code> 等伪元素的 CSS 规则中生效。</li>
+<li><strong>解决方案</strong>：如果你需要在过渡动画中动态改变并在 CSS 中使用自定义属性（比如通过 JS 计算动画参数），目前看来比较可靠的方法是动态创建或修改 CSS 规则本身。例如：
+<ul>
+<li>创建一个 <code>&#x3C;style></code> 标签，动态写入包含自定义属性值的 CSS 规则。</li>
+<li>使用 <code>document.adoptedStyleSheets</code> API，动态添加或修改包含这些规则的 <code>CSSStyleSheet</code> 对象。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>特定元素或上下文的不支持</strong>
+除了快照带来的上下文问题，还有一些特定的场景经过测试发现 Level 1 目前无法支持：</p>
+<ul>
+<li><strong>Shadow DOM 内元素</strong>：如果你尝试在 Web Component 的 Shadow Root 内部给一个元素设置 <code>view-transition-name</code>，你会发现它并<strong>不会</strong>参与到 View Transition 动画中。这似乎是因为 View Transition 的伪元素树是在主文档上下文中创建和渲染的，当前的匹配和渲染机制可能无法有效地跨越 Shadow Boundary 来识别和处理内部元素的过渡。这意味着，如果你的关键过渡元素封装在 Shadow DOM 里，你需要寻找变通方法（比如将该元素通过 Slot 暴露到 Light DOM，或者状态提升后在主文档中渲染过渡副本）。</li>
+<li><strong><code>display: contents</code> 元素</strong>：给设置了 <code>display: contents;</code> 的元素添加 <code>view-transition-name</code> 同样是<strong>无效</strong>的。<code>display: contents</code> 的核心作用是让元素自身不产生盒子 (box)，将其子元素“提升”到父级。而 View Transitions 是基于元素渲染后的几何快照（位置、尺寸）进行工作的，一个没有自身渲染盒子的元素，自然无法被捕获其几何信息，也就无法作为独立的过渡单元参与动画了。</li>
+</ul>
+</li>
+<li>
+<p><strong>在 view-transition 过程中，视图窗口不可发生变化</strong>
+一旦变化会直接跳过变换（skipTransition），注意这跟 DOM 元素的变化不一样</p>
+<ul>
+<li>比如窗口视图的 resize 行为会导致跳过变换</li>
+<li>比如窗口视图完全遮挡行为会导致跳过变换（这应该跟操作系统的遮挡识别有关系，它会改变浏览器的出啊窗口视图的属性，从而导致 view-transition 失效）
+<ul>
+<li>比方说浏览器标签、或者最小化浏览器，都会触发这个问题。</li>
+</ul>
+</li>
+<li>这也就导致了，在 devtools 调试的时候很糟心的一个点：在 Animations 面板暂停一个 View Transition 动画后，如果你做了上面所提到行为（比如你要切换到别的 tab 页去看资料；比如你的编辑器切换上来遮挡了浏览器窗口），就会导致 <code>::view-transition</code> 直接消失。</li>
+</ul>
+</li>
+</ol>
+<h2 id="三view-transitions-的适用场景与挑战">三、View Transitions 的适用场景与挑战</h2>
+<p>了解了复杂性和限制后，哪些场景适合用，哪些场景要三思？</p>
+<ol>
+<li>
+<p><strong>启动屏幕 (Splash Screen)</strong></p>
+<ul>
+<li><strong>优势</strong>：渲染抑制在这里反而是个优点。你可以在应用初始化、加载资源、准备首屏 DOM 的过程中，用 View Transitions 显示一个启动画面（比如 Logo 淡入淡出）。由于原始文档被抑制渲染和交互，正好符合启动阶段的需求。</li>
+<li><strong>代码结构</strong>：
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#6A737D">// 伪代码</span></span>
+<span class="line"><span style="color:#B392F0">prepareSplashScreenDOM</span><span style="color:#E1E4E8">(); </span><span style="color:#6A737D">// 先把启动屏DOM准备好</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> vt</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> document.</span><span style="color:#B392F0">startViewTransition</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">async</span><span style="color:#E1E4E8"> () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#6A737D">  // 在这个回调里，异步加载应用资源、初始化状态、渲染主界面DOM</span></span>
+<span class="line"><span style="color:#F97583">  await</span><span style="color:#B392F0"> loadAppResources</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">  await</span><span style="color:#B392F0"> initialRender</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#6A737D">  // DOM 准备好后，可以开始“关闭”启动屏的动画逻辑（比如让Logo飞走）</span></span>
+<span class="line"><span style="color:#B392F0">  triggerSplashScreenExitAnimationLogic</span><span style="color:#E1E4E8">(); </span><span style="color:#6A737D">// 这部分逻辑可能是更新某些元素的name或样式</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"><span style="color:#6A737D">// 可选：监听 finished 后彻底移除启动屏DOM</span></span>
+<span class="line"><span style="color:#E1E4E8">vt.finished.</span><span style="color:#B392F0">then</span><span style="color:#E1E4E8">(removeSplashScreenDOM);</span></span></code></pre>
+</li>
+<li><strong>挑战</strong>：如果想做带有<strong>加载进度条</strong>的启动屏，会遇到前面提到的问题。简单的进度条（比如一个色块变长）可能还行，但如果进度条本身有复杂纹理或效果，View Transitions 默认的 bounds（边界框）动画可能会导致纹理拉伸变形。你需要：
+<ul>
+<li>将纹理独立为一个带 <code>view-transition-name</code> 的元素。</li>
+<li>可能需要隐藏 DOM 元素的原始纹理，在 <code>::view-transition-group(texture)</code> 或 <code>::view-transition-new(texture)</code> 上重新绘制或应用纹理。</li>
+<li>如果想实现平滑的进度更新动画，而不是简单的两点过渡，可能需要放弃 CSS 动画，在 <code>transition.ready</code> 后介入，使用 Web Animations API 精确控制 <code>::view-transition-new(progressBarValue)</code> 的 <code>clip-path</code> 或 <code>transform</code>。</li>
+<li><strong>结论</strong>：对于复杂的、需要实时更新的加载动画，View Transitions 可能增加的复杂性远超其带来的便利，此时不如用传统 JS+CSS 动画方案。</li>
+<li>最后这里给出 DEMO 链接 <a href="https://appn.dwewb.com/examples/kitchen-sink/view-transition-demo-splash-screen/">progress demo by view-transition</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>简单的内容切换/卡片展开等</strong></p>
+<ul>
+<li>对于不涉及复杂多元素协调、动画时长可控的场景，View Transitions 依然是很好的选择，比如列表项点击展开为详情、页面主体内容的简单淡入淡出或滑动切换。</li>
+</ul>
+</li>
+</ol>
+<h2 id="总结与思考">总结与思考</h2>
+<p>CSS View Transitions Level 1 无疑为 Web 带来了强大的原生级动画能力，尤其是在处理简单的状态切换时，能极大简化代码。但它并非银弹。</p>
+<ul>
+<li><strong>核心优势</strong>在于解耦了 DOM 更新和视觉过渡，让状态管理更清晰。</li>
+<li><strong>核心挑战</strong>在于其 Level 1 的设计基于单文档状态快照，当我们在 SPA 中模拟多页面流时，需要手动填补这种模式差异带来的沟壑，尤其是对 <code>view-transition-name</code> 的精细管理。</li>
+<li><strong>局限性</strong>（如渲染抑制、快照上下文问题）也决定了它不适用于所有动画场景，特别是长耗时或需要高度交互保障的过渡。</li>
+</ul>
+<p>对于简单的、符合其设计模型的场景，大胆用，享受它带来的便利。
+对于复杂的、尤其是试图在 SPA 中复刻原生多页面导航细节的场景，请<strong>仔细评估</strong>引入它的成本（代码复杂性、潜在的限制）是否值得。
+有时候，传统的 JS 动画库或纯 CSS 动画可能仍然是更灵活或更稳妥的选择。</p> </article>  </div> </main> <aside class="hidden lg:block sticky top-0 h-screen w-64 flex-shrink-0 py-8 pl-8"> <div class="space-y-4"> <div class="rounded-xl border bg-card text-card-foreground shadow"><div class="p-6 pt-0"><ul><li><a href="#一spa-导航模拟看起来很美做起来费心">一、SPA 导航模拟：看起来很美，做起来费心</a></li><li><a href="#二深入-view-transitions-的限制与脾气">二、深入 View Transitions 的限制与“脾气”</a></li><li><a href="#三view-transitions-的适用场景与挑战">三、View Transitions 的适用场景与挑战</a></li><li><a href="#总结与思考">总结与思考</a></li></ul></div></div> <div class="rounded-xl border bg-card text-card-foreground shadow"><div class="flex flex-col space-y-1.5 p-6"><div class="font-semibold leading-none tracking-tight">Tags</div></div><div class="p-6 pt-0"><div class="flex flex-wrap gap-2"><a href="/tags/article" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">article</a><a href="/tags/event" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">event</a><a href="/tags/rust" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">rust</a><a href="/tags/iced" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">iced</a><a href="/tags/gui" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">gui</a><a href="/tags/multiplatform" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">multiplatform</a><a href="/tags/mobile" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">mobile</a><a href="/tags/web" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">web</a><a href="/tags/Kotlin" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">Kotlin</a><a href="/tags/linux" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">linux</a><a href="/tags/dns" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">dns</a><a href="/tags/javascript" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">javascript</a><a href="/tags/async" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">async</a><a href="/tags/reactive" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">reactive</a><a href="/tags/html&amp;css" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">html&amp;css</a><a href="/tags/cogitation" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">cogitation</a><a href="/tags/tools" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">tools</a><a href="/tags/efficiency" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">efficiency</a><a href="/tags/trivial" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">trivial</a><a href="/tags/lift" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">lift</a><a href="/tags/C++" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">C++</a></div></div></div> <div class="rounded-xl border bg-card text-card-foreground shadow"><div class="flex flex-col space-y-1.5 p-6"><div class="font-semibold leading-none tracking-tight">Archive</div></div><div class="p-6 pt-0"><ul><li><a href="/archive/2025/09">2025-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2025/06">2025-06<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2025/05">2025-05<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2025/04">2025-04<!-- --> (<!-- -->12<!-- -->)</a></li><li><a href="/archive/2025/03">2025-03<!-- --> (<!-- -->9<!-- -->)</a></li><li><a href="/archive/2024/05">2024-05<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2024/04">2024-04<!-- --> (<!-- -->3<!-- -->)</a></li><li><a href="/archive/2023/05">2023-05<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2023/04">2023-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2023/03">2023-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2022/10">2022-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2022/04">2022-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2021/12">2021-12<!-- --> (<!-- -->3<!-- -->)</a></li><li><a href="/archive/2021/07">2021-07<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2021/04">2021-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/10">2020-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/09">2020-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/05">2020-05<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2020/04">2020-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/03">2020-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2018/07">2018-07<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2017/10">2017-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2017/03">2017-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/10">2016-10<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2016/09">2016-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/08">2016-08<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/07">2016-07<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/05">2016-05<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/03">2016-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/02">2016-02<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2015/02">2015-02<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2014/09">2014-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2014/04">2014-04<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2014/03">2014-03<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2014/02">2014-02<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2014/01">2014-01<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2013/12">2013-12<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/10">2013-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/09">2013-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/08">2013-08<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2013/07">2013-07<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2013/06">2013-06<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/05">2013-05<!-- --> (<!-- -->4<!-- -->)</a></li></ul></div></div> </div> </aside> </div> <astro-island uid="Tziuc" prefix="r11" component-url="/_astro/BackToTop.B6mUL4XD.js" component-export="default" renderer-url="/_astro/client.6DCnCeAt.js" props="{}" ssr client="load" opts="{&quot;name&quot;:&quot;BackToTop&quot;,&quot;value&quot;:true}" await-children><button type="button" aria-label="Back to top" class="fixed right-8 bottom-8 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900/20 text-white shadow-lg backdrop-blur-sm backdrop-saturate-200 transition-opacity duration-300 hover:bg-zinc-700 dark:bg-zinc-100/20 dark:text-zinc-900 dark:hover:bg-zinc-300 opacity-0"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up" aria-hidden="true"><path d="m5 12 7-7 7 7"></path><path d="M12 19V5"></path></svg></button><!--astro:end--></astro-island>  </body></html>

@@ -1,0 +1,263 @@
+<!DOCTYPE html><html lang="zh-CN"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width"><link rel="icon" type="image/png" href="/icon-192x192.png"><meta name="generator" content="Astro v5.13.9"><title>View Transitions API (Level-2 cross-document)</title><meta name="description" content="GauBee's personal blog"><meta name="astro-view-transitions-enabled" content="true"><meta name="astro-view-transitions-fallback" content="animate"><script type="module" src="/_astro/ClientRouter.astro_astro_type_script_index_0_lang.B3vRBseb.js"></script><link rel="stylesheet" href="/_astro/editor.ByX6VvEs.css"></head> <body class="bg-white text-zinc-900 transition-colors duration-300 dark:bg-zinc-900 dark:text-zinc-50">  <div class="flex max-w-7xl mx-auto"> <aside class="hidden lg:block sticky top-0 h-screen w-64 flex-shrink-0 py-8 pr-8"> <aside class="w-64 p-4 pr-8"><nav class="flex flex-col space-y-2"><a href="/" class="flex items-center gap-4 py-3 px-6 text-lg font-semibold no-underline text-zinc-900 dark:text-zinc-100 rounded-full transition-colors duration-200 ease-in-out hover:bg-gray-200 dark:hover:bg-zinc-800"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-house" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"></path><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg><span>主页</span></a><a href="/events" class="flex items-center gap-4 py-3 px-6 text-lg font-semibold no-underline text-zinc-900 dark:text-zinc-100 rounded-full transition-colors duration-200 ease-in-out hover:bg-gray-200 dark:hover:bg-zinc-800"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rss" aria-hidden="true"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg><span>时事快讯</span></a></nav></aside> </aside> <main class="flex-1 min-w-0"> <style>astro-island,astro-slot,astro-static-slot{display:contents}</style><script>(()=>{var e=async t=>{await(await t())()};(self.Astro||(self.Astro={})).load=e;window.dispatchEvent(new Event("astro:load"));})();</script><script>(()=>{var A=Object.defineProperty;var g=(i,o,a)=>o in i?A(i,o,{enumerable:!0,configurable:!0,writable:!0,value:a}):i[o]=a;var d=(i,o,a)=>g(i,typeof o!="symbol"?o+"":o,a);{let i={0:t=>m(t),1:t=>a(t),2:t=>new RegExp(t),3:t=>new Date(t),4:t=>new Map(a(t)),5:t=>new Set(a(t)),6:t=>BigInt(t),7:t=>new URL(t),8:t=>new Uint8Array(t),9:t=>new Uint16Array(t),10:t=>new Uint32Array(t),11:t=>1/0*t},o=t=>{let[l,e]=t;return l in i?i[l](e):void 0},a=t=>t.map(o),m=t=>typeof t!="object"||t===null?t:Object.fromEntries(Object.entries(t).map(([l,e])=>[l,o(e)]));class y extends HTMLElement{constructor(){super(...arguments);d(this,"Component");d(this,"hydrator");d(this,"hydrate",async()=>{var b;if(!this.hydrator||!this.isConnected)return;let e=(b=this.parentElement)==null?void 0:b.closest("astro-island[ssr]");if(e){e.addEventListener("astro:hydrate",this.hydrate,{once:!0});return}let c=this.querySelectorAll("astro-slot"),n={},h=this.querySelectorAll("template[data-astro-template]");for(let r of h){let s=r.closest(this.tagName);s!=null&&s.isSameNode(this)&&(n[r.getAttribute("data-astro-template")||"default"]=r.innerHTML,r.remove())}for(let r of c){let s=r.closest(this.tagName);s!=null&&s.isSameNode(this)&&(n[r.getAttribute("name")||"default"]=r.innerHTML)}let p;try{p=this.hasAttribute("props")?m(JSON.parse(this.getAttribute("props"))):{}}catch(r){let s=this.getAttribute("component-url")||"<unknown>",v=this.getAttribute("component-export");throw v&&(s+=` (export ${v})`),console.error(`[hydrate] Error parsing props for component ${s}`,this.getAttribute("props"),r),r}let u;await this.hydrator(this)(this.Component,p,n,{client:this.getAttribute("client")}),this.removeAttribute("ssr"),this.dispatchEvent(new CustomEvent("astro:hydrate"))});d(this,"unmount",()=>{this.isConnected||this.dispatchEvent(new CustomEvent("astro:unmount"))})}disconnectedCallback(){document.removeEventListener("astro:after-swap",this.unmount),document.addEventListener("astro:after-swap",this.unmount,{once:!0})}connectedCallback(){if(!this.hasAttribute("await-children")||document.readyState==="interactive"||document.readyState==="complete")this.childrenConnectedCallback();else{let e=()=>{document.removeEventListener("DOMContentLoaded",e),c.disconnect(),this.childrenConnectedCallback()},c=new MutationObserver(()=>{var n;((n=this.lastChild)==null?void 0:n.nodeType)===Node.COMMENT_NODE&&this.lastChild.nodeValue==="astro:end"&&(this.lastChild.remove(),e())});c.observe(this,{childList:!0}),document.addEventListener("DOMContentLoaded",e)}}async childrenConnectedCallback(){let e=this.getAttribute("before-hydration-url");e&&await import(e),this.start()}async start(){let e=JSON.parse(this.getAttribute("opts")),c=this.getAttribute("client");if(Astro[c]===void 0){window.addEventListener(`astro:${c}`,()=>this.start(),{once:!0});return}try{await Astro[c](async()=>{let n=this.getAttribute("renderer-url"),[h,{default:p}]=await Promise.all([import(this.getAttribute("component-url")),n?import(n):()=>()=>{}]),u=this.getAttribute("component-export")||"default";if(!u.includes("."))this.Component=h[u];else{this.Component=h;for(let f of u.split("."))this.Component=this.Component[f]}return this.hydrator=p,this.hydrate},e,this)}catch(n){console.error(`[astro-island] Error hydrating ${this.getAttribute("component-url")}`,n)}}attributeChangedCallback(){this.hydrate()}}d(y,"observedAttributes",["props"]),customElements.get("astro-island")||customElements.define("astro-island",y)}})();</script><astro-island uid="7EKTW" prefix="r13" component-url="/_astro/MobileNav.DnXM_NFf.js" component-export="default" renderer-url="/_astro/client.6DCnCeAt.js" props="{&quot;title&quot;:[0,&quot;View Transitions API (Level-2 cross-document)&quot;]}" ssr client="load" opts="{&quot;name&quot;:&quot;MobileNav&quot;,&quot;value&quot;:true}" await-children><div id="mobile-topbar" class="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-zinc-200 bg-white/80 px-4 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/80 lg:hidden"><div class="w-6"></div><div class="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">View Transitions API (Level-2 cross-document)</div><button type="button" aria-label="Open menu"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-menu" aria-hidden="true"><path d="M4 5h16"></path><path d="M4 12h16"></path><path d="M4 19h16"></path></svg></button></div><template data-astro-template> <div class="space-y-4"> <astro-island uid="xUzWD" prefix="r7" component-url="/_astro/TableOfContentsCard.CsCJMAN2.js" component-export="default" renderer-url="/_astro/client.6DCnCeAt.js" props="{&quot;headings&quot;:[1,[[0,{&quot;depth&quot;:[0,2],&quot;slug&quot;:[0,&quot;一初心不改level-2-的核心目标与设计哲学&quot;],&quot;text&quot;:[0,&quot;一、初心不改：Level 2 的核心目标与设计哲学&quot;]}],[0,{&quot;depth&quot;:[0,2],&quot;slug&quot;:[0,&quot;二入门跨文档转场只需一句咒语&quot;],&quot;text&quot;:[0,&quot;二、入门：跨文档转场，只需“一句咒语”？&quot;]}],[0,{&quot;depth&quot;:[0,2],&quot;slug&quot;:[0,&quot;三进阶掌控生命周期定制跨文档之旅&quot;],&quot;text&quot;:[0,&quot;三、进阶：掌控生命周期，定制跨文档之旅&quot;]}],[0,{&quot;depth&quot;:[0,2],&quot;slug&quot;:[0,&quot;四精通level-2-的独门绝技让转场更溜&quot;],&quot;text&quot;:[0,&quot;四、精通：Level 2 的独门绝技，让转场更溜！&quot;]}],[0,{&quot;depth&quot;:[0,2],&quot;slug&quot;:[0,&quot;五注意事项与未来展望&quot;],&quot;text&quot;:[0,&quot;五、注意事项与未来展望&quot;]}],[0,{&quot;depth&quot;:[0,2],&quot;slug&quot;:[0,&quot;六总结mpa-的春天体验的飞跃&quot;],&quot;text&quot;:[0,&quot;六、总结：MPA 的春天，体验的飞跃&quot;]}]]]}" ssr client="load" opts="{&quot;name&quot;:&quot;TableOfContentsCard&quot;,&quot;value&quot;:true}" await-children><div class="rounded-xl border bg-card text-card-foreground shadow"><div class="p-6 pt-0"><ul><li><a href="#一初心不改level-2-的核心目标与设计哲学">一、初心不改：Level 2 的核心目标与设计哲学</a></li><li><a href="#二入门跨文档转场只需一句咒语">二、入门：跨文档转场，只需“一句咒语”？</a></li><li><a href="#三进阶掌控生命周期定制跨文档之旅">三、进阶：掌控生命周期，定制跨文档之旅</a></li><li><a href="#四精通level-2-的独门绝技让转场更溜">四、精通：Level 2 的独门绝技，让转场更溜！</a></li><li><a href="#五注意事项与未来展望">五、注意事项与未来展望</a></li><li><a href="#六总结mpa-的春天体验的飞跃">六、总结：MPA 的春天，体验的飞跃</a></li></ul></div></div><!--astro:end--></astro-island> <!-- <TagsCard client:load tags={allTags} />
+          <ArchiveCard client:load postsByMonth={postsByMonth} /> --> </div> </template><!--astro:end--></astro-island> <div class="p-6">  <article class="prose dark:prose-invert max-w-none"> <p>上一篇文章咱们聊了 <a href="/article/0054.css-view-transitions-1">View Transitions API (Level-1 single-document)</a> 如何优雅地解决了 SPA（单页应用）里那为了动画而扭曲 DOM、编写复杂 JS 的痛点。通过 <code>document.startViewTransition</code>、快照机制和神奇的伪元素树，它成功地将 <strong>DOM 状态更新</strong> 与 <strong>视觉过渡动画</strong> 解耦，让开发者能轻松实现丝滑的同文档视图切换。</p>
+<p>但是，Level 1 的能力仅限于“家里面”（同一个文档）。一旦涉及到“出门串门”（跨文档导航，比如从 <code>a.html</code> 跳到 <code>b.html</code>），那熟悉的白屏闪烁又回来了。MPA（多页应用）的用户体验难道就只能停留在“上古时代”吗？</p>
+<p>W3C 的大佬们显然不满足于此。于是，<strong>CSS View Transitions Module Level 2</strong> 应运而生，它的核心使命，就是<strong>将 Level 1 的丝滑体验，延伸到传统的跨文档导航场景</strong>，并在此基础上增加更多强大的功能！</p>
+<p>今天，咱们就接着上一篇的步伐，重点探索 Level 2 的世界，看看它是如何打通跨文档的“任督二脉”，以及它带来了哪些令人兴奋的新特性！</p>
+<h2 id="一初心不改level-2-的核心目标与设计哲学">一、初心不改：Level 2 的核心目标与设计哲学</h2>
+<p>Level 2 继承并扩展了 Level 1 的核心哲学：<strong>解耦 DOM 更新与视觉过渡</strong>。但它的目标更宏大：</p>
+<ol>
+<li><strong>拥抱 MPA：</strong> 正视 MPA 在 Web 生态中的重要地位，为其提供现代化的过渡体验。</li>
+<li><strong>声明式优先：</strong> 尽可能通过简单的 CSS（<code>@view-transition</code> 规则）来启用跨文档转场，降低接入成本。</li>
+<li><strong>生命周期钩子：</strong> 在跨文档导航的关键节点（旧页面卸载前、新页面展现前）提供 JS 事件 (<code>pageswap</code>, <code>pagereveal</code>)，赋予开发者精细控制的能力。</li>
+<li><strong>能力增强：</strong> 不仅仅是解决跨文档问题，还基于实践反馈，加入了选择性转场、样式复用、自动命名、嵌套转场、分层捕获等一系列“武功秘籍”。</li>
+</ol>
+<p>简而言之，Level 2 就是要在尊重并兼容传统 MPA 架构的前提下，将流畅转场的能力普及化、标准化，并让它变得更强大、更灵活。</p>
+<h2 id="二入门跨文档转场只需一句咒语">二、入门：跨文档转场，只需“一句咒语”？</h2>
+<p>想让你的 MPA 页面跳转也动起来？Level 2 说，基础操作很简单：</p>
+<p><strong>核心开关：<code>@view-transition</code> 规则</strong></p>
+<p>你需要在<strong>跳转前</strong>和<strong>跳转后</strong>两个页面的 CSS 中，都加入这个新的 <code>@</code> 规则，并设置 <code>navigation</code> 描述符：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="css"><code><span class="line"><span style="color:#6A737D">/* 在 page-a.html 和 page-b.html 的 CSS 里都要有 */</span></span>
+<span class="line"><span style="color:#F97583">@view-transition</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  navigation: auto; </span><span style="color:#6A737D">/* 关键先生！告诉浏览器，我想自动开启跨文档转场 */</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>只要加上这句，并且满足以下<strong>浏览器自动触发的条件</strong>：</p>
+<ol>
+<li><strong>同源（Same Origin）</strong>：安全第一，必须的。</li>
+<li><strong>用户触发导航</strong>：点击链接、提交表单、浏览器前进/后退等。地址栏输入、书签等不算。</li>
+<li><strong>页面可见</strong>：导航期间页面得在前台。</li>
+<li><strong>无跨域重定向</strong>：中间不能有跨域跳转搅局。</li>
+<li><strong>双方同意</strong>：两个页面都得写上 <code>navigation: auto;</code>。</li>
+</ol>
+<p>那么，恭喜你！从 <code>page-a.html</code> 跳转到 <code>page-b.html</code> 时，默认的<strong>交叉淡入淡出 (cross-fade)</strong> 效果就会自动应用。是不是比 Level 1 的 <code>document.startViewTransition</code> 更“傻瓜化”？</p>
+<p>当然，这只是起点。默认效果往往不能满足我们骚动的心，我们需要更精妙的控制。</p>
+<h2 id="三进阶掌控生命周期定制跨文档之旅">三、进阶：掌控生命周期，定制跨文档之旅</h2>
+<p>Level 1 里我们有 <code>startViewTransition</code> 的回调和返回的 <code>ViewTransition</code> 对象（包含 <code>ready</code>, <code>finished</code> 等 Promise）。在 Level 2 的跨文档场景下，流程变了，控制方式也随之升级：</p>
+<p><strong>跨文档生命周期 &#x26; JS 钩子：</strong></p>
+<ol>
+<li>
+<p><strong>用户操作 (Old Document):</strong> 点击链接/后退等。</p>
+</li>
+<li>
+<p><strong><code>pageswap</code> 事件 (Old Document - <code>window</code> 上监听):</strong> 这是旧页面被换掉前的<strong>最后机会</strong>！</p>
+<ul>
+<li>你可以通过 <code>event.viewTransition</code>（如果转场条件满足，它就是个 <code>ViewTransition</code> 对象，否则为 <code>null</code>）来搞事情。</li>
+<li><strong>用途：</strong>
+<ul>
+<li>检查导航信息（<code>event.activation</code>），比如 <code>navigationType</code> 是不是 <code>traverse</code> (前进/后退)。</li>
+<li>动态给转场添加类型 <code>event.viewTransition.types.add('my-type')</code>，用于后续 CSS 选择性应用动画（见下文）。</li>
+<li>根据某些条件决定<strong>跳过转场</strong> <code>event.viewTransition.skipTransition()</code>。</li>
+<li>在 <code>event.viewTransition.finished</code> Promise 中执行清理工作（注意，这可能在页面从 BFCache 恢复后才触发）。</li>
+</ul>
+</li>
+</ul>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#E1E4E8">window.</span><span style="color:#B392F0">addEventListener</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"pageswap"</span><span style="color:#E1E4E8">, (</span><span style="color:#FFAB70">event</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">!</span><span style="color:#E1E4E8">event.viewTransition) </span><span style="color:#F97583">return</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">// 不满足转场条件</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"旧页面拜拜前，最后搞点事！"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#6A737D">  // 例如：给后退导航加个特殊类型</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (event.activation.navigationType </span><span style="color:#F97583">===</span><span style="color:#9ECBFF"> "traverse"</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#E1E4E8">    event.viewTransition.types.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"going-back"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+</li>
+<li>
+<p><strong>捕获旧状态 &#x26; 卸载旧页面。</strong></p>
+</li>
+<li>
+<p><strong><code>pagereveal</code> 事件 (New Document - <code>window</code> 上监听):</strong> 新页面 DOM 加载完毕，<strong>首次渲染前</strong>触发。</p>
+<ul>
+<li>同样通过 <code>event.viewTransition</code>（如果转场是从旧页面成功启动的，这里就会有值）来操作。</li>
+<li><strong>用途：</strong>
+<ul>
+<li>在新页面侧确认转场是否依然有效，或根据新页面的状态决定跳过。</li>
+<li>可以在这里修改转场类型 <code>event.viewTransition.types.add/remove/clear()</code>。</li>
+<li>等待 <code>event.viewTransition.ready</code> 来执行需要新旧状态都捕获完成才能开始的 JS 动画（类似 Level 1）。</li>
+<li><strong>重要：</strong> Level 2 里，这个 <code>event.viewTransition</code> 的 <code>updateCallbackDone</code> Promise 是一开始就 resolved 的（因为 DOM 更新是浏览器导航完成的，不是由你的回调触发）。</li>
+</ul>
+</li>
+</ul>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#E1E4E8">window.</span><span style="color:#B392F0">addEventListener</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"pagereveal"</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">async</span><span style="color:#E1E4E8"> (</span><span style="color:#FFAB70">event</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">!</span><span style="color:#E1E4E8">event.viewTransition) </span><span style="color:#F97583">return</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">// 没有进行转场</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"新页面来了，我瞅瞅！"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#6A737D">  // 例如：如果 URL 包含 #no-transition，就跳过</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (location.hash.</span><span style="color:#B392F0">includes</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"no-transition"</span><span style="color:#E1E4E8">)) {</span></span>
+<span class="line"><span style="color:#E1E4E8">    event.viewTransition.</span><span style="color:#B392F0">skipTransition</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#6A737D">  // 可以等 ready 后用 JS 控制动画</span></span>
+<span class="line"><span style="color:#F97583">  await</span><span style="color:#E1E4E8"> event.viewTransition.ready;</span></span>
+<span class="line"><span style="color:#E1E4E8">  console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"新旧状态都好了，准备浪起来！"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#6A737D">  // document.documentElement.animate(...)</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+</li>
+<li>
+<p><strong>捕获新状态 &#x26; 执行动画 &#x26; 完成。</strong></p>
+</li>
+</ol>
+<p><strong>新状态何时稳定？靠“渲染阻塞”！</strong></p>
+<p>Level 2 没有 <code>updateCallback</code> Promise 了，浏览器怎么知道新页面何时“准备就绪”可以拍新照片了？答案是<strong>渲染阻塞机制 (Render-blocking mechanism)</strong>。</p>
+<p>开发者可以通过给 <code>&#x3C;link rel="stylesheet"></code>, <code>&#x3C;script></code>, 甚至新增的 <code>&#x3C;link rel="expect" href="#element-id"></code> (等待特定元素出现) 添加 <code>blocking="render"</code> 属性，来告诉浏览器：“等这些关键资源加载/执行/元素就位后，再算我新页面稳定了，才能拍快照、启动动画！”</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="html"><code><span class="line"><span style="color:#E1E4E8">&#x3C;</span><span style="color:#85E89D">head</span><span style="color:#E1E4E8">></span></span>
+<span class="line"><span style="color:#6A737D">  &#x3C;!-- 样式必须先应用 --></span></span>
+<span class="line"><span style="color:#E1E4E8">  &#x3C;</span><span style="color:#85E89D">link</span><span style="color:#B392F0"> rel</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">"stylesheet"</span><span style="color:#B392F0"> href</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">"style.css"</span><span style="color:#E1E4E8"> /></span></span>
+<span class="line"><span style="color:#6A737D">  &#x3C;!-- 默认就是 render-blocking --></span></span>
+<span class="line"><span style="color:#6A737D">  &#x3C;!-- 这个 JS 可能调整布局，等它执行完 --></span></span>
+<span class="line"><span style="color:#E1E4E8">  &#x3C;</span><span style="color:#85E89D">script</span><span style="color:#B392F0"> src</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">"layout-fix.js"</span><span style="color:#B392F0"> blocking</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">"render"</span><span style="color:#B392F0"> async</span><span style="color:#E1E4E8">>&#x3C;/</span><span style="color:#85E89D">script</span><span style="color:#E1E4E8">></span></span>
+<span class="line"><span style="color:#6A737D">  &#x3C;!-- 等主要内容区域加载并解析出来 --></span></span>
+<span class="line"><span style="color:#E1E4E8">  &#x3C;</span><span style="color:#85E89D">link</span><span style="color:#B392F0"> rel</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">"expect"</span><span style="color:#B392F0"> href</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">"#main-content"</span><span style="color:#B392F0"> blocking</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">"render"</span><span style="color:#E1E4E8"> /></span></span>
+<span class="line"><span style="color:#E1E4E8">&#x3C;/</span><span style="color:#85E89D">head</span><span style="color:#E1E4E8">></span></span></code></pre>
+<p><strong>注意：</strong> 过度使用 <code>blocking="render"</code> 会让旧页面卡住太久，体验反而下降。要确保阻塞的资源能快速加载。</p>
+<h2 id="四精通level-2-的独门绝技让转场更溜">四、精通：Level 2 的独门绝技，让转场更溜！</h2>
+<p>Level 2 不仅仅是把 Level 1 搬到了跨文档，还带来了许多激动人心的新功能：</p>
+<ol>
+<li>
+<p><strong>选择性视图转场 (Selective View Transitions):</strong></p>
+<ul>
+<li>
+<p><strong>痛点：</strong> Level 1 里所有转场都一样，想根据不同交互（如导航 VS 卡片展开）应用不同动画比较麻烦。</p>
+</li>
+<li>
+<p><strong>Level 2 方案：</strong> 引入 <strong><code>types</code></strong> 的概念。</p>
+<ul>
+<li><strong>设置类型：</strong>
+<ul>
+<li>通过 JS 在 <code>pageswap</code> / <code>pagereveal</code> 里 <code>event.viewTransition.types.add('your-type')</code>。</li>
+<li>或者直接在 <code>@view-transition</code> 规则里声明：
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="css"><code><span class="line"><span style="color:#F97583">@view-transition</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  navigation: auto;</span></span>
+<span class="line"><span style="color:#E1E4E8">  types: </span><span style="color:#85E89D">slide-nav</span><span style="color:#85E89D"> card-expand</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">/* 声明默认类型 */</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</li>
+</ul>
+</li>
+<li><strong>匹配类型：</strong> 使用新的 CSS 伪类：
+<ul>
+<li><code>:active-view-transition</code>: 匹配有<strong>任何</strong>转场活动时的 <code>&#x3C;html></code>。</li>
+<li><code>:active-view-transition-type(type1, type2...)</code>: 匹配活动转场的 <code>types</code> <strong>包含</strong>括号里<strong>至少一个</strong>类型时的 <code>&#x3C;html></code>。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>示例：</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="css"><code><span class="line"><span style="color:#6A737D">/* 默认淡入淡出 */</span></span>
+<span class="line"><span style="color:#E1E4E8">::view-transition-old(root) {</span></span>
+<span class="line"><span style="color:#79B8FF">  animation</span><span style="color:#E1E4E8">: fade-out </span><span style="color:#79B8FF">0.3</span><span style="color:#F97583">s</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#E1E4E8">::view-transition-new(root) {</span></span>
+<span class="line"><span style="color:#79B8FF">  animation</span><span style="color:#E1E4E8">: fade-in </span><span style="color:#79B8FF">0.3</span><span style="color:#F97583">s</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">/* 如果是导航滑动类型 */</span></span>
+<span class="line"><span style="color:#B392F0">:root</span><span style="color:#E1E4E8">:active-view-transition-type(</span><span style="color:#85E89D">slide-nav</span><span style="color:#E1E4E8">) ::view-transition-old(root) {</span></span>
+<span class="line"><span style="color:#79B8FF">  animation-name</span><span style="color:#E1E4E8">: slide-left-out;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#B392F0">:root</span><span style="color:#E1E4E8">:active-view-transition-type(</span><span style="color:#85E89D">slide-nav</span><span style="color:#E1E4E8">) ::view-transition-new(root) {</span></span>
+<span class="line"><span style="color:#79B8FF">  animation-name</span><span style="color:#E1E4E8">: slide-right-in;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</li>
+<li>
+<p><strong>好处：</strong> 可以用清晰的 CSS 规则，为不同类型的转场定义不同的动画，逻辑分离。</p>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>样式复用 (<code>view-transition-class</code>):</strong></p>
+<ul>
+<li>
+<p><strong>痛点：</strong> 很多元素 <code>view-transition-name</code> 不同，但想用同一套动画，写一堆 <code>::view-transition-group(name1)</code>, <code>::view-transition-group(name2)</code>… 太累。</p>
+</li>
+<li>
+<p><strong>Level 2 方案：</strong> <code>view-transition-class</code> CSS 属性 + 类选择器语法。</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="css"><code><span class="line"><span style="color:#6A737D">/* 给所有卡片加上 class */</span></span>
+<span class="line"><span style="color:#B392F0">.card</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#79B8FF">  view-transition-class</span><span style="color:#E1E4E8">: my-card;</span></span>
+<span class="line"><span style="color:#6A737D">  /* name 还是需要的，比如用 auto */</span></span>
+<span class="line"><span style="color:#79B8FF">  view-transition-name</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">auto</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">/* 用类选择器选中所有这些卡片的 group */</span></span>
+<span class="line"><span style="color:#E1E4E8">::view-transition-group(</span><span style="color:#85E89D">*</span><span style="color:#B392F0">.my-card</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#6A737D">  /* 注意这个 *.classname 语法 */</span></span>
+<span class="line"><span style="color:#79B8FF">  animation-timing-function</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">ease-in-out</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</li>
+<li>
+<p><strong>好处：</strong> DRY！极大简化了对共享动画行为的元素的样式定义。</p>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>自动 <code>view-transition-name</code>:</strong></p>
+<ul>
+<li><strong>痛点：</strong> 手动给列表项等大量元素起名字太烦。</li>
+<li><strong>Level 2 方案：</strong> <code>view-transition-name: auto;</code>
+<ul>
+<li>有 <code>id</code> 就用 <code>id</code>。</li>
+<li>没 <code>id</code> 浏览器内部生成唯一标识。</li>
+</ul>
+</li>
+<li><strong>跨文档注意！！！</strong> <code>auto</code> 生成的、非 <code>id</code> 的名字，在<strong>新旧文档间不会匹配</strong>！这意味着它们总是触发进入/退出动画，而不是平滑过渡。想让元素在新旧页面平滑连接，还是要确保它们有<strong>相同且稳定</strong>的 <code>view-transition-name</code>（用 <code>id</code> 或手动指定相同 name）。</li>
+</ul>
+</li>
+<li>
+<p><strong>嵌套视图转场 (<code>view-transition-group</code> CSS 属性):</strong></p>
+<ul>
+<li>
+<p><strong>痛点：</strong> Level 1 的扁平伪元素树无法处理父元素的 <code>clip-path</code>, <code>overflow: hidden</code>, <code>filter</code>, <code>opacity</code> 或复杂的 3D 变换，导致动画效果失真。</p>
+</li>
+<li>
+<p><strong>Level 2 方案：</strong> <code>view-transition-group</code> CSS 属性，允许你指定一个父级 <code>view-transition-name</code> (或 <code>nearest</code>, <code>contain</code>)，从而构建嵌套的伪元素树。</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="css"><code><span class="line"><span style="color:#B392F0">.container</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#79B8FF">  view-transition-name</span><span style="color:#E1E4E8">: container;</span></span>
+<span class="line"><span style="color:#79B8FF">  clip-path</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">circle</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">50</span><span style="color:#F97583">%</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#B392F0">.content-inside</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#79B8FF">  view-transition-name</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">content</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#6A737D">  /* 让 content 的 group 成为 container group 的子元素 */</span></span>
+<span class="line"><span style="color:#79B8FF">  view-transition-group</span><span style="color:#E1E4E8">: container;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">/* 现在可以给 container group 加 clip-path 动画 */</span></span>
+<span class="line"><span style="color:#E1E4E8">::view-transition-group(container) {</span></span>
+<span class="line"><span style="color:#79B8FF">  animation</span><span style="color:#E1E4E8">: clip-reveal </span><span style="color:#79B8FF">0.5</span><span style="color:#F97583">s</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</li>
+<li>
+<p><strong>好处：</strong> 动画能更好地反映 DOM 的层级和效果（如剪裁、滤镜），实现更复杂的视觉效果。</p>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>分层捕获 (Layered Capture - 底层改进):</strong></p>
+<ul>
+<li><strong>痛点：</strong> Level 1 的快照是扁平图片，<code>border</code>, <code>background-gradient</code>, <code>box-shadow</code>, <code>filter</code> 等效果无法独立动画，只能跟着图片一起变形或淡变，很生硬。</li>
+<li><strong>Level 2 方案：</strong> 浏览器不再只拍一张扁平快照，而是捕获元素的多个 CSS 属性层（如背景、边框、阴影、滤镜、透明度、内边距等），并在动画时对这些<strong>属性本身</strong>进行插值。</li>
+<li><strong>好处：</strong> 动画效果大大丰富！边框可以平滑变色变形，渐变背景可以流畅过渡，阴影和滤镜也能动起来，视觉表现力提升一个档次！这使得转场感觉更“原生”，而不是简单的图片切换。</li>
+</ul>
+</li>
+</ol>
+<h2 id="五注意事项与未来展望">五、注意事项与未来展望</h2>
+<ul>
+<li><strong>安全：</strong> 依然严格限制同源，并处理了跨域重定向问题。</li>
+<li><strong>兼容性：</strong> <strong>划重点！Level 2 目前 (2025-4-7) 仍是 W3C 工作草案 (Working Draft)</strong>，API 和行为可能变化，浏览器支持尚不完善或处于实验阶段。生产环境使用务必谨慎，关注 Can I use 和浏览器厂商动态。</li>
+<li><strong>性能：</strong> 复杂的嵌套、大量的独立元素、消耗大的动画依然需要关注性能测试和优化。</li>
+<li><strong>调试：</strong> 现代浏览器开发者工具正在逐步增强对 View Transitions（包括 Level 2 特性）的调试支持。</li>
+</ul>
+<h2 id="六总结mpa-的春天体验的飞跃">六、总结：MPA 的春天，体验的飞跃</h2>
+<p>CSS View Transitions Module Level 2 是对 Level 1 的一次意义重大的扩展和增强。它不仅将丝滑的转场体验带给了更广泛的 MPA 网站，还通过 <code>types</code>、<code>view-transition-class</code>、<code>auto</code> name、<code>view-transition-group</code> 属性以及底层的分层捕获，极大地提升了转场的灵活性、开发效率和视觉表现力。</p>
+<p>虽然还是草案，但它描绘的未来无疑是激动人心的。掌握了 View Transitions Level 1 和 Level 2，你就拥有了打造下一代 Web 流畅体验的利器。</p>
+<p>希望这篇结合了 Level 1 回顾与 Level 2 深入的探索，能让你对 View Transitions 有一个更全面、更深入的认识。赶紧动手尝试（在支持的实验性浏览器中），感受这触手可及的未来吧！</p>
+<p><strong>参考资料：</strong></p>
+<ul>
+<li><a href="https://www.w3.org/TR/css-view-transitions-1/">W3C CSS View Transitions Module Level 1 Spec</a></li>
+<li><a href="https://developer.mozilla.org/en-US/docs/Web/API/View_Transition_API">MDN 文档: View Transitions API</a></li>
+<li><a href="https://developer.chrome.com/docs/web-platform/view-transitions/cross-document">Cross-document view transitions for multi-page applications</a></li>
+<li><a href="https://caniuse.com/cross-document-view-transitions"><code>caniuse View Transitions (cross-document)</code></a>
+<ul>
+<li>chrome 126+</li>
+<li>safari 18.2+</li>
+</ul>
+</li>
+</ul> </article>  </div> </main> <aside class="hidden lg:block sticky top-0 h-screen w-64 flex-shrink-0 py-8 pl-8"> <div class="space-y-4"> <div class="rounded-xl border bg-card text-card-foreground shadow"><div class="p-6 pt-0"><ul><li><a href="#一初心不改level-2-的核心目标与设计哲学">一、初心不改：Level 2 的核心目标与设计哲学</a></li><li><a href="#二入门跨文档转场只需一句咒语">二、入门：跨文档转场，只需“一句咒语”？</a></li><li><a href="#三进阶掌控生命周期定制跨文档之旅">三、进阶：掌控生命周期，定制跨文档之旅</a></li><li><a href="#四精通level-2-的独门绝技让转场更溜">四、精通：Level 2 的独门绝技，让转场更溜！</a></li><li><a href="#五注意事项与未来展望">五、注意事项与未来展望</a></li><li><a href="#六总结mpa-的春天体验的飞跃">六、总结：MPA 的春天，体验的飞跃</a></li></ul></div></div> <div class="rounded-xl border bg-card text-card-foreground shadow"><div class="flex flex-col space-y-1.5 p-6"><div class="font-semibold leading-none tracking-tight">Tags</div></div><div class="p-6 pt-0"><div class="flex flex-wrap gap-2"><a href="/tags/article" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">article</a><a href="/tags/event" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">event</a><a href="/tags/rust" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">rust</a><a href="/tags/iced" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">iced</a><a href="/tags/gui" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">gui</a><a href="/tags/multiplatform" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">multiplatform</a><a href="/tags/mobile" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">mobile</a><a href="/tags/web" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">web</a><a href="/tags/Kotlin" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">Kotlin</a><a href="/tags/linux" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">linux</a><a href="/tags/dns" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">dns</a><a href="/tags/javascript" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">javascript</a><a href="/tags/async" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">async</a><a href="/tags/reactive" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">reactive</a><a href="/tags/html&amp;css" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">html&amp;css</a><a href="/tags/cogitation" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">cogitation</a><a href="/tags/tools" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">tools</a><a href="/tags/efficiency" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">efficiency</a><a href="/tags/trivial" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">trivial</a><a href="/tags/lift" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">lift</a><a href="/tags/C++" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">C++</a></div></div></div> <div class="rounded-xl border bg-card text-card-foreground shadow"><div class="flex flex-col space-y-1.5 p-6"><div class="font-semibold leading-none tracking-tight">Archive</div></div><div class="p-6 pt-0"><ul><li><a href="/archive/2025/09">2025-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2025/06">2025-06<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2025/05">2025-05<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2025/04">2025-04<!-- --> (<!-- -->12<!-- -->)</a></li><li><a href="/archive/2025/03">2025-03<!-- --> (<!-- -->9<!-- -->)</a></li><li><a href="/archive/2024/05">2024-05<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2024/04">2024-04<!-- --> (<!-- -->3<!-- -->)</a></li><li><a href="/archive/2023/05">2023-05<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2023/04">2023-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2023/03">2023-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2022/10">2022-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2022/04">2022-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2021/12">2021-12<!-- --> (<!-- -->3<!-- -->)</a></li><li><a href="/archive/2021/07">2021-07<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2021/04">2021-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/10">2020-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/09">2020-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/05">2020-05<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2020/04">2020-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/03">2020-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2018/07">2018-07<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2017/10">2017-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2017/03">2017-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/10">2016-10<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2016/09">2016-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/08">2016-08<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/07">2016-07<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/05">2016-05<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/03">2016-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/02">2016-02<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2015/02">2015-02<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2014/09">2014-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2014/04">2014-04<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2014/03">2014-03<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2014/02">2014-02<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2014/01">2014-01<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2013/12">2013-12<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/10">2013-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/09">2013-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/08">2013-08<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2013/07">2013-07<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2013/06">2013-06<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/05">2013-05<!-- --> (<!-- -->4<!-- -->)</a></li></ul></div></div> </div> </aside> </div> <astro-island uid="Tziuc" prefix="r11" component-url="/_astro/BackToTop.B6mUL4XD.js" component-export="default" renderer-url="/_astro/client.6DCnCeAt.js" props="{}" ssr client="load" opts="{&quot;name&quot;:&quot;BackToTop&quot;,&quot;value&quot;:true}" await-children><button type="button" aria-label="Back to top" class="fixed right-8 bottom-8 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900/20 text-white shadow-lg backdrop-blur-sm backdrop-saturate-200 transition-opacity duration-300 hover:bg-zinc-700 dark:bg-zinc-100/20 dark:text-zinc-900 dark:hover:bg-zinc-300 opacity-0"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up" aria-hidden="true"><path d="m5 12 7-7 7 7"></path><path d="M12 19V5"></path></svg></button><!--astro:end--></astro-island>  </body></html>

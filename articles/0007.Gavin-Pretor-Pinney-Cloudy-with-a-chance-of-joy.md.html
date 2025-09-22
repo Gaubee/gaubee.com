@@ -1,0 +1,225 @@
+<!DOCTYPE html><html lang="zh-CN"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width"><link rel="icon" type="image/png" href="/icon-192x192.png"><meta name="generator" content="Astro v5.13.9"><title>「TED」Gavin Pretor-Pinney: Cloudy with a chance of joy</title><meta name="description" content="GauBee's personal blog"><meta name="astro-view-transitions-enabled" content="true"><meta name="astro-view-transitions-fallback" content="animate"><script type="module" src="/_astro/ClientRouter.astro_astro_type_script_index_0_lang.B3vRBseb.js"></script><link rel="stylesheet" href="/_astro/editor.ByX6VvEs.css"></head> <body class="bg-white text-zinc-900 transition-colors duration-300 dark:bg-zinc-900 dark:text-zinc-50">  <div class="flex max-w-7xl mx-auto"> <aside class="hidden lg:block sticky top-0 h-screen w-64 flex-shrink-0 py-8 pr-8"> <aside class="w-64 p-4 pr-8"><nav class="flex flex-col space-y-2"><a href="/" class="flex items-center gap-4 py-3 px-6 text-lg font-semibold no-underline text-zinc-900 dark:text-zinc-100 rounded-full transition-colors duration-200 ease-in-out hover:bg-gray-200 dark:hover:bg-zinc-800"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-house" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"></path><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg><span>主页</span></a><a href="/events" class="flex items-center gap-4 py-3 px-6 text-lg font-semibold no-underline text-zinc-900 dark:text-zinc-100 rounded-full transition-colors duration-200 ease-in-out hover:bg-gray-200 dark:hover:bg-zinc-800"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rss" aria-hidden="true"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg><span>时事快讯</span></a></nav></aside> </aside> <main class="flex-1 min-w-0"> <style>astro-island,astro-slot,astro-static-slot{display:contents}</style><script>(()=>{var e=async t=>{await(await t())()};(self.Astro||(self.Astro={})).load=e;window.dispatchEvent(new Event("astro:load"));})();</script><script>(()=>{var A=Object.defineProperty;var g=(i,o,a)=>o in i?A(i,o,{enumerable:!0,configurable:!0,writable:!0,value:a}):i[o]=a;var d=(i,o,a)=>g(i,typeof o!="symbol"?o+"":o,a);{let i={0:t=>m(t),1:t=>a(t),2:t=>new RegExp(t),3:t=>new Date(t),4:t=>new Map(a(t)),5:t=>new Set(a(t)),6:t=>BigInt(t),7:t=>new URL(t),8:t=>new Uint8Array(t),9:t=>new Uint16Array(t),10:t=>new Uint32Array(t),11:t=>1/0*t},o=t=>{let[l,e]=t;return l in i?i[l](e):void 0},a=t=>t.map(o),m=t=>typeof t!="object"||t===null?t:Object.fromEntries(Object.entries(t).map(([l,e])=>[l,o(e)]));class y extends HTMLElement{constructor(){super(...arguments);d(this,"Component");d(this,"hydrator");d(this,"hydrate",async()=>{var b;if(!this.hydrator||!this.isConnected)return;let e=(b=this.parentElement)==null?void 0:b.closest("astro-island[ssr]");if(e){e.addEventListener("astro:hydrate",this.hydrate,{once:!0});return}let c=this.querySelectorAll("astro-slot"),n={},h=this.querySelectorAll("template[data-astro-template]");for(let r of h){let s=r.closest(this.tagName);s!=null&&s.isSameNode(this)&&(n[r.getAttribute("data-astro-template")||"default"]=r.innerHTML,r.remove())}for(let r of c){let s=r.closest(this.tagName);s!=null&&s.isSameNode(this)&&(n[r.getAttribute("name")||"default"]=r.innerHTML)}let p;try{p=this.hasAttribute("props")?m(JSON.parse(this.getAttribute("props"))):{}}catch(r){let s=this.getAttribute("component-url")||"<unknown>",v=this.getAttribute("component-export");throw v&&(s+=` (export ${v})`),console.error(`[hydrate] Error parsing props for component ${s}`,this.getAttribute("props"),r),r}let u;await this.hydrator(this)(this.Component,p,n,{client:this.getAttribute("client")}),this.removeAttribute("ssr"),this.dispatchEvent(new CustomEvent("astro:hydrate"))});d(this,"unmount",()=>{this.isConnected||this.dispatchEvent(new CustomEvent("astro:unmount"))})}disconnectedCallback(){document.removeEventListener("astro:after-swap",this.unmount),document.addEventListener("astro:after-swap",this.unmount,{once:!0})}connectedCallback(){if(!this.hasAttribute("await-children")||document.readyState==="interactive"||document.readyState==="complete")this.childrenConnectedCallback();else{let e=()=>{document.removeEventListener("DOMContentLoaded",e),c.disconnect(),this.childrenConnectedCallback()},c=new MutationObserver(()=>{var n;((n=this.lastChild)==null?void 0:n.nodeType)===Node.COMMENT_NODE&&this.lastChild.nodeValue==="astro:end"&&(this.lastChild.remove(),e())});c.observe(this,{childList:!0}),document.addEventListener("DOMContentLoaded",e)}}async childrenConnectedCallback(){let e=this.getAttribute("before-hydration-url");e&&await import(e),this.start()}async start(){let e=JSON.parse(this.getAttribute("opts")),c=this.getAttribute("client");if(Astro[c]===void 0){window.addEventListener(`astro:${c}`,()=>this.start(),{once:!0});return}try{await Astro[c](async()=>{let n=this.getAttribute("renderer-url"),[h,{default:p}]=await Promise.all([import(this.getAttribute("component-url")),n?import(n):()=>()=>{}]),u=this.getAttribute("component-export")||"default";if(!u.includes("."))this.Component=h[u];else{this.Component=h;for(let f of u.split("."))this.Component=this.Component[f]}return this.hydrator=p,this.hydrate},e,this)}catch(n){console.error(`[astro-island] Error hydrating ${this.getAttribute("component-url")}`,n)}}attributeChangedCallback(){this.hydrate()}}d(y,"observedAttributes",["props"]),customElements.get("astro-island")||customElements.define("astro-island",y)}})();</script><astro-island uid="1I9YaK" prefix="r13" component-url="/_astro/MobileNav.DnXM_NFf.js" component-export="default" renderer-url="/_astro/client.6DCnCeAt.js" props="{&quot;title&quot;:[0,&quot;「TED」Gavin Pretor-Pinney: Cloudy with a chance of joy&quot;]}" ssr client="load" opts="{&quot;name&quot;:&quot;MobileNav&quot;,&quot;value&quot;:true}" await-children><div id="mobile-topbar" class="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-zinc-200 bg-white/80 px-4 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/80 lg:hidden"><div class="w-6"></div><div class="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">「TED」Gavin Pretor-Pinney: Cloudy with a chance of joy</div><button type="button" aria-label="Open menu"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-menu" aria-hidden="true"><path d="M4 5h16"></path><path d="M4 12h16"></path><path d="M4 19h16"></path></svg></button></div><template data-astro-template> <div class="space-y-4"> <astro-island uid="ZDy2R0" prefix="r7" component-url="/_astro/TableOfContentsCard.CsCJMAN2.js" component-export="default" renderer-url="/_astro/client.6DCnCeAt.js" props="{&quot;headings&quot;:[1,[]]}" ssr client="load" opts="{&quot;name&quot;:&quot;TableOfContentsCard&quot;,&quot;value&quot;:true}"></astro-island> <!-- <TagsCard client:load tags={allTags} />
+          <ArchiveCard client:load postsByMonth={postsByMonth} /> --> </div> </template><!--astro:end--></astro-island> <div class="p-6">  <article class="prose dark:prose-invert max-w-none"> <p>Clouds.
+Have you ever noticed how much people moan about them?
+They get a bad rap.
+If you think about it, the English language
+has written into it negative associations towards the clouds.
+Someone who’s down or depressed,
+they’re under a cloud.
+And when there’s bad news in store,
+there’s a cloud on the horizon.
+I saw an article the other day.
+It was about problems with computer processing
+over the Internet.
+“A cloud over the cloud,” was the headline.
+It seems like they’re everyone’s default
+doom-and-gloom metaphor.
+But I think they’re beautiful, don’t you?
+It’s just that their beauty is missed
+because they’re so omnipresent,
+so, I don’t know, commonplace,
+that people don’t notice them.
+They don’t notice the beauty, but they don’t even notice the clouds
+unless they get in the way of the sun.
+And so people think of clouds as
+things that get in the way.
+They think of them as the annoying, frustrating obstructions,
+and then they rush off and do some blue-sky thinking.
+(Laughter)
+But most people, when you stop to ask them,
+will admit to harboring a strange sort of fondness for clouds.
+It’s like a nostalgic fondness,
+and they make them think of their youth.
+Who here can’t remember thinking, well,
+looking and finding shapes in the clouds
+when they were kids?
+You know, when you were masters of daydreaming?
+Aristophanes, the ancient Greek playwright,
+he described the clouds as the patron godesses
+of idle fellows
+two and a half thousand years ago,
+and you can see what he means.
+It’s just that these days, us adults seem reluctant
+to allow ourselves the indulgence
+of just allowing our imaginations
+to drift along in the breeze, and I think that’s a pity.
+I think we should perhaps do a bit more of it.
+I think we should be a bit more willing, perhaps,
+to look at the beautiful sight of the sunlight bursting out
+from behind the clouds and go, “Wait a minute,
+that’s two cats dancing the salsa!”
+(Laughter) (Applause)
+Or seeing the big, white, puffy one up there
+over the shopping center looks like
+the Abominable Snowman going to rob a bank.
+(Laughter)
+They’re like nature’s version of those inkblot images,
+you know, that shrinks used to show their patients
+in the ’60s,
+and I think if you consider the shapes you see in the clouds,
+you’ll save money on psychoanalysis bills.
+Let’s say you’re in love. All right?
+And you look up and what do you see?
+Right? Or maybe the opposite.
+You’ve just been dumped by your partner,
+and everywhere you look, it’s kissing couples.
+(Laughter)
+Perhaps you’re having a moment of existential angst.
+You know, you’re thinking about your own mortality.
+And there, on the horizon, it’s the Grim Reaper.
+(Laughter)
+Or maybe you see a topless sunbather.
+(Laughter)
+What would that mean?
+What would that mean? I have no idea.
+But one thing I do know is this:
+The bad press that clouds get is totally unfair.
+I think we should stand up for them,
+which is why, a few years ago,
+I started the Cloud Appreciation Society.
+Tens of thousands of members now
+in almost 100 countries around the world.
+And all these photographs that I’m showing,
+they were sent in by members.
+And the society exists to remind people of this:
+Clouds are not something to moan about.
+Far from it. They are, in fact,
+the most diverse, evocative, poetic aspect of nature.
+I think, if you live with your head in the clouds
+every now and then, it helps you keep your feet on the ground.
+And I want to show you why, with the help of
+some of my favorite types of clouds.
+Let’s start with this one. It’s the cirrus cloud,
+named after the Latin for a lock of hair.
+It’s composed entirely of ice crystals
+cascading from the upper reaches of the troposphere,
+and as these ice crystals fall,
+they pass through different layers with different winds
+and they speed up and slow down,
+giving the cloud these brush-stroked appearances,
+these brush-stroke forms known as fall streaks.
+And these winds up there can be very, very fierce.
+They can be 200 miles an hour, 300 miles an hour.
+These clouds are bombing along,
+but from all the way down here,
+they appear to be moving gracefully, slowly,
+like most clouds.
+And so to tune into the clouds is to slow down,
+to calm down.
+It’s like a bit of everyday meditation.
+Those are common clouds.
+What about rarer ones, like the lenticularis,
+the UFO-shaped lenticularis cloud?
+These clouds form in the region of mountains.
+When the wind passes, rises to pass over the mountain,
+it can take on a wave-like path in the lee of the peak,
+with these clouds hovering at the crest
+of these invisible standing waves of air,
+these flying saucer-like forms,
+and some of the early black-and-white UFO photos
+are in fact lenticularis clouds. It’s true.
+A little rarer are the fallstreak holes. All right?
+This is when a layer is made up of very, very cold
+water droplets, and in one region they start to freeze,
+and this freezing sets off a chain reaction which spreads outwards
+with the ice crystals cascading and falling down below,
+giving the appearance of jellyfish tendrils down below.
+Rarer still, the Kelvin-Helmholtz cloud.
+Not a very snappy name. Needs a rebrand.
+This looks like a series of breaking waves,
+and it’s caused by shearing winds — the wind
+above the cloud layer and below the cloud layer
+differ significantly, and in the middle, in between,
+you get this undulating of the air,
+and if the difference in those speeds is just right,
+the tops of the undulations curl over
+in these beautiful breaking wave-like vortices.
+All right. Those are rarer clouds than the cirrus,
+but they’re not that rare.
+If you look up, and you pay attention to the sky,
+you’ll see them sooner or later,
+maybe not quite as dramatic as these, but you’ll see them.
+And you’ll see them around where you live.
+Clouds are the most egalitarian
+of nature’s displays, because we all have a good,
+fantastic view of the sky.
+And these clouds, these rarer clouds,
+remind us that the exotic can be found in the everyday.
+Nothing is more nourishing, more stimulating
+to an active, inquiring mind than being surprised,
+being amazed. It’s why we’re all here at TED, right?
+But you don’t need to rush off
+away from the familiar, across the world
+to be surprised.
+You just need to step outside,
+pay attention to what’s so commonplace, so everyday,
+so mundane that everybody else misses it.
+One cloud that people rarely miss is this one:
+the cumulonimbus storm cloud.
+It’s what’s produces thunder and lightning and hail.
+These clouds spread out at the top in this enormous
+anvil fashion stretching 10 miles up into the atmosphere.
+They are an expression of the majestic architecture
+of our atmosphere.
+But from down below, they are the embodiment
+of the powerful, elemental force and power
+that drives our atmosphere.
+To be there is to be connected in the driving rain
+and the hail, to feel connected to our atmosphere.
+It’s to be reminded that we are creatures
+that inhabit this ocean of air.
+We don’t live beneath the sky. We live within it.
+And that connection, that visceral connection to our atmosphere
+feels to me like an antidote.
+It’s an antidote to the growing tendency we have
+to feel that we can really ever experience life
+by watching it on a computer screen, you know,
+when we’re in a wi-fi zone.
+But the one cloud that best expresses
+why cloudspotting is more valuable today than ever
+is this one, the cumulus cloud.
+Right? It forms on a sunny day.
+If you close your eyes and think of a cloud,
+it’s probably one of these that comes to mind.
+All those cloud shapes at the beginning,
+those were cumulus clouds.
+The sharp, crisp outlines of this formation
+make it the best one for finding shapes in.
+And it reminds us
+of the aimless nature of cloudspotting,
+what an aimless activity it is.
+You’re not going to change the world
+by lying on your back and gazing up at the sky, are you?
+It’s pointless. It’s a pointless activity,
+which is precisely why it’s so important.
+The digital world conspires to make us feel
+eternally busy, perpetually busy.
+You know, when you’re not dealing with
+the traditional pressures of earning a living
+and putting food on the table, raising a family,
+writing thank you letters,
+you have to now contend with
+answering a mountain of unanswered emails,
+updating a Facebook page,
+feeding your Twitter feed.
+And cloudspotting legitimizes doing nothing.
+(Laughter)
+And sometimes we need -
+(Applause)
+Sometimes we need excuses to do nothing.
+We need to be reminded by these
+patron goddesses of idle fellows
+that slowing down
+and being in the present, not thinking about
+what you’ve got to do and what you should have done,
+but just being here, letting your imagination
+lift from the everyday concerns down here
+and just being in the present, it’s good for you,
+and it’s good for the way you feel.
+It’s good for your ideas. It’s good for your creativity.
+It’s good for your soul.
+So keep looking up,
+marvel at the ephemeral beauty,
+and always remember to live life with your head in the clouds.
+Thank you very much.
+(Applause)</p> </article>  </div> </main> <aside class="hidden lg:block sticky top-0 h-screen w-64 flex-shrink-0 py-8 pl-8"> <div class="space-y-4">  <div class="rounded-xl border bg-card text-card-foreground shadow"><div class="flex flex-col space-y-1.5 p-6"><div class="font-semibold leading-none tracking-tight">Tags</div></div><div class="p-6 pt-0"><div class="flex flex-wrap gap-2"><a href="/tags/article" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">article</a><a href="/tags/event" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">event</a><a href="/tags/rust" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">rust</a><a href="/tags/iced" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">iced</a><a href="/tags/gui" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">gui</a><a href="/tags/multiplatform" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">multiplatform</a><a href="/tags/mobile" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">mobile</a><a href="/tags/web" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">web</a><a href="/tags/Kotlin" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">Kotlin</a><a href="/tags/linux" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">linux</a><a href="/tags/dns" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">dns</a><a href="/tags/javascript" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">javascript</a><a href="/tags/async" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">async</a><a href="/tags/reactive" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">reactive</a><a href="/tags/html&amp;css" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">html&amp;css</a><a href="/tags/cogitation" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">cogitation</a><a href="/tags/tools" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">tools</a><a href="/tags/efficiency" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">efficiency</a><a href="/tags/trivial" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">trivial</a><a href="/tags/lift" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">lift</a><a href="/tags/C++" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">C++</a></div></div></div> <div class="rounded-xl border bg-card text-card-foreground shadow"><div class="flex flex-col space-y-1.5 p-6"><div class="font-semibold leading-none tracking-tight">Archive</div></div><div class="p-6 pt-0"><ul><li><a href="/archive/2025/09">2025-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2025/06">2025-06<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2025/05">2025-05<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2025/04">2025-04<!-- --> (<!-- -->12<!-- -->)</a></li><li><a href="/archive/2025/03">2025-03<!-- --> (<!-- -->9<!-- -->)</a></li><li><a href="/archive/2024/05">2024-05<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2024/04">2024-04<!-- --> (<!-- -->3<!-- -->)</a></li><li><a href="/archive/2023/05">2023-05<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2023/04">2023-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2023/03">2023-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2022/10">2022-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2022/04">2022-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2021/12">2021-12<!-- --> (<!-- -->3<!-- -->)</a></li><li><a href="/archive/2021/07">2021-07<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2021/04">2021-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/10">2020-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/09">2020-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/05">2020-05<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2020/04">2020-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/03">2020-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2018/07">2018-07<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2017/10">2017-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2017/03">2017-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/10">2016-10<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2016/09">2016-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/08">2016-08<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/07">2016-07<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/05">2016-05<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/03">2016-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/02">2016-02<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2015/02">2015-02<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2014/09">2014-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2014/04">2014-04<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2014/03">2014-03<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2014/02">2014-02<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2014/01">2014-01<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2013/12">2013-12<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/10">2013-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/09">2013-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/08">2013-08<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2013/07">2013-07<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2013/06">2013-06<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/05">2013-05<!-- --> (<!-- -->4<!-- -->)</a></li></ul></div></div> </div> </aside> </div> <astro-island uid="Tziuc" prefix="r10" component-url="/_astro/BackToTop.B6mUL4XD.js" component-export="default" renderer-url="/_astro/client.6DCnCeAt.js" props="{}" ssr client="load" opts="{&quot;name&quot;:&quot;BackToTop&quot;,&quot;value&quot;:true}" await-children><button type="button" aria-label="Back to top" class="fixed right-8 bottom-8 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900/20 text-white shadow-lg backdrop-blur-sm backdrop-saturate-200 transition-opacity duration-300 hover:bg-zinc-700 dark:bg-zinc-100/20 dark:text-zinc-900 dark:hover:bg-zinc-300 opacity-0"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up" aria-hidden="true"><path d="m5 12 7-7 7 7"></path><path d="M12 19V5"></path></svg></button><!--astro:end--></astro-island>  </body></html>

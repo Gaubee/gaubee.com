@@ -1,0 +1,102 @@
+<!DOCTYPE html><html lang="zh-CN"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width"><link rel="icon" type="image/png" href="/icon-192x192.png"><meta name="generator" content="Astro v5.13.9"><title>Web 未来技术猜想（一）</title><meta name="description" content="GauBee's personal blog"><meta name="astro-view-transitions-enabled" content="true"><meta name="astro-view-transitions-fallback" content="animate"><script type="module" src="/_astro/ClientRouter.astro_astro_type_script_index_0_lang.B3vRBseb.js"></script><link rel="stylesheet" href="/_astro/editor.ByX6VvEs.css"></head> <body class="bg-white text-zinc-900 transition-colors duration-300 dark:bg-zinc-900 dark:text-zinc-50">  <div class="flex max-w-7xl mx-auto"> <aside class="hidden lg:block sticky top-0 h-screen w-64 flex-shrink-0 py-8 pr-8"> <aside class="w-64 p-4 pr-8"><nav class="flex flex-col space-y-2"><a href="/" class="flex items-center gap-4 py-3 px-6 text-lg font-semibold no-underline text-zinc-900 dark:text-zinc-100 rounded-full transition-colors duration-200 ease-in-out hover:bg-gray-200 dark:hover:bg-zinc-800"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-house" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"></path><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg><span>主页</span></a><a href="/events" class="flex items-center gap-4 py-3 px-6 text-lg font-semibold no-underline text-zinc-900 dark:text-zinc-100 rounded-full transition-colors duration-200 ease-in-out hover:bg-gray-200 dark:hover:bg-zinc-800"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rss" aria-hidden="true"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg><span>时事快讯</span></a></nav></aside> </aside> <main class="flex-1 min-w-0"> <style>astro-island,astro-slot,astro-static-slot{display:contents}</style><script>(()=>{var e=async t=>{await(await t())()};(self.Astro||(self.Astro={})).load=e;window.dispatchEvent(new Event("astro:load"));})();</script><script>(()=>{var A=Object.defineProperty;var g=(i,o,a)=>o in i?A(i,o,{enumerable:!0,configurable:!0,writable:!0,value:a}):i[o]=a;var d=(i,o,a)=>g(i,typeof o!="symbol"?o+"":o,a);{let i={0:t=>m(t),1:t=>a(t),2:t=>new RegExp(t),3:t=>new Date(t),4:t=>new Map(a(t)),5:t=>new Set(a(t)),6:t=>BigInt(t),7:t=>new URL(t),8:t=>new Uint8Array(t),9:t=>new Uint16Array(t),10:t=>new Uint32Array(t),11:t=>1/0*t},o=t=>{let[l,e]=t;return l in i?i[l](e):void 0},a=t=>t.map(o),m=t=>typeof t!="object"||t===null?t:Object.fromEntries(Object.entries(t).map(([l,e])=>[l,o(e)]));class y extends HTMLElement{constructor(){super(...arguments);d(this,"Component");d(this,"hydrator");d(this,"hydrate",async()=>{var b;if(!this.hydrator||!this.isConnected)return;let e=(b=this.parentElement)==null?void 0:b.closest("astro-island[ssr]");if(e){e.addEventListener("astro:hydrate",this.hydrate,{once:!0});return}let c=this.querySelectorAll("astro-slot"),n={},h=this.querySelectorAll("template[data-astro-template]");for(let r of h){let s=r.closest(this.tagName);s!=null&&s.isSameNode(this)&&(n[r.getAttribute("data-astro-template")||"default"]=r.innerHTML,r.remove())}for(let r of c){let s=r.closest(this.tagName);s!=null&&s.isSameNode(this)&&(n[r.getAttribute("name")||"default"]=r.innerHTML)}let p;try{p=this.hasAttribute("props")?m(JSON.parse(this.getAttribute("props"))):{}}catch(r){let s=this.getAttribute("component-url")||"<unknown>",v=this.getAttribute("component-export");throw v&&(s+=` (export ${v})`),console.error(`[hydrate] Error parsing props for component ${s}`,this.getAttribute("props"),r),r}let u;await this.hydrator(this)(this.Component,p,n,{client:this.getAttribute("client")}),this.removeAttribute("ssr"),this.dispatchEvent(new CustomEvent("astro:hydrate"))});d(this,"unmount",()=>{this.isConnected||this.dispatchEvent(new CustomEvent("astro:unmount"))})}disconnectedCallback(){document.removeEventListener("astro:after-swap",this.unmount),document.addEventListener("astro:after-swap",this.unmount,{once:!0})}connectedCallback(){if(!this.hasAttribute("await-children")||document.readyState==="interactive"||document.readyState==="complete")this.childrenConnectedCallback();else{let e=()=>{document.removeEventListener("DOMContentLoaded",e),c.disconnect(),this.childrenConnectedCallback()},c=new MutationObserver(()=>{var n;((n=this.lastChild)==null?void 0:n.nodeType)===Node.COMMENT_NODE&&this.lastChild.nodeValue==="astro:end"&&(this.lastChild.remove(),e())});c.observe(this,{childList:!0}),document.addEventListener("DOMContentLoaded",e)}}async childrenConnectedCallback(){let e=this.getAttribute("before-hydration-url");e&&await import(e),this.start()}async start(){let e=JSON.parse(this.getAttribute("opts")),c=this.getAttribute("client");if(Astro[c]===void 0){window.addEventListener(`astro:${c}`,()=>this.start(),{once:!0});return}try{await Astro[c](async()=>{let n=this.getAttribute("renderer-url"),[h,{default:p}]=await Promise.all([import(this.getAttribute("component-url")),n?import(n):()=>()=>{}]),u=this.getAttribute("component-export")||"default";if(!u.includes("."))this.Component=h[u];else{this.Component=h;for(let f of u.split("."))this.Component=this.Component[f]}return this.hydrator=p,this.hydrate},e,this)}catch(n){console.error(`[astro-island] Error hydrating ${this.getAttribute("component-url")}`,n)}}attributeChangedCallback(){this.hydrate()}}d(y,"observedAttributes",["props"]),customElements.get("astro-island")||customElements.define("astro-island",y)}})();</script><astro-island uid="2rzxtc" prefix="r13" component-url="/_astro/MobileNav.DnXM_NFf.js" component-export="default" renderer-url="/_astro/client.6DCnCeAt.js" props="{&quot;title&quot;:[0,&quot;Web 未来技术猜想（一）&quot;]}" ssr client="load" opts="{&quot;name&quot;:&quot;MobileNav&quot;,&quot;value&quot;:true}" await-children><div id="mobile-topbar" class="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-zinc-200 bg-white/80 px-4 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/80 lg:hidden"><div class="w-6"></div><div class="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">Web 未来技术猜想（一）</div><button type="button" aria-label="Open menu"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-menu" aria-hidden="true"><path d="M4 5h16"></path><path d="M4 12h16"></path><path d="M4 19h16"></path></svg></button></div><template data-astro-template> <div class="space-y-4"> <astro-island uid="1hrHIS" prefix="r7" component-url="/_astro/TableOfContentsCard.CsCJMAN2.js" component-export="default" renderer-url="/_astro/client.6DCnCeAt.js" props="{&quot;headings&quot;:[1,[[0,{&quot;depth&quot;:[0,3],&quot;slug&quot;:[0,&quot;第一种是功能性模块&quot;],&quot;text&quot;:[0,&quot;第一种是功能性模块&quot;]}],[0,{&quot;depth&quot;:[0,3],&quot;slug&quot;:[0,&quot;第二种是浏览器内核&quot;],&quot;text&quot;:[0,&quot;第二种是浏览器内核&quot;]}],[0,{&quot;depth&quot;:[0,3],&quot;slug&quot;:[0,&quot;总结&quot;],&quot;text&quot;:[0,&quot;总结&quot;]}]]]}" ssr client="load" opts="{&quot;name&quot;:&quot;TableOfContentsCard&quot;,&quot;value&quot;:true}" await-children><div class="rounded-xl border bg-card text-card-foreground shadow"><div class="p-6 pt-0"><ul><li><a href="#第一种是功能性模块">第一种是功能性模块</a></li><li><a href="#第二种是浏览器内核">第二种是浏览器内核</a></li><li><a href="#总结">总结</a></li></ul></div></div><!--astro:end--></astro-island> <!-- <TagsCard client:load tags={allTags} />
+          <ArchiveCard client:load postsByMonth={postsByMonth} /> --> </div> </template><!--astro:end--></astro-island> <div class="p-6">  <article class="prose dark:prose-invert max-w-none"> <p>对于近十年来 Web 技术的高速发展，很有多精彩的概念与设计涌现出来，但也有很多设计是建立在历史 Web 技术的架构上。</p>
+<p>这间接地导致了浏览器的开发越来越难，现在还存活的浏览器内核也就只剩下 Webkit 和 Blink 了（Firefix 的 Servo 份额实在太小了，开发进度也实在缓慢）……</p>
+<p>即便这两个内核的代码都是开源的，但并不意味着“不垄断”，Web 技术再这样发展下去，只会制造出越来越高的技术壁垒。因为开源并不意味着自由，技术标准的话语权还是掌握在别人手里，你想贡献代码，还得看社区是否“有时间”去接纳，还得有大量的条条框框在限制着你，而反观 Chrome 团队，它们则是能肆无忌惮地往 Chrome 中添加各种实验性功能。从技术层面上来说，技术人的贡献固然是令人尊敬值得肯定，但从资本的层面上来说，这些新技术的堆在这般的堆砌，制造技术壁垒、掌握标准话语权，不正是垄断牟利的老套路吗？</p>
+<p>我这里大胆预测一下，未来 Web 技术一定带来突变。
+或者说这不是预测，是我个人假设要去从头设计一个浏览器，我应该怎么去做。宏观上会分成两大种类的模块来开发：</p>
+<h3 id="第一种是功能性模块">第一种是功能性模块</h3>
+<p>比如蓝牙模块、HTTP1/2/3 协议模块、USB 模块、摄像头模块等等。对此可以理解成“驱动模块”，但不同的是，驱动模块目的只是将硬件被操作系统的接口所认知，功能性模块还加入了隐私保护的概念，所有的行为对于使用者来说必须是公开透明的。这不是单纯做好“功能授权”与“信息流向透明”就能解决的问题，还是确保用户的身份不被追踪，用户的偏好不被预测等等。
+这类模块由两部分组成：一部分是“原子接口”，一部分是“应用接口”。</p>
+<ol>
+<li>其中“原子接口”只能由操作系统提供，类似于操作系统的 API，但是要符合上文所提到的 Web 的隐私安全性的定义。
+<blockquote>
+<p>Web 开发者可以直接在网页上进行使用 WASM/JS 围绕“原子接口”进行开发。</p>
+<p>比如说摄像头模块的原子接口，可以做到对相机预览功能的二次开发，或者直接拿到 YUV、RGB、RAW 等格式进行处理等等。但现实情况是，每一个物理硬件都有它的特性，我们只能说这些硬件在出厂的时候通过了可用性的测试，但并无法保证所有的硬件都是一致的，所以我们往往需要加入一个理想数据模型，来结合实际硬件的情况，加入一定的偏移与噪点来消除误差，这其实是需要硬件厂商和系统驱动要去解决的问题。</p>
+</blockquote>
+</li>
+<li>其次“应用接口”是基于“原子接口”开发出来的应用。首先操作系统会提供一套默认的“应用接口”，正因为将浏览器的开发成本嫁接到操作系统上，并将之模块化，才有可能将浏览器的开发成本大大降低。
+<blockquote>
+<p>同时第三方开发者通用也可以在“原子接口”确保安全性与隐私性的基础上使用原生的指令集进行二次开发，这种第三方开发的原生应用，可以上架到应用市场。正如我们可以去设置<code>mailto:</code>邮件协议的处理程序一样。</p>
+<p>虽然是原生开发，但是并不代表可以绕过“原子接口”去直接使用更加底层的操作系统接口，毕竟是 Web 技术，一定要确保隐私性与安全性。</p>
+<p>但是在应用市场上，会有明确需要通过功能测试与基准测试才能正式上架，在下载的时候，用户也可以看到测试的分数，在功能性与性能之间做出选择。同时也正式因为只能基于“原子接口”，牺牲少量性能换来了更高的安全性，用户不用担心使用第三方摄像头功能模块的时候，数据会被悄悄泄露上传到别的地方去。</p>
+</blockquote>
+</li>
+<li>对于 Web 开发者如何使用这些功能模块呢？
+<ol>
+<li>一般情况下会直接使用“应用接口”。大部分接口使用时都需要经过授权；部分接口会有明确的状态信息限制；也会有接口调用日志。</li>
+<li>但是开发者无法拿到接口开发商的信息，因为这些信息很有可能被当作指纹来识别。</li>
+</ol>
+</li>
+</ol>
+<h3 id="第二种是浏览器内核">第二种是浏览器内核</h3>
+<p>它是一个综合性的模块，也是开发难度最大的模块，它的作用就是定义 Web 技术最基础的输入与输出。</p>
+<ol>
+<li>对于输入，就是要将键盘、鼠标、触摸、陀螺仪、摄影、声音、环境亮度等输入信号抽象定义。
+<ol>
+<li>开发者无法拿到这些信号的源头（比如键盘的型号、鼠标的型号等等），只能拿到这些输入的值，比如用户点击了屏幕上的哪里，使用手点击的还是鼠标点击的，点击的力度是多大等等，这种是数值。</li>
+<li>有时候这些值还会在精度允许的范围内做一定的模糊，特别是跟现实有关的值，不允许过高的精度（如果需要也需要通过用户允许），以防止有站点采集这些信息作为指纹识别。
+<blockquote>
+<p>比如说我们可以使用陀螺仪，实现对心跳频率的识别，识别出你是年轻人还是老人，从而做出差异化体验，这种模糊识别是允许的。</p>
+<p>但是要知道，每个人心跳就跟指纹一样，都会有细微的差别，如果陀螺仪的精度过高，那么在 AI 技术的加持下，很有可能就能更进一步精确识别出个体。
+如果这种机制存在，黑客或者一些大型企业就能通过一些手段，在很多网页上注入它们的监控算法，将这些信息收集，只要收集的时间够长，这时候你的个人隐私就与裸奔无异了。你的生活里的信息很可能会被人引导、控制、甚至攻击。</p>
+</blockquote>
+</li>
+</ol>
+</li>
+<li>对于输出，就是要将画面，音频、震动等信息的输出方式进行封装。
+<ol>
+<li>
+<p>其中最难的就是“画面”的输出了，虽然我对计算机图形编程并没有多少研究，但是对于 Web 渲染我有一定的使用心得。</p>
+</li>
+<li>
+<p>请我允许我偏执地认为，HTML+CSS 的绘制，曾经是一种很棒的标准，它除了绘制的功能，还提供了屏幕可读的功能，这对于对于视力障碍人群是很友好的。</p>
+</li>
+<li>
+<p>但现在我并不在觉得它是优秀的设计，Web2.0 蓬勃发展，已经加入了太多太多功能，因为其过去的封闭性，所以标准制定者需要对这些标准的兼容性负责，所以它们现在实在过于膨胀。</p>
+</li>
+<li>
+<p>好在现在有人在开放性上一直做出努力：</p>
+<ol>
+<li>WebComponent 在一定程度上已经能满足大部分场景，新的提案也一直在推进。</li>
+<li>而 CSS Houdini 的发展则有些迟缓，但我相信它正在以正确的方式在解决问题，它的野心很大，需要开放“解析”、“布局”、“绘制”、“合成”的过程，所以难度自然更大。
+<blockquote>
+<p>相信未来新的 CSS、HTML 标准应该只能属于“功能性模块“而不是“浏览器内核”。</p>
+</blockquote>
+</li>
+</ol>
+<blockquote>
+<p>软件的高内聚与硬件的高内聚并不一样，硬件是会有损耗的，所以当我们更新硬件时，拿到的就是一个全新的设备。
+而软件的问题，则是会跟着历史的进程去向下兼容下去。如果软件保持高内聚而不开放，这就会导致软件的功能会越来越臃肿。相反的如果使用开放的架构，我们可以明确地定义新的标准，果断地遗弃过去的功能，对于兼容性，就直接由过去的功能模块来做就好。新的标准可以更加专注于小范围领域内的逻辑自洽的设计就好了，这也能使之拥有更高的性能，同时也拥有更少的成本。</p>
+</blockquote>
+</li>
+<li>
+<p>未来，HTML 会专注于表单、结构化、屏幕可读性，这可以让人们基本没有 CSS 的辅助，也能基于这些文本与超文本标记语言，理解到网页的大体内容。</p>
+</li>
+<li>
+<p>而 CSS，则是会更进一步融合 canvas-2d/webgl/webgpu 等绘制功能来提供更棒的视觉体验。</p>
+</li>
+<li>
+<p>信息的输入，则是会围绕 HTML 来展开捕获，而后将之传递给 CSS。</p>
+</li>
+</ol>
+</li>
+</ol>
+<h3 id="总结">总结</h3>
+<p>综合以上关于技术的几点构想，假如真的成立，那么未来浏览器与 Web 技术的发展会有这几种趋势特征：</p>
+<ol>
+<li>开发一个浏览器的成本会越来越低。低到一个人也能通过整个开源社区来独立实现一个比较高效的 Web 浏览器。</li>
+<li>性能与原生差距很低。基于浏览器的二次开发会称为原生软件的开发标准，比如可以替换“功能性模块”来实现更进一步的性能与体验的升级。</li>
+<li>浏览器会更加省电。
+<ol>
+<li>这也是因为浏览器的模块协同机制的改变，操作系统可以更加精细地调控对各个模块电源的使用来进一步省电，比如降低触摸与鼠标的输入频率。</li>
+<li>Web 技术的历史包袱会更小，对于过时的技术，本身就是存在过过去的硬件性能水平下，那么对于当下的硬件水平，我们可以只提供更少的资源，在确保功能正常的情况下同时省电。</li>
+</ol>
+</li>
+<li>向兼容性不再是困扰开发者的事情。
+<ol>
+<li>一方面是浏览器架构的升级，升级核心组件会变得更加简单；</li>
+<li>另一方开发者可以更加激进地不去考虑兼容性的问题，想要使用新的技术，只需要操作系统后台去安装这些模块即可。</li>
+</ol>
+</li>
+<li>用户会有更多的选择权与话语权。体现在用户可以更加轻松地杜绝个人信息盗取，这也会为整个互联网的发展带来更加良性的循环，而不是靠着贩卖用户信息牟利。</li>
+</ol> </article>  </div> </main> <aside class="hidden lg:block sticky top-0 h-screen w-64 flex-shrink-0 py-8 pl-8"> <div class="space-y-4"> <div class="rounded-xl border bg-card text-card-foreground shadow"><div class="p-6 pt-0"><ul><li><a href="#第一种是功能性模块">第一种是功能性模块</a></li><li><a href="#第二种是浏览器内核">第二种是浏览器内核</a></li><li><a href="#总结">总结</a></li></ul></div></div> <div class="rounded-xl border bg-card text-card-foreground shadow"><div class="flex flex-col space-y-1.5 p-6"><div class="font-semibold leading-none tracking-tight">Tags</div></div><div class="p-6 pt-0"><div class="flex flex-wrap gap-2"><a href="/tags/article" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">article</a><a href="/tags/event" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">event</a><a href="/tags/rust" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">rust</a><a href="/tags/iced" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">iced</a><a href="/tags/gui" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">gui</a><a href="/tags/multiplatform" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">multiplatform</a><a href="/tags/mobile" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">mobile</a><a href="/tags/web" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">web</a><a href="/tags/Kotlin" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">Kotlin</a><a href="/tags/linux" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">linux</a><a href="/tags/dns" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">dns</a><a href="/tags/javascript" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">javascript</a><a href="/tags/async" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">async</a><a href="/tags/reactive" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">reactive</a><a href="/tags/html&amp;css" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">html&amp;css</a><a href="/tags/cogitation" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">cogitation</a><a href="/tags/tools" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">tools</a><a href="/tags/efficiency" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">efficiency</a><a href="/tags/trivial" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">trivial</a><a href="/tags/lift" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">lift</a><a href="/tags/C++" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">C++</a></div></div></div> <div class="rounded-xl border bg-card text-card-foreground shadow"><div class="flex flex-col space-y-1.5 p-6"><div class="font-semibold leading-none tracking-tight">Archive</div></div><div class="p-6 pt-0"><ul><li><a href="/archive/2025/09">2025-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2025/06">2025-06<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2025/05">2025-05<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2025/04">2025-04<!-- --> (<!-- -->12<!-- -->)</a></li><li><a href="/archive/2025/03">2025-03<!-- --> (<!-- -->9<!-- -->)</a></li><li><a href="/archive/2024/05">2024-05<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2024/04">2024-04<!-- --> (<!-- -->3<!-- -->)</a></li><li><a href="/archive/2023/05">2023-05<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2023/04">2023-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2023/03">2023-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2022/10">2022-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2022/04">2022-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2021/12">2021-12<!-- --> (<!-- -->3<!-- -->)</a></li><li><a href="/archive/2021/07">2021-07<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2021/04">2021-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/10">2020-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/09">2020-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/05">2020-05<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2020/04">2020-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/03">2020-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2018/07">2018-07<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2017/10">2017-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2017/03">2017-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/10">2016-10<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2016/09">2016-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/08">2016-08<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/07">2016-07<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/05">2016-05<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/03">2016-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/02">2016-02<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2015/02">2015-02<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2014/09">2014-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2014/04">2014-04<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2014/03">2014-03<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2014/02">2014-02<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2014/01">2014-01<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2013/12">2013-12<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/10">2013-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/09">2013-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/08">2013-08<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2013/07">2013-07<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2013/06">2013-06<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/05">2013-05<!-- --> (<!-- -->4<!-- -->)</a></li></ul></div></div> </div> </aside> </div> <astro-island uid="Tziuc" prefix="r11" component-url="/_astro/BackToTop.B6mUL4XD.js" component-export="default" renderer-url="/_astro/client.6DCnCeAt.js" props="{}" ssr client="load" opts="{&quot;name&quot;:&quot;BackToTop&quot;,&quot;value&quot;:true}" await-children><button type="button" aria-label="Back to top" class="fixed right-8 bottom-8 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900/20 text-white shadow-lg backdrop-blur-sm backdrop-saturate-200 transition-opacity duration-300 hover:bg-zinc-700 dark:bg-zinc-100/20 dark:text-zinc-900 dark:hover:bg-zinc-300 opacity-0"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up" aria-hidden="true"><path d="m5 12 7-7 7 7"></path><path d="M12 19V5"></path></svg></button><!--astro:end--></astro-island>  </body></html>

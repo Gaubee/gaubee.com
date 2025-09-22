@@ -1,0 +1,505 @@
+<!DOCTYPE html><html lang="zh-CN"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width"><link rel="icon" type="image/png" href="/icon-192x192.png"><meta name="generator" content="Astro v5.13.9"><title>深入浅出 Observable：驯服 Web/JS 异步事件流的“瑞士军刀”？</title><meta name="description" content="GauBee's personal blog"><meta name="astro-view-transitions-enabled" content="true"><meta name="astro-view-transitions-fallback" content="animate"><script type="module" src="/_astro/ClientRouter.astro_astro_type_script_index_0_lang.B3vRBseb.js"></script><link rel="stylesheet" href="/_astro/editor.ByX6VvEs.css"></head> <body class="bg-white text-zinc-900 transition-colors duration-300 dark:bg-zinc-900 dark:text-zinc-50">  <div class="flex max-w-7xl mx-auto"> <aside class="hidden lg:block sticky top-0 h-screen w-64 flex-shrink-0 py-8 pr-8"> <aside class="w-64 p-4 pr-8"><nav class="flex flex-col space-y-2"><a href="/" class="flex items-center gap-4 py-3 px-6 text-lg font-semibold no-underline text-zinc-900 dark:text-zinc-100 rounded-full transition-colors duration-200 ease-in-out hover:bg-gray-200 dark:hover:bg-zinc-800"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-house" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"></path><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg><span>主页</span></a><a href="/events" class="flex items-center gap-4 py-3 px-6 text-lg font-semibold no-underline text-zinc-900 dark:text-zinc-100 rounded-full transition-colors duration-200 ease-in-out hover:bg-gray-200 dark:hover:bg-zinc-800"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rss" aria-hidden="true"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg><span>时事快讯</span></a></nav></aside> </aside> <main class="flex-1 min-w-0"> <style>astro-island,astro-slot,astro-static-slot{display:contents}</style><script>(()=>{var e=async t=>{await(await t())()};(self.Astro||(self.Astro={})).load=e;window.dispatchEvent(new Event("astro:load"));})();</script><script>(()=>{var A=Object.defineProperty;var g=(i,o,a)=>o in i?A(i,o,{enumerable:!0,configurable:!0,writable:!0,value:a}):i[o]=a;var d=(i,o,a)=>g(i,typeof o!="symbol"?o+"":o,a);{let i={0:t=>m(t),1:t=>a(t),2:t=>new RegExp(t),3:t=>new Date(t),4:t=>new Map(a(t)),5:t=>new Set(a(t)),6:t=>BigInt(t),7:t=>new URL(t),8:t=>new Uint8Array(t),9:t=>new Uint16Array(t),10:t=>new Uint32Array(t),11:t=>1/0*t},o=t=>{let[l,e]=t;return l in i?i[l](e):void 0},a=t=>t.map(o),m=t=>typeof t!="object"||t===null?t:Object.fromEntries(Object.entries(t).map(([l,e])=>[l,o(e)]));class y extends HTMLElement{constructor(){super(...arguments);d(this,"Component");d(this,"hydrator");d(this,"hydrate",async()=>{var b;if(!this.hydrator||!this.isConnected)return;let e=(b=this.parentElement)==null?void 0:b.closest("astro-island[ssr]");if(e){e.addEventListener("astro:hydrate",this.hydrate,{once:!0});return}let c=this.querySelectorAll("astro-slot"),n={},h=this.querySelectorAll("template[data-astro-template]");for(let r of h){let s=r.closest(this.tagName);s!=null&&s.isSameNode(this)&&(n[r.getAttribute("data-astro-template")||"default"]=r.innerHTML,r.remove())}for(let r of c){let s=r.closest(this.tagName);s!=null&&s.isSameNode(this)&&(n[r.getAttribute("name")||"default"]=r.innerHTML)}let p;try{p=this.hasAttribute("props")?m(JSON.parse(this.getAttribute("props"))):{}}catch(r){let s=this.getAttribute("component-url")||"<unknown>",v=this.getAttribute("component-export");throw v&&(s+=` (export ${v})`),console.error(`[hydrate] Error parsing props for component ${s}`,this.getAttribute("props"),r),r}let u;await this.hydrator(this)(this.Component,p,n,{client:this.getAttribute("client")}),this.removeAttribute("ssr"),this.dispatchEvent(new CustomEvent("astro:hydrate"))});d(this,"unmount",()=>{this.isConnected||this.dispatchEvent(new CustomEvent("astro:unmount"))})}disconnectedCallback(){document.removeEventListener("astro:after-swap",this.unmount),document.addEventListener("astro:after-swap",this.unmount,{once:!0})}connectedCallback(){if(!this.hasAttribute("await-children")||document.readyState==="interactive"||document.readyState==="complete")this.childrenConnectedCallback();else{let e=()=>{document.removeEventListener("DOMContentLoaded",e),c.disconnect(),this.childrenConnectedCallback()},c=new MutationObserver(()=>{var n;((n=this.lastChild)==null?void 0:n.nodeType)===Node.COMMENT_NODE&&this.lastChild.nodeValue==="astro:end"&&(this.lastChild.remove(),e())});c.observe(this,{childList:!0}),document.addEventListener("DOMContentLoaded",e)}}async childrenConnectedCallback(){let e=this.getAttribute("before-hydration-url");e&&await import(e),this.start()}async start(){let e=JSON.parse(this.getAttribute("opts")),c=this.getAttribute("client");if(Astro[c]===void 0){window.addEventListener(`astro:${c}`,()=>this.start(),{once:!0});return}try{await Astro[c](async()=>{let n=this.getAttribute("renderer-url"),[h,{default:p}]=await Promise.all([import(this.getAttribute("component-url")),n?import(n):()=>()=>{}]),u=this.getAttribute("component-export")||"default";if(!u.includes("."))this.Component=h[u];else{this.Component=h;for(let f of u.split("."))this.Component=this.Component[f]}return this.hydrator=p,this.hydrate},e,this)}catch(n){console.error(`[astro-island] Error hydrating ${this.getAttribute("component-url")}`,n)}}attributeChangedCallback(){this.hydrate()}}d(y,"observedAttributes",["props"]),customElements.get("astro-island")||customElements.define("astro-island",y)}})();</script><astro-island uid="Z1iipdX" prefix="r13" component-url="/_astro/MobileNav.DnXM_NFf.js" component-export="default" renderer-url="/_astro/client.6DCnCeAt.js" props="{&quot;title&quot;:[0,&quot;深入浅出 Observable：驯服 Web/JS 异步事件流的“瑞士军刀”？&quot;]}" ssr client="load" opts="{&quot;name&quot;:&quot;MobileNav&quot;,&quot;value&quot;:true}" await-children><div id="mobile-topbar" class="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-zinc-200 bg-white/80 px-4 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/80 lg:hidden"><div class="w-6"></div><div class="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">深入浅出 Observable：驯服 Web/JS 异步事件流的“瑞士军刀”？</div><button type="button" aria-label="Open menu"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-menu" aria-hidden="true"><path d="M4 5h16"></path><path d="M4 12h16"></path><path d="M4 19h16"></path></svg></button></div><template data-astro-template> <div class="space-y-4"> <astro-island uid="Z1iPLNP" prefix="r7" component-url="/_astro/TableOfContentsCard.CsCJMAN2.js" component-export="default" renderer-url="/_astro/client.6DCnCeAt.js" props="{&quot;headings&quot;:[1,[[0,{&quot;depth&quot;:[0,2],&quot;slug&quot;:[0,&quot;一observable-的灵魂拷问它到底想干啥&quot;],&quot;text&quot;:[0,&quot;一、Observable 的灵魂拷问——它到底想干啥？&quot;]}],[0,{&quot;depth&quot;:[0,2],&quot;slug&quot;:[0,&quot;二前世今生observable-的长征路&quot;],&quot;text&quot;:[0,&quot;二、前世今生——Observable 的“长征路”&quot;]}],[0,{&quot;depth&quot;:[0,2],&quot;slug&quot;:[0,&quot;三小试牛刀eventtargetwhen-初体验&quot;],&quot;text&quot;:[0,&quot;三、小试牛刀——EventTarget.when() 初体验&quot;]}],[0,{&quot;depth&quot;:[0,2],&quot;slug&quot;:[0,&quot;四登堂入室核心-observable-api-与概念&quot;],&quot;text&quot;:[0,&quot;四、登堂入室——核心 Observable API 与概念&quot;]}],[0,{&quot;depth&quot;:[0,2],&quot;slug&quot;:[0,&quot;五神兵利器玩转-observable-操作符&quot;],&quot;text&quot;:[0,&quot;五、神兵利器——玩转 Observable 操作符&quot;]}],[0,{&quot;depth&quot;:[0,2],&quot;slug&quot;:[0,&quot;六万物皆可-observableobservablefrom&quot;],&quot;text&quot;:[0,&quot;六、万物皆可 Observable——Observable.from()&quot;]}],[0,{&quot;depth&quot;:[0,2],&quot;slug&quot;:[0,&quot;七融会贯通实战场景演练&quot;],&quot;text&quot;:[0,&quot;七、融会贯通——实战场景演练&quot;]}],[0,{&quot;depth&quot;:[0,2],&quot;slug&quot;:[0,&quot;八站在巨人肩上总结与展望&quot;],&quot;text&quot;:[0,&quot;八、站在巨人肩上——总结与展望&quot;]}]]]}" ssr client="load" opts="{&quot;name&quot;:&quot;TableOfContentsCard&quot;,&quot;value&quot;:true}" await-children><div class="rounded-xl border bg-card text-card-foreground shadow"><div class="p-6 pt-0"><ul><li><a href="#一observable-的灵魂拷问它到底想干啥">一、Observable 的灵魂拷问——它到底想干啥？</a></li><li><a href="#二前世今生observable-的长征路">二、前世今生——Observable 的“长征路”</a></li><li><a href="#三小试牛刀eventtargetwhen-初体验">三、小试牛刀——EventTarget.when() 初体验</a></li><li><a href="#四登堂入室核心-observable-api-与概念">四、登堂入室——核心 Observable API 与概念</a></li><li><a href="#五神兵利器玩转-observable-操作符">五、神兵利器——玩转 Observable 操作符</a></li><li><a href="#六万物皆可-observableobservablefrom">六、万物皆可 Observable——Observable.from()</a></li><li><a href="#七融会贯通实战场景演练">七、融会贯通——实战场景演练</a></li><li><a href="#八站在巨人肩上总结与展望">八、站在巨人肩上——总结与展望</a></li></ul></div></div><!--astro:end--></astro-island> <!-- <TagsCard client:load tags={allTags} />
+          <ArchiveCard client:load postsByMonth={postsByMonth} /> --> </div> </template><!--astro:end--></astro-island> <div class="p-6">  <article class="prose dark:prose-invert max-w-none"> <p>今天，跟大家聊聊一个在 Web 平台“难产”多年，但江湖上早已流传其传说、众多框架和库默默拥抱的家伙——<strong>Observable</strong>。</p>
+<p>是不是感觉 <code>addEventListener</code> 用得有点腻歪了？回调地狱、手动移除监听、组合复杂逻辑时的捉襟见肘……这些痛点，就像鞋里的小石子，时不时硌得慌。Observable 提案，就像一位身怀绝技的武林高手，试图用一种更优雅、更“函数式”的姿态，来解决这些前端事件处理的“疑难杂症”。</p>
+<p>这篇文章，从它想解决的问题出发，一路扒开它的前世今生、核心概念、实战技巧，最后再一起畅想下它的未来。准备好了吗？发车！</p>
+<h2 id="一observable-的灵魂拷问它到底想干啥">一、Observable 的灵魂拷问——它到底想干啥？</h2>
+<p>任何技术的出现都不是空穴来风。Observable 想解决的核心痛点，其实就是我们日常与异步事件打交道时的“不爽”。</p>
+<p>想想看，我们用 <code>addEventListener</code> 是怎么操作的：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> controller</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> AbortController</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> signal</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> controller.signal;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> handleMouseMove</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">e</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#E1E4E8">  console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"鼠标移动:"</span><span style="color:#E1E4E8">, e.clientX, e.clientY);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> handleMouseUp</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">e</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#E1E4E8">  console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"鼠标松开，停止监听移动"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#6A737D">  // 关键：需要手动移除监听</span></span>
+<span class="line"><span style="color:#E1E4E8">  element.</span><span style="color:#B392F0">removeEventListener</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"mousemove"</span><span style="color:#E1E4E8">, handleMouseMove);</span></span>
+<span class="line"><span style="color:#6A737D">  // 如果还有其他监听，也得一一移除...</span></span>
+<span class="line"><span style="color:#E1E4E8">  document.</span><span style="color:#B392F0">removeEventListener</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"mouseup"</span><span style="color:#E1E4E8">, handleMouseUp);</span></span>
+<span class="line"><span style="color:#6A737D">  // 或者用 AbortController 批量取消，但还是得手动调用 abort</span></span>
+<span class="line"><span style="color:#6A737D">  // controller.abort();</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">element.</span><span style="color:#B392F0">addEventListener</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#9ECBFF">  "mousedown"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  (</span><span style="color:#FFAB70">e</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"鼠标按下，开始监听移动和松开"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">    element.</span><span style="color:#B392F0">addEventListener</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"mousemove"</span><span style="color:#E1E4E8">, handleMouseMove, { signal });</span></span>
+<span class="line"><span style="color:#E1E4E8">    document.</span><span style="color:#B392F0">addEventListener</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"mouseup"</span><span style="color:#E1E4E8">, handleMouseUp, { signal });</span></span>
+<span class="line"><span style="color:#E1E4E8">  },</span></span>
+<span class="line"><span style="color:#E1E4E8">  { signal },</span></span>
+<span class="line"><span style="color:#E1E4E8">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// 想在某个条件下停止所有监听？</span></span>
+<span class="line"><span style="color:#6A737D">// controller.abort();</span></span></code></pre>
+<p>这段代码眼熟吧？是不是有内味儿了？</p>
+<ol>
+<li><strong>命令式 (Imperative)</strong>: 你得一步步告诉浏览器“做什么”（添加监听、移除监听）。</li>
+<li><strong>状态管理复杂</strong>: 需要手动管理监听器的添加和移除，尤其是涉及多个事件、需要条件性取消时，很容易遗漏，造成内存泄漏或逻辑错误。</li>
+<li><strong>组合困难</strong>: 想实现“当 A 事件发生后，监听 B 事件，直到 C 事件发生”这种逻辑，往往需要嵌套回调，代码可读性和可维护性直线下降。</li>
+</ol>
+<p><strong>Observable 的哲学：把事件流当成一等公民</strong></p>
+<p>Observable 说：“别那么麻烦了！咱换个思路。” 它借鉴了函数式编程和响应式编程的思想，把<strong>随时间发生的、可能多次的事件，看作是一个数据流（Stream）</strong>。这个流，就像数组一样，你可以对它进行各种操作（过滤、映射、组合……），而且这些操作是**声明式 (Declarative)**的。</p>
+<p>你不再关心具体怎么添加、移除监听器，而是<strong>描述</strong>你想要什么样的事件流，以及当流中有数据（事件）或者流结束时，你想做什么。</p>
+<p><strong>核心优势总结：</strong></p>
+<ul>
+<li><strong>可组合 (Composable)</strong>: 像链式调用 <code>.filter().map()</code> 一样处理事件流。</li>
+<li><strong>显式终止 (Explicit Termination)</strong>: 清晰地定义事件流何时开始、何时结束，以及结束后的清理逻辑。</li>
+<li><strong>更清晰的代码</strong>: 声明式的代码往往更易读、更易懂。</li>
+</ul>
+<p>看看用 Observable （假设的 <code>.when()</code> API）改写是什么感觉：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#6A737D">// 描述：监听鼠标按下事件，对于每次按下：</span></span>
+<span class="line"><span style="color:#E1E4E8">element.</span><span style="color:#B392F0">when</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"mousedown"</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">subscribe</span><span style="color:#E1E4E8">(() </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"鼠标按下，开始监听移动和松开"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#6A737D">  // 描述：监听鼠标移动事件，直到鼠标松开事件发生</span></span>
+<span class="line"><span style="color:#E1E4E8">  element</span></span>
+<span class="line"><span style="color:#E1E4E8">    .</span><span style="color:#B392F0">when</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"mousemove"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    .</span><span style="color:#B392F0">takeUntil</span><span style="color:#E1E4E8">(document.</span><span style="color:#B392F0">when</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"mouseup"</span><span style="color:#E1E4E8">)) </span><span style="color:#6A737D">// 关键：声明式终止</span></span>
+<span class="line"><span style="color:#E1E4E8">    .</span><span style="color:#B392F0">subscribe</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#B392F0">      next</span><span style="color:#E1E4E8">: (</span><span style="color:#FFAB70">e</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"鼠标移动:"</span><span style="color:#E1E4E8">, e.clientX, e.clientY),</span></span>
+<span class="line"><span style="color:#B392F0">      complete</span><span style="color:#E1E4E8">: () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"鼠标松开，移动监听自动停止"</span><span style="color:#E1E4E8">), </span><span style="color:#6A737D">// 流完成</span></span>
+<span class="line"><span style="color:#E1E4E8">    });</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+<p>是不是感觉清爽多了？<code>takeUntil</code> 就像给事件流设了个“截止阀”，一旦 <code>document</code> 的 <code>mouseup</code> 事件发生，<code>mousemove</code> 事件流就自动停止并清理，无需手动 <code>removeEventListener</code>。这就是 Observable 解决问题的核心思路：<strong>用声明式的方式，优雅地管理和组合异步事件流。</strong></p>
+<h2 id="二前世今生observable-的长征路">二、前世今生——Observable 的“长征路”</h2>
+<p>了解一项技术，不能只看它光鲜亮丽的 API，还得知道它背后那点“陈芝麻烂谷子”的故事。Observable 的诞生和标准化之路，可谓一波三折，充满了技术大佬们的思考和博弈。</p>
+<ol>
+<li>
+<p><strong>TC39 的萌芽与受挫</strong>: 最早，Observable 是在 TC39（ECMAScript 标准委员会）被提出的（大约 2015 年），由 Ben Lesh（RxJS 的核心开发者）等人推动。当时的设想是把它作为 JavaScript 语言的一部分，就像 Promise 一样。但提案在 TC39 卡在了 Stage 1 很长时间。反对的声音认为，Observable 似乎更像是一个“库级”的功能，而不是语言核心必备的；而且它没有引入新的语法，更依赖于 API 设计，这让一些委员觉得它不够“底层”。</p>
+</li>
+<li>
+<p><strong>转战 WHATWG</strong>: 眼看 TC39 此路不通，大佬们（尤其是 Google 团队的 Ben Lesh）改变策略，尝试将 Observable 作为 Web 平台（DOM）的一部分来标准化（大约 2017 年底，就是 GitHub Issue #544 的开端）。理由是：Web 平台充满了事件（DOM 事件、网络事件等），<code>EventTarget</code> 是事实标准，Observable 与 <code>EventTarget</code> 结合能发挥最大价值，解决 Web 开发者的实际痛点。这似乎更有说服力。</p>
+</li>
+<li>
+<p><strong>漫长的讨论与演进</strong>: 在 WHATWG 的讨论（Issue #544 里可以看到大量讨论细节）中，API 的形态也几经变化：</p>
+<ul>
+<li>最初叫 <code>on()</code>，后来为了避免与现有属性冲突或歧义，改成了 <code>when()</code>。</li>
+<li>关于 <code>subscribe()</code> 方法的参数形态（函数重载 vs. 对象），Web IDL 的限制引发了讨论（Domenic 的解释）。</li>
+<li><code>preventDefault()</code> 的问题被反复提及（Anne van Kesteren 等人提出），因为 Promise 的微任务调度机制可能导致在 <code>then()</code> 中调用 <code>preventDefault()</code> 失效，这促使大家思考同步执行的重要性。</li>
+<li>与 <code>AbortController</code>/<code>AbortSignal</code> 的集成，成为取消订阅（unsubscription）的标准方式，这大大增强了它的实用性。</li>
+</ul>
+</li>
+<li>
+<p><strong>用户态的繁荣</strong>: 标准化进展缓慢，但挡不住人民群众（开发者）的需求啊！以 RxJS 为首的各种 Observable 实现库在社区大行其道，每周几千万甚至上亿的下载量（README 中 Ben Lesh 提到 RxJS 每周 4700 万+下载量），以及众多框架（Angular、Vue (vue-rx)、Svelte、XState 等）对 Observable 的内置支持或良好集成，都证明了其价值和开发者对其的依赖。这反过来也给标准化提供了强大的动力和事实依据——大家都这么用了，标准是不是该跟上了？</p>
+</li>
+<li>
+<p><strong>WICG 的再出发</strong>: 目前，Observable 的标准化工作主要在 WICG（Web Platform Incubator Community Group）进行，由 Dominic Farolino (Google) 等人继续推进。目标是吸取过去的经验教训，整合社区的最佳实践，最终拿出一个浏览器厂商愿意实现、开发者用着顺手的标准 API。</p>
+</li>
+</ol>
+<p>可以说，Observable 的历史，就是一部在语言核心与平台特性之间不断探索、在社区实践与标准化博弈之间不断演进的历史。</p>
+<h2 id="三小试牛刀eventtargetwhen-初体验">三、小试牛刀——<code>EventTarget.when()</code> 初体验</h2>
+<p>说了这么多背景，是时候上手感受一下了。Observable 提案的核心入口，就是给 <code>EventTarget</code> (我们熟悉的 <code>element</code>, <code>document</code>, <code>window</code> 等的老祖宗) 添加了一个新方法：<code>.when()</code>。</p>
+<p><code>.when(eventType, options)</code> 方法返回一个 Observable 对象，这个对象代表了指定类型的事件流。</p>
+<p><strong>基础用法：替代 <code>addEventListener</code></strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> clicks</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> element.</span><span style="color:#B392F0">when</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"click"</span><span style="color:#E1E4E8">); </span><span style="color:#6A737D">// 返回一个代表点击事件的 Observable</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// 订阅这个 Observable，开始监听</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> subscription</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> clicks.</span><span style="color:#B392F0">subscribe</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#B392F0">  next</span><span style="color:#E1E4E8">: (</span><span style="color:#FFAB70">event</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#6A737D">    // 每当点击事件发生，next 回调被触发</span></span>
+<span class="line"><span style="color:#E1E4E8">    console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Element clicked!"</span><span style="color:#E1E4E8">, event.target);</span></span>
+<span class="line"><span style="color:#E1E4E8">  },</span></span>
+<span class="line"><span style="color:#B392F0">  error</span><span style="color:#E1E4E8">: (</span><span style="color:#FFAB70">err</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#6A737D">    // 如果 Observable 内部出错（虽然 DOM 事件一般不会）</span></span>
+<span class="line"><span style="color:#E1E4E8">    console.</span><span style="color:#B392F0">error</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Something went wrong:"</span><span style="color:#E1E4E8">, err);</span></span>
+<span class="line"><span style="color:#E1E4E8">  },</span></span>
+<span class="line"><span style="color:#B392F0">  complete</span><span style="color:#E1E4E8">: () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#6A737D">    // 如果事件流正常结束（DOM 事件流通常不会自然结束）</span></span>
+<span class="line"><span style="color:#E1E4E8">    console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Click stream completed."</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">  },</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// 想停止监听？取消订阅即可</span></span>
+<span class="line"><span style="color:#6A737D">// subscription.abort(); // 假设 subscribe 返回带有 abort 方法的对象，或使用 AbortSignal</span></span></code></pre>
+<p><strong>链式操作：过滤与映射</strong></p>
+<p>这才是 Observable 的魅力所在！假设我们只想处理点击到特定子元素 <code>.foo</code> 的事件，并且只关心点击的坐标：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#E1E4E8">element</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">when</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"click"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">filter</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">e</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> e.target.</span><span style="color:#B392F0">matches</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">".foo"</span><span style="color:#E1E4E8">)) </span><span style="color:#6A737D">// 过滤：只保留目标匹配 '.foo' 的事件</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">map</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">e</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> ({ x: e.clientX, y: e.clientY })) </span><span style="color:#6A737D">// 映射：将事件对象转换为坐标对象</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">subscribe</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#B392F0">    next</span><span style="color:#E1E4E8">: (</span><span style="color:#FFAB70">point</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#6A737D">      // 这里收到的就是坐标对象了</span></span>
+<span class="line"><span style="color:#E1E4E8">      console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Clicked on .foo at:"</span><span style="color:#E1E4E8">, point);</span></span>
+<span class="line"><span style="color:#B392F0">      handleClickAtPoint</span><span style="color:#E1E4E8">(point); </span><span style="color:#6A737D">// 调用你的处理函数</span></span>
+<span class="line"><span style="color:#E1E4E8">    },</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span></code></pre>
+<p>对比一下用 <code>addEventListener</code> 实现相同逻辑：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#E1E4E8">element.</span><span style="color:#B392F0">addEventListener</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"click"</span><span style="color:#E1E4E8">, (</span><span style="color:#FFAB70">e</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (e.target.</span><span style="color:#B392F0">matches</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">".foo"</span><span style="color:#E1E4E8">)) {</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> point</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> { x: e.clientX, y: e.clientY };</span></span>
+<span class="line"><span style="color:#E1E4E8">    console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Clicked on .foo at:"</span><span style="color:#E1E4E8">, point);</span></span>
+<span class="line"><span style="color:#B392F0">    handleClickAtPoint</span><span style="color:#E1E4E8">(point);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"><span style="color:#6A737D">// 清理？还得手动 removeEventListener...</span></span></code></pre>
+<p>是不是高下立判？Observable 的链式调用，把事件的处理流程（过滤、转换）清晰地表达了出来，代码更具声明性。</p>
+<h2 id="四登堂入室核心-observable-api-与概念">四、登堂入室——核心 Observable API 与概念</h2>
+<p>要真正掌握 Observable，光会用 <code>.when()</code> 还不够，得深入理解其核心 API 和运作机制。</p>
+<p><strong>1. <code>new Observable(subscribeFn)</code> 构造函数</strong></p>
+<p>虽然提案的核心是集成 <code>EventTarget</code>，但 Observable 本身也可以手动创建。构造函数接收一个<strong>订阅函数 (subscribe function)</strong> <code>subscribeFn</code> 作为参数。</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> myObservable</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Observable</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">subscriber</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#6A737D">  // 这个函数在每次调用 myObservable.subscribe() 时执行</span></span>
+<span class="line"><span style="color:#E1E4E8">  console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Subscription started!"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> i </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> intervalId</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> setInterval</span><span style="color:#E1E4E8">(() </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (i </span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF"> 5</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#E1E4E8">      subscriber.</span><span style="color:#B392F0">next</span><span style="color:#E1E4E8">(i</span><span style="color:#F97583">++</span><span style="color:#E1E4E8">); </span><span style="color:#6A737D">// 发送下一个值</span></span>
+<span class="line"><span style="color:#E1E4E8">    } </span><span style="color:#F97583">else</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      subscriber.</span><span style="color:#B392F0">complete</span><span style="color:#E1E4E8">(); </span><span style="color:#6A737D">// 发送完成信号，流结束</span></span>
+<span class="line"><span style="color:#B392F0">      clearInterval</span><span style="color:#E1E4E8">(intervalId);</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }, </span><span style="color:#79B8FF">1000</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // --- 清理逻辑 (Teardown) ---</span></span>
+<span class="line"><span style="color:#6A737D">  // 返回一个函数，或使用 subscriber.addTeardown()</span></span>
+<span class="line"><span style="color:#6A737D">  // 这个函数会在取消订阅或流完成/错误时执行</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#B392F0"> teardown</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Subscription teardown: Clearing interval."</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#B392F0">    clearInterval</span><span style="color:#E1E4E8">(intervalId);</span></span>
+<span class="line"><span style="color:#E1E4E8">  };</span></span>
+<span class="line"><span style="color:#E1E4E8">  subscriber.</span><span style="color:#B392F0">addTeardown</span><span style="color:#E1E4E8">(teardown); </span><span style="color:#6A737D">// 推荐方式</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">  // 或者 return teardown; // 老式 API 可能这样</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Observable created."</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> subscription</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> myObservable.</span><span style="color:#B392F0">subscribe</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#B392F0">  next</span><span style="color:#E1E4E8">: (</span><span style="color:#FFAB70">value</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Received:"</span><span style="color:#E1E4E8">, value),</span></span>
+<span class="line"><span style="color:#B392F0">  complete</span><span style="color:#E1E4E8">: () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Stream complete!"</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#B392F0">  error</span><span style="color:#E1E4E8">: (</span><span style="color:#FFAB70">err</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> console.</span><span style="color:#B392F0">error</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Stream error:"</span><span style="color:#E1E4E8">, err),</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Subscribed."</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// 稍后取消订阅</span></span>
+<span class="line"><span style="color:#B392F0">setTimeout</span><span style="color:#E1E4E8">(() </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Aborting subscription..."</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">  subscription.</span><span style="color:#B392F0">abort</span><span style="color:#E1E4E8">(); </span><span style="color:#6A737D">// 假设返回的对象有 abort 或使用 signal</span></span>
+<span class="line"><span style="color:#E1E4E8">}, </span><span style="color:#79B8FF">3500</span><span style="color:#E1E4E8">);</span></span></code></pre>
+<p><strong>关键点：</strong></p>
+<ul>
+<li><strong>订阅函数 (<code>subscribeFn</code>)</strong>: 定义了当有人订阅时，如何产生数据并发给订阅者 (<code>subscriber</code>)。</li>
+<li><strong>订阅者 (<code>subscriber</code>)</strong>: 一个对象，有 <code>next()</code>, <code>error()</code>, <code>complete()</code> 方法，用来接收 Observable 发出的信号。还有一个 <code>addTeardown()</code> 方法注册清理逻辑。</li>
+<li><strong>惰性执行 (Lazy Execution)</strong>: <code>new Observable(...)</code> 只是创建了蓝图，<code>subscribeFn</code> 里面的代码（比如 <code>setInterval</code>）在调用 <code>.subscribe()</code> 之前<strong>不会</strong>执行。只有当 <code>.subscribe()</code> 被调用时，订阅流程才真正开始。可以多次调用 <code>.subscribe()</code>，每次都会独立执行一次 <code>subscribeFn</code>。</li>
+<li><strong>清理逻辑 (Teardown)</strong>: 这是 Observable 的精髓之一！<code>subscribeFn</code> 必须提供一种方式来清理它所占用的资源（比如清除定时器、移除事件监听器、关闭 WebSocket 连接等）。这通过 <code>subscriber.addTeardown()</code> 注册，确保在订阅被取消 (<code>abort()</code>) 或流自然结束 (<code>complete()</code> 或 <code>error()</code>) 时，资源能被正确释放。这解决了 <code>addEventListener</code> 需要手动 <code>removeEventListener</code> 的痛点。</li>
+</ul>
+<p><strong>2. 同步与异步传递 (Synchronous &#x26; Asynchronous Delivery)</strong></p>
+<ul>
+<li><strong>同步性</strong>: 与 Promise 不同（Promise 的 <code>.then</code> 回调总是异步执行，放入微任务队列），Observable 的 <code>subscriber.next()</code> 调用<strong>可以是同步的</strong>。这意味着，当事件源（如 <code>element.click()</code>）同步触发事件时，<code>.when('click').subscribe({ next: ... })</code> 中的 <code>next</code> 回调也可能<strong>在同一个事件循环 tick 中同步执行</strong>。
+<ul>
+<li><strong>重要性</strong>: 这对于需要立即响应并可能调用 <code>event.preventDefault()</code> 的场景至关重要。如果像 Promise 那样总是异步，<code>preventDefault()</code> 可能就太晚了（尤其是在脚本触发事件时，如 <code>element.click()</code>）。这是 Observable 相较于基于 Promise 的事件处理（如 <code>element.on('click', async () => ...)</code> 或一些 Promise-returning 操作符）的关键优势之一。</li>
+</ul>
+</li>
+<li><strong>异步性</strong>: 当然，Observable 也可以异步发送数据，比如上面 <code>setInterval</code> 的例子。</li>
+</ul>
+<p><strong>3. <code>AbortController</code> 与取消订阅</strong></p>
+<p>现代 Observable 提案紧密拥抱了 Web 平台的 <code>AbortController</code> 和 <code>AbortSignal</code>。</p>
+<ul>
+<li><strong>外部取消</strong>: 调用 <code>.subscribe(observer, { signal })</code> 时传入一个 <code>AbortSignal</code>。当这个 <code>signal</code> 被 <code>abort()</code> 时，订阅会自动取消，并触发 teardown 逻辑。</li>
+<li><strong>内部取消/Teardown</strong>: <code>subscriber</code> 对象内部通常会关联一个 <code>AbortSignal</code> (<code>subscriber.signal</code>)，<code>subscribeFn</code> 可以监听这个 signal，以便在订阅被取消时及时停止工作。<code>addTeardown</code> 注册的函数也会在这个 signal 被 abort 时调用。</li>
+</ul>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#6A737D">// 例子：同步“数据洪流”与 AbortController</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> syncObservable</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Observable</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">subscriber</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  let</span><span style="color:#E1E4E8"> i </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  try</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    while</span><span style="color:#E1E4E8"> (</span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#E1E4E8">      subscriber.</span><span style="color:#B392F0">next</span><span style="color:#E1E4E8">(i</span><span style="color:#F97583">++</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#6A737D">      // 检查订阅是否已被外部取消</span></span>
+<span class="line"><span style="color:#F97583">      if</span><span style="color:#E1E4E8"> (subscriber.signal.aborted) {</span></span>
+<span class="line"><span style="color:#E1E4E8">        console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Subscription aborted internally, breaking loop."</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">        break</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">      }</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  } </span><span style="color:#F97583">finally</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#6A737D">    // 确保清理逻辑被调用</span></span>
+<span class="line"><span style="color:#E1E4E8">    console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Sync observable teardown."</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#6A737D">  // 注意：同步 Observable 通常在循环结束后才 complete/error</span></span>
+<span class="line"><span style="color:#6A737D">  // subscriber.complete(); // 可能不会执行到这里如果被 abort</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> controller</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> AbortController</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">syncObservable.</span><span style="color:#B392F0">subscribe</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#E1E4E8">  {</span></span>
+<span class="line"><span style="color:#B392F0">    next</span><span style="color:#E1E4E8">: (</span><span style="color:#FFAB70">data</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Sync data:"</span><span style="color:#E1E4E8">, data);</span></span>
+<span class="line"><span style="color:#F97583">      if</span><span style="color:#E1E4E8"> (data </span><span style="color:#F97583">></span><span style="color:#79B8FF"> 100</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#E1E4E8">        console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Data > 100, aborting..."</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">        controller.</span><span style="color:#B392F0">abort</span><span style="color:#E1E4E8">(); </span><span style="color:#6A737D">// 从外部取消订阅</span></span>
+<span class="line"><span style="color:#E1E4E8">      }</span></span>
+<span class="line"><span style="color:#E1E4E8">    },</span></span>
+<span class="line"><span style="color:#B392F0">    complete</span><span style="color:#E1E4E8">: () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Sync complete."</span><span style="color:#E1E4E8">), </span><span style="color:#6A737D">// 可能不会被调用</span></span>
+<span class="line"><span style="color:#B392F0">    error</span><span style="color:#E1E4E8">: (</span><span style="color:#FFAB70">err</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> console.</span><span style="color:#B392F0">error</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Sync error:"</span><span style="color:#E1E4E8">, err),</span></span>
+<span class="line"><span style="color:#E1E4E8">  },</span></span>
+<span class="line"><span style="color:#E1E4E8">  { signal: controller.signal },</span></span>
+<span class="line"><span style="color:#E1E4E8">); </span><span style="color:#6A737D">// 传入 signal</span></span></code></pre>
+<h2 id="五神兵利器玩转-observable-操作符">五、神兵利器——玩转 Observable 操作符</h2>
+<p>如果说 Observable 对象是内功心法，那操作符 (Operators) 就是各式各样的武功招式。它们是让 Observable 变得强大和灵活的关键。操作符本质上是函数，接收一个 Observable，返回一个新的 Observable，中间对数据流进行处理。</p>
+<p>提案中建议内置一些核心且常用的操作符，很多都借鉴自数组方法或 TC39 的 Iterator Helpers 提案，保持了平台 API 的一致性。</p>
+<p><strong>分类来看：</strong></p>
+<ol>
+<li>
+<p><strong>创建型 (Creation)</strong>:</p>
+<ul>
+<li><code>new Observable()</code>: 基础构造器。</li>
+<li><code>Observable.from()</code>: 从其他类型转换（后面细说）。</li>
+<li><code>EventTarget.when()</code>: 从 DOM 事件创建。</li>
+</ul>
+</li>
+<li>
+<p><strong>转换型 (Transformation)</strong>:</p>
+<ul>
+<li><code>map(fn)</code>: 对流中的每个值应用函数 <code>fn</code>，发出转换后的值。
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#E1E4E8">source.</span><span style="color:#B392F0">map</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">x</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> x </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 2</span><span style="color:#E1E4E8">); </span><span style="color:#6A737D">// 把每个值乘以 2</span></span></code></pre>
+</li>
+<li><code>filter(fn)</code>: 只发出流中满足条件 <code>fn(value)</code> 为 <code>true</code> 的值。
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#E1E4E8">source.</span><span style="color:#B392F0">filter</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">x</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> x </span><span style="color:#F97583">%</span><span style="color:#79B8FF"> 2</span><span style="color:#F97583"> ===</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">); </span><span style="color:#6A737D">// 只保留偶数</span></span></code></pre>
+</li>
+<li><code>flatMap(fn)</code> / <code>switchMap(fn)</code>: <code>map</code> 的升级版。<code>fn</code> 需要返回一个 Observable。<code>flatMap</code> 会订阅所有返回的内部 Observable 并合并它们的输出；<code>switchMap</code> 则只关心最新的内部 Observable，当外部 Observable 发出新值时，会取消订阅上一个内部 Observable。常用于处理异步请求（如搜索建议）。
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#6A737D">// 每次输入，发起请求，但只关心最新输入的结果</span></span>
+<span class="line"><span style="color:#E1E4E8">inputElement</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">when</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"input"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">switchMap</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">e</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span></span>
+<span class="line"><span style="color:#E1E4E8">    Observable.</span><span style="color:#B392F0">from</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">fetch</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">`/api/search?q=${</span><span style="color:#E1E4E8">e</span><span style="color:#9ECBFF">.</span><span style="color:#E1E4E8">target</span><span style="color:#9ECBFF">.</span><span style="color:#E1E4E8">value</span><span style="color:#9ECBFF">}`</span><span style="color:#E1E4E8">)),</span></span>
+<span class="line"><span style="color:#E1E4E8">  )</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">subscribe</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">results</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#B392F0"> updateUI</span><span style="color:#E1E4E8">(results));</span></span></code></pre>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>过滤/限制型 (Filtering/Limiting)</strong>:</p>
+<ul>
+<li><code>take(n)</code>: 只取流中的前 <code>n</code> 个值，然后完成。</li>
+<li><code>drop(n)</code>: 跳过流中的前 <code>n</code> 个值。</li>
+<li><code>takeUntil(notifierObservable)</code>: 持续发出值，直到 <code>notifierObservable</code> 发出第一个值或完成/错误，然后完成。这是实现<strong>声明式取消</strong>的关键！常用于拖拽、游戏序列等。
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#6A737D">// 拖拽示例</span></span>
+<span class="line"><span style="color:#E1E4E8">mousedown$</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">flatMap</span><span style="color:#E1E4E8">(() </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> mousemove$.</span><span style="color:#B392F0">takeUntil</span><span style="color:#E1E4E8">(mouseup$))</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">subscribe</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">pos</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#B392F0"> updateElementPosition</span><span style="color:#E1E4E8">(pos));</span></span></code></pre>
+</li>
+<li><code>filter(fn)</code>: (前面已提)</li>
+</ul>
+</li>
+<li>
+<p><strong>组合型 (Combination)</strong>: (提案初期可能不包含，但 userland 常见)</p>
+<ul>
+<li><code>merge(obs1, obs2, ...)</code>: 合并多个流，任何一个流发值都发出。</li>
+<li><code>concat(obs1, obs2, ...)</code>: 按顺序连接多个流，等前一个完成后再订阅下一个。</li>
+<li><code>zip(obs1, obs2, ...)</code>: 将多个流的值按顺序配对发出。</li>
+</ul>
+</li>
+<li>
+<p><strong>聚合/终止型 (Aggregation/Termination)</strong>: 这类操作符通常会消费整个（或部分）流，并返回一个<strong>Promise</strong>。</p>
+<ul>
+<li><code>reduce(fn, initialValue)</code>: 类似数组的 reduce，对流中所有值进行累加计算，流完成后 Promise resolve 最终结果。
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#6A737D">// 计算鼠标按下期间 Y 坐标最大值 (Example 4 from README)</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> maxY</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> element</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">when</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"mousemove"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">takeUntil</span><span style="color:#E1E4E8">(element.</span><span style="color:#B392F0">when</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"mouseup"</span><span style="color:#E1E4E8">))</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">map</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">e</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> e.clientY)</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">reduce</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">max</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">y</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> Math.</span><span style="color:#B392F0">max</span><span style="color:#E1E4E8">(max, y), </span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">);</span></span></code></pre>
+</li>
+<li><code>toArray()</code>: 收集流中所有值到一个数组，流完成后 Promise resolve 这个数组。</li>
+<li><code>forEach(fn)</code>: 对流中每个值执行 <code>fn</code>，流完成后 Promise resolve <code>undefined</code>。</li>
+<li><code>first()</code> / <code>last()</code>: 获取第一个/最后一个值，然后完成流，Promise resolve 该值。</li>
+<li><code>find(fn)</code> / <code>some(fn)</code> / <code>every(fn)</code>: 类似数组方法，找到第一个满足条件的/是否有满足条件的/是否所有都满足条件，Promise resolve 结果。</li>
+</ul>
+</li>
+</ol>
+<p><strong>⚠️ <code>preventDefault</code> 的再次警示</strong></p>
+<p>对于上面那些<strong>返回 Promise</strong> 的聚合/终止型操作符（如 <code>reduce</code>, <code>find</code>, <code>first</code> 等），需要特别注意 <code>preventDefault()</code> 的问题！</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#6A737D">// 潜在问题代码</span></span>
+<span class="line"><span style="color:#E1E4E8">element</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">when</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"click"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">first</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">then</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">e</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#6A737D">    // 这个 then 回调是异步（微任务）执行的</span></span>
+<span class="line"><span style="color:#E1E4E8">    e.</span><span style="color:#B392F0">preventDefault</span><span style="color:#E1E4E8">(); </span><span style="color:#6A737D">// 对于脚本触发的 click，这里可能太晚了！</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span></code></pre>
+<p>因为 <code>.then()</code> 的回调是异步执行的，如果 <code>click</code> 事件是由脚本（如 <code>element.click()</code>）同步触发的，事件的默认行为可能在 <code>then()</code> 回调执行前就已经发生了，导致 <code>preventDefault()</code> 无效。</p>
+<p><strong>解决方案：</strong> 在 Promise 产生之前，同步地处理 <code>preventDefault</code>。</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#6A737D">// 方案一：使用 map 同步处理</span></span>
+<span class="line"><span style="color:#E1E4E8">element.</span><span style="color:#B392F0">when</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'click'</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">map</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">e</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    e.</span><span style="color:#B392F0">preventDefault</span><span style="color:#E1E4E8">(); </span><span style="color:#6A737D">// 在 map 中同步调用</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> e; </span><span style="color:#6A737D">// 仍然传递事件对象</span></span>
+<span class="line"><span style="color:#E1E4E8">  })</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">first</span><span style="color:#E1E4E8">() </span><span style="color:#6A737D">// first 现在接收的是已经阻止了默认行为的事件</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">then</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">e</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#6A737D">    // 做其他事情...</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// 方案二：如果提案支持 .do() 或 tap() 操作符 (纯副作用)</span></span>
+<span class="line"><span style="color:#E1E4E8">element.</span><span style="color:#B392F0">when</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'click'</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">do</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">e</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> e.</span><span style="color:#B392F0">preventDefault</span><span style="color:#E1E4E8">()) </span><span style="color:#6A737D">// 同步执行副作用</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">first</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">then</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">e</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">...</span><span style="color:#E1E4E8"> });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// 方案三：如果 first() 支持传入回调 (更特定)</span></span>
+<span class="line"><span style="color:#E1E4E8">element.</span><span style="color:#B392F0">when</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'click'</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">first</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">e</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> e.</span><span style="color:#B392F0">preventDefault</span><span style="color:#E1E4E8">()) </span><span style="color:#6A737D">// 在 first 内部同步处理</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">then</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">e</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">...</span><span style="color:#E1E4E8"> });</span></span></code></pre>
+<p>这是使用 Observable 时需要牢记的一个重要细节。好消息是，这个问题在 RxJS 等库中已存在多年，社区已经习惯并找到了应对方法，所以不必过于恐慌。</p>
+<h2 id="六万物皆可-observableobservablefrom">六、万物皆可 Observable——<code>Observable.from()</code></h2>
+<p>为了让 Observable 能更好地融入现有生态，提案提供了 <code>Observable.from()</code> 静态方法，可以将多种类型的值转换成 Observable：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#6A737D">// 1. 从 Promise 创建</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> promise</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> fetch</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"/api/data"</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">then</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">res</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> res.</span><span style="color:#B392F0">json</span><span style="color:#E1E4E8">());</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> promiseObservable</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> Observable.</span><span style="color:#B392F0">from</span><span style="color:#E1E4E8">(promise);</span></span>
+<span class="line"><span style="color:#E1E4E8">promiseObservable.</span><span style="color:#B392F0">subscribe</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#B392F0">  next</span><span style="color:#E1E4E8">: (</span><span style="color:#FFAB70">data</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Data from promise:"</span><span style="color:#E1E4E8">, data), </span><span style="color:#6A737D">// Promise resolve 时触发 next 和 complete</span></span>
+<span class="line"><span style="color:#B392F0">  error</span><span style="color:#E1E4E8">: (</span><span style="color:#FFAB70">err</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> console.</span><span style="color:#B392F0">error</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Fetch error:"</span><span style="color:#E1E4E8">, err), </span><span style="color:#6A737D">// Promise reject 时触发 error</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// 2. 从数组 (Iterable) 创建</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> array</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">3</span><span style="color:#E1E4E8">];</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> arrayObservable</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> Observable.</span><span style="color:#B392F0">from</span><span style="color:#E1E4E8">(array);</span></span>
+<span class="line"><span style="color:#E1E4E8">arrayObservable.</span><span style="color:#B392F0">subscribe</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#B392F0">  next</span><span style="color:#E1E4E8">: (</span><span style="color:#FFAB70">value</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Value from array:"</span><span style="color:#E1E4E8">, value), </span><span style="color:#6A737D">// 同步依次发出 1, 2, 3</span></span>
+<span class="line"><span style="color:#B392F0">  complete</span><span style="color:#E1E4E8">: () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Array stream complete."</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// 3. 从异步迭代器 (AsyncIterable) 创建 (例如 ReadableStream)</span></span>
+<span class="line"><span style="color:#F97583">async</span><span style="color:#F97583"> function*</span><span style="color:#B392F0"> asyncGenerator</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#F97583">  yield</span><span style="color:#9ECBFF"> "a"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  await</span><span style="color:#F97583"> new</span><span style="color:#79B8FF"> Promise</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">resolve</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#B392F0"> setTimeout</span><span style="color:#E1E4E8">(resolve, </span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8">));</span></span>
+<span class="line"><span style="color:#F97583">  yield</span><span style="color:#9ECBFF"> "b"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> asyncObservable</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> Observable.</span><span style="color:#B392F0">from</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">asyncGenerator</span><span style="color:#E1E4E8">());</span></span>
+<span class="line"><span style="color:#E1E4E8">asyncObservable.</span><span style="color:#B392F0">subscribe</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#B392F0">  next</span><span style="color:#E1E4E8">: (</span><span style="color:#FFAB70">value</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Value from async iterable:"</span><span style="color:#E1E4E8">, value), </span><span style="color:#6A737D">// 异步发出 'a', 'b'</span></span>
+<span class="line"><span style="color:#B392F0">  complete</span><span style="color:#E1E4E8">: () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Async stream complete."</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// 4. 从另一个 Observable 创建 (幂等)</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> source</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> Observable.</span><span style="color:#B392F0">from</span><span style="color:#E1E4E8">([</span><span style="color:#79B8FF">10</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">20</span><span style="color:#E1E4E8">]);</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> sameObservable</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> Observable.</span><span style="color:#B392F0">from</span><span style="color:#E1E4E8">(source); </span><span style="color:#6A737D">// 直接返回 source</span></span></code></pre>
+<p>这个 <code>from()</code> 方法极大地增强了 Observable 的通用性，让它可以方便地桥接其他异步模式。</p>
+<h2 id="七融会贯通实战场景演练">七、融会贯通——实战场景演练</h2>
+<p>理论说了不少，来看几个更接近真实世界的例子，感受 Observable 的威力。</p>
+<p><strong>场景 1：WebSocket 消息多路复用 (Multiplexing)</strong> (来自官方 <a href="https://github.com/WICG/observable/blob/master/README.md">README</a> Example 5)</p>
+<p>想象一下，一个 WebSocket 连接需要同时处理多种类型的消息（比如不同股票的报价）。我们希望为每种类型的消息创建一个独立的 Observable 流，并且当订阅某个流时自动发送订阅消息给服务器，取消订阅时自动发送取消订阅消息。</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> socket</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> WebSocket</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"wss://example.com"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// 通用的多路复用函数</span></span>
+<span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> multiplex</span><span style="color:#E1E4E8">({ </span><span style="color:#FFAB70">startMsg</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">stopMsg</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">match</span><span style="color:#E1E4E8"> }) {</span></span>
+<span class="line"><span style="color:#6A737D">  // 等待 socket 连接成功</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> readyToSend$</span><span style="color:#F97583"> =</span></span>
+<span class="line"><span style="color:#E1E4E8">    socket.readyState </span><span style="color:#F97583">===</span><span style="color:#E1E4E8"> WebSocket.</span><span style="color:#79B8FF">OPEN</span></span>
+<span class="line"><span style="color:#F97583">      ?</span><span style="color:#E1E4E8"> Observable.</span><span style="color:#B392F0">from</span><span style="color:#E1E4E8">([</span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">]) </span><span style="color:#6A737D">// 已连接，立即发送</span></span>
+<span class="line"><span style="color:#F97583">      :</span><span style="color:#E1E4E8"> socket</span></span>
+<span class="line"><span style="color:#E1E4E8">          .</span><span style="color:#B392F0">when</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"open"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">          .</span><span style="color:#B392F0">map</span><span style="color:#E1E4E8">(() </span><span style="color:#F97583">=></span><span style="color:#79B8FF"> true</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">          .</span><span style="color:#B392F0">take</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">); </span><span style="color:#6A737D">// 等待 open 事件</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> readyToSend$.</span><span style="color:#B392F0">flatMap</span><span style="color:#E1E4E8">(() </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Sending start message:"</span><span style="color:#E1E4E8">, startMsg);</span></span>
+<span class="line"><span style="color:#E1E4E8">    socket.</span><span style="color:#B392F0">send</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">JSON</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">stringify</span><span style="color:#E1E4E8">(startMsg));</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // 返回一个 Observable，它：</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> socket</span></span>
+<span class="line"><span style="color:#E1E4E8">      .</span><span style="color:#B392F0">when</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"message"</span><span style="color:#E1E4E8">) </span><span style="color:#6A737D">// 监听所有消息</span></span>
+<span class="line"><span style="color:#E1E4E8">      .</span><span style="color:#B392F0">map</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">e</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#79B8FF"> JSON</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">parse</span><span style="color:#E1E4E8">(e.data)) </span><span style="color:#6A737D">// 解析 JSON 数据</span></span>
+<span class="line"><span style="color:#E1E4E8">      .</span><span style="color:#B392F0">filter</span><span style="color:#E1E4E8">(match) </span><span style="color:#6A737D">// 过滤出匹配的消息</span></span>
+<span class="line"><span style="color:#E1E4E8">      .</span><span style="color:#B392F0">takeUntil</span><span style="color:#E1E4E8">(socket.</span><span style="color:#B392F0">when</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"close"</span><span style="color:#E1E4E8">)) </span><span style="color:#6A737D">// 当 socket 关闭时停止</span></span>
+<span class="line"><span style="color:#E1E4E8">      .</span><span style="color:#B392F0">takeUntil</span><span style="color:#E1E4E8">(socket.</span><span style="color:#B392F0">when</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"error"</span><span style="color:#E1E4E8">)) </span><span style="color:#6A737D">// 当 socket 错误时停止</span></span>
+<span class="line"><span style="color:#E1E4E8">      .</span><span style="color:#B392F0">finally</span><span style="color:#E1E4E8">(() </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#6A737D">        // 无论如何结束，都执行清理</span></span>
+<span class="line"><span style="color:#6A737D">        // 清理逻辑：发送停止消息</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> (socket.readyState </span><span style="color:#F97583">===</span><span style="color:#E1E4E8"> WebSocket.</span><span style="color:#79B8FF">OPEN</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#E1E4E8">          console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Sending stop message:"</span><span style="color:#E1E4E8">, stopMsg);</span></span>
+<span class="line"><span style="color:#E1E4E8">          socket.</span><span style="color:#B392F0">send</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">JSON</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">stringify</span><span style="color:#E1E4E8">(stopMsg));</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#E1E4E8">      });</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// 特定股票流的工厂函数</span></span>
+<span class="line"><span style="color:#F97583">function</span><span style="color:#B392F0"> streamStock</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">ticker</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#B392F0"> multiplex</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">    startMsg: { ticker, type: </span><span style="color:#9ECBFF">"sub"</span><span style="color:#E1E4E8"> },</span></span>
+<span class="line"><span style="color:#E1E4E8">    stopMsg: { ticker, type: </span><span style="color:#9ECBFF">"unsub"</span><span style="color:#E1E4E8"> },</span></span>
+<span class="line"><span style="color:#B392F0">    match</span><span style="color:#E1E4E8">: (</span><span style="color:#FFAB70">data</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> data.ticker </span><span style="color:#F97583">===</span><span style="color:#E1E4E8"> ticker, </span><span style="color:#6A737D">// 匹配对应 ticker 的数据</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// 创建不同股票的流</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> googTrades$</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> streamStock</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"GOOG"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> nflxTrades$</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> streamStock</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"NFLX"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// 订阅 GOOG 股票流</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> googSubscription</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> googTrades$.</span><span style="color:#B392F0">subscribe</span><span style="color:#E1E4E8">({ next: updateGoogView });</span></span>
+<span class="line"><span style="color:#6A737D">// 订阅 NFLX 股票流</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> nflxSubscription</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> nflxTrades$.</span><span style="color:#B392F0">subscribe</span><span style="color:#E1E4E8">({ next: updateNflxView });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// 稍后，用户不想看 GOOG 了</span></span>
+<span class="line"><span style="color:#E1E4E8">googSubscription.</span><span style="color:#B392F0">abort</span><span style="color:#E1E4E8">(); </span><span style="color:#6A737D">// 取消订阅，会自动触发 finally 发送 unsub 消息</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// 如果 socket 意外关闭或出错，所有流也会自动停止并尝试发送 unsub</span></span></code></pre>
+<p>这个例子展示了 Observable 如何优雅地处理：</p>
+<ul>
+<li>异步依赖（等待 socket open）</li>
+<li>事件流的过滤和转换</li>
+<li>多个终止条件 (<code>takeUntil</code>)</li>
+<li>资源清理 (<code>finally</code>，确保发送取消订阅消息)</li>
+</ul>
+<p><strong>场景 2：实现“秘密指令”输入检测</strong> (来自官方 <a href="https://github.com/WICG/observable/blob/master/README.md">README</a> Example 6)</p>
+<p>检测用户是否按顺序输入了一系列特定的按键（比如经典的 Konami Code）。</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> konamiCode</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span></span>
+<span class="line"><span style="color:#9ECBFF">  "ArrowUp"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">  "ArrowUp"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">  "ArrowDown"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">  "ArrowDown"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">  "ArrowLeft"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">  "ArrowRight"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">  "ArrowLeft"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">  "ArrowRight"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">  "b"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">  "a"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">  "Enter"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">];</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> keydown$</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> document.</span><span style="color:#B392F0">when</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"keydown"</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">map</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">e</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> e.key);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">keydown$</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">bufferCount</span><span style="color:#E1E4E8">(konamiCode.</span><span style="color:#79B8FF">length</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">) </span><span style="color:#6A737D">// 创建一个滑动窗口，每次包含 11 个按键</span></span>
+<span class="line"><span style="color:#6A737D">  // .buffer(keydown$.debounceTime(1000)) // 或者用 buffer + debounceTime 检测连续按键序列</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">filter</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">keys</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> keys.</span><span style="color:#B392F0">every</span><span style="color:#E1E4E8">((</span><span style="color:#FFAB70">key</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">i</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> key </span><span style="color:#F97583">===</span><span style="color:#E1E4E8"> konamiCode[i])) </span><span style="color:#6A737D">// 检查窗口内容是否匹配</span></span>
+<span class="line"><span style="color:#E1E4E8">  .</span><span style="color:#B392F0">subscribe</span><span style="color:#E1E4E8">(() </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Konami Code Entered! 🎉"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#6A737D">    // 执行你的彩蛋逻辑...</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// RxJS 可能有更直接的操作符如 sequenceEqual 或 window/buffer 组合</span></span>
+<span class="line"><span style="color:#6A737D">// 上面的 bufferCount 是一个简化的思路，实际可能需要更复杂的逻辑</span></span>
+<span class="line"><span style="color:#6A737D">// 比如 RxJS 的：</span></span>
+<span class="line"><span style="color:#6A737D">// keydown$.windowCount(konamiCode.length, 1)</span></span>
+<span class="line"><span style="color:#6A737D">//   .flatMap(window => window.sequenceEqual(Observable.from(konamiCode)))</span></span>
+<span class="line"><span style="color:#6A737D">//   .filter(matches => matches)</span></span>
+<span class="line"><span style="color:#6A737D">//   .subscribe(() => console.log('Konami Code Entered! 🎉'));</span></span></code></pre>
+<p><em>(注：原生 Observable 提案初期可能不包含 <code>bufferCount</code>、<code>windowCount</code>、<code>sequenceEqual</code> 等高级操作符，这里仅作示例。但这个例子展示了 Observable 在处理序列模式匹配方面的潜力。)</em></p>
+<p>这个例子说明，通过组合操作符，Observable 可以用来识别和响应复杂的事件模式。</p>
+<h2 id="八站在巨人肩上总结与展望">八、站在巨人肩上——总结与展望</h2>
+<p>好了，关于 Observable，我们从理念到实践，聊了不少。现在，让我们站在开发者和提案者的角度，做个总结和展望。</p>
+<p><strong>开发者视角：Observable 带来了什么？</strong></p>
+<ol>
+<li><strong>代码更优雅</strong>: 声明式的链式调用，让复杂的异步事件处理逻辑（过滤、映射、组合、节流、防抖、取消）变得更清晰、更易读、更易维护。</li>
+<li><strong>解放双手</strong>: 自动的资源管理（Teardown 机制），让你告别手动 <code>removeEventListener</code> 的烦恼和潜在的内存泄漏。</li>
+<li><strong>统一模型</strong>: 有望提供一个统一的、强大的模型来处理各种异步数据流，不仅仅是 DOM 事件，还包括动画、网络请求、用户输入等。</li>
+<li><strong>性能潜力</strong>: 原生实现通常比用户态库有更好的性能，并且可以更好地与浏览器 DevTools 集成，提供更好的调试体验。</li>
+<li><strong>潜在的 Bundle Size 减小</strong>: 如果 Observable 成为原生 API，那么像 RxJS 这样的库可以做得更小（只提供原生不包含的操作符），或者开发者可以直接使用原生 API，减少项目依赖体积。</li>
+<li><strong>需要注意的坑</strong>: 主要是 Promise-returning 操作符与 <code>preventDefault()</code> 的交互问题，需要养成良好的处理习惯。</li>
+</ol>
+<p><strong>提案者视角：道阻且长，行则将至</strong></p>
+<ol>
+<li><strong>漫漫长路</strong>: Observable 的标准化之路异常坎坷，反映了在 Web 平台添加新基础原语的复杂性和挑战性（语言 vs. 平台，API 设计细节，厂商协调等）。</li>
+<li><strong>社区力量</strong>: 用户态库的巨大成功和广泛应用，是推动其标准化的最有力武器。它证明了开发者确实需要这样的工具。</li>
+<li><strong>平台整合</strong>: 将 Observable 与 <code>EventTarget</code>、<code>AbortController</code> 等现有平台特性深度整合，是其最终成功的关键。它不是孤立的 API，而是 Web 异步处理生态的一部分。</li>
+<li><strong>未来可期</strong>: 随着提案在 WICG 的推进，以及 Chrome 135 已经上架了 Observable API，，我们有理由期待，在不久的将来，或许就能在更多的浏览器中原生使用 <code>Observable</code> 了。</li>
+</ol>
+<p><strong>总结</strong></p>
+<p>Observable 不是银弹，但它确实为我们处理 Web 异步事件流提供了一套强大而优雅的范式。它鼓励我们用<strong>声明式</strong>的思维去构建<strong>可组合</strong>、<strong>易于管理</strong>的事件处理逻辑。虽然它的标准化历程充满波折，但其背后蕴含的响应式编程思想，以及在社区中展现出的强大生命力，都预示着它可能是 Web 开发的下一个重要基石。</p>
+<p>希望这篇文章能帮你揭开 Observable 的神秘面纱。但是目前并没有非常靠谱的 <a href="https://github.com/keithamus/observable-polyfill">observable-polyfill</a> ，但因为这个提案本身就是从社区中践行演化出来的，你可以在官方 <a href="https://github.com/WICG/observable/blob/master/README.md#userland-libraries">README/userland-libraries</a> 找到一些相似的库，提前感受响应式编程的魅力吧！</p> </article>  </div> </main> <aside class="hidden lg:block sticky top-0 h-screen w-64 flex-shrink-0 py-8 pl-8"> <div class="space-y-4"> <div class="rounded-xl border bg-card text-card-foreground shadow"><div class="p-6 pt-0"><ul><li><a href="#一observable-的灵魂拷问它到底想干啥">一、Observable 的灵魂拷问——它到底想干啥？</a></li><li><a href="#二前世今生observable-的长征路">二、前世今生——Observable 的“长征路”</a></li><li><a href="#三小试牛刀eventtargetwhen-初体验">三、小试牛刀——EventTarget.when() 初体验</a></li><li><a href="#四登堂入室核心-observable-api-与概念">四、登堂入室——核心 Observable API 与概念</a></li><li><a href="#五神兵利器玩转-observable-操作符">五、神兵利器——玩转 Observable 操作符</a></li><li><a href="#六万物皆可-observableobservablefrom">六、万物皆可 Observable——Observable.from()</a></li><li><a href="#七融会贯通实战场景演练">七、融会贯通——实战场景演练</a></li><li><a href="#八站在巨人肩上总结与展望">八、站在巨人肩上——总结与展望</a></li></ul></div></div> <div class="rounded-xl border bg-card text-card-foreground shadow"><div class="flex flex-col space-y-1.5 p-6"><div class="font-semibold leading-none tracking-tight">Tags</div></div><div class="p-6 pt-0"><div class="flex flex-wrap gap-2"><a href="/tags/article" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">article</a><a href="/tags/event" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">event</a><a href="/tags/rust" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">rust</a><a href="/tags/iced" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">iced</a><a href="/tags/gui" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">gui</a><a href="/tags/multiplatform" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">multiplatform</a><a href="/tags/mobile" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">mobile</a><a href="/tags/web" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">web</a><a href="/tags/Kotlin" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">Kotlin</a><a href="/tags/linux" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">linux</a><a href="/tags/dns" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">dns</a><a href="/tags/javascript" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">javascript</a><a href="/tags/async" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">async</a><a href="/tags/reactive" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">reactive</a><a href="/tags/html&amp;css" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">html&amp;css</a><a href="/tags/cogitation" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">cogitation</a><a href="/tags/tools" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">tools</a><a href="/tags/efficiency" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">efficiency</a><a href="/tags/trivial" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">trivial</a><a href="/tags/lift" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">lift</a><a href="/tags/C++" class="bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1 text-sm font-semibold">C++</a></div></div></div> <div class="rounded-xl border bg-card text-card-foreground shadow"><div class="flex flex-col space-y-1.5 p-6"><div class="font-semibold leading-none tracking-tight">Archive</div></div><div class="p-6 pt-0"><ul><li><a href="/archive/2025/09">2025-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2025/06">2025-06<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2025/05">2025-05<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2025/04">2025-04<!-- --> (<!-- -->12<!-- -->)</a></li><li><a href="/archive/2025/03">2025-03<!-- --> (<!-- -->9<!-- -->)</a></li><li><a href="/archive/2024/05">2024-05<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2024/04">2024-04<!-- --> (<!-- -->3<!-- -->)</a></li><li><a href="/archive/2023/05">2023-05<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2023/04">2023-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2023/03">2023-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2022/10">2022-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2022/04">2022-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2021/12">2021-12<!-- --> (<!-- -->3<!-- -->)</a></li><li><a href="/archive/2021/07">2021-07<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2021/04">2021-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/10">2020-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/09">2020-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/05">2020-05<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2020/04">2020-04<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2020/03">2020-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2018/07">2018-07<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2017/10">2017-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2017/03">2017-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/10">2016-10<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2016/09">2016-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/08">2016-08<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/07">2016-07<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/05">2016-05<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/03">2016-03<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2016/02">2016-02<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2015/02">2015-02<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2014/09">2014-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2014/04">2014-04<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2014/03">2014-03<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2014/02">2014-02<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2014/01">2014-01<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2013/12">2013-12<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/10">2013-10<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/09">2013-09<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/08">2013-08<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2013/07">2013-07<!-- --> (<!-- -->2<!-- -->)</a></li><li><a href="/archive/2013/06">2013-06<!-- --> (<!-- -->1<!-- -->)</a></li><li><a href="/archive/2013/05">2013-05<!-- --> (<!-- -->4<!-- -->)</a></li></ul></div></div> </div> </aside> </div> <astro-island uid="Tziuc" prefix="r11" component-url="/_astro/BackToTop.B6mUL4XD.js" component-export="default" renderer-url="/_astro/client.6DCnCeAt.js" props="{}" ssr client="load" opts="{&quot;name&quot;:&quot;BackToTop&quot;,&quot;value&quot;:true}" await-children><button type="button" aria-label="Back to top" class="fixed right-8 bottom-8 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900/20 text-white shadow-lg backdrop-blur-sm backdrop-saturate-200 transition-opacity duration-300 hover:bg-zinc-700 dark:bg-zinc-100/20 dark:text-zinc-900 dark:hover:bg-zinc-300 opacity-0"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up" aria-hidden="true"><path d="m5 12 7-7 7 7"></path><path d="M12 19V5"></path></svg></button><!--astro:end--></astro-island>  </body></html>

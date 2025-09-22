@@ -1,0 +1,1 @@
+import{r as t}from"./index.BYzbZSVE.js";const n="github_token";function i({children:e}){const[o,r]=t.useState(!1);return t.useEffect(()=>{localStorage.getItem(n)?r(!0):window.location.href="/admin/login"},[]),o?e:null}export{i as default};
