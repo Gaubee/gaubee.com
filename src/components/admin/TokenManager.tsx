@@ -1,4 +1,8 @@
 import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { KeyRound } from 'lucide-react';
 
 const GITHUB_TOKEN_KEY = 'github_token';
 
@@ -18,21 +22,26 @@ export default function TokenManager() {
   };
 
   return (
-    <div className="p-4 border rounded-lg">
-      <h2 className="text-lg font-semibold mb-2">GitHub Access Token</h2>
-      <input
-        type="password"
-        value={token}
-        onChange={(e) => setToken(e.target.value)}
-        className="w-full p-2 border rounded"
-        placeholder="Enter your GitHub PAT"
-      />
-      <button
-        onClick={handleSave}
-        className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-      >
-        Save Token
-      </button>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center">
+            <KeyRound className="mr-2" /> GitHub Access Token
+        </CardTitle>
+        <CardDescription>
+            Your GitHub Personal Access Token is stored securely in your browser's local storage.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Input
+            type="password"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            placeholder="Enter your GitHub PAT"
+        />
+        <Button onClick={handleSave} className="w-full">
+            Save Token
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

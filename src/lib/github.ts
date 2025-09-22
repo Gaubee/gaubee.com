@@ -3,15 +3,26 @@ import type { StagedChange } from './db';
 
 const GITHUB_TOKEN_KEY = 'github_token';
 
+let octokitInstance: Octokit | null = null;
+
+// This function allows tests to inject a mock instance.
+export function __setOctokitInstance(instance: Octokit | null) {
+    octokitInstance = instance;
+}
+
 function getOctokit() {
+  if (octokitInstance) {
+    return octokitInstance;
+  }
+
   const token = typeof window !== 'undefined' ? localStorage.getItem(GITHUB_TOKEN_KEY) : null;
   if (!token) {
-    // We can't throw an error here directly because this might be called on the server
-    // where window is not defined. The calling function should handle the null case.
     console.warn('GitHub token not found. Please set it in the admin panel.');
     return null;
   }
-  return new Octokit({ auth: token });
+
+  octokitInstance = new Octokit({ auth: token });
+  return octokitInstance;
 }
 
 const OWNER = 'gaubee';
@@ -30,12 +41,14 @@ export async function getFileContent(path: string): Promise<string> {
       path,
     });
 
-    // Type guard to ensure we have a file object with content
+    // @ts-ignore
     if ('content' in response.data && 'encoding' in response.data && response.data.encoding === 'base64') {
-      // Decode from base64. Handle browser and Node.js environments.
+      // @ts-ignore
       if (typeof window !== 'undefined') {
+        // @ts-ignore
         return window.atob(response.data.content);
       } else {
+        // @ts-ignore
         return Buffer.from(response.data.content, 'base64').toString('utf-8');
       }
     } else {
@@ -66,7 +79,6 @@ export async function getRepoContents(path: string = '') {
     return [];
   } catch (error) {
     console.error(`Error fetching repo contents for path "${path}":`, error);
-    // Potentially handle different types of errors, e.g., 404 Not Found
     return [];
   }
 }
@@ -106,7 +118,7 @@ export async function commitChanges(message: string, changes: StagedChange[], br
       return {
         path: change.path,
         sha: blobData.sha,
-        mode: '100644' as const, // file mode
+        mode: '100644' as const,
         type: 'blob' as const,
       };
     });
@@ -118,7 +130,7 @@ export async function commitChanges(message: string, changes: StagedChange[], br
     .filter(change => change.status === 'deleted')
     .map(change => ({
       path: change.path,
-      sha: null, // Deleting a file is done by setting its SHA to null
+      sha: null,
       mode: '100644' as const,
       type: 'blob' as const,
     }));

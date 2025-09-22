@@ -7,6 +7,7 @@ const DB_VERSION = 1;
 export interface StagedChange {
   path: string; // This will be the primary key
   content?: string; // Content is optional for 'deleted' status
+  originalContent?: string; // Original content for diffing 'updated' status
   status: 'created' | 'updated' | 'deleted';
 }
 

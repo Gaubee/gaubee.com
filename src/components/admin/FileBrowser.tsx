@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { getRepoContents } from '../../lib/github';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Folder, File, Trash2, ArrowUp } from 'lucide-react';
 
 type RepoContent = {
   name: string;
@@ -14,7 +17,7 @@ interface Props {
 
 export default function FileBrowser({ onFileSelect, onFileDelete }: Props) {
   const [contents, setContents] = useState<RepoContent[]>([]);
-  const [currentPath, setCurrentPath] = useState('');
+  const [currentPath, setCurrentPath] = useState('src/content');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,46 +62,53 @@ export default function FileBrowser({ onFileSelect, onFileDelete }: Props) {
   };
 
   const handleGoUp = () => {
+    if (currentPath === 'src/content') return; // Don't go above the content root
     const pathParts = currentPath.split('/').filter(p => p);
     pathParts.pop();
     setCurrentPath(pathParts.join('/'));
   };
 
   return (
-    <div className="p-4 border rounded-lg mt-4">
-      <h2 className="text-lg font-semibold mb-2">File Browser</h2>
-      <div className="mb-2">
-        {currentPath && (
-          <button onClick={handleGoUp} className="text-blue-500 hover:underline">
-            .. Up
-          </button>
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle>File Browser</CardTitle>
+        {currentPath !== 'src/content' && (
+          <Button variant="outline" size="sm" onClick={handleGoUp}>
+            <ArrowUp className="mr-2 h-4 w-4" /> Up
+          </Button>
         )}
-        <span className="ml-2 text-gray-500">/{currentPath}</span>
-      </div>
-      {loading && <div>Loading files...</div>}
-      {error && <div className="text-red-500">Error: {error}</div>}
-      {!loading && !error && (
-        <ul>
-          {contents.map((item) => (
-            <li
-              key={item.path}
-              className="flex items-center justify-between cursor-pointer hover:bg-gray-100 p-1 rounded"
-            >
-              <div onClick={() => handleItemClick(item)} className="flex-grow flex items-center">
-                <span className="mr-2">{item.type === 'dir' ? '📁' : '📄'}</span>
-                {item.name}
-              </div>
-              <button
-                onClick={(e) => handleDeleteClick(e, item)}
-                className="text-red-500 hover:text-red-700 px-2"
-                title={`Delete ${item.name}`}
+      </CardHeader>
+      <CardContent>
+        <div className="mb-2 text-sm text-muted-foreground">/{currentPath}</div>
+        {loading && <div className="text-center p-4">Loading...</div>}
+        {error && <div className="text-red-500 p-4">Error: {error}</div>}
+        {!loading && !error && (
+          <ul className="space-y-1">
+            {contents.map((item) => (
+              <li
+                key={item.path}
+                className="flex items-center justify-between cursor-pointer hover:bg-accent p-2 rounded-md"
+                onClick={() => handleItemClick(item)}
               >
-                &times;
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+                <div className="flex-grow flex items-center truncate">
+                  {item.type === 'dir' ? <Folder className="mr-2 h-4 w-4" /> : <File className="mr-2 h-4 w-4" />}
+                  <span className="truncate">{item.name}</span>
+                </div>
+                {item.type === 'file' && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => handleDeleteClick(e, item)}
+                    title={`Delete ${item.name}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }
