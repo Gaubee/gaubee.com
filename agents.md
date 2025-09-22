@@ -30,10 +30,13 @@
      3. **代码审查**: 调用 `request_code_review()` 工具来获取代码变更的反馈。
    - **前端验证**: 如果进行了任何前端 UI 相关的更改，必须在提交前执行 `frontend_verification_instructions` 并遵循其指示完成验证。
    - **测试环境**: 我们的开发环境中已经安装了 `npm:playwright`、`npm:vitest` 的相关依赖了。方便 AI 使用 vitest/playwright 来编写测试代码。
-     1. 使用 `pnpm test` 来执行 playwright 测试脚本
-     1. 使用 `pnpm vitest --run` 来执行 vitest 测试脚本
+     1. 使用 `pnpm test` 来执行 playwright 测试脚本。
+        1. 使用之前请仔细阅读 `playwright.config.ts` 文件。
+           > 比如你可以通过环境变量`PLAYWRIGHT_BASE_URL`来自定义`page.goto('/')`的baseUrl
+        2. 或者自己执行 `pnpm playwright` 去做更加仔细更加可控的的测试运行
+     2. 使用 `pnpm vitest --run` 来执行 vitest 测试脚本
    - **单元测试**: 在`tests`文件夹下开发 vitest 测试代码来验证基础功能。也可以开发 Playwright 脚本，用来做组件可用性可靠性验证。
-      > 为此可能需要提供一些特殊的页面来为组件的测试提供访问路径。可以使用 `/_test/*` 这样的路径
+     > 为此可能需要提供一些特殊的页面来为组件的测试提供访问路径。可以使用 `/_test/*` 这样的路径
    - **技术验证**: 在`tests/jules-scratch`文件夹下，使用 Playwright 脚本 + 截图的方式进行验证。这套流程（启动服务 -> 编写/运行脚本 -> 生成截图 -> 分析截图 -> 修复 -> 再次验证）被证明是定位和解决布局等视觉问题的有效方法。
 4. 分支与提交
    - **分支命名**: 功能开发分支应使用 `feat/` 前缀，例如 `feat/redesign-ui`。修复 bug 的分支应使用 `fix/` 前缀。
