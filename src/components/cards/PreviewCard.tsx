@@ -42,7 +42,7 @@ export default function PreviewCard({ header, children }: PreviewCardProps) {
       >
         {children}
         {isOverflowing && (
-          <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-white to-transparent dark:from-zinc-900 dark:to-transparent"></div>
+          <div className="absolute inset-0 mask-fade-bottom pointer-events-none"></div>
         )}
       </div>
     </div>
