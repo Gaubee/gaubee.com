@@ -1,8 +1,8 @@
+import { matter } from "@gaubee/nodekit";
 import fs from "fs/promises";
-import path from "path";
 import { glob } from "glob";
-import matter from "gray-matter";
 import MiniSearch from "minisearch";
+import path from "path";
 
 // Define the structure of the documents we want to index
 interface Document {

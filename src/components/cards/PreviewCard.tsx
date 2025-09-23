@@ -1,8 +1,9 @@
 import { cn } from "@/lib/utils";
 import { iter_map_not_null } from "@gaubee/util";
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MagicCard } from "../ui/magic-card";
 import { ProgressiveBlur } from "../ui/progressive-blur";
+import { PreviewImages } from "./PreviewImages";
 
 interface PreviewCardProps {
   header?: ReactNode;
@@ -13,19 +14,6 @@ interface PreviewCardProps {
   collection?: string;
   children: ReactNode;
 }
-function getGridColsClass(count: number): string {
-  if (count === 1) return "grid-cols-1";
-  if (count === 2 || count === 4) return "grid-cols-2";
-  return "grid-cols-3";
-}
-function getImgAspectRatio(count: number): string {
-  if (count === 1) return "aspect-16/9";
-  if (count === 2) return "aspect-3/3";
-  if (count === 3) return "aspect-3/2";
-  if (count === 4) return "aspect-4/2";
-  return "aspect-3/2";
-}
-
 export default function PreviewCard({
   header,
   children,
@@ -94,26 +82,16 @@ export default function PreviewCard({
             <h2 className="text-xl font-bold text-zinc-800 dark:text-zinc-100">
               {title}
             </h2>
-            {images && images.length > 0 && (
-              <div
-                className={cn([
-                  "grid",
-                  "gap-2",
-                  getGridColsClass(images.length),
-                ])}
-              >
-                {images.slice(0, 9).map((src) => (
-                  <img
-                    src={src}
-                    alt={`preview image for ${title}`}
-                    className={cn(
-                      "h-auto w-full rounded-md object-cover",
-                      getImgAspectRatio(images.length),
-                    )}
-                  />
-                ))}
-              </div>
-            )}
+
+            {images &&
+              images.length > 0 &&
+              PreviewImages({
+                className: "drop-shadow-md",
+                images: images.map((src) => ({
+                  src,
+                  alt: `preview image for ${title}`,
+                })),
+              })}
           </div>
         )}
         <div

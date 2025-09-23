@@ -47,10 +47,10 @@ test.beforeEach(async ({ page }) => {
 
 test.describe('Admin Panel', () => {
     test('should login successfully and see file browser', async ({ page }) => {
-        await page.goto('/gaubee/login');
+        await page.goto('/admin/login');
         await page.getByPlaceholder('ghp_...').fill('test-token');
         await page.getByRole('button', { name: 'Save and Continue' }).click();
-        await page.waitForURL('**/gaubee');
+        await page.waitForURL('**/admin');
 
         await expect(page.getByText('File Management')).toBeVisible();
         await expect(page.getByText('articles')).toBeVisible();
@@ -58,20 +58,20 @@ test.describe('Admin Panel', () => {
     });
 
     test('should navigate to editor, edit, and stage a change', async ({ page }) => {
-        await page.goto('/gaubee/login');
+        await page.goto('/admin/login');
         await page.getByPlaceholder('ghp_...').fill('test-token');
         await page.getByRole('button', { name: 'Save and Continue' }).click();
-        await page.waitForURL('**/gaubee');
+        await page.waitForURL('**/admin');
 
         await page.getByText('test.md').click();
-        await page.waitForURL('**/gaubee/editor?path=src/content/test.md');
+        await page.waitForURL('**/admin/editor?path=src/content/test.md');
 
         const editor = page.locator('.ProseMirror');
         await expect(editor).toBeVisible();
         await editor.fill('# Updated Content');
 
         await page.getByRole('button', { name: 'Stage Changes' }).click();
-        await page.waitForURL('**/gaubee');
+        await page.waitForURL('**/admin');
 
         const stagedChangesList = page.locator('div:has-text("Staged Changes")');
         await expect(stagedChangesList.getByText('test.md')).toBeVisible();
@@ -79,17 +79,17 @@ test.describe('Admin Panel', () => {
     });
 
     test('should show diff view for an updated file', async ({ page }) => {
-        await page.goto('/gaubee/login');
+        await page.goto('/admin/login');
         await page.getByPlaceholder('ghp_...').fill('test-token');
         await page.getByRole('button', { name: 'Save and Continue' }).click();
-        await page.waitForURL('**/gaubee');
+        await page.waitForURL('**/admin');
 
         await page.getByText('test.md').click();
-        await page.waitForURL('**/gaubee/editor?path=src/content/test.md');
+        await page.waitForURL('**/admin/editor?path=src/content/test.md');
 
         await page.locator('.ProseMirror').fill('# Updated Content');
         await page.getByRole('button', { name: 'Stage Changes' }).click();
-        await page.waitForURL('**/gaubee');
+        await page.waitForURL('**/admin');
 
         await page.locator('div:has-text("Staged Changes")').getByText('test.md').click();
 
@@ -100,10 +100,10 @@ test.describe('Admin Panel', () => {
     });
 
     test('should commit a change successfully', async ({ page }) => {
-        await page.goto('/gaubee/login');
+        await page.goto('/admin/login');
         await page.getByPlaceholder('ghp_...').fill('test-token');
         await page.getByRole('button', { name: 'Save and Continue' }).click();
-        await page.waitForURL('**/gaubee');
+        await page.waitForURL('**/admin');
 
         await page.evaluate(async () => {
           return new Promise<void>(resolve => {
@@ -119,7 +119,7 @@ test.describe('Admin Panel', () => {
         });
 
         await page.reload();
-        await page.waitForURL('**/gaubee');
+        await page.waitForURL('**/admin');
 
         const dialogPromise = page.waitForEvent('dialog');
         await page.getByPlaceholder('Enter your commit message...').fill('Test commit');
