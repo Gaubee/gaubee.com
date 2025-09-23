@@ -1,7 +1,7 @@
-import { func_remember } from "./func_remember.js";
 import { Task } from "@lit/task";
 import { html, LitElement } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { func_remember } from "./func_remember.js";
 
 @customElement("com-youtube-player")
 export class ComYoutubePlayerElement extends LitElement {
@@ -57,11 +57,11 @@ export class ComYoutubePlayerElement extends LitElement {
           events: {
             onReady: onPlayerReady,
           },
-        }
+        },
       );
       return player;
     },
-    () => [this.videoId]
+    () => [this.videoId],
   );
 
   protected override render() {

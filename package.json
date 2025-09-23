@@ -28,7 +28,7 @@
     "@astrojs/react": "^4.3.1",
     "@fontsource-variable/inter": "^5.2.8",
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
-    "@gaubee/nodekit": "^0.12.0",
+    "@gaubee/nodekit": "^0.14.0",
     "@gaubee/util": "^0.35.1",
     "@google/genai": "^1.20.0",
     "@lit/task": "^1.0.3",

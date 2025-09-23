@@ -20,12 +20,14 @@ const { postsByMonth, allTags } = await getSiteData();
 ---
 
 <RootLayout title={title}>
-  <div class="flex max-w-7xl mx-auto">
-    <aside class="hidden lg:block sticky top-0 h-screen w-64 flex-shrink-0 py-8 pr-8">
+  <div class="mx-auto flex max-w-7xl">
+    <aside
+      class="sticky top-0 hidden h-screen w-64 flex-shrink-0 py-8 pr-8 lg:block"
+    >
       <LeftSidebar />
     </aside>
 
-    <main class="flex-1 min-w-0">
+    <main class="min-w-0 flex-1">
       <MobileNav client:load title={title}>
         <div class="space-y-4">
           <TableOfContentsCard client:load headings={headings} />
@@ -39,7 +41,9 @@ const { postsByMonth, allTags } = await getSiteData();
       </div>
     </main>
 
-    <aside class="hidden lg:block sticky top-0 h-screen w-64 flex-shrink-0 py-8 pl-8">
+    <aside
+      class="sticky top-0 hidden h-screen w-64 flex-shrink-0 py-8 pl-8 lg:block"
+    >
       <div class="space-y-4">
         <TableOfContentsCard headings={headings} />
         <TagsCard tags={allTags} />
