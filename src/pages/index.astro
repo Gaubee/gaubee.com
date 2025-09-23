@@ -3,10 +3,12 @@ import ContentLayout from "../layouts/ContentLayout.astro";
 import PreviewCard from "../components/cards/PreviewCard.tsx";
 import MarkdownRenderer from "../components/MarkdownRenderer.tsx";
 import { getSiteData } from "@/lib/getSiteData";
+// import { obj_pick } from "@gaubee/util";
 
 const { allPosts } = await getSiteData();
 
 const pageTitle = "Gaubee's Blog";
+// const f = 6;
 ---
 
 <ContentLayout title={pageTitle}>
@@ -19,17 +21,24 @@ const pageTitle = "Gaubee's Blog";
 
   <div class="mt-8 flex flex-col">
     {
+      // allPosts.slice(0 + f, 2 + f)
       allPosts.map((post) => (
         <div class="py-4" id={post.id}>
+          {/* <code>
+            {JSON.stringify(obj_pick(post, "title", "data", "previewBody"))}
+          </code> */}
           <PreviewCard
-            client:visible
+            client:load
             href={`/${post.collection}/${post.id}`}
             collection={post.collection}
             images={post.images}
-            title={post.title}
+            title={post.title ?? post.id}
             datetime={post.data.datetime}
           >
-            <MarkdownRenderer client:only markdown={post.previewBody} />
+            <MarkdownRenderer
+              markdown={post.previewBody}
+              streamdown={{ controls: { mermaid: false } }}
+            />
           </PreviewCard>
         </div>
       ))

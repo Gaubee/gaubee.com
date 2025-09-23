@@ -12,7 +12,7 @@ interface PreviewCardProps {
   href?: string;
   title?: string;
   collection?: string;
-  children: ReactNode;
+  children?: ReactNode;
 }
 export default function PreviewCard({
   header,
@@ -52,10 +52,7 @@ export default function PreviewCard({
 
   return (
     <MagicCard gradientOpacity={0.1}>
-      <a
-        href={href}
-        className={cn("flex flex-col gap-4 p-4", isOverflowing ? "pb-1" : "")}
-      >
+      <a href={href} className={cn("flex flex-col gap-4 px-4 py-2")}>
         {header ?? (
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
@@ -96,10 +93,7 @@ export default function PreviewCard({
         )}
         <div
           ref={contentRef}
-          className={`relative max-h-[13rem] overflow-hidden`}
-          style={{
-            scrollbarWidth: "none",
-          }}
+          className={`relative max-h-[13rem] overflow-hidden scrollbar-none`}
         >
           {children}
         </div>

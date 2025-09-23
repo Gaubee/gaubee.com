@@ -24,15 +24,15 @@ const { Content, headings } = await render(post);
 <ContentLayout title={post.data.title} headings={headings}>
   <article class="prose dark:prose-invert max-w-none">
     <!-- 1. 只在客户端渲染 -->
+      <!-- client:only -->
     <MarkdownRenderer
-      client:only
       className="md-renderer"
       markdown={post.body}
     />
     <!-- 2. 无 JS 时的回退 -->
-    <div class="fallback-content">
+    <!-- <div class="fallback-content">
       <Content />
-    </div>
+    </div> -->
   </article>
 </ContentLayout>
 

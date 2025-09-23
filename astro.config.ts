@@ -73,12 +73,13 @@ export default defineConfig({
         ],
       },
       devOptions: {
-        enabled: true,
+        enabled: false,
         navigateFallbackAllowlist: [/^\/$/],
       },
     }),
   ],
   vite: {
+    ssr: { noExternal: ["streamdown"] },
     plugins: [tailwindcss()],
   },
   build: {
