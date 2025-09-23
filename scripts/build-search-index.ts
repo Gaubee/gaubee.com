@@ -1,6 +1,6 @@
 import { matter } from "@gaubee/nodekit";
 import fs from "fs/promises";
-import { glob } from "glob";
+import { globby } from "globby";
 import MiniSearch from "minisearch";
 import path from "path";
 
@@ -25,8 +25,8 @@ async function generateSearchIndex() {
   });
 
   // 2. Find all markdown files
-  const articleFiles = await glob("src/content/articles/**/*.md");
-  const eventFiles = await glob("src/content/events/**/*.md");
+  const articleFiles = await globby("src/content/articles/**/*.md");
+  const eventFiles = await globby("src/content/events/**/*.md");
   const allFiles = [...articleFiles, ...eventFiles];
 
   // 3. Process each file

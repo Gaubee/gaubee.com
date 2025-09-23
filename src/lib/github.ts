@@ -3,13 +3,12 @@ import { Octokit } from "@octokit/rest";
 import type { StagedChange } from "./db";
 
 const GITHUB_TOKEN_KEY = "github_token";
-
-let octokitInstance: Octokit | null = null;
-
-// This function allows tests to inject a mock instance.
-export function __setOctokitInstance(instance: Octokit | null) {
-  octokitInstance = instance;
+declare global {
+  // This property allows tests to inject a mock instance.
+  var __injectedOctokitInstance: Octokit | undefined;
 }
+let octokitInstance: Octokit | null =
+  globalThis.__injectedOctokitInstance ?? null;
 
 function getOctokit(tokenOverride?: string) {
   if (octokitInstance) {
@@ -51,18 +50,13 @@ export async function getFileContent(path: string): Promise<string> {
   }
 
   try {
-    const response = await octokit.repos.getContent({
+    const { data } = await octokit.repos.getContent({
       owner: OWNER,
       repo: REPO,
       path,
     });
-    debugger;
-    if (
-      "type" in response.data &&
-      response.data.type == "file" &&
-      response.data.encoding === "base64"
-    ) {
-      const encoded = response.data.content;
+    if ("type" in data && data.type == "file" && data.encoding === "base64") {
+      const encoded = data.content;
       const buff = str_to_base64_binary(encoded);
       const decoder = new TextDecoder("utf-8");
       return decoder.decode(buff);

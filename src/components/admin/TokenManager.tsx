@@ -13,7 +13,8 @@ import { useEffect, useState } from "react";
 
 const GITHUB_TOKEN_KEY = "github_token";
 
-export default function TokenManager() {
+interface TokenManagerProps {}
+export default function TokenManager({}: TokenManagerProps) {
   const [token, setToken] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,8 +34,10 @@ export default function TokenManager() {
 
     if (isValid) {
       localStorage.setItem(GITHUB_TOKEN_KEY, token);
+      console.log("QAQ set token", token);
       window.location.href = "/admin"; // Redirect to the main admin page
     } else {
+      console.error("Invalid token. Please check your token and try again.");
       setError("Invalid token. Please check your token and try again.");
       localStorage.removeItem(GITHUB_TOKEN_KEY); // Clear invalid token
     }
@@ -55,14 +58,16 @@ export default function TokenManager() {
         <Input
           type="password"
           value={token}
-          onChange={(e) => setToken(e.target.value)}
+          onInput={(e) => setToken((e.target as any).value)}
+          onChange={(e) => setToken((e.target as any).value)}
           placeholder="ghp_..."
           onKeyDown={(e) => e.key === "Enter" && handleSaveAndValidate()}
         />
         {error && <p className="text-sm text-destructive">{error}</p>}
         <Button
           onClick={handleSaveAndValidate}
-          disabled={isLoading}
+          disabled={isLoading || token.length === 0}
+          aria-disabled={isLoading || token.length === 0}
           className="w-full"
         >
           {isLoading ? (

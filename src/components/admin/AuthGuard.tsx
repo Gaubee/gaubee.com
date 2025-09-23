@@ -7,6 +7,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const token = localStorage.getItem(GITHUB_TOKEN_KEY);
+    console.log("QAQ get token", token);
     if (!token) {
       window.location.href = "/admin/login";
     } else {
