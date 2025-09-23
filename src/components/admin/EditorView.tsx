@@ -46,7 +46,7 @@ Start writing...
 `;
       setPath(newPath);
       setOriginalContent(newContent);
-      const { body: content, attributes: data } = matter<any>(newContent);
+      const { content, data } = matter<any>(newContent);
       setMetadata(data);
       setMarkdownContent(content);
       setIsNewFile(true);
@@ -62,7 +62,7 @@ Start writing...
     try {
       const fileContent = await getFileContent(filePath);
       setOriginalContent(fileContent);
-      const { body: content, attributes: data } = matter<any>(fileContent);
+      const { content, data } = matter<any>(fileContent);
       setMetadata(data);
       setMarkdownContent(content);
     } catch (error) {
@@ -98,15 +98,15 @@ Start writing...
 
   if (isLoadingContent) {
     return (
-      <div className="p-4 border rounded-lg h-full flex items-center justify-center bg-muted">
+      <div className="bg-muted flex h-full items-center justify-center rounded-lg border p-4">
         <p>Loading...</p>
       </div>
     );
   }
 
   return (
-    <div className="p-4 md:p-8 space-y-4">
-      <header className="flex flex-wrap gap-4 justify-between items-center">
+    <div className="space-y-4 p-4 md:p-8">
+      <header className="flex flex-wrap items-center justify-between gap-4">
         <Button
           variant="outline"
           onClick={() => (window.location.href = "/admin")}
@@ -114,7 +114,7 @@ Start writing...
           <ArrowLeft className="mr-2 h-4 w-4" />
           <span className="hidden sm:inline">Back to Files</span>
         </Button>
-        <div className="font-mono text-sm truncate order-last sm:order-none w-full sm:w-auto text-center">
+        <div className="order-last w-full truncate text-center font-mono text-sm sm:order-none sm:w-auto">
           {path}
         </div>
         <Button onClick={handleStageChanges} disabled={!hasChanges}>

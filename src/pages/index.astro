@@ -20,7 +20,7 @@ const pageTitle = "Gaubee's Blog";
   <div class="mt-8 flex flex-col">
     {
       allPosts.map((post) => (
-        <div class="py-4">
+        <div class="py-4" id={post.id}>
           <PreviewCard
             client:visible
             href={`/${post.collection}/${post.id}`}
