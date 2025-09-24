@@ -1,6 +1,6 @@
 ---
 import { getCollection } from "astro:content";
-import ContentLayout from "../../layouts/ContentLayout.astro";
+import ScaffoldLayout from "../../layouts/ScaffoldLayout.astro";
 import Card from "../../components/Card.tsx";
 
 export async function getStaticPaths() {
@@ -25,7 +25,7 @@ const filteredPosts = allPosts.filter((post) =>
 );
 ---
 
-<ContentLayout title={`Tagged: ${tag}`}>
+<ScaffoldLayout title={`Tagged: ${tag}`}>
   <div class="border-b border-zinc-200 px-4 pb-4 dark:border-zinc-700">
     <h1 class="text-3xl font-bold">
       Tagged: <span class="text-sky-600 dark:text-sky-400">{tag}</span>
@@ -52,4 +52,4 @@ const filteredPosts = allPosts.filter((post) =>
       ))
     }
   </div>
-</ContentLayout>
+</ScaffoldLayout>

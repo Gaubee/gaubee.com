@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scaffold Component Demo</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+        
+        .scaffold-container {
+            display: flex;
+            min-height: 100vh;
+        }
+        
+        /* Navigation Rail (Tablet/Desktop) */
+        .nav-rail {
+            width: 208px;
+            background: #f8f9fa;
+            border-right: 1px solid #e9ecef;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .nav-rail.collapsed {
+            width: 72px;
+        }
+        
+        .nav-rail h3 {
+            margin: 0 0 16px 0;
+            font-size: 16px;
+        }
+        
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-radius: 8px;
+            text-decoration: none;
+            color: #495057;
+            margin-bottom: 8px;
+        }
+        
+        .nav-item:hover {
+            background: #e9ecef;
+        }
+        
+        .nav-item span {
+            margin-left: 12px;
+        }
+        
+        .nav-rail.collapsed .nav-item span {
+            display: none;
+        }
+        
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* App Bar */
+        .app-bar {
+            height: 64px;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .app-bar h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        
+        /* Content Area */
+        .content-area {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+        }
+        
+        /* Bottom Bar (Mobile) */
+        .bottom-bar {
+            display: none;
+            height: 64px;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid #e9ecef;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+        }
+        
+        .bottom-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
+            color: #495057;
+            padding: 8px;
+        }
+        
+        .bottom-item span {
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        
+        /* Responsive Behavior */
+        @media (max-width: 1023px) {
+            .nav-rail {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 639px) {
+            .bottom-bar {
+                display: flex;
+            }
+            
+            .app-bar {
+                height: 56px;
+                padding: 0 16px;
+            }
+            
+            .content-area {
+                padding: 16px;
+                margin-bottom: 64px;
+            }
+        }
+        
+        /* Demo Content */
+        .demo-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .demo-content h2 {
+            margin-top: 32px;
+        }
+        
+        .demo-content p {
+            line-height: 1.6;
+            color: #495057;
+        }
+    </style>
+</head>
+<body>
+    <div class="scaffold-container">
+        <!-- Navigation Rail (Tablet/Desktop) -->
+        <aside class="nav-rail">
+            <h3>导航</h3>
+            <a href="#" class="nav-item">
+                <div>🏠</div>
+                <span>首页</span>
+            </a>
+            <a href="#" class="nav-item">
+                <div>📚</div>
+                <span>文章</span>
+            </a>
+            <a href="#" class="nav-item">
+                <div>📅</div>
+                <span>事件</span>
+            </a>
+            <a href="#" class="nav-item">
+                <div>🔖</div>
+                <span>标签</span>
+            </a>
+            <a href="#" class="nav-item">
+                <div>📂</div>
+                <span>归档</span>
+            </a>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- App Bar -->
+            <header class="app-bar">
+                <h1>Gaubee's Blog</h1>
+            </header>
+
+            <!-- Content Area -->
+            <main class="content-area">
+                <div class="demo-content">
+                    <h1>欢迎来到 Gaubee's Blog</h1>
+                    <p>这是一个使用 Scaffold 组件构建的响应式博客系统演示。</p>
+                    
+                    <h2>响应式布局</h2>
+                    <p>Scaffold 组件会根据屏幕尺寸自动调整布局：</p>
+                    <ul>
+                        <li><strong>桌面端</strong>：显示永久导航栏（左侧）和完整应用栏</li>
+                        <li><strong>平板端</strong>：显示可折叠导航栏（左侧）和完整应用栏</li>
+                        <li><strong>移动端</strong>：显示底部导航栏和可折叠应用栏</li>
+                    </ul>
+                    
+                    <h2>组件特性</h2>
+                    <p>Scaffold 组件包含以下核心功能：</p>
+                    <ul>
+                        <li><strong>AppBar</strong>：顶部应用栏，支持滚动时折叠效果</li>
+                        <li><strong>NavigationRail</strong>：侧边导航栏，支持桌面端和平板端</li>
+                        <li><strong>BottomBar</strong>：底部导航栏，专为移动端设计</li>
+                        <li><strong>Drawer</strong>：抽屉面板，用于移动端导航和设置</li>
+                        <li><strong>响应式设计</strong>：自动适配不同屏幕尺寸</li>
+                    </ul>
+                    
+                    <h2>设计理念</h2>
+                    <p>Scaffold 组件融合了 Material 3 设计语言和 iOS 交互习惯：</p>
+                    <ul>
+                        <li>Material 3 的动态色彩、圆角和阴影效果</li>
+                        <li>iOS 风格的侧滑返回手势</li>
+                        <li>流畅的动画过渡效果</li>
+                        <li>安全区域适配（SafeArea）</li>
+                    </ul>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Bottom Bar (Mobile) -->
+    <footer class="bottom-bar">
+        <a href="#" class="bottom-item">
+            <div>🏠</div>
+            <span>首页</span>
+        </a>
+        <a href="#" class="bottom-item">
+            <div>📚</div>
+            <span>文章</span>
+        </a>
+        <a href="#" class="bottom-item">
+            <div>📅</div>
+            <span>事件</span>
+        </a>
+        <a href="#" class="bottom-item">
+            <div>⚙️</div>
+            <span>设置</span>
+        </a>
+    </footer>
+
+    <script>
+        // Simple demo of responsive behavior
+        function updateLayout() {
+            const navRail = document.querySelector('.nav-rail');
+            const bottomBar = document.querySelector('.bottom-bar');
+            const width = window.innerWidth;
+            
+            if (width < 640) {
+                // Mobile
+                if (navRail) navRail.style.display = 'none';
+                if (bottomBar) bottomBar.style.display = 'flex';
+            } else if (width < 1024) {
+                // Tablet
+                if (navRail) {
+                    navRail.style.display = 'flex';
+                    navRail.classList.add('collapsed');
+                }
+                if (bottomBar) bottomBar.style.display = 'none';
+            } else {
+                // Desktop
+                if (navRail) {
+                    navRail.style.display = 'flex';
+                    navRail.classList.remove('collapsed');
+                }
+                if (bottomBar) bottomBar.style.display = 'none';
+            }
+        }
+        
+        // Update layout on resize
+        window.addEventListener('resize', updateLayout);
+        
+        // Initial layout update
+        updateLayout();
+    </script>
+</body>
+</html>

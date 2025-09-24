@@ -1,6 +1,6 @@
 ---
 import { getCollection, render } from "astro:content";
-import ContentLayout from "../../layouts/ContentLayout.astro";
+import ScaffoldLayout from "../../layouts/ScaffoldLayout.astro";
 import PrevNextEvent from "../../components/PrevNextEvent.tsx";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 
@@ -43,7 +43,7 @@ const nextEvent = next
   : null;
 ---
 
-<ContentLayout title={post.data.title} headings={headings}>
+<ScaffoldLayout title={post.data.title} headings={headings}>
   <article class="prose dark:prose-invert max-w-none">
     <!-- 1. 只在客户端渲染 -->
     <MarkdownRenderer
@@ -56,7 +56,9 @@ const nextEvent = next
       <Content />
     </div>
   </article>
-</ContentLayout>
+
+  <PrevNextEvent prevEvent={prevEvent} nextEvent={nextEvent} />
+</ScaffoldLayout>
 
 <style>
   /* 3. 有 JS 时隐藏 fallback */

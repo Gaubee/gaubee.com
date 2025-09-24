@@ -1,5 +1,5 @@
 ---
-import ContentLayout from "../layouts/ContentLayout.astro";
+import ScaffoldLayout from "../layouts/ScaffoldLayout.astro";
 import Card from "../components/Card.tsx";
 import { getCollection } from "astro:content";
 
@@ -11,7 +11,7 @@ const sortedEvents = events.sort(
 const pageTitle = "Gaubee's Blog";
 ---
 
-<ContentLayout title={pageTitle}>
+<ScaffoldLayout title={pageTitle}>
   <div class="px-4">
     <h1 class="mb-2 text-3xl font-bold">Gaubee's Feed</h1>
     <p class="text-lg text-zinc-600 dark:text-zinc-400">
@@ -34,4 +34,4 @@ const pageTitle = "Gaubee's Blog";
       ))
     }
   </div>
-</ContentLayout>
+</ScaffoldLayout>

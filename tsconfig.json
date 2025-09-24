@@ -13,7 +13,8 @@
       ]
     },
     "types": [
-      "dom-navigation"
+      "dom-navigation",
+      "@testing-library/jest-dom"
     ],
     "allowImportingTsExtensions": true,
     "experimentalDecorators": true,

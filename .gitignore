@@ -3,7 +3,7 @@ node_modules/
 # Build artifacts
 /dist
 /dev-dist
-.astro/
+.*/
 search-index.json
 
 # Environment variables

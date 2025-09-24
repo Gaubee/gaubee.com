@@ -1,0 +1,171 @@
+---
+import RootLayout from "./RootLayout.astro";
+import { ScaffoldProvider } from "@/components/scaffold/scaffoldAtoms.tsx";
+import Scaffold from "@/components/scaffold/Scaffold";
+import AppBar from "@/components/scaffold/AppBar";
+import NavigationRail from "@/components/scaffold/NavigationRail";
+import BottomBar from "@/components/scaffold/BottomBar";
+import Drawer from "@/components/scaffold/Drawer";
+import SettingPanel from "@/components/scaffold/SettingPanel";
+import LeftSidebar from "../components/LeftSidebar.tsx";
+import BackToTop from "../components/BackToTop.tsx";
+import TableOfContentsCard from "@/components/cards/TableOfContentsCard.tsx";
+import TagsCard from "@/components/cards/TagsCard.tsx";
+import ArchiveCard from "@/components/cards/ArchiveCard.tsx";
+import { getSiteData } from "@/lib/getSiteData.ts";
+import type { MarkdownHeading } from "astro";
+import { Home, Search, Bookmark, Bell, User, Settings } from "lucide-react";
+
+interface Props {
+  title: string;
+  headings?: MarkdownHeading[];
+}
+
+const { title, headings = [] } = Astro.props;
+const { postsByMonth, allTags } = await getSiteData();
+---
+
+<RootLayout title={title}>
+  <ScaffoldProvider initialTheme="light">
+    <Scaffold>
+      <!-- Navigation Rail (Tablet/Desktop) -->
+      <NavigationRail>
+        <div class="space-y-2 p-2">
+          <a
+            href="/"
+            class="flex items-center rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            <Home className="h-5 w-5" />
+            <span class="ml-2">首页</span>
+          </a>
+          <a
+            href="/archive"
+            class="flex items-center rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            <Bookmark className="h-5 w-5" />
+            <span class="ml-2">归档</span>
+          </a>
+          <a
+            href="/tags"
+            class="flex items-center rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            <Search className="h-5 w-5" />
+            <span class="ml-2">标签</span>
+          </a>
+        </div>
+      </NavigationRail>
+
+      <!-- Main Content Area -->
+      <div class="flex flex-1 flex-col">
+        <AppBar title={title} />
+
+        <div class="flex flex-1">
+          <!-- Left Sidebar (Desktop) -->
+          <aside
+            class="sticky top-0 hidden h-screen w-64 flex-shrink-0 py-8 pr-8 lg:block"
+          >
+            <LeftSidebar />
+          </aside>
+
+          <main class="min-w-0 flex-1">
+            <div class="p-6">
+              <slot />
+            </div>
+          </main>
+
+          <!-- Right Sidebar (Desktop) -->
+          <aside
+            class="sticky top-0 hidden h-screen w-64 flex-shrink-0 py-8 pl-8 lg:block"
+          >
+            <div class="space-y-4">
+              <TableOfContentsCard headings={headings} />
+              <TagsCard tags={allTags} />
+              <ArchiveCard postsByMonth={postsByMonth} />
+            </div>
+          </aside>
+        </div>
+
+        <BottomBar>
+          <a href="/" class="flex flex-col items-center justify-center p-2">
+            <Home className="h-5 w-5" />
+            <span class="text-xs">首页</span>
+          </a>
+          <a
+            href="/archive"
+            class="flex flex-col items-center justify-center p-2"
+          >
+            <Bookmark className="h-5 w-5" />
+            <span class="text-xs">归档</span>
+          </a>
+          <a href="/tags" class="flex flex-col items-center justify-center p-2">
+            <Search className="h-5 w-5" />
+            <span class="text-xs">标签</span>
+          </a>
+          <a
+            href="/settings"
+            class="flex flex-col items-center justify-center p-2"
+          >
+            <Settings className="h-5 w-5" />
+            <span class="text-xs">设置</span>
+          </a>
+        </BottomBar>
+      </div>
+
+      <!-- Left Drawer (Mobile) -->
+      <Drawer side="left">
+        <div class="p-4">
+          <h2 class="mb-4 text-lg font-semibold">菜单</h2>
+          <nav class="space-y-2">
+            <a
+              href="/"
+              class="flex items-center rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              <Home className="h-5 w-5" />
+              <span class="ml-2">首页</span>
+            </a>
+            <a
+              href="/archive"
+              class="flex items-center rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              <Bookmark className="h-5 w-5" />
+              <span class="ml-2">归档</span>
+            </a>
+            <a
+              href="/tags"
+              class="flex items-center rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              <Search className="h-5 w-5" />
+              <span class="ml-2">标签</span>
+            </a>
+          </nav>
+        </div>
+      </Drawer>
+
+      <!-- Right Drawer (Settings) -->
+      <Drawer side="right">
+        <SettingPanel title="设置">
+          <div class="space-y-6">
+            <div>
+              <h3 class="mb-2 text-lg font-medium">外观</h3>
+              <p class="text-muted-foreground text-sm">
+                自定义应用程序的外观。
+              </p>
+            </div>
+
+            <div>
+              <h3 class="mb-2 text-lg font-medium">通知</h3>
+              <p class="text-muted-foreground text-sm">配置通知偏好设置。</p>
+            </div>
+
+            <div>
+              <h3 class="mb-2 text-lg font-medium">账户</h3>
+              <p class="text-muted-foreground text-sm">管理您的账户设置。</p>
+            </div>
+          </div>
+        </SettingPanel>
+      </Drawer>
+    </Scaffold>
+  </ScaffoldProvider>
+
+  <BackToTop client:load />
+</RootLayout>

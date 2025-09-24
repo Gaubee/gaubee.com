@@ -33,8 +33,14 @@ export async function getSiteData() {
 
   const postsByMonth = allPosts.reduce(
     (acc, post) => {
-      const year = post.data.date.getFullYear();
-      const month = (post.data.date.getMonth() + 1).toString().padStart(2, "0");
+      const date = new Date(post.data.date);
+      if (isNaN(date.getTime())) {
+        console.warn("Invalid date for post:", post.id, post.data.date);
+        return acc;
+      }
+      
+      const year = date.getFullYear();
+      const month = (date.getMonth() + 1).toString().padStart(2, "0");
       const key = `${year}-${month}`;
       if (!acc[key]) {
         acc[key] = 0;

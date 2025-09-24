@@ -1,5 +1,6 @@
 ---
-import RootLayout from "../../layouts/RootLayout.astro";
+import ScaffoldLayout from "@/layouts/ScaffoldLayout.astro";
+import RootLayout from "@/layouts/RootLayout.astro";
 
 // Re-defining props here as it's not exported from the base layout.
 interface Props {
@@ -9,6 +10,6 @@ interface Props {
 const { title } = Astro.props;
 ---
 
-<RootLayout title={title}>
+<ScaffoldLayout title={title}>
   <slot />
-</RootLayout>
+</ScaffoldLayout>
