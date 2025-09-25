@@ -1,6 +1,6 @@
-import "dotenv/config";
 import { GoogleGenAI } from "@google/genai";
 import crypto from "crypto";
+import "dotenv/config";
 import { existsSync, readFileSync } from "fs";
 import fs from "fs/promises";
 import path from "path";
@@ -23,7 +23,7 @@ try {
   console.log("Manually parsed and loaded variables from .env file.");
 } catch (e: any) {
   console.log(
-    `Could not read .env file. Error: ${e.message}. Proceeding without it.`
+    `Could not read .env file. Error: ${e.message}. Proceeding without it.`,
   );
 }
 

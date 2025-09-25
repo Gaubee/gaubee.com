@@ -5,7 +5,6 @@
 
 @custom-variant dark (&:is(.dark *));
 
-
 @theme inline {
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -88,7 +87,6 @@
     corner-shape: superellipse(2);
   }
 }
-
 
 .dark {
   --background: oklch(0.129 0.042 264.695);

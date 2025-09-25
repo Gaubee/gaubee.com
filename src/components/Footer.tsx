@@ -1,4 +1,4 @@
-import { Github } from 'lucide-react';
+import { Github } from "lucide-react";
 
 const Footer = () => {
   return (

@@ -1,8 +1,8 @@
 import { getCollection } from "astro:content";
 import {
   extractImagesFromMarkdown,
-  getPreviewBody,
   getMdTitle,
+  getPreviewBody,
 } from "./markdownUtils";
 
 export async function getSiteData() {

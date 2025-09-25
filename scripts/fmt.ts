@@ -29,6 +29,17 @@ function gitChangedFiles(): string[] {
       /\.(ts|tsx|mts|cts|css|html|json|astro)/.test(filename),
     );
 }
+function gitAllFiles(): string[] {
+  // 所有被 Git 跟踪的文件
+  const { stdout } = execaSync`git ls-files`;
+  return stdout
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter((filename) =>
+      /\.(ts|tsx|mts|cts|css|html|json|astro)$/.test(filename),
+    );
+}
 
 function run(cmd: string, args: string[]): void {
   console.log(
@@ -43,11 +54,21 @@ function run(cmd: string, args: string[]): void {
 }
 
 function main(): void {
-  const files = gitChangedFiles();
-  if (files.length === 0) {
-    console.log("No changed files to format.");
-    return;
+  let files: string[];
+  if (process.argv.includes("--all")) {
+    files = gitAllFiles();
+    if (files.length === 0) {
+      console.log("No files to format.");
+      return;
+    }
+  } else {
+    files = gitChangedFiles();
+    if (files.length === 0) {
+      console.log("No changed files to format.");
+      return;
+    }
   }
+
   console.log(green("Prettier formatting:"));
   files.forEach((f) => console.log("  -", blue(f)));
 

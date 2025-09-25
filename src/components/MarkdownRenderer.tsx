@@ -1,6 +1,6 @@
-import { Streamdown } from "streamdown";
-import type { MermaidConfig } from "mermaid";
 import { cn } from "@/lib/utils";
+import type { MermaidConfig } from "mermaid";
+import { Streamdown } from "streamdown";
 
 interface MarkdownRendererProps {
   markdown?: string;
