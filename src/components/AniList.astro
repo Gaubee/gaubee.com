@@ -1,0 +1,22 @@
+
+<script>
+  // 只在客户端跑
+  const staggerList = document.querySelector('.stagger-list');
+  if (staggerList) {
+    // 1. 统一观察器
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(en => {
+          if (en.isIntersecting) {
+            en.target.classList.add('stagger-in');
+            io.unobserve(en.target);          // 只播一次
+          }
+        });
+      },
+      { rootMargin: '0px 0px -10% 0px' }       // 提前 10% 视口触发
+    );
+
+    // 2. 把需要动画的元素注册进去
+    document.querySelectorAll('[data-stagger]').forEach(el => io.observe(el));
+  }
+</script>

@@ -1,10 +1,10 @@
 ---
-import ContentLayout from "../layouts/ContentLayout.astro";
-import Card from "../components/Card.tsx";
-import { getCollection } from "astro:content";
+import ContentLayout from "@/layouts/ContentLayout.astro";
+import Card from "@/components/Card.tsx";
+import { getSiteData } from "@/lib/getSiteData";
 
-const articles = await getCollection("articles");
-const sortedArticles = articles.sort(
+const { allArticles } = await getSiteData();
+const sortedArticles = allArticles.sort(
   (a, b) => new Date(b.data.date).valueOf() - new Date(a.data.date).valueOf(),
 );
 

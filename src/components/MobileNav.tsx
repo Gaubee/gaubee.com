@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import MobileTopbar from "./MobileTopbar";
 
 interface Props {
-  title: string;
+  title?: string;
   children: React.ReactNode; // This will be the content of the sheet
 }
 

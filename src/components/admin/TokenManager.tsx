@@ -34,7 +34,6 @@ export default function TokenManager({}: TokenManagerProps) {
 
     if (isValid) {
       localStorage.setItem(GITHUB_TOKEN_KEY, token);
-      console.log("QAQ set token", token);
       window.location.href = "/admin"; // Redirect to the main admin page
     } else {
       console.error("Invalid token. Please check your token and try again.");

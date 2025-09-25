@@ -1,7 +1,7 @@
+import { func_remember } from "@gaubee/util/func";
 import { Task } from "@lit/task";
 import { html, LitElement } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import { func_remember } from "./func_remember.js";
 
 @customElement("com-youtube-player")
 export class ComYoutubePlayerElement extends LitElement {

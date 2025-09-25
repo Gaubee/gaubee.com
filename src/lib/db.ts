@@ -48,5 +48,4 @@ export async function getAllChanges() {
 export async function deleteChange(path: string) {
   const db = await getDb();
   await db.delete(STORE_NAME, path);
-  console.log("QAQ after deleteChange", db.getAll(STORE_NAME));
 }

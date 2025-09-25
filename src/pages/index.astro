@@ -1,10 +1,18 @@
 ---
-import ContentLayout from "../layouts/ContentLayout.astro";
-import PreviewCard from "../components/cards/PreviewCard.tsx";
-import MarkdownRenderer from "../components/MarkdownRenderer.tsx";
+import ContentLayout from "@/layouts/ContentLayout.astro";
+import PreviewCard from "@/components/cards/PreviewCard.tsx";
 import { getSiteData } from "@/lib/getSiteData";
+import { getCollection } from "astro:content";
 
+const articles = await getCollection("articles");
 const { allPosts } = await getSiteData();
+const pieviewsPosts = await Promise.all(
+  allPosts.slice(0, 10).map(async (post) => {
+    return {
+      ...post,
+    };
+  }),
+);
 
 const pageTitle = "Gaubee's Blog";
 ---
@@ -17,22 +25,63 @@ const pageTitle = "Gaubee's Blog";
     </p>
   </div>
 
-  <div class="mt-8 flex flex-col">
+  <div class="stagger-list mt-8 flex flex-col">
     {
-      allPosts.map((post) => (
-        <div class="py-4" id={post.id}>
+      pieviewsPosts.map((post, i) => (
+        <div class="stagger-item py-4" id={post.id}>
+          {/* // key={post.id} */}
           <PreviewCard
-            client:visible
+            key={post.id}
+            client:load
             href={`/${post.collection}/${post.id}`}
             collection={post.collection}
             images={post.images}
-            title={post.title}
-            datetime={post.data.datetime}
+            title={post.safeTitle}
+            datetime={post.data.date}
           >
-            <MarkdownRenderer client:only markdown={post.previewBody} />
+            <div class="prose max-w-none" set:html={post.data.previewHTML} />
+            {/* {post.data.previewHTML} */}
+            {/* {(await render(post.previewBody)).Content()} */}
+            {/* <MarkdownRenderer client:only markdown={post.previewBody} /> */}
           </PreviewCard>
         </div>
       ))
     }
   </div>
 </ContentLayout>
+
+<style>
+  /* 1. 关键帧：进场 / 出场 */
+  @keyframes animate-in {
+    from {
+      opacity: 0;
+      transform: translateY(20%);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes animate-out {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-20%);
+    }
+  }
+
+  /* 2. 每个列表项绑定到 view() timeline */
+  .stagger-list .stagger-item {
+    /*  同时绑定两段动画：entry 阶段播 animate-in，exit 阶段播 animate-out */
+    animation:
+      animate-in linear forwards,
+      animate-out linear forwards;
+    animation-timeline: view();
+    /*  元素底部碰到视口底部开始播入，顶部离开视口顶部开始播出  */
+    animation-range: entry, exit;
+    /*  如果想让“出现”提前一点，可把 entry 0% 改成 entry 20%  */
+  }
+</style>

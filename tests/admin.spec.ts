@@ -150,8 +150,6 @@ test.describe("Admin Panel", () => {
     page.addInitScript(() => {
       Object.assign(globalThis, {
         __db_inject: new Promise<void>((resolve) => {
-          debugger;
-          console.log("QAQ InjectGaubeeAdminDB");
           if (localStorage.getItem("InjectGaubeeAdminDB") === "done") {
             resolve();
             return;

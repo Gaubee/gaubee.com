@@ -1,18 +1,19 @@
 ---
-import { getCollection, render } from "astro:content";
-import ContentLayout from "../../layouts/ContentLayout.astro";
-import MarkdownRenderer from "@/components/MarkdownRenderer";
+import { render } from "astro:content";
+import ContentLayout from "@/layouts/ContentLayout.astro";
+import { getSiteData } from "@/lib/getSiteData";
 
 export async function getStaticPaths() {
-  const posts = await getCollection("articles");
-  return posts.map((post) => ({
+  const { allArticles } = await getSiteData();
+
+  return allArticles.map((post) => ({
     params: { id: post.id },
   }));
 }
 
 const { id } = Astro.params;
-const posts = await getCollection("articles");
-const post = posts.find((p) => p.id === id);
+const { allArticles } = await getSiteData();
+const post = allArticles.find((p) => p.id === id);
 
 if (!post) {
   return new Response(null, { status: 404 });
@@ -21,24 +22,8 @@ if (!post) {
 const { Content, headings } = await render(post);
 ---
 
-<ContentLayout title={post.data.title} headings={headings}>
+<ContentLayout title={post.safeTitle} headings={headings}>
   <article class="prose dark:prose-invert max-w-none">
-    <!-- 1. 只在客户端渲染 -->
-    <MarkdownRenderer
-      client:only
-      className="md-renderer"
-      markdown={post.body}
-    />
-    <!-- 2. 无 JS 时的回退 -->
-    <div class="fallback-content">
-      <Content />
-    </div>
+    <Content />
   </article>
 </ContentLayout>
-
-<style>
-  /* 3. 有 JS 时隐藏 fallback */
-  :global(astro-island:has(.md-renderer) ~ .fallback-content) {
-    display: none;
-  }
-</style>

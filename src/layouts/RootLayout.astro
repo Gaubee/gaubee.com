@@ -6,11 +6,11 @@ import "@fontsource-variable/jetbrains-mono";
 import { pwaInfo } from "virtual:pwa-info";
 
 interface Props {
-  title: string;
+  title?: string;
   description?: string;
 }
 
-const { title, description = "Gaubee's personal blog" } = Astro.props;
+const { title = "", description = "Gaubee's personal blog" } = Astro.props;
 ---
 
 <!doctype html>

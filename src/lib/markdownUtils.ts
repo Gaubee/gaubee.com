@@ -24,8 +24,10 @@ export function getPreviewBody(body?: string) {
   return lines.slice(0, endIndex).join("\n");
 }
 
-export function getMdTitle(title?: string, body?: string) {
+export function getMdTitle(title?: string, body?: string, filePath?: string) {
   return (
-    title || (body ?? "").split("\n").find((line) => /^#+\s+.+/.test(line))
+    title ||
+    (body ?? "").split("\n").find((line) => /^#+\s+.+/.test(line)) ||
+    filePath?.replace(/^(\d+\.)/, "")?.replace(/\.mdx?$/, "")
   );
 }

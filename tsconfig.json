@@ -9,6 +9,7 @@
       "@/*": ["./src/*"]
     },
     "types": ["dom-navigation"],
+    "strictNullChecks": true,
     "allowImportingTsExtensions": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true

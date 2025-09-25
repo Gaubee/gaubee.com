@@ -1,20 +1,28 @@
 import { cn } from "@/lib/utils";
 import { iter_map_not_null } from "@gaubee/util";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState, // 引入 useMemo
+  type ReactNode,
+} from "react";
 import { MagicCard } from "../ui/magic-card";
 import { ProgressiveBlur } from "../ui/progressive-blur";
 import { PreviewImages } from "./PreviewImages";
 
 interface PreviewCardProps {
+  key?: React.Key | null;
   header?: ReactNode;
   datetime?: string | number | Date;
   images?: string[];
   href?: string;
   title?: string;
   collection?: string;
-  children: ReactNode;
+  children?: ReactNode;
 }
 export default function PreviewCard({
+  key,
   header,
   children,
   images,
@@ -25,78 +33,99 @@ export default function PreviewCard({
 }: PreviewCardProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
+  // 新增 state，用于控制内容的“淡入”动画效果
+  const [isContentVisible, setIsContentVisible] = useState(false);
 
   useEffect(() => {
     const contentElement = contentRef.current;
     if (!contentElement) return;
 
     const checkOverflow = () => {
-      // Check if the scroll height is greater than the client height
       if (contentElement.scrollHeight > contentElement.clientHeight) {
         setIsOverflowing(true);
       } else {
         setIsOverflowing(false);
       }
+      // 检查完成后，设置内容为可见，触发动画
+      setIsContentVisible(true);
     };
 
-    // Initial check
+    // 初始检查
     checkOverflow();
 
-    // Use ResizeObserver to check for overflow when the content changes size
     const resizeObserver = new ResizeObserver(checkOverflow);
     resizeObserver.observe(contentElement);
 
-    // Cleanup observer on component unmount
     return () => resizeObserver.disconnect();
-  }, [children]); // Rerun effect if children change
+  }, [children]); // 依赖项保持不变
+
+  // [性能优化] 使用 useMemo 缓存头部元数据的 JSX 结构
+  const headerMeta = useMemo(() => {
+    if (!collection && !datetime) return null;
+
+    const date = datetime ? new Date(datetime) : null;
+
+    return (
+      <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+        {iter_map_not_null([
+          collection && <span className="capitalize">{collection}</span>,
+          date && (
+            <time dateTime={date.toISOString()}>
+              {date.toLocaleDateString("zh-cn", {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
+            </time>
+          ),
+        ])
+          .map((item, i, arr) =>
+            i !== arr.length - 1
+              ? [item, <span key={`dot-${i}`}>·</span>]
+              : item,
+          )
+          .flat()}
+      </div>
+    );
+  }, [collection, datetime]);
+
+  // [性能优化] 使用 useMemo 缓存图片数组的 props
+  const previewImagesProps = useMemo(() => {
+    if (!images || images.length === 0) return null;
+    return {
+      className: "drop-shadow-md",
+      images: images.map((src) => ({
+        src,
+        alt: `preview image for ${title}`,
+      })),
+    };
+  }, [images, title]);
 
   return (
-    <MagicCard gradientOpacity={0.1}>
-      <a
-        href={href}
-        className={cn("flex flex-col gap-4 p-4", isOverflowing ? "pb-1" : "")}
-      >
+    <MagicCard key={key} gradientOpacity={0.1}>
+      <article className={cn("flex flex-col gap-4 p-4 pb-2")}>
         {header ?? (
           <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-              {iter_map_not_null([
-                collection && <span className="capitalize">{collection}</span>,
-                datetime && (
-                  <time dateTime={new Date(datetime).toISOString()}>
-                    {new Date(datetime).toLocaleDateString(undefined, {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </time>
-                ),
-              ])
-                .map((item, i, arr) => {
-                  if (i !== arr.length - 1) {
-                    return [item, <span>·</span>];
-                  }
-                  return item;
-                })
-                .flat()}
-            </div>
-            <h2 className="text-xl font-bold text-zinc-800 dark:text-zinc-100">
-              {title}
-            </h2>
-
-            {images &&
-              images.length > 0 &&
-              PreviewImages({
-                className: "drop-shadow-md",
-                images: images.map((src) => ({
-                  src,
-                  alt: `preview image for ${title}`,
-                })),
-              })}
+            {headerMeta}
+            <a href={href}>
+              <h2 className="text-xl font-bold text-zinc-800 dark:text-zinc-100">
+                {title}
+              </h2>
+            </a>
+            {previewImagesProps && <PreviewImages {...previewImagesProps} />}
           </div>
         )}
+        {/*
+          [动画实现]
+          - 添加 transition-opacity 和 duration-500 来定义动画效果
+          - 根据 isContentVisible 的状态切换 opacity-10 (初始) 和 opacity-100 (动画后)
+        */}
         <div
           ref={contentRef}
-          className={`relative max-h-[13rem] overflow-hidden`}
+          className={cn(
+            "relative max-h-[13rem] overflow-hidden transition-opacity duration-500",
+            isContentVisible ? "opacity-100" : "opacity-0",
+          )}
           style={{
             scrollbarWidth: "none",
           }}
@@ -104,7 +133,6 @@ export default function PreviewCard({
           {children}
         </div>
         {isOverflowing && (
-          // <div className="to-background pointer-events-none absolute inset-[0_1px_1px] bg-gradient-to-b from-transparent from-50%"></div>
           <ProgressiveBlur
             height="180px"
             position="bottom"
@@ -112,7 +140,7 @@ export default function PreviewCard({
             blurLevels={[0.5, 0.6, 0.8, 1.2, 2, 4, 6, 8]}
           />
         )}
-      </a>
+      </article>
     </MagicCard>
   );
 }
