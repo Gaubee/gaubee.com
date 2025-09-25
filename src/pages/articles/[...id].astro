@@ -2,6 +2,7 @@
 import { render } from "astro:content";
 import ContentLayout from "@/layouts/ContentLayout.astro";
 import { getSiteData } from "@/lib/getSiteData";
+import { ContentScrollProgress } from "@/components/ContentScrollProgress";
 
 export async function getStaticPaths() {
   const { allArticles } = await getSiteData();
@@ -24,6 +25,7 @@ const { Content, headings } = await render(post);
 
 <ContentLayout title={post.safeTitle} headings={headings}>
   <article class="prose dark:prose-invert max-w-none">
+    <ContentScrollProgress />
     <Content />
   </article>
 </ContentLayout>

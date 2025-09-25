@@ -149,3 +149,93 @@
     -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
   }
 }
+
+.prose *:not(pre) > code {
+  word-break: auto-phrase; /* 当没有空格时，在任何字符处断开 */
+  word-wrap: break-word; /* 允许在长单词或 URL 处断开 */
+  /* 如果希望行内代码也保持不换行并滚动，可以考虑：
+  white-space: nowrap;
+  overflow-x: auto;
+  display: inline-block; */
+
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-radius: 2rem;
+  padding: 0.2rem;
+}
+.prose pre {
+  overflow-x: auto; /* 使代码块在水平方向上可滚动 */
+  white-space: pre; /* 保持原始的空白和换行，但允许滚动 */
+  word-wrap: normal; /* 确保不强制换行 */
+  box-shadow: inset 0 0 7px -5px var(--card-foreground);
+  border-radius: 1.4em;
+}
+
+/* 滚动阴影 */
+.prose pre:has(> code) {
+  display: flex;
+  flex-direction: row;
+  /** 原版 1.1428571em */
+  padding-inline: 0;
+
+  /* 基础样式 */
+  &::before,
+  &::after {
+    content: "";
+    display: block;
+    position: sticky;
+    top: 0em;
+    bottom: 0em;
+    width: 1.1428571em;
+    flex-shrink: 0;
+
+    background-color: var(--primary);
+    filter: blur(1rem);
+  }
+
+  &::before {
+    left: 0;
+    mask-image: radial-gradient(
+      /* 从左侧中心点开始 */ farthest-side at 0 50%,
+      color-mix(in srgb, #000 25%, transparent),
+      transparent
+    );
+  }
+
+  &::after {
+    right: 0;
+    mask-image: radial-gradient(
+      /* 从右侧中心点开始 */ farthest-side at 100% 50%,
+      color-mix(in srgb, #000 25%, transparent),
+      transparent
+    );
+  }
+
+  /* 滚动动画 */
+  overflow-y: auto;
+  scroll-timeline: --scroll-timeline x;
+
+  &::before,
+  &::after {
+    animation-name: reveal;
+    animation-timeline: --scroll-timeline;
+    animation-fill-mode: both;
+  }
+
+  &::before {
+    animation-range: 1em 2em;
+  }
+
+  &::after {
+    animation-direction: reverse;
+    animation-range: calc(100% - 2em) calc(100% - 1em);
+  }
+}
+@keyframes reveal {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
