@@ -4,7 +4,8 @@ import tailwindcss from "@tailwindcss/vite";
 import AstroPWA from "@vite-pwa/astro";
 import { defineConfig } from "astro/config";
 import rehypeMermaid from "rehype-mermaid";
-import { rehypeWrapTables } from "./scripts/rehype-wrap-tables";
+import { rehypeResponsiveImages } from "./plugins/rehype-responsive-images";
+import { rehypeWrapTables } from "./plugins/rehype-wrap-tables";
 
 // https://astro.build/config
 export default defineConfig({
@@ -20,7 +21,11 @@ export default defineConfig({
         dark: "github-dark",
       },
     },
-    rehypePlugins: [rehypeMermaid, rehypeWrapTables],
+    rehypePlugins: [
+      [rehypeMermaid, { strategy: "img-svg" }],
+      rehypeWrapTables,
+      rehypeResponsiveImages,
+    ],
   },
   integrations: [
     react(),

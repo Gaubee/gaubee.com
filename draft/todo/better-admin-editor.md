@@ -25,9 +25,9 @@
    5. 因为我们的“草稿项目”其实是一个文件夹，因此可以编辑页面中，要有一个文件列表栏。我们可以在这个项目中存放多个文件。如果我在md中上传图片、上传文件，那么这些图片文件都会被存放到这个草稿文件夹中。
    6. 所有文本文件都可以打开编辑或者修改、保存。如果是视频文件和图片文件或者pdf等非文本的文件，就不支持修改功能，只有基础的删除、替换的功能。
    7. 如果是md文件，那么会额外提供一个“发表”的功能按钮，那么会出现一个确认发布的弹窗：
-      1. 一旦确认，首先会生成 `draft/{project-name}/{article,event}-{nid}[.{suffix}].md` 这样的文件，然后同时会创建资源文件夹`/assets/{article,event}-{nid}/`来存放引用的文件，最后创建`src/content/{articles,events}/{nid}.{project-name}[.{suffix}].md`文件。
+      1. 一旦确认，首先会生成 `draft/{project-name}/{article,event}-{nid}[.{suffix}].md` 这样的文件，然后同时会创建资源文件夹`public/assets/{article,event}-{nid}/`来存放引用的文件，最后创建`src/content/{articles,events}/{nid}.{project-name}[.{suffix}].md`文件。
       1. 如果文件名本身已经是 `{article,event}-{nid}[.{suffix}].md` 这样的名字形式，那么就没有“发表”的按钮，而是“更新”的按钮。更新是不用弹出“发表确认弹窗”的，而是直接写入到对应的文件了。前提是能找到对应的文件才能更新成功，否则需要弹出警告说文件不存在，需要用户二次确认才能去写入不存在的文件。
-         1. 不论是更新或者创建`/assets/{article,event}-{nid}/`下的文件是一定不能有残留的没有被使用的资源文件。
+         1. 不论是更新或者创建`public/assets/{article,event}-{nid}/`下的文件是一定不能有残留的没有被使用的资源文件。
       1. `{nid}`是自动生成的id序号，不可重复。需要去到当前的`src/content/{articles,events}`中获取最后一页的数据，取到最后一条数据的id，然后+1，作为新的id序号。
          > 这里要注意，article的id长度至少是4位，event的id长度至少是5位，位数不够要向前补`0`
       1. 是发表的时候，确认弹窗中会有一个“发布类型”选择器和“后缀内容”输入框：
@@ -35,11 +35,11 @@
          2. 后缀内容是可选的，如果不填，最终发布出来的就是`{nid}.{project-name}.md`这样的文件名，填写了就是`{nid}.{project-name}.{suffix}.md`这样的文件名
       1. 注意：`draft/{project-name}/{article,event}-{nid}[.{suffix}].md` 文件和 `src/content/{articles,events}/{nid}.{project-name}[.{suffix}].md` 的文件内容是不完全一样的，主要是在于文件的链接上：
          1. draft 文件夹下的链接是相对路径。链接到当前`{project-name}`的目录下。并且使用真实的文件名。
-         2. 正式发布后，articles 文件夹下的链接是绝对路径到`/assets/{article,event}-{nid}/`这个目录下。文件名使用hash，原本的文件名会被用作alt信息（如果没有alt信息的话）。
+         2. 正式发布后，articles 文件夹下的链接是绝对路径到`public/assets/{article,event}-{nid}/`这个目录下。文件名使用hash，原本的文件名会被用作alt信息（如果没有alt信息的话）。
          3. 这种设计的目的有两点：
             1. 隔离。确保草稿项目的文件永远不会影响到正式发布的文章或者时讯
             2. 可逆。我们可以根据文件的 hash（github-api原生支持）来找出原本的存在于 draft 的文件夹的文件，如果有，就可以做逆向转换。
             - 注意！！：为什么需要“可逆”的支持呢，因为我们在打开`draft/{project-name}/{article,event}-{nid}[.{suffix}].md`文件的时候，同时要检查一下`src/content/{articles,events}/{nid}.{project-name}[.{suffix}].md`文件，如果存在后者的文件。那么就会有一个“恢复”按钮：
-              1. 恢复功能就是将`src/content/{articles,events}/{nid}.{project-name}[.{suffix}].md`和`/assets/{article,event}-{nid}/`目录下的文件逆向转化成`draft/{project-name}/{article,event}-{nid}[.{suffix}].md`和`draft/{project-name}/`下的文件（同时引用链接也会做相应的转化）。
+              1. 恢复功能就是将`src/content/{articles,events}/{nid}.{project-name}[.{suffix}].md`和`public/assets/{article,event}-{nid}/`目录下的文件逆向转化成`draft/{project-name}/{article,event}-{nid}[.{suffix}].md`和`draft/{project-name}/`下的文件（同时引用链接也会做相应的转化）。
               2. 我们在发现存在`src/content/{articles,events}/{nid}.{project-name}[.{suffix}].md`文件后，说明恢复功能可用，这时候还需要检查一下修改时间。如果后者的修改时间是更加的新，说明用户没有来“草稿项目”中修改文件，而是直接在发布的文章基础上做了修改。所以此时我们需要主动直接提示用户是否要进行文件恢复。
             - 因为可逆，所以如果我们打开一个`src/content/{articles,events}/{nid}.{project-name}[.{suffix}].md`文件要编辑的时候，如果能逆向找到草稿文件夹，那么编辑界面就会亮起一个按钮：“打开草稿项目”。如果找不到，那么应该亮起另一个按钮：“创建草稿项目”。

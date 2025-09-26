@@ -10,10 +10,11 @@
     },
     "types": ["dom-navigation"],
     "strictNullChecks": true,
+    "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "plugins/**/*", "scripts/**/*"],
   "exclude": ["node_modules", "dist"]
 }
