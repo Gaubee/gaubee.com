@@ -22,7 +22,7 @@ const { title = "", description = "Gaubee's personal blog" } = Astro.props;
     <title>{title}</title>
     <meta name="description" content={description} />
     <script src="/src/pwa.ts"></script>
-    <link rel="stylesheet" href="/src/tailwind.css">
+    <link rel="stylesheet" href="/src/tailwind.css" />
     {pwaInfo && <Fragment set:html={pwaInfo.webManifest.linkTag} />}
 
     <ClientRouter />

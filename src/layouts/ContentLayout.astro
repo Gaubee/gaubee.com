@@ -38,7 +38,7 @@ const { postsByMonth, allTags } = await getSiteData();
       </MobileNav>
       <ContentScrollProgress />
 
-      <div class="p-6">
+      <div id="content" class="p-6">
         <slot />
       </div>
     </main>
@@ -54,11 +54,12 @@ const { postsByMonth, allTags } = await getSiteData();
     </aside>
   </div>
 
-  <Footer client:load />
+  <Footer />
   <BackToTop client:load />
 </RootLayout>
 
 <style>
+  /** 默认隐藏滚动条，因此已经有 ContentScrollProgress 提供视觉滚动的支持了 */
   @plugin "tailwind-scrollbar";
   :root {
     @apply scrollbar-none;
