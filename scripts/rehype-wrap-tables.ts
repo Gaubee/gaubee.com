@@ -13,17 +13,18 @@ export const rehypeWrapTables: RehypePlugins[number] = () => {
           node.properties.className,
           "whitespace-nowrap",
         );
-        node.properties.dataX = "1";
-        console.log("QAQ", node);
         node.properties = { ...node.properties };
         // 创建一个 <div> 元素，并添加 class
-        const wrapper = h("div", { className: "overflow-x-auto" }, [
-          // 把当前的 <table> 元素放进 div 里
+        const wrapper = h(
+          "div",
           {
-            ...node,
-            properties: { ...node.properties },
+            className: "overflow-x-auto table-wrapper",
           },
-        ]);
+          [
+            // 把当前的 <table> 元素放进 div 里
+            node,
+          ],
+        );
 
         // 用我们新创建的 wrapper 替换掉原来的 <table> 节点
         parent.children.splice(index, 1, wrapper);

@@ -8,6 +8,9 @@ import { cn } from "@/lib/utils";
 interface MagicCardProps {
   children?: React.ReactNode;
   className?: string;
+  classNames?: {
+    bg?: string;
+  };
   gradientSize?: number;
   gradientColor?: string;
   gradientOpacity?: number;
@@ -18,6 +21,7 @@ interface MagicCardProps {
 export function MagicCard({
   children,
   className,
+  classNames,
   gradientSize = 200,
   gradientColor = "#262626",
   gradientOpacity = 0.8,
@@ -87,7 +91,12 @@ export function MagicCard({
           `,
         }}
       />
-      <div className="absolute inset-px rounded-[inherit] bg-background" />
+      <div
+        className={cn(
+          "absolute inset-px rounded-[inherit]",
+          classNames?.bg ?? "bg-background",
+        )}
+      />
       <motion.div
         className="pointer-events-none absolute inset-px rounded-[inherit] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
         style={{

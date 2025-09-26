@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "ts": "astro check",
-    "dev": "astro dev",
+    "dev": "astro dev --force",
+    "sync": "astro sync --force",
     "fmt": "tsx scripts/fmt.ts",
     "start": "astro dev",
     "ui": "pnpm dlx shadcn@latest",

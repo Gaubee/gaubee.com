@@ -33,6 +33,7 @@ const pageTitle = "Gaubee's Blog";
           <PreviewCard
             key={post.id}
             client:load
+            classNames={{ rounded: "rounded-3xl" }}
             href={`/${post.collection}/${post.id}`}
             collection={post.collection}
             images={post.images}

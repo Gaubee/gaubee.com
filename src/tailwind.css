@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@plugin 'tailwind-scrollbar';
+@plugin "tailwind-scrollbar";
 @plugin "tailwindcss-animate";
 @plugin "@tailwindcss/typography";
 @import "tw-animate-css";
@@ -172,7 +172,8 @@
 }
 
 /* 滚动阴影 */
-.prose pre:has(> code) {
+.prose pre:has(> code),
+.prose .table-wrapper {
   display: flex;
   flex-direction: row;
   /** 原版 1.1428571em */
@@ -237,5 +238,12 @@
   }
   100% {
     opacity: 1;
+  }
+}
+
+/* 滚动条样式 */
+@layer components {
+  * {
+    @apply scrollbar-thin scrollbar-thumb-accent-foreground/38 scrollbar-hover:scrollbar-thumb-accent-foreground/68 scrollbar-track-transparent;
   }
 }

@@ -9,6 +9,7 @@ import TagsCard from "@/components/cards/TagsCard.tsx";
 import ArchiveCard from "@/components/cards/ArchiveCard.tsx";
 import { getSiteData } from "@/lib/getSiteData.ts";
 import type { MarkdownHeading } from "astro";
+import { ContentScrollProgress } from "@/components/ContentScrollProgress";
 
 interface Props {
   title?: string;
@@ -35,6 +36,7 @@ const { postsByMonth, allTags } = await getSiteData();
           <ArchiveCard client:load postsByMonth={postsByMonth} /> -->
         </div>
       </MobileNav>
+      <ContentScrollProgress />
 
       <div class="p-6">
         <slot />
@@ -55,3 +57,10 @@ const { postsByMonth, allTags } = await getSiteData();
   <Footer client:load />
   <BackToTop client:load />
 </RootLayout>
+
+<style>
+  @plugin "tailwind-scrollbar";
+  :root {
+    @apply scrollbar-none;
+  }
+</style>

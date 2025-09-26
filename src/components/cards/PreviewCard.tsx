@@ -13,6 +13,8 @@ import { PreviewImages } from "./PreviewImages";
 
 interface PreviewCardProps {
   key?: React.Key | null;
+  className?: string;
+  classNames?: { rounded?: string };
   header?: ReactNode;
   datetime?: string | number | Date;
   images?: string[];
@@ -23,6 +25,8 @@ interface PreviewCardProps {
 }
 export default function PreviewCard({
   key,
+  className,
+  classNames,
   header,
   children,
   images,
@@ -102,7 +106,11 @@ export default function PreviewCard({
   }, [images, title]);
 
   return (
-    <MagicCard key={key} gradientOpacity={0.1}>
+    <MagicCard
+      key={key}
+      gradientOpacity={0.1}
+      className={cn(className, classNames?.rounded)}
+    >
       <article className={cn("flex flex-col gap-4 p-4 pb-2")}>
         {header ?? (
           <div className="flex flex-col gap-2">
@@ -134,9 +142,10 @@ export default function PreviewCard({
         </div>
         {isOverflowing && (
           <ProgressiveBlur
-            height="180px"
+            height="min(180px, 50%)"
             position="bottom"
             className="right-[1px] !bottom-[1px] left-[1px]"
+            classNames={{ layer: classNames?.rounded }}
             blurLevels={[0.5, 0.6, 0.8, 1.2, 2, 4, 6, 8]}
           />
         )}

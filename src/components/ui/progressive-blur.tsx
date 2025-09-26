@@ -5,6 +5,9 @@ import React from "react";
 
 export interface ProgressiveBlurProps {
   className?: string;
+  classNames?: {
+    layer?: string;
+  };
   height?: string;
   position?: "top" | "bottom" | "both";
   blurLevels?: number[];
@@ -13,6 +16,7 @@ export interface ProgressiveBlurProps {
 
 export function ProgressiveBlur({
   className,
+  classNames,
   height = "30%",
   position = "bottom",
   blurLevels = [0.5, 1, 2, 4, 8, 16, 32, 64],
@@ -37,7 +41,7 @@ export function ProgressiveBlur({
     >
       {/* First blur layer (pseudo element) */}
       <div
-        className="absolute inset-0"
+        className={cn("absolute inset-0", classNames?.layer)}
         style={{
           zIndex: 1,
           backdropFilter: `blur(${blurLevels[0]}px)`,
@@ -74,7 +78,7 @@ export function ProgressiveBlur({
         return (
           <div
             key={`blur-${index}`}
-            className="absolute inset-0"
+            className={cn("absolute inset-0", classNames?.layer)}
             style={{
               zIndex: index + 2,
               backdropFilter: `blur(${blurLevels[blurIndex]}px)`,
@@ -88,7 +92,7 @@ export function ProgressiveBlur({
 
       {/* Last blur layer (pseudo element) */}
       <div
-        className="absolute inset-0"
+        className={cn("absolute inset-0", classNames?.layer)}
         style={{
           zIndex: blurLevels.length,
           backdropFilter: `blur(${blurLevels[blurLevels.length - 1]}px)`,
