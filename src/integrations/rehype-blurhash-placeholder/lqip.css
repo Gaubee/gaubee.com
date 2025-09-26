@@ -1,0 +1,51 @@
+/* integrations/astro-lqip/lqip.css */
+
+.lqip-img {
+  /* 确保图片本身在加载前是透明的，并且占据其布局空间 */
+  display: block;
+  width: 100%;
+  height: auto; /* 与 aspect-ratio 协同工作 */
+  background-color: transparent;
+  color: transparent; /* 隐藏 alt text，直到图片加载 */
+  position: relative;
+}
+
+.lqip-img::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1; /* 确保在图片之上 */
+  
+  /* 解码 --lqip 变量并绘制背景 */
+  --lqip-pi: 3.1415926535;
+  --lqip-nx: calc(mod(var(--lqip), 9) + 1);
+  --lqip-ny: calc(floor(var(--lqip) / 9) + 1);
+  --lqip-r: calc(mod(floor(var(--lqip) / 65536), 256) / 255);
+  --lqip-g: calc(mod(floor(var(--lqip) / 256), 256) / 255);
+  --lqip-b: calc(mod(var(--lqip), 256) / 255);
+  --lqip-bg-r: calc(1.055 * pow(var(--lqip-r), 1/2.4) - 0.055);
+  --lqip-bg-g: calc(1.055 * pow(var(--lqip-g), 1/2.4) - 0.055);
+  --lqip-bg-b: calc(1.055 * pow(var(--lqip-b), 1/2.4) - 0.055);
+
+  background-image:
+    linear-gradient(0deg,
+      rgb(calc(255*var(--lqip-bg-r)), calc(255*var(--lqip-bg-g)), calc(255*var(--lqip-bg-b))),
+      rgb(calc(255*var(--lqip-bg-r)), calc(255*var(--lqip-bg-g)), calc(255*var(--lqip-bg-b)))
+    );
+
+  /* 图片加载后，伪元素淡出 */
+  opacity: 1;
+  transition: opacity 500ms ease-in-out;
+}
+
+.lqip-img.loaded::before {
+  opacity: 0;
+}
+
+/* 别忘了图片本身的加载过渡效果 */
+.lqip-img.loaded {
+  color: initial; /* 显示 alt text */
+}

@@ -97,9 +97,6 @@ importers:
       motion:
         specifier: ^12.23.18
         version: 12.23.18(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
-      photoswipe:
-        specifier: ^5.4.4
-        version: 5.4.4
       react:
         specifier: ^19.1.1
         version: 19.1.1
@@ -170,6 +167,9 @@ importers:
       '@vite-pwa/astro':
         specifier: ^1.1.0
         version: 1.1.0(astro@5.13.10(@types/node@24.5.2)(jiti@2.5.1)(lightningcss@1.30.1)(rollup@2.79.2)(terser@5.44.0)(tsx@4.20.5)(typescript@5.9.2)(yaml@2.8.1))(vite-plugin-pwa@1.0.3(vite@7.1.7(@types/node@24.5.2)(jiti@2.5.1)(lightningcss@1.30.1)(terser@5.44.0)(tsx@4.20.5)(yaml@2.8.1))(workbox-build@7.3.0(@types/babel__core@7.20.5))(workbox-window@7.3.0))
+      blurhash:
+        specifier: ^2.0.5
+        version: 2.0.5
       debug:
         specifier: ^4.4.3
         version: 4.4.3
@@ -2839,6 +2839,9 @@ packages:
   blob-to-buffer@1.2.9:
     resolution: {integrity: sha512-BF033y5fN6OCofD3vgHmNtwZWRcq9NLyyxyILx9hfMy1sXYy4ojFl765hJ2lP0YaN2fuxPaLO2Vzzoxy0FLFFA==}
 
+  blurhash@2.0.5:
+    resolution: {integrity: sha512-cRygWd7kGBQO3VEhPiTgq4Wc43ctsM+o46urrmPOiuAe+07fzlSB9OJVdpgDL0jPqXUVQ9ht7aq7kxOeJHRK+w==}
+
   boxen@8.0.1:
     resolution: {integrity: sha512-F3PH5k5juxom4xktynS7MoFY+NUWH5LC4CnH11YB8NPew+HLpmBLCybSAEyb2F+4pRXhuhWqFesoQd6DAyc2hw==}
     engines: {node: '>=18'}
@@ -4681,10 +4684,6 @@ packages:
   pathval@2.0.1:
     resolution: {integrity: sha512-//nshmD55c46FuFw26xV/xFAaB5HF9Xdap7HJBBnrKdAd6/GxDBaNA1870O79+9ueg61cZLSVc+OaFlfmObYVQ==}
     engines: {node: '>= 14.16'}
-
-  photoswipe@5.4.4:
-    resolution: {integrity: sha512-WNFHoKrkZNnvFFhbHL93WDkW3ifwVOXSW3w1UuZZelSmgXpIGiZSNlZJq37rR8YejqME2rHs9EhH9ZvlvFH2NA==}
-    engines: {node: '>= 0.12.0'}
 
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
@@ -8969,6 +8968,8 @@ snapshots:
 
   blob-to-buffer@1.2.9: {}
 
+  blurhash@2.0.5: {}
+
   boxen@8.0.1:
     dependencies:
       ansi-align: 3.0.1
@@ -11295,8 +11296,6 @@ snapshots:
   pathe@2.0.3: {}
 
   pathval@2.0.1: {}
-
-  photoswipe@5.4.4: {}
 
   picocolors@1.1.1: {}
 

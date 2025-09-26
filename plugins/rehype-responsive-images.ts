@@ -1,14 +1,12 @@
 import { createResolverByRootFile } from "@gaubee/nodekit";
 import type { RehypePlugins } from "astro";
 import Debug from "debug";
-import type { Element, Root } from "hast";
 import { createHash } from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
-import { match, P } from "ts-pattern";
-import { visit } from "unist-util-visit";
+import { getLocalImgs } from "./helper/get-local-imgs";
 
 const log = Debug("rehype-responsive-images");
 // --- 配置 ---
@@ -66,46 +64,9 @@ interface ImageSource {
  */
 export const rehypeResponsiveImages: RehypePlugins[number] = () => {
   return async (tree, file) => {
-    const imageNodes: {
-      imgSrc: string;
-      imgFilepath: string;
-      node: Element;
-      index: number;
-      parent: Root | Element;
-    }[] = [];
-
     // 1. 收集所有需要处理的图片节点
-    visit(tree, "element", (node, index, parent) => {
-      if (
-        index != null &&
-        parent != null &&
-        node.tagName === "img" &&
-        node.properties.src
-      ) {
-        const src = node.properties.src;
-        // 只处理本地图片，跳过外部链接
-        match(src)
-          .with(
-            P.string.startsWith("http://"),
-            P.string.startsWith("https://"),
-            () => {
-              // ignore
-            },
-          )
-          .with(P.string, (src) => {
-            const imgFilepath = path.join(PUBLIC_DIR, src);
+    const imageNodes = getLocalImgs(PUBLIC_DIR, tree);
 
-            if (!existsSync(imgFilepath)) {
-              log(`图片未找到，已跳过: ${imgFilepath}`);
-              return;
-            }
-            imageNodes.push({ imgSrc: src, imgFilepath, node, index, parent });
-          })
-          .otherwise(() => {
-            //ignore
-          });
-      }
-    });
     if (imageNodes.length === 0) {
       return;
     }

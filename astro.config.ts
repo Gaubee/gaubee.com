@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import AstroPWA from "@vite-pwa/astro";
 import { defineConfig } from "astro/config";
 import rehypeMermaid from "rehype-mermaid";
+import { rehypeLqip } from "./plugins/rehype-blurhash-placeholder/rehype-lqip-plugin";
 import { rehypeResponsiveImages } from "./plugins/rehype-responsive-images";
 import { rehypeWrapTables } from "./plugins/rehype-wrap-tables";
 
@@ -25,11 +26,13 @@ export default defineConfig({
       [rehypeMermaid, { strategy: "img-svg" }],
       rehypeWrapTables,
       rehypeResponsiveImages,
+      rehypeLqip,
     ],
   },
   integrations: [
     react(),
     mdx(),
+    // astroLqip(),
     AstroPWA({
       registerType: "autoUpdate",
       injectRegister: "script-defer",
