@@ -1,11 +1,15 @@
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { upsertChange } from "@/lib/db";
-import { getFileContent } from "@/lib/github";
+import { getFileContent, getNextPostId } from "@/lib/files";
 import { matter } from "@gaubee/nodekit/front-matter";
-import { ArrowLeft, GitCommit } from "lucide-react";
+import { ArrowLeft, GitCommit, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import MarkdownEditor from "./MarkdownEditor";
-import MetadataEditor from "./MetadataEditor";
+import SmartMetadataEditor from "./SmartMetadataEditor";
+import prettier from "prettier/standalone";
+import prettierPluginMarkdown from "prettier/plugins/markdown";
 
 export default function EditorView() {
   const [path, setPath] = useState<string | null>(null);
@@ -25,32 +29,7 @@ export default function EditorView() {
       fetchContent(filePath);
     } else if (newFileType) {
       const type = newFileType === "article" ? "article" : "event";
-      const filename = prompt(
-        `Enter the filename for the new ${type} (e.g., my-new-post.md):`,
-      );
-      if (!filename || !filename.endsWith(".md")) {
-        alert("Invalid filename. Must end with .md");
-        window.location.href = "/admin"; // Go back if invalid
-        return;
-      }
-      const newPath = `src/content/${type}s/${filename}`;
-      const newContent = `---
-title: "New ${type}"
-date: "${new Date().toISOString()}"
-tags: []
----
-
-# New ${type}: ${filename}
-
-Start writing...
-`;
-      setPath(newPath);
-      setOriginalContent(newContent);
-      const { content, data } = matter<any>(newContent);
-      setMetadata(data);
-      setMarkdownContent(content);
-      setIsNewFile(true);
-      setIsLoadingContent(false);
+      initializeNewFile(type);
     } else {
       // No path or new file type, redirect to file browser
       window.location.href = "/admin";
@@ -73,11 +52,49 @@ Start writing...
     }
   }
 
+  const [slug, setSlug] = useState("");
+  const [nextId, setNextId] = useState<number | null>(null);
+
+  const initializeNewFile = async (type: "article" | "event") => {
+    const id = await getNextPostId(type);
+    setNextId(id);
+    setIsNewFile(true);
+    setIsLoadingContent(false);
+  };
+
+  const handleCreateFile = () => {
+    if (!slug || !nextId) return;
+    const type = new URLSearchParams(window.location.search).get("new") as "article" | "event";
+    const paddedId = nextId.toString().padStart(4, "0");
+    const filename = `${paddedId}.${slug}.md`;
+    const newPath = `src/content/${type}s/${filename}`;
+    const newContent = `---
+title: "New ${type}"
+date: "${new Date().toISOString()}"
+updated: "${new Date().toISOString()}"
+tags: []
+---
+
+# New ${type}: ${slug}
+
+Start writing...
+`;
+    setPath(newPath);
+    setOriginalContent(newContent);
+    const { content, data } = matter<any>(newContent);
+    setMetadata(data);
+    setMarkdownContent(content);
+  };
+
   const handleStageChanges = async () => {
     if (!path) return;
 
     try {
-      const newContent = matter.stringify(markdownContent, metadata);
+      const updatedMetadata = {
+        ...metadata,
+        updated: new Date().toISOString(),
+      };
+      const newContent = matter.stringify(markdownContent, updatedMetadata);
       const status = isNewFile ? "created" : "updated";
       await upsertChange({
         path: path,
@@ -104,6 +121,31 @@ Start writing...
     );
   }
 
+  if (isNewFile && !path) {
+    return (
+      <div className="space-y-4 p-4 md:p-8">
+        <h3 className="text-lg font-semibold">Create New File</h3>
+        <div className="flex items-end space-x-2">
+          <div className="flex-grow">
+            <Label htmlFor="slug">Slug</Label>
+            <Input
+              id="slug"
+              type="text"
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+            />
+          </div>
+          <Button onClick={handleCreateFile}>Create</Button>
+        </div>
+        {nextId && slug && (
+          <p className="text-sm text-muted-foreground">
+            Filename: {`${nextId.toString().padStart(4, "0")}.${slug}.md`}
+          </p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 p-4 md:p-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
@@ -117,13 +159,36 @@ Start writing...
         <div className="order-last w-full truncate text-center font-mono text-sm sm:order-none sm:w-auto">
           {path}
         </div>
-        <Button onClick={handleStageChanges} disabled={!hasChanges}>
-          <GitCommit className="mr-2 h-4 w-4" />
-          Stage Changes
-        </Button>
+        <div>
+          <Button onClick={handleFormat} variant="outline" className="mr-2">
+            <Sparkles className="mr-2 h-4 w-4" />
+            Format
+          </Button>
+          <Button onClick={handleStageChanges} disabled={!hasChanges}>
+            <GitCommit className="mr-2 h-4 w-4" />
+            Stage Changes
+          </Button>
+        </div>
       </header>
-      <MetadataEditor metadata={metadata} onChange={setMetadata} />
-      <MarkdownEditor content={markdownContent} onChange={setMarkdownContent} />
+      <SmartMetadataEditor metadata={metadata} onChange={setMetadata} />
+      <MarkdownEditor
+        content={markdownContent}
+        onChange={setMarkdownContent}
+        path={path}
+      />
     </div>
   );
+
+  async function handleFormat() {
+    try {
+      const formatted = await prettier.format(markdownContent, {
+        parser: "markdown",
+        plugins: [prettierPluginMarkdown],
+      });
+      setMarkdownContent(formatted);
+    } catch (error) {
+      console.error("Failed to format markdown:", error);
+      alert("Failed to format markdown. See console for details.");
+    }
+  }
 }

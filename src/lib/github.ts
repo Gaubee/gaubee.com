@@ -172,3 +172,18 @@ export async function commitChanges(
 
   return newCommit;
 }
+
+export async function uploadFile(path: string, content: string) {
+  const octokit = getOctokit();
+  if (!octokit) {
+    throw new Error("GitHub client not initialized.");
+  }
+
+  await octokit.repos.createOrUpdateFileContents({
+    owner: OWNER,
+    repo: REPO,
+    path,
+    message: `feat: upload ${path}`,
+    content: content,
+  });
+}
