@@ -265,4 +265,7 @@
   * {
     @apply scrollbar-thin scrollbar-thumb-accent-foreground/38 scrollbar-hover:scrollbar-thumb-accent-foreground/68 scrollbar-track-transparent;
   }
+  :focus-visible {
+    outline: none;
+  }
 }

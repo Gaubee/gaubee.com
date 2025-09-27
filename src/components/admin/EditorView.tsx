@@ -1,19 +1,125 @@
 import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { upsertChange } from "@/lib/db";
 import { getFileContent } from "@/lib/github";
 import { matter } from "@gaubee/nodekit/front-matter";
-import { ArrowLeft, GitCommit } from "lucide-react";
+import {
+  ArrowLeft,
+  Columns,
+  GitCommit,
+  PanelLeft,
+  PanelRight,
+  Sparkles,
+} from "lucide-react";
+import prettierPluginMarkdown from "prettier/plugins/markdown";
+import prettier from "prettier/standalone";
 import { useEffect, useState } from "react";
-import MarkdownEditor from "./MarkdownEditor";
-import MetadataEditor from "./MetadataEditor";
+import CodeMirrorEditor from "./CodeMirrorEditor";
+import MarkdownPreview from "./MarkdownPreview";
+import MetadataEditor from "./metadata-editor/MetadataEditor";
+import MetadataPreview from "./MetadataPreview";
+import TableOfContents from "./TableOfContents";
+
+import { getFieldHandler } from "./metadata-editor/field-handler";
+import {
+  type EditorMetadata,
+  type MetadataFieldSchema,
+} from "./metadata-editor/types";
+
+function generateInitialSchema(
+  data: Record<string, any>,
+): Record<string, MetadataFieldSchema> {
+  const schema: Record<string, MetadataFieldSchema> = {};
+  Object.keys(data).forEach((key, index) => {
+    if (key === "__editor_metadata") return;
+    const value = data[key];
+    let detectedType: MetadataFieldSchema["type"] = "text";
+    if (typeof value === "number") {
+      detectedType = "number";
+    } else if (
+      value instanceof Date ||
+      (typeof value === "string" && !isNaN(new Date(value).getTime()))
+    ) {
+      detectedType = "date";
+    } else if (
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value)
+    ) {
+      detectedType = "object";
+    }
+
+    schema[key] = {
+      type: detectedType,
+      isArray: Array.isArray(value),
+      order: index,
+      description: `Configuration for the '${key}' field.`,
+    };
+  });
+  return schema;
+}
 
 export default function EditorView() {
   const [path, setPath] = useState<string | null>(null);
   const [originalContent, setOriginalContent] = useState<string>("");
-  const [metadata, setMetadata] = useState<Record<string, any>>({});
+  const [metadata, setMetadata] = useState<EditorMetadata>({});
   const [markdownContent, setMarkdownContent] = useState("");
   const [isLoadingContent, setIsLoadingContent] = useState(true);
   const [isNewFile, setIsNewFile] = useState(false);
+  const [viewMode, setViewMode] = useState("split"); // 'editor', 'preview', 'split'
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  useEffect(() => {
+    if (isMobile && viewMode === "split") {
+      setViewMode("editor");
+    }
+  }, [isMobile, viewMode]);
+
+  const handleFormat = async () => {
+    // Format markdown content
+    try {
+      const formattedContent = await prettier.format(markdownContent, {
+        parser: "markdown",
+        plugins: [prettierPluginMarkdown],
+      });
+      setMarkdownContent(formattedContent);
+    } catch (error) {
+      console.error("Failed to format markdown:", error);
+      alert("Error formatting markdown. See console for details.");
+    }
+
+    // Format metadata
+    const newMetadata = { ...metadata };
+    let metadataChanged = false;
+    for (const key in newMetadata) {
+      if (key === "__editor_metadata") continue;
+
+      const schema = newMetadata.__editor_metadata?.[key];
+      if (schema) {
+        const handler = getFieldHandler(schema.type);
+        const value = newMetadata[key];
+
+        if (handler.verify(value)) {
+          const formattedValue = handler.format(value);
+          if (formattedValue !== value) {
+            newMetadata[key] = formattedValue;
+            metadataChanged = true;
+          }
+        }
+      }
+    }
+
+    if (metadataChanged) {
+      setMetadata(newMetadata);
+    }
+  };
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -25,9 +131,11 @@ export default function EditorView() {
       fetchContent(filePath);
     } else if (newFileType) {
       const type = newFileType === "article" ? "article" : "event";
-      const filename = prompt(
-        `Enter the filename for the new ${type} (e.g., my-new-post.md):`,
-      );
+      const filename =
+        urlParams.get("filename") ??
+        prompt(
+          `Enter the filename for the new ${type} (e.g., my-new-post.md):`,
+        );
       if (!filename || !filename.endsWith(".md")) {
         alert("Invalid filename. Must end with .md");
         window.location.href = "/admin"; // Go back if invalid
@@ -37,7 +145,18 @@ export default function EditorView() {
       const newContent = `---
 title: "New ${type}"
 date: "${new Date().toISOString()}"
+updated: "${new Date().toISOString()}"
 tags: []
+__editor_metadata:
+  title:
+    type: text
+  date:
+    type: datetime
+  updated:
+    type: datetime
+  tags:
+    type: text
+    isArray: true
 ---
 
 # New ${type}: ${filename}
@@ -47,6 +166,11 @@ Start writing...
       setPath(newPath);
       setOriginalContent(newContent);
       const { content, data } = matter<any>(newContent);
+
+      if (!data.__editor_metadata) {
+        data.__editor_metadata = generateInitialSchema(data);
+      }
+
       setMetadata(data);
       setMarkdownContent(content);
       setIsNewFile(true);
@@ -63,6 +187,11 @@ Start writing...
       const fileContent = await getFileContent(filePath);
       setOriginalContent(fileContent);
       const { content, data } = matter<any>(fileContent);
+
+      if (!data.__editor_metadata) {
+        data.__editor_metadata = generateInitialSchema(data);
+      }
+
       setMetadata(data);
       setMarkdownContent(content);
     } catch (error) {
@@ -77,7 +206,12 @@ Start writing...
     if (!path) return;
 
     try {
-      const newContent = matter.stringify(markdownContent, metadata);
+      const updatedMetadata = {
+        ...metadata,
+        updated: new Date().toISOString(),
+      };
+
+      const newContent = matter.stringify(markdownContent, updatedMetadata);
       const status = isNewFile ? "created" : "updated";
       await upsertChange({
         path: path,
@@ -114,16 +248,95 @@ Start writing...
           <ArrowLeft className="mr-2 h-4 w-4" />
           <span className="hidden sm:inline">Back to Files</span>
         </Button>
-        <div className="order-last w-full truncate text-center font-mono text-sm sm:order-none sm:w-auto">
-          {path}
+        <div className="order-last flex-grow text-center sm:order-none">
+          <ToggleGroup
+            type="single"
+            defaultValue="split"
+            value={viewMode}
+            onValueChange={(value) => {
+              if (value) setViewMode(value);
+            }}
+            aria-label="Editor view mode"
+            className="mx-auto inline-flex"
+          >
+            <ToggleGroupItem value="editor" aria-label="Editor only">
+              <PanelLeft className="h-4 w-4" />
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="split"
+              aria-label="Split view"
+              disabled={isMobile}
+            >
+              <Columns className="h-4 w-4" />
+            </ToggleGroupItem>
+            <ToggleGroupItem value="preview" aria-label="Preview only">
+              <PanelRight className="h-4 w-4" />
+            </ToggleGroupItem>
+          </ToggleGroup>
         </div>
-        <Button onClick={handleStageChanges} disabled={!hasChanges}>
-          <GitCommit className="mr-2 h-4 w-4" />
-          Stage Changes
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleFormat}>
+            <Sparkles className="mr-2 h-4 w-4" />
+            Format
+          </Button>
+          <Button onClick={handleStageChanges} disabled={!hasChanges}>
+            <GitCommit className="mr-2 h-4 w-4" />
+            Stage Changes
+          </Button>
+        </div>
       </header>
-      <MetadataEditor metadata={metadata} onChange={setMetadata} />
-      <MarkdownEditor content={markdownContent} onChange={setMarkdownContent} />
+      <div className="w-full truncate text-center font-mono text-sm text-muted-foreground">
+        {path}
+      </div>
+
+      {/* New Metadata Section */}
+      <div
+        className={`grid grid-cols-1 gap-4 ${viewMode === "split" && !isMobile ? "md:grid-cols-2" : ""}`}
+      >
+        {(viewMode === "editor" || (viewMode === "split" && !isMobile)) && (
+          <div
+            className={viewMode === "split" && !isMobile ? "" : "col-span-full"}
+          >
+            <MetadataEditor metadata={metadata} setMetadata={setMetadata} />
+          </div>
+        )}
+        {(viewMode === "preview" || (viewMode === "split" && !isMobile)) && (
+          <div
+            className={viewMode === "split" && !isMobile ? "" : "col-span-full"}
+          >
+            <MetadataPreview metadata={metadata} />
+          </div>
+        )}
+      </div>
+
+      {/* Markdown Section */}
+      <div
+        className={`grid grid-cols-1 gap-4 ${
+          viewMode === "split" && !isMobile ? "md:grid-cols-2" : ""
+        }`}
+      >
+        {(viewMode === "editor" || (viewMode === "split" && !isMobile)) && (
+          <div
+            className={viewMode === "split" && !isMobile ? "" : "col-span-full"}
+          >
+            <CodeMirrorEditor
+              content={markdownContent}
+              onChange={setMarkdownContent}
+              path={path}
+            />
+          </div>
+        )}
+        {(viewMode === "preview" || (viewMode === "split" && !isMobile)) && (
+          <div
+            className={viewMode === "split" && !isMobile ? "" : "col-span-full"}
+          >
+            <div className="space-y-4">
+              <TableOfContents content={markdownContent} />
+              <MarkdownPreview content={markdownContent} />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
