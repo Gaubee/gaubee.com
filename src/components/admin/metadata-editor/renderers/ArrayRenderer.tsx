@@ -1,22 +1,43 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, PlusCircle } from "lucide-react";
+import { X, PlusCircle, GripVertical } from "lucide-react";
 import { useState } from "react";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+function SortableArrayItem({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} className="flex items-center gap-2">
+      <div {...listeners} className="cursor-grab"><GripVertical /></div>
+      <div className="flex-grow">{children}</div>
+    </div>
+  );
+}
 
 interface ArrayRendererProps {
   value: any[];
-  onItemChange: (index: number, value: string) => void;
+  renderItem: (item: any, index: number) => React.ReactNode;
+  onItemChange: (index: number, value: any) => void;
   onAddItem: (newItem: string) => void;
   onRemoveItem: (index: number) => void;
+  onReorder: (oldIndex: number, newIndex: number) => void;
 }
 
 export function ArrayRenderer({
   value,
-  onItemChange,
+  renderItem,
   onAddItem,
   onRemoveItem,
+  onReorder,
 }: ArrayRendererProps) {
   const [newItem, setNewItem] = useState("");
+  const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
   const handleAddItem = () => {
     if (newItem.trim() === "") return;
@@ -24,24 +45,35 @@ export function ArrayRenderer({
     setNewItem("");
   };
 
+  function handleDragEnd(event: DragEndEvent) {
+    const {active, over} = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = value.findIndex((_, index) => `${index}` === active.id);
+      const newIndex = value.findIndex((_, index) => `${index}` === over.id);
+      onReorder(oldIndex, newIndex);
+    }
+  }
+
+  const itemsWithIds = value.map((_, index) => ({ id: `${index}` }));
+
   return (
     <div className="space-y-2">
-      {(value || []).map((item, index) => (
-        <div key={index} className="flex items-center gap-2">
-          <Input
-            type="text"
-            value={item}
-            onChange={(e) => onItemChange(index, e.target.value)}
-          />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onRemoveItem(index)}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      ))}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={itemsWithIds.map(i => i.id)} strategy={verticalListSortingStrategy}>
+          {value.map((item, index) => (
+            <SortableArrayItem key={index} id={`${index}`}>
+                {renderItem(item, index)}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onRemoveItem(index)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+            </SortableArrayItem>
+          ))}
+        </SortableContext>
+      </DndContext>
       <div className="flex items-center gap-2">
         <Input
           type="text"

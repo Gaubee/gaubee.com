@@ -23,16 +23,18 @@ import { type MetadataFieldSchema } from "./types";
 interface FieldMetadataEditDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  fieldKey: string;
+  fieldKey?: string;
   fieldSchema: MetadataFieldSchema;
+  isNew: boolean;
   onSave: (newKey: string, newSchema: MetadataFieldSchema) => void;
 }
 
 export function FieldMetadataEditDialog({
   isOpen,
   onOpenChange,
-  fieldKey,
+  fieldKey = "",
   fieldSchema,
+  isNew,
   onSave,
 }: FieldMetadataEditDialogProps) {
   const [newKey, setNewKey] = useState(fieldKey);
@@ -45,7 +47,7 @@ export function FieldMetadataEditDialog({
     setNewType(fieldSchema.type);
     setIsArr(fieldSchema.isArray);
     setDescription(fieldSchema.description);
-  }, [fieldKey, fieldSchema]);
+  }, [fieldKey, fieldSchema, isOpen]);
 
   const handleSaveChanges = () => {
     onSave(newKey, {
@@ -54,18 +56,18 @@ export function FieldMetadataEditDialog({
       isArray: isArr,
       description,
     });
-    onOpenChange(false); // Close dialog on save
+    onOpenChange(false);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Edit Field: {fieldKey}</DialogTitle>
+          <DialogTitle>{isNew ? "Create New Field" : `Edit Field: ${fieldKey}`}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="key" className="text-right">
+          <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-4 md:gap-4">
+            <Label htmlFor="key" className="md:text-right">
               Key
             </Label>
             <Input
@@ -73,10 +75,11 @@ export function FieldMetadataEditDialog({
               value={newKey}
               onChange={(e) => setNewKey(e.target.value)}
               className="col-span-3"
+              readOnly={!isNew && newKey === 'updated'}
             />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="type" className="text-right">
+          <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-4 md:gap-4">
+            <Label htmlFor="type" className="md:text-right">
               Type
             </Label>
             <Select value={newType} onValueChange={(value: string) => setNewType(value as MetadataFieldSchema["type"])}>
@@ -95,8 +98,8 @@ export function FieldMetadataEditDialog({
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="description" className="text-right">
+          <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-4 md:gap-4">
+            <Label htmlFor="description" className="md:text-right">
               Description
             </Label>
             <Input
@@ -106,14 +109,14 @@ export function FieldMetadataEditDialog({
               className="col-span-3"
             />
           </div>
-          <div className="col-span-4 flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-2 md:col-start-2 md:col-span-3">
             <Label htmlFor="is-array">
               Is Array
             </Label>
             <Checkbox
               id="is-array"
               checked={isArr}
-              onCheckedChange={(checked: boolean) => setIsArr(Boolean(checked))}
+              onCheckedChange={(checked: boolean) => setIsArr(checked)}
             />
           </div>
         </div>
