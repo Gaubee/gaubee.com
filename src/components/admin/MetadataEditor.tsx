@@ -23,7 +23,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { X, PlusCircle, Pencil } from "lucide-react";
 import { useState } from "react";
-
+import * as YAML from "js-yaml";
 interface MetadataEditorProps {
   metadata: Record<string, any>;
   onChange: (newMetadata: Record<string, any>) => void;
@@ -57,22 +57,33 @@ export default function MetadataEditor({
     } else if (typeof val === "number") {
       detectedType = "number";
     } else if (val && typeof val === "object") {
-      detectedType = "json";
+      // TODO: Future enhancement to allow selecting different object notations (e.g. JSON, YAML)
+      detectedType = "object";
     }
     setNewType(detectedType);
     setIsEditing(true);
   };
 
   const validateField = (key: string, value: any): boolean => {
-    if (typeof value === 'object' && value !== null) {
+    if (typeof value === "object" && value !== null) {
       return true; // Already a valid object/array
     }
-    try {
-      JSON.parse(value);
-      return true;
-    } catch (e) {
-      return false;
+    // For string values, try to parse as JSON or YAML
+    if (typeof value === "string") {
+      try {
+        JSON.parse(value);
+        return true;
+      } catch (jsonError) {
+        try {
+          YAML.load(value);
+          return true;
+        } catch (yamlError) {
+          return false;
+        }
+      }
     }
+    // For other primitive types, consider them valid
+    return true;
   };
 
   const handleFocus = (key: string) => {
@@ -95,22 +106,40 @@ export default function MetadataEditor({
 
     const { key: oldKey } = currentField;
     const newMetadata = { ...metadata };
-    let newValue = newMetadata[oldKey]; // This value might be a string from the Textarea
+    let valueToConvert = newMetadata[oldKey];
 
-    // If the value is a string from editing a JSON/array field, parse it first.
-    if (typeof newValue === 'string' && (Array.isArray(currentField.value) || typeof currentField.value === 'object')) {
-        if (!validateField(oldKey, newValue)) {
-            alert(`The value for '${newKey}' is not valid JSON. Please correct it before saving.`);
-            return;
+    // Convert value based on the selected type
+    switch (newType) {
+      case "number":
+        valueToConvert = Number(valueToConvert);
+        break;
+      case "date":
+      case "datetime":
+        const date = new Date(valueToConvert);
+        if (!isNaN(+date)) {
+          valueToConvert = date.toISOString();
+        } else {
+          alert("Invalid date format.");
+          return;
         }
-        newValue = JSON.parse(newValue);
+        break;
+      case "object":
+        if (typeof valueToConvert === 'string') {
+          try {
+            valueToConvert = YAML.load(valueToConvert);
+          } catch (e) {
+            alert("Invalid YAML/JSON format.");
+            return;
+          }
+        }
+        break;
     }
 
     // Handle the "Is Array" toggle
-    if (isArr && !Array.isArray(newValue)) {
-      newValue = newValue ? [newValue] : []; // Wrap non-empty value in array, or create empty array
-    } else if (!isArr && Array.isArray(newValue)) {
-      newValue = newValue[0] ?? ""; // Use first element or empty string
+    if (isArr && !Array.isArray(valueToConvert)) {
+      valueToConvert = valueToConvert ? [valueToConvert] : [];
+    } else if (!isArr && Array.isArray(valueToConvert)) {
+      valueToConvert = valueToConvert[0] ?? "";
     }
 
     // Handle key change
@@ -118,7 +147,7 @@ export default function MetadataEditor({
       delete newMetadata[oldKey];
     }
 
-    newMetadata[newKey] = newValue;
+    newMetadata[newKey] = valueToConvert;
 
     onChange(newMetadata);
     setIsEditing(false);
@@ -201,7 +230,9 @@ export default function MetadataEditor({
               onChange={(e) => setNewItem(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddItem(key))}
             />
-            <Button onClick={() => handleAddItem(key)}>Add</Button>
+            <Button variant="ghost" size="icon" onClick={() => handleAddItem(key)}>
+              <PlusCircle className="h-5 w-5" />
+            </Button>
           </div>
         </div>
       );

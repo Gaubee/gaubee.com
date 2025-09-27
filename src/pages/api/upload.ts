@@ -5,6 +5,8 @@ const GITHUB_TOKEN = import.meta.env.GITHUB_TOKEN;
 const OWNER = "gaubee";
 const REPO = "gaubee.com";
 
+// TODO: Refactor this to create a new branch and a Pull Request instead of committing directly to main.
+// This is a safer and more robust approach for production environments.
 export const POST: APIRoute = async ({ request }) => {
   if (!GITHUB_TOKEN) {
     return new Response("GitHub token is not configured.", { status: 500 });

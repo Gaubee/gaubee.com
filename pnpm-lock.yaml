@@ -88,6 +88,9 @@ importers:
       '@tiptap/starter-kit':
         specifier: ^3.4.4
         version: 3.4.4
+      '@types/js-yaml':
+        specifier: ^4.0.9
+        version: 4.0.9
       '@uiw/codemirror-theme-github':
         specifier: ^4.25.2
         version: 4.25.2(@codemirror/language@6.11.3)(@codemirror/state@6.5.2)(@codemirror/view@6.38.3)
@@ -115,6 +118,9 @@ importers:
       idb:
         specifier: ^8.0.3
         version: 8.0.3
+      js-yaml:
+        specifier: ^4.1.0
+        version: 4.1.0
       lit:
         specifier: ^3.3.1
         version: 3.3.1
@@ -2710,6 +2716,9 @@ packages:
 
   '@types/hast@3.0.4':
     resolution: {integrity: sha512-WPs+bbQw5aCj+x6laNGWLH3wviHtoCv/P3+otBhbOhJgG8qtpdAMlTCxLtsTWA7LH1Oh/bFCHsBn0TPS5m30EQ==}
+
+  '@types/js-yaml@4.0.9':
+    resolution: {integrity: sha512-k4MGaQl5TGo/iipqb2UDG2UwjXziSWkh0uysQelTlJpX1qGlpUZYm8PnO4DxG1qBomtJUdYJ6qR6xdIah10JLg==}
 
   '@types/katex@0.16.7':
     resolution: {integrity: sha512-HMwFiRujE5PjrgwHQ25+bsLJgowjGjm5Z8FVSf0N6PwgJrwxH0QxzHYDcKsTfV3wva0vzrpqMTJS2jXPr5BMEQ==}
@@ -9090,6 +9099,8 @@ snapshots:
   '@types/hast@3.0.4':
     dependencies:
       '@types/unist': 3.0.3
+
+  '@types/js-yaml@4.0.9': {}
 
   '@types/katex@0.16.7': {}
 

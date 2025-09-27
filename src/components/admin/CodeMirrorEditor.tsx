@@ -190,6 +190,9 @@ export default function CodeMirrorEditor({
         height="500px"
         theme={githubDark}
         extensions={[
+          // TODO: Add autocompletion and hinting functionality.
+          // This would involve adding the @codemirror/autocomplete package
+          // and configuring it with sources for markdown keywords, etc.
           markdown({
             base: markdownLanguage,
             codeLanguages: (info) => {
