@@ -24,9 +24,17 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { X, PlusCircle, Pencil } from "lucide-react";
 import { useState } from "react";
 import * as YAML from "js-yaml";
+import { type EditorMetadata, type MetadataFieldSchema } from "./EditorView";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 interface MetadataEditorProps {
-  metadata: Record<string, any>;
-  onChange: (newMetadata: Record<string, any>) => void;
+  metadata: EditorMetadata;
+  onChange: (newMetadata: EditorMetadata) => void;
 }
 
 export default function MetadataEditor({
@@ -48,19 +56,15 @@ export default function MetadataEditor({
   const handleEditField = (key: string, value: any) => {
     setCurrentField({ key, value });
     setNewKey(key);
-    setIsArr(Array.isArray(value));
-
-    const val = Array.isArray(value) ? value[0] : value;
-    let detectedType = "text";
-    if (key === "date" || key === "updated") {
-      detectedType = "date";
-    } else if (typeof val === "number") {
-      detectedType = "number";
-    } else if (val && typeof val === "object") {
-      // TODO: Future enhancement to allow selecting different object notations (e.g. JSON, YAML)
-      detectedType = "object";
+    const schema = metadata.__editor_metadata?.[key];
+    if (schema) {
+      setIsArr(schema.isArray);
+      setNewType(schema.type);
+    } else {
+      // Fallback for safety, this case should be rare after EditorView changes
+      setIsArr(Array.isArray(value));
+      setNewType("text");
     }
-    setNewType(detectedType);
     setIsEditing(true);
   };
 
@@ -108,46 +112,63 @@ export default function MetadataEditor({
     const newMetadata = { ...metadata };
     let valueToConvert = newMetadata[oldKey];
 
-    // Convert value based on the selected type
-    switch (newType) {
-      case "number":
-        valueToConvert = Number(valueToConvert);
-        break;
-      case "date":
-      case "datetime":
-        const date = new Date(valueToConvert);
-        if (!isNaN(+date)) {
-          valueToConvert = date.toISOString();
-        } else {
-          alert("Invalid date format.");
-          return;
+    // This is the source of truth for the schema, even for a new key
+    const newSchema = newMetadata.__editor_metadata?.[oldKey] ?? {
+        order: 99,
+        description: ""
+    };
+
+    // 1. Convert value based on the selected type
+    if (typeof valueToConvert === 'string') {
+        switch (newType) {
+            case "number":
+                const num = parseFloat(valueToConvert);
+                valueToConvert = isNaN(num) ? 0 : num;
+                break;
+            case "date":
+            case "datetime":
+                const date = new Date(valueToConvert);
+                if (isNaN(+date)) {
+                    alert("Invalid date format. Cannot save.");
+                    return;
+                }
+                valueToConvert = date.toISOString();
+                break;
+            case "object":
+                try {
+                    valueToConvert = YAML.load(valueToConvert);
+                } catch (e) {
+                    alert("Invalid YAML/JSON format. Cannot save.");
+                    return;
+                }
+                break;
         }
-        break;
-      case "object":
-        if (typeof valueToConvert === 'string') {
-          try {
-            valueToConvert = YAML.load(valueToConvert);
-          } catch (e) {
-            alert("Invalid YAML/JSON format.");
-            return;
-          }
-        }
-        break;
     }
 
-    // Handle the "Is Array" toggle
+    // 2. Handle the "Is Array" toggle
     if (isArr && !Array.isArray(valueToConvert)) {
       valueToConvert = valueToConvert ? [valueToConvert] : [];
     } else if (!isArr && Array.isArray(valueToConvert)) {
       valueToConvert = valueToConvert[0] ?? "";
     }
 
-    // Handle key change
+    // 3. Update the schema
+    newSchema.type = newType as MetadataFieldSchema['type'];
+    newSchema.isArray = isArr;
+
+    // 4. Handle key change
     if (oldKey !== newKey) {
       delete newMetadata[oldKey];
+      if(newMetadata.__editor_metadata) {
+        delete newMetadata.__editor_metadata[oldKey];
+      }
     }
 
+    // 5. Save the new value and schema
     newMetadata[newKey] = valueToConvert;
+    if(newMetadata.__editor_metadata){
+        newMetadata.__editor_metadata[newKey] = newSchema;
+    }
 
     onChange(newMetadata);
     setIsEditing(false);
@@ -196,6 +217,7 @@ export default function MetadataEditor({
   };
 
   const renderInput = (key: string, value: any) => {
+    const schema = metadata.__editor_metadata?.[key];
     const { isValid = true, isFocused } = validationState[key] || {};
     const validationClass = !isValid
       ? isFocused
@@ -203,10 +225,10 @@ export default function MetadataEditor({
         : "border-red-500"
       : "";
 
-    if (Array.isArray(value)) {
+    if (schema?.isArray) {
       return (
         <div className="space-y-2">
-          {value.map((item, index) => (
+          {(value || []).map((item: any, index: number) => (
             <div key={index} className="flex items-center gap-2">
               <Input
                 type="text"
@@ -238,48 +260,56 @@ export default function MetadataEditor({
       );
     }
 
-    if (typeof value === "object" && value !== null) {
-      return (
-        <Textarea
-          id={`meta-${key}`}
-          name={key}
-          value={typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
-          onFocus={() => handleFocus(key)}
-          onBlur={(e) => handleBlur(key, e.target.value)}
-          onChange={(e) => {
-            const { name, value } = e.target;
-            onChange({ ...metadata, [name]: value });
-            const isValid = validateField(key, value);
-            setValidationState(prev => ({ ...prev, [key]: { ...prev[key], isValid } }));
-          }}
-          className={`h-24 font-mono ${validationClass}`}
-        />
-      );
+    switch (schema?.type) {
+      case "object":
+        return (
+          <Textarea
+            id={`meta-${key}`}
+            name={key}
+            value={typeof value === 'string' ? value : YAML.dump(value)}
+            onFocus={() => handleFocus(key)}
+            onBlur={(e) => handleBlur(key, e.target.value)}
+            onChange={(e) => {
+              const { name, value } = e.target;
+              onChange({ ...metadata, [name]: value });
+              const isValid = validateField(key, value);
+              setValidationState(prev => ({ ...prev, [key]: { ...prev[key], isValid } }));
+            }}
+            className={`h-24 font-mono ${validationClass}`}
+          />
+        );
+      case "date":
+      case "datetime":
+        const dateValue = value ? new Date(value).toISOString().split("T")[0] : "";
+        return (
+          <Input
+            id={`meta-${key}`}
+            name={key}
+            type={schema.type === 'datetime' ? 'datetime-local' : 'date'}
+            value={dateValue}
+            onChange={handleDateChange}
+          />
+        );
+      default:
+        return (
+          <Input
+            id={`meta-${key}`}
+            name={key}
+            type="text"
+            value={String(value ?? '')}
+            onChange={handleInputChange}
+          />
+        );
     }
-
-    if (key === "date" || key === "updated") {
-      const dateValue = value ? new Date(value).toISOString().split("T")[0] : "";
-      return (
-        <Input
-          id={`meta-${key}`}
-          name={key}
-          type="date"
-          value={dateValue}
-          onChange={handleDateChange}
-        />
-      );
-    }
-
-    return (
-      <Input
-        id={`meta-${key}`}
-        name={key}
-        type="text"
-        value={String(value)}
-        onChange={handleInputChange}
-      />
-    );
   };
+
+  const sortedKeys = Object.keys(metadata)
+    .filter((key) => key !== "__editor_metadata")
+    .sort((a, b) => {
+      const orderA = metadata.__editor_metadata?.[a]?.order ?? 99;
+      const orderB = metadata.__editor_metadata?.[b]?.order ?? 99;
+      return orderA - orderB;
+    });
 
   return (
     <Card>
@@ -291,24 +321,33 @@ export default function MetadataEditor({
         </Button>
       </CardHeader>
       <CardContent className="grid gap-4 md:grid-cols-2">
-        {Object.entries(metadata).map(([key, value]) => (
-          <div key={key} className="grid gap-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor={`meta-${key}`} className="capitalize">
-                {key}
-              </Label>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5"
-                onClick={() => handleEditField(key, value)}
-              >
-                <Pencil className="h-3 w-3" />
-              </Button>
+        <TooltipProvider>
+          {sortedKeys.map((key) => (
+            <div key={key} className="grid gap-2">
+              <div className="flex items-center gap-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Label htmlFor={`meta-${key}`} className="capitalize">
+                      {key}
+                    </Label>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{metadata.__editor_metadata?.[key]?.description}</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5"
+                  onClick={() => handleEditField(key, metadata[key])}
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
+              </div>
+              {renderInput(key, metadata[key])}
             </div>
-            {renderInput(key, value)}
-          </div>
-        ))}
+          ))}
+        </TooltipProvider>
       </CardContent>
       {isEditing && currentField && (
         <Dialog open={isEditing} onOpenChange={setIsEditing}>

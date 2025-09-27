@@ -22,10 +22,46 @@ import TableOfContents from "./TableOfContents";
 import prettier from "prettier/standalone";
 import prettierPluginMarkdown from "prettier/plugins/markdown";
 
+export type MetadataFieldSchema = {
+  type: "text" | "date" | "datetime" | "number" | "url" | "tel" | "color" | "object";
+  isArray: boolean;
+  order: number;
+  description: string;
+};
+
+export type EditorMetadata = {
+  __editor_metadata?: Record<string, MetadataFieldSchema>;
+  [key: string]: any;
+};
+
+function generateInitialSchema(data: Record<string, any>): Record<string, MetadataFieldSchema> {
+  const schema: Record<string, MetadataFieldSchema> = {};
+  Object.keys(data).forEach((key, index) => {
+    if (key === "__editor_metadata") return;
+    const value = data[key];
+    let detectedType: MetadataFieldSchema["type"] = "text";
+    if (typeof value === "number") {
+      detectedType = "number";
+    } else if (value instanceof Date || (typeof value === "string" && !isNaN(new Date(value).getTime()))) {
+      detectedType = "date";
+    } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+      detectedType = "object";
+    }
+
+    schema[key] = {
+      type: detectedType,
+      isArray: Array.isArray(value),
+      order: index,
+      description: `Configuration for the '${key}' field.`,
+    };
+  });
+  return schema;
+}
+
 export default function EditorView() {
   const [path, setPath] = useState<string | null>(null);
   const [originalContent, setOriginalContent] = useState<string>("");
-  const [metadata, setMetadata] = useState<Record<string, any>>({});
+  const [metadata, setMetadata] = useState<EditorMetadata>({});
   const [markdownContent, setMarkdownContent] = useState("");
   const [isLoadingContent, setIsLoadingContent] = useState(true);
   const [isNewFile, setIsNewFile] = useState(false);
@@ -90,6 +126,11 @@ Start writing...
       setPath(newPath);
       setOriginalContent(newContent);
       const { content, data } = matter<any>(newContent);
+
+      if (!data.__editor_metadata) {
+        data.__editor_metadata = generateInitialSchema(data);
+      }
+
       setMetadata(data);
       setMarkdownContent(content);
       setIsNewFile(true);
@@ -106,6 +147,11 @@ Start writing...
       const fileContent = await getFileContent(filePath);
       setOriginalContent(fileContent);
       const { content, data } = matter<any>(fileContent);
+
+      if (!data.__editor_metadata) {
+        data.__editor_metadata = generateInitialSchema(data);
+      }
+
       setMetadata(data);
       setMarkdownContent(content);
     } catch (error) {
