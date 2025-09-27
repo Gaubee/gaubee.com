@@ -194,13 +194,13 @@ export default function CodeMirrorEditor({
             base: markdownLanguage,
             codeLanguages: (info) => {
               if (info === "mermaid") {
-                return mermaid;
+                return mermaid().language;
               }
               const lang = languages.find(
                 (l) => l.name === info || l.alias.includes(info)
               );
               if (lang) {
-                return lang;
+                return lang.load();
               }
               return null;
             },

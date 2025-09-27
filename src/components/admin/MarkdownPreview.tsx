@@ -47,7 +47,7 @@ export default function MarkdownPreview({ content }: MarkdownPreviewProps) {
 
   return (
     <div
-      className="prose prose-invert max-w-none rounded-lg border bg-background p-4"
+      className="prose max-w-none rounded-lg border bg-background p-4"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
