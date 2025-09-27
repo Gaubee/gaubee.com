@@ -2,8 +2,19 @@ import { Button } from "@/components/ui/button";
 import { upsertChange } from "@/lib/db";
 import { getFileContent } from "@/lib/github";
 import { matter } from "@gaubee/nodekit/front-matter";
-import { ArrowLeft, GitCommit, Sparkles } from "lucide-react";
-import { useEffect, useState }from "react";
+import {
+  ArrowLeft,
+  GitCommit,
+  Sparkles,
+  PanelLeft,
+  PanelRight,
+  Columns,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group";
 import MetadataEditor from "./MetadataEditor";
 import CodeMirrorEditor from "./CodeMirrorEditor";
 import MarkdownPreview from "./MarkdownPreview";
@@ -18,6 +29,15 @@ export default function EditorView() {
   const [markdownContent, setMarkdownContent] = useState("");
   const [isLoadingContent, setIsLoadingContent] = useState(true);
   const [isNewFile, setIsNewFile] = useState(false);
+  const [viewMode, setViewMode] = useState("split"); // 'editor', 'preview', 'split'
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const handleFormat = async () => {
     try {
@@ -136,8 +156,31 @@ Start writing...
           <ArrowLeft className="mr-2 h-4 w-4" />
           <span className="hidden sm:inline">Back to Files</span>
         </Button>
-        <div className="order-last w-full truncate text-center font-mono text-sm sm:order-none sm:w-auto">
-          {path}
+        <div className="order-last flex-grow text-center sm:order-none">
+          <ToggleGroup
+            type="single"
+            defaultValue="split"
+            value={viewMode}
+            onValueChange={(value) => {
+              if (value) setViewMode(value);
+            }}
+            aria-label="Editor view mode"
+            className="mx-auto inline-flex"
+          >
+            <ToggleGroupItem value="editor" aria-label="Editor only">
+              <PanelLeft className="h-4 w-4" />
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="split"
+              aria-label="Split view"
+              disabled={isMobile}
+            >
+              <Columns className="h-4 w-4" />
+            </ToggleGroupItem>
+            <ToggleGroupItem value="preview" aria-label="Preview only">
+              <PanelRight className="h-4 w-4" />
+            </ToggleGroupItem>
+          </ToggleGroup>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={handleFormat}>
@@ -150,17 +193,40 @@ Start writing...
           </Button>
         </div>
       </header>
+      <div className="w-full truncate text-center font-mono text-sm text-muted-foreground">
+        {path}
+      </div>
       <MetadataEditor metadata={metadata} onChange={setMetadata} />
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <CodeMirrorEditor
-          content={markdownContent}
-          onChange={setMarkdownContent}
-          path={path}
-        />
-        <div className="space-y-4">
-          <TableOfContents content={markdownContent} />
-          <MarkdownPreview content={markdownContent} />
-        </div>
+      <div
+        className={`grid grid-cols-1 gap-4 ${
+          viewMode === "split" && !isMobile ? "md:grid-cols-2" : ""
+        }`}
+      >
+        {(viewMode === "editor" || (viewMode === "split" && !isMobile)) && (
+          <div
+            className={
+              viewMode === "split" && !isMobile ? "" : "col-span-full"
+            }
+          >
+            <CodeMirrorEditor
+              content={markdownContent}
+              onChange={setMarkdownContent}
+              path={path}
+            />
+          </div>
+        )}
+        {(viewMode === "preview" || (viewMode === "split" && !isMobile)) && (
+          <div
+            className={
+              viewMode === "split" && !isMobile ? "" : "col-span-full"
+            }
+          >
+            <div className="space-y-4">
+              <TableOfContents content={markdownContent} />
+              <MarkdownPreview content={markdownContent} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

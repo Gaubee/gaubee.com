@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { X, PlusCircle, Pencil } from "lucide-react";
 import { useState } from "react";
 
@@ -32,7 +33,6 @@ export default function MetadataEditor({
   metadata,
   onChange,
 }: MetadataEditorProps) {
-  const [newTag, setNewTag] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [currentField, setCurrentField] = useState<{
     key: string;
@@ -40,15 +40,22 @@ export default function MetadataEditor({
   } | null>(null);
   const [newKey, setNewKey] = useState("");
   const [newType, setNewType] = useState("");
+  const [isArr, setIsArr] = useState(false);
 
   const handleEditField = (key: string, value: any) => {
     setCurrentField({ key, value });
     setNewKey(key);
-    // Infer type from value for the select default
+    setIsArr(Array.isArray(value));
+
+    const val = Array.isArray(value) ? value[0] : value;
     let detectedType = "text";
-    if (key === "date" || key === "updated") detectedType = "date";
-    else if (typeof value === "number") detectedType = "number";
-    else if (Array.isArray(value)) detectedType = "tags";
+    if (key === "date" || key === "updated") {
+      detectedType = "date";
+    } else if (typeof val === "number") {
+      detectedType = "number";
+    } else if (val && typeof val === "object") {
+      detectedType = "json";
+    }
     setNewType(detectedType);
     setIsEditing(true);
   };
@@ -56,20 +63,28 @@ export default function MetadataEditor({
   const handleUpdateField = () => {
     if (!currentField) return;
 
-    const { key: oldKey, value: oldValue } = currentField;
+    const { key: oldKey } = currentField;
     const newMetadata = { ...metadata };
+    let newValue = newMetadata[oldKey];
 
-    let newValue = oldValue;
-    // Handle type conversion
-    if (newType === "tags" && !Array.isArray(oldValue)) {
-      newValue = String(oldValue).split(",").map(s => s.trim());
-    } else if (newType === "number" && isNaN(Number(oldValue))) {
-      newValue = 0;
-    } else if (newType === "date" && isNaN(new Date(oldValue).getTime())) {
-      newValue = new Date().toISOString();
+    // If the value is a string from a textarea, it might need parsing
+    if (typeof newValue === 'string' && (isArr || newType === 'json')) {
+      try {
+        newValue = JSON.parse(newValue);
+      } catch (e) {
+        alert(`Invalid JSON format for field '${newKey}'. Please fix it before saving.`);
+        return;
+      }
     }
 
-    // If key has changed, remove old key
+    // Handle array conversion
+    if (isArr && !Array.isArray(newValue)) {
+      newValue = [newValue];
+    } else if (!isArr && Array.isArray(newValue)) {
+      newValue = newValue[0] ?? ''; // Use first element or empty string
+    }
+
+    // Handle key change
     if (oldKey !== newKey) {
       delete newMetadata[oldKey];
     }
@@ -92,20 +107,6 @@ export default function MetadataEditor({
     onChange({ ...metadata, [name]: new Date(value).toISOString() });
   };
 
-  const handleAddTag = () => {
-    if (newTag && !metadata.tags.includes(newTag)) {
-      onChange({ ...metadata, tags: [...metadata.tags, newTag] });
-      setNewTag("");
-    }
-  };
-
-  const handleRemoveTag = (tagToRemove: string) => {
-    onChange({
-      ...metadata,
-      tags: metadata.tags.filter((tag: string) => tag !== tagToRemove),
-    });
-  };
-
   const handleAddField = () => {
     const newField = prompt("Enter the new field name:");
     if (newField && !metadata.hasOwnProperty(newField)) {
@@ -116,86 +117,35 @@ export default function MetadataEditor({
   };
 
   const renderInput = (key: string, value: any) => {
-    const type = newType || "text"; // Fallback to text if type is not set
-    if (type === "date" || type === "datetime") {
-      const dateValue = value
-        ? new Date(value).toISOString().slice(0, 16)
-        : "";
-      return (
-        <Input
-          id={`meta-${key}`}
-          name={key}
-          type={type === "date" ? "date" : "datetime-local"}
-          value={dateValue}
-          onChange={handleDateChange}
-        />
-      );
-    }
-
-    if (type === "number") {
-      return (
-        <Input
-          id={`meta-${key}`}
-          name={key}
-          type="number"
-          value={value}
-          onChange={handleInputChange}
-        />
-      );
-    }
-
-    if (type === "url" || type === "tel" || type === "color") {
-       return (
-        <Input
-          id={`meta-${key}`}
-          name={key}
-          type={type}
-          value={value}
-          onChange={handleInputChange}
-        />
-      );
-    }
-
-    if (type === "tags" && Array.isArray(value)) {
-      return (
-        <div>
-          <div className="flex flex-wrap gap-2">
-            {value.map((tag) => (
-              <Badge key={tag} variant="secondary">
-                {tag}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="ml-1 h-4 w-4"
-                  onClick={() => handleRemoveTag(tag)}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </Badge>
-            ))}
-          </div>
-          <div className="mt-2 flex gap-2">
-            <Input
-              type="text"
-              value={newTag}
-              onChange={(e) => setNewTag(e.target.value)}
-              placeholder="Add a tag"
-              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddTag())}
-            />
-            <Button onClick={handleAddTag}>Add</Button>
-          </div>
-        </div>
-      );
-    }
-
-    if (typeof value === "string" && value.length > 100) {
+    if (typeof value === "object" && value !== null) {
       return (
         <Textarea
           id={`meta-${key}`}
           name={key}
-          value={value}
-          onChange={handleInputChange}
-          className="h-24"
+          value={typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
+          onChange={(e) => {
+            const { name, value } = e.target;
+            try {
+              const parsed = JSON.parse(value);
+              onChange({ ...metadata, [name]: parsed });
+            } catch (err) {
+              onChange({ ...metadata, [name]: value });
+            }
+          }}
+          className="h-24 font-mono"
+        />
+      );
+    }
+
+    if (key === "date" || key === "updated") {
+      const dateValue = value ? new Date(value).toISOString().split("T")[0] : "";
+      return (
+        <Input
+          id={`meta-${key}`}
+          name={key}
+          type="date"
+          value={dateValue}
+          onChange={handleDateChange}
         />
       );
     }
@@ -205,7 +155,7 @@ export default function MetadataEditor({
         id={`meta-${key}`}
         name={key}
         type="text"
-        value={value}
+        value={String(value)}
         onChange={handleInputChange}
       />
     );
@@ -274,12 +224,22 @@ export default function MetadataEditor({
                     <SelectItem value="date">Date</SelectItem>
                     <SelectItem value="datetime">DateTime</SelectItem>
                     <SelectItem value="number">Number</SelectItem>
-                    <SelectItem value="tags">Tags (Array)</SelectItem>
                     <SelectItem value="url">URL</SelectItem>
                     <SelectItem value="tel">Telephone</SelectItem>
                     <SelectItem value="color">Color</SelectItem>
+                    <SelectItem value="json">JSON</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="col-span-4 flex items-center justify-end gap-2">
+                <Label htmlFor="is-array" className="">
+                  Is Array
+                </Label>
+                <Checkbox
+                  id="is-array"
+                  checked={isArr}
+                  onCheckedChange={(checked) => setIsArr(Boolean(checked))}
+                />
               </div>
             </div>
             <DialogFooter>
