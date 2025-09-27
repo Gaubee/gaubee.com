@@ -2,7 +2,9 @@
 import ContentLayout from "@/layouts/ContentLayout.astro";
 import PreviewCard from "@/components/cards/PreviewCard.tsx";
 import { getSiteData } from "@/lib/getSiteData";
+import { getCollection } from "astro:content";
 
+const articles = await getCollection("articles");
 const { allPosts } = await getSiteData();
 const pieviewsPosts = await Promise.all(
   allPosts.slice(0, 10).map(async (post) => {
@@ -25,7 +27,7 @@ const pageTitle = "Gaubee's Blog";
 
   <div class="stagger-list mt-8 flex flex-col">
     {
-      pieviewsPosts.map((post) => (
+      pieviewsPosts.map((post, i) => (
         <div class="stagger-item py-4" id={post.id}>
           {/* // key={post.id} */}
           <PreviewCard

@@ -8,6 +8,7 @@ import EditorToolbar from "./EditorToolbar";
 import { EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { EditorView, type ViewUpdate } from "@codemirror/view";
+import { type SyntaxNode } from "@lezer/common";
 
 interface CodeMirrorEditorProps {
   content: string;
@@ -87,28 +88,84 @@ export default function CodeMirrorEditor({
     view.focus();
   };
 
+  const toggleLinePrefix = (prefix: string) => {
+    const view = editor.current?.view;
+    if (!view) return;
+    const { state, dispatch } = view;
+    const { from, to } = state.selection.main;
+
+    const startLine = state.doc.lineAt(from);
+    const endLine = state.doc.lineAt(to);
+
+    let allPrefixed = true;
+    for (let i = startLine.number; i <= endLine.number; i++) {
+        const line = state.doc.line(i);
+        if (line.length > 0 && !line.text.startsWith(prefix)) {
+            allPrefixed = false;
+            break;
+        }
+    }
+
+    const changes = [];
+    for (let i = startLine.number; i <= endLine.number; i++) {
+        const line = state.doc.line(i);
+        if (line.length === 0 && endLine.number > startLine.number) continue;
+
+        if (allPrefixed) {
+            if (line.text.startsWith(prefix)) {
+                changes.push({ from: line.from, to: line.from + prefix.length, insert: "" });
+            }
+        } else {
+            changes.push({ from: line.from, insert: prefix });
+        }
+    }
+
+    if (changes.length > 0) {
+      dispatch({ changes });
+    }
+    view.focus();
+  };
+
   const handleBold = () => toggleWrap("**");
   const handleItalic = () => toggleWrap("*");
   const handleStrikethrough = () => toggleWrap("~~");
-  const handleCode = () => toggleWrap("`");
-  const handleQuote = () => { /* Simplified for now */ };
-  const handleList = () => { /* Simplified for now */ };
-  const handleLink = () => { /* Simplified for now */ };
+  const handleCode = () => toggleWrap("\n```\n", "\n```\n"); // For code blocks
+  const handleQuote = () => toggleLinePrefix("> ");
+  const handleList = () => toggleLinePrefix("- ");
+  const handleLink = () => {
+    const view = editor.current?.view;
+    if (!view) return;
+    const url = prompt("Enter the URL for the link:");
+    if (!url) {
+      view.focus();
+      return;
+    }
+    const { from, to } = view.state.selection.main;
+    const selection = view.state.sliceDoc(from, to);
+    const link = `[${selection || 'link text'}](${url})`;
+    view.dispatch(view.state.update({ changes: { from, to, insert: link } }));
+    view.focus();
+  };
 
   const checkActiveFormats = (state: EditorState) => {
     const { from } = state.selection.main;
     const tree = syntaxTree(state);
     const formats: Record<string, boolean> = {};
-    tree.iterate({
-      enter: (node) => {
-        if (node.from <= from && node.to >= from) {
-          if (node.name.includes("StrongEmphasis")) formats.bold = true;
-          if (node.name.includes("Emphasis")) formats.italic = true;
-          if (node.name.includes("Strikethrough")) formats.strikethrough = true;
-          if (node.name.includes("InlineCode")) formats.code = true;
-        }
-      },
-    });
+
+    // Resolve the node at the cursor and walk up the tree to find all active formats.
+    let node: SyntaxNode | null = tree.resolve(from, -1); // -1 bias gets the node before the cursor, good for this use case
+    while (node) {
+      const nodeName = node.name;
+      if (nodeName.includes("StrongEmphasis")) formats.bold = true;
+      if (nodeName.includes("Emphasis")) formats.italic = true;
+      if (nodeName.includes("Strikethrough")) formats.strikethrough = true;
+      if (nodeName.includes("InlineCode")) formats.code = true;
+      if (nodeName.includes("FencedCode")) formats.code = true;
+      if (nodeName.includes("Blockquote")) formats.quote = true;
+      if (nodeName.includes("ListItem")) formats.list = true;
+      if (nodeName.includes("Link")) formats.link = true;
+      node = node.parent;
+    }
     setActiveFormats(formats);
   };
 

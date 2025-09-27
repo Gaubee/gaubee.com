@@ -65,59 +65,56 @@ export function FieldMetadataEditDialog({
         <DialogHeader>
           <DialogTitle>{isNew ? "Create New Field" : `Edit Field: ${fieldKey}`}</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-4 md:gap-4">
-            <Label htmlFor="key" className="md:text-right">
-              Key
-            </Label>
-            <Input
-              id="key"
-              value={newKey}
-              onChange={(e) => setNewKey(e.target.value)}
-              className="col-span-3"
-              readOnly={!isNew && newKey === 'updated'}
-            />
-          </div>
-          <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-4 md:gap-4">
-            <Label htmlFor="type" className="md:text-right">
-              Type
-            </Label>
-            <Select value={newType} onValueChange={(value: string) => setNewType(value as MetadataFieldSchema["type"])}>
-              <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Select a type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="text">Text</SelectItem>
-                <SelectItem value="date">Date</SelectItem>
-                <SelectItem value="datetime">DateTime</SelectItem>
-                <SelectItem value="number">Number</SelectItem>
-                <SelectItem value="url">URL</SelectItem>
-                <SelectItem value="tel">Telephone</SelectItem>
-                <SelectItem value="color">Color</SelectItem>
-                <SelectItem value="object">Object (YAML/JSON)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-4 md:gap-4">
-            <Label htmlFor="description" className="md:text-right">
-              Description
-            </Label>
-            <Input
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="col-span-3"
-            />
-          </div>
-          <div className="flex items-center justify-end gap-2 md:col-start-2 md:col-span-3">
-            <Label htmlFor="is-array">
-              Is Array
-            </Label>
+        <div className="grid grid-cols-1 gap-y-4 py-4 md:grid-cols-4 md:gap-x-4">
+          <Label htmlFor="key" className="md:text-right md:mt-2">
+            Key
+          </Label>
+          <Input
+            id="key"
+            value={newKey}
+            onChange={(e) => setNewKey(e.target.value)}
+            className="md:col-span-3"
+            readOnly={!isNew && newKey === 'updated'}
+          />
+
+          <Label htmlFor="type" className="md:text-right md:mt-2">
+            Type
+          </Label>
+          <Select value={newType} onValueChange={(value: string) => setNewType(value as MetadataFieldSchema["type"])}>
+            <SelectTrigger className="md:col-span-3">
+              <SelectValue placeholder="Select a type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="text">Text</SelectItem>
+              <SelectItem value="date">Date</SelectItem>
+              <SelectItem value="datetime">DateTime</SelectItem>
+              <SelectItem value="number">Number</SelectItem>
+              <SelectItem value="url">URL</SelectItem>
+              <SelectItem value="tel">Telephone</SelectItem>
+              <SelectItem value="color">Color</SelectItem>
+              <SelectItem value="object">Object (YAML/JSON)</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Label htmlFor="description" className="md:text-right md:mt-2">
+            Description
+          </Label>
+          <Input
+            id="description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="md:col-span-3"
+          />
+
+          <div className="flex items-center gap-2 md:col-start-2 md:col-span-3">
             <Checkbox
               id="is-array"
               checked={isArr}
               onCheckedChange={(checked: boolean) => setIsArr(checked)}
             />
+            <Label htmlFor="is-array" className="cursor-pointer">
+              Is Array
+            </Label>
           </div>
         </div>
         <DialogFooter>

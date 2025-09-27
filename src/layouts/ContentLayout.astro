@@ -11,12 +11,16 @@ import { getSiteData } from "@/lib/getSiteData.ts";
 import type { MarkdownHeading } from "astro";
 import { ContentScrollProgress } from "@/components/ContentScrollProgress";
 
+import type { CollectionEntry } from "astro:content";
+
 interface Props {
   title?: string;
   headings?: MarkdownHeading[];
+  prev?: CollectionEntry<"articles" | "events">;
+  next?: CollectionEntry<"articles" | "events">;
 }
 
-const { title, headings = [] } = Astro.props;
+const { title, headings = [], prev, next } = Astro.props;
 const { postsByMonth, allTags } = await getSiteData();
 ---
 
@@ -41,6 +45,23 @@ const { postsByMonth, allTags } = await getSiteData();
       <div class="p-6">
         <slot />
       </div>
+
+      <nav class="flex justify-between p-6">
+        <div>
+          {prev && (
+            <a href={`/${prev.collection}/${prev.id}`} class="hover:text-sky-600 dark:hover:text-sky-400">
+              &larr; {prev.data.title}
+            </a>
+          )}
+        </div>
+        <div>
+          {next && (
+            <a href={`/${next.collection}/${next.id}`} class="hover:text-sky-600 dark:hover:text-sky-400">
+              {next.data.title} &rarr;
+            </a>
+          )}
+        </div>
+      </nav>
     </main>
 
     <aside

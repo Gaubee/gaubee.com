@@ -28,6 +28,15 @@ if (!post) {
 const { Content, headings } = await render(post);
 
 // Manually find prev/next for this page
+const currentIndex = allEvents.findIndex((p) => p.id === id);
+const prev = allEvents[currentIndex - 1];
+const next = allEvents[currentIndex + 1];
+const prevEvent = prev
+  ? { slug: prev.id, data: { title: prev.data.title } }
+  : null;
+const nextEvent = next
+  ? { slug: next.id, data: { title: next.data.title } }
+  : null;
 ---
 
 <ContentLayout title={post.safeTitle} headings={headings}>

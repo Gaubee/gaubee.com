@@ -23,8 +23,7 @@ function SortableArrayItem({ id, children }: { id: string; children: React.React
 interface ArrayRendererProps {
   value: any[];
   renderItem: (item: any, index: number) => React.ReactNode;
-  onItemChange: (index: number, value: any) => void;
-  onAddItem: (newItem: string) => void;
+  onAddItem: () => void;
   onRemoveItem: (index: number) => void;
   onReorder: (oldIndex: number, newIndex: number) => void;
 }
@@ -40,8 +39,8 @@ export function ArrayRenderer({
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
   const handleAddItem = () => {
-    if (newItem.trim() === "") return;
-    onAddItem(newItem);
+    // The parent component will handle creating the default value.
+    onAddItem();
     setNewItem("");
   };
 
