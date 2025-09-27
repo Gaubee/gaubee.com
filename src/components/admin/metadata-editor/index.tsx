@@ -2,16 +2,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { PlusCircle, Pencil } from "lucide-react";
+import { PlusCircle, Pencil, X } from "lucide-react";
 import { useState } from "react";
 import * as YAML from "js-yaml";
-import { type EditorMetadata, type MetadataFieldSchema } from "./types";
-import { validateField } from "./utils";
+import { type EditorMetadata, type MetadataFieldSchema, type MetadataFieldType } from "./types";
 import { FieldMetadataEditDialog } from "./FieldMetadataEditDialog";
 import { ArrayRenderer } from "./renderers/ArrayRenderer";
-import { DateRenderer } from "./renderers/DateRenderer";
-import { ObjectRenderer } from "./renderers/ObjectRenderer";
+import { DateRenderer, validateDate } from "./renderers/DateRenderer";
+import { ObjectRenderer, validateObject } from "./renderers/ObjectRenderer";
 import { TextRenderer } from "./renderers/TextRenderer";
+
+const getValidator = (type: MetadataFieldType) => {
+  switch (type) {
+    case "date":
+    case "datetime":
+      return validateDate;
+    case "object":
+      return validateObject;
+    default:
+      return (value: any) => true; // Default validator for simple types
+  }
+};
 
 interface MetadataEditorProps {
   metadata: EditorMetadata;
@@ -33,26 +44,50 @@ export default function MetadataEditor({ metadata, onChange }: MetadataEditorPro
 
   const handleUpdateField = (newKey: string, newSchema: MetadataFieldSchema) => {
     if (!currentField) return;
-    const { key: oldKey } = currentField;
+
+    const { key: oldKey, schema: oldSchema } = currentField;
     const newMetadata = { ...metadata };
     const newEditorMeta = { ...newMetadata.__editor_metadata };
-
     let value = newMetadata[oldKey];
 
-    if (newSchema.isArray && !Array.isArray(value)) {
-      value = value ? [value] : [];
-    } else if (!newSchema.isArray && Array.isArray(value)) {
-      value = value[0] ?? "";
+    const typeChanged = newSchema.type !== oldSchema.type;
+    const arrayStatusChanged = newSchema.isArray !== oldSchema.isArray;
+
+    // If type or array status has changed, reset the value to a safe default.
+    if (typeChanged || arrayStatusChanged) {
+      if (newSchema.isArray) {
+        value = [];
+      } else {
+        switch (newSchema.type) {
+          case 'number':
+            value = 0;
+            break;
+          case 'object':
+            value = {};
+            break;
+          case 'date':
+          case 'datetime':
+            value = new Date().toISOString();
+            break;
+          default:
+            value = '';
+            break;
+        }
+      }
     }
 
+    // Handle key change by removing old key and its schema
     if (oldKey !== newKey) {
       delete newMetadata[oldKey];
-      delete newEditorMeta[oldKey];
+      if (newEditorMeta) delete newEditorMeta[oldKey];
     }
 
+    // Save the new value and the new schema
     newMetadata[newKey] = value;
-    newEditorMeta[newKey] = newSchema;
-    newMetadata.__editor_metadata = newEditorMeta;
+    if (newEditorMeta) {
+      newEditorMeta[newKey] = newSchema;
+      newMetadata.__editor_metadata = newEditorMeta;
+    }
 
     onChange(newMetadata);
     setIsEditing(false);
@@ -63,7 +98,7 @@ export default function MetadataEditor({ metadata, onChange }: MetadataEditorPro
     const newFieldKey = prompt("Enter the new field name:");
     if (newFieldKey && !metadata.hasOwnProperty(newFieldKey)) {
       const newMetadata = { ...metadata };
-      const newEditorMeta = { ...newMetadata.__editor_metadata };
+      const newEditorMeta = { ...newMetadata.__editor_metadata } as Record<string, MetadataFieldSchema>;
 
       newMetadata[newFieldKey] = "";
       newEditorMeta[newFieldKey] = {
@@ -80,8 +115,24 @@ export default function MetadataEditor({ metadata, onChange }: MetadataEditorPro
   };
 
   const handleFocus = (key: string) => setValidationState(prev => ({ ...prev, [key]: { ...prev[key], isFocused: true } }));
-  const handleBlur = (key: string, value: any) => setValidationState(prev => ({ ...prev, [key]: { isValid: validateField(value), isFocused: false } }));
-  const handleValueChange = (key: string, value: any) => onChange({ ...metadata, [key]: value });
+
+  const handleBlur = (key: string) => {
+    const schema = metadata.__editor_metadata?.[key];
+    if (!schema) return;
+    const validator = getValidator(schema.type);
+    const isValid = validator(metadata[key]);
+    setValidationState(prev => ({ ...prev, [key]: { isValid, isFocused: false } }));
+  };
+
+  const handleValueChange = (key: string, value: any) => {
+    const newMetadata = { ...metadata, [key]: value };
+    const schema = newMetadata.__editor_metadata?.[key];
+    if (schema && schema.type === 'object') {
+        const isValid = getValidator(schema.type)(value);
+        setValidationState(prev => ({ ...prev, [key]: { ...prev[key], isValid } }));
+    }
+    onChange(newMetadata);
+  };
 
   const sortedKeys = Object.keys(metadata)
     .filter((key) => key !== "__editor_metadata")
@@ -140,7 +191,7 @@ export default function MetadataEditor({ metadata, onChange }: MetadataEditorPro
                     value={value}
                     className={validationClass}
                     onFocus={() => handleFocus(key)}
-                    onBlur={(e) => handleBlur(key, e.target.value)}
+                    onBlur={() => handleBlur(key)}
                     onChange={(e) => handleValueChange(key, e.target.value)}
                   />
                 ) : schema.type === 'date' || schema.type === 'datetime' ? (
@@ -149,7 +200,7 @@ export default function MetadataEditor({ metadata, onChange }: MetadataEditorPro
                     name={key}
                     value={value}
                     type={schema.type}
-                    onChange={(e) => handleValueChange(key, new Date(e.target.value).toISOString())}
+                    onChange={(e) => handleValueChange(key, e.target.value)}
                   />
                 ) : (
                   <TextRenderer

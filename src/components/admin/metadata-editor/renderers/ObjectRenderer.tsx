@@ -33,3 +33,21 @@ export function ObjectRenderer({
     />
   );
 }
+
+/**
+ * Validates if a given string can be parsed as YAML or JSON.
+ * @param value The string value to validate.
+ * @returns True if the value is valid YAML/JSON, false otherwise.
+ */
+export function validateObject(value: any): boolean {
+  if (typeof value !== 'string') {
+    // If it's already an object, it's valid.
+    return typeof value === 'object' && value !== null;
+  }
+  try {
+    YAML.load(value);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}

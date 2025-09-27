@@ -54,6 +54,7 @@ export function FieldMetadataEditDialog({
       isArray: isArr,
       description,
     });
+    onOpenChange(false); // Close dialog on save
   };
 
   return (

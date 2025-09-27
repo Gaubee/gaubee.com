@@ -7,6 +7,9 @@ export type MetadataFieldType =
   | "tel"
   | "color"
   | "object";
+  // TODO: Add 'enum-select' type for future enhancement.
+  // This would allow selecting from a predefined list of options,
+  // which could be configured globally or per-field.
 
 export type MetadataFieldSchema = {
   type: MetadataFieldType;

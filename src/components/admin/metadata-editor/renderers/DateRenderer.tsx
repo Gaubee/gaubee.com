@@ -21,3 +21,13 @@ export function DateRenderer({ id, name, value, type, onChange }: DateRendererPr
     />
   );
 }
+
+/**
+ * Validates if a given value can be parsed into a valid Date.
+ * @param value The value to validate.
+ * @returns True if the value is a valid date, false otherwise.
+ */
+export function validateDate(value: any): boolean {
+  const date = new Date(value);
+  return !isNaN(+date);
+}
