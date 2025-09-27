@@ -41,6 +41,9 @@ export default function MetadataEditor({
   const [newKey, setNewKey] = useState("");
   const [newType, setNewType] = useState("");
   const [isArr, setIsArr] = useState(false);
+  const [validationState, setValidationState] = useState<
+    Record<string, { isValid: boolean; isFocused: boolean }>
+  >({});
 
   const handleEditField = (key: string, value: any) => {
     setCurrentField({ key, value });
@@ -60,28 +63,54 @@ export default function MetadataEditor({
     setIsEditing(true);
   };
 
+  const validateField = (key: string, value: any): boolean => {
+    if (typeof value === 'object' && value !== null) {
+      return true; // Already a valid object/array
+    }
+    try {
+      JSON.parse(value);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const handleFocus = (key: string) => {
+    setValidationState(prev => ({
+      ...prev,
+      [key]: { ...prev[key], isFocused: true },
+    }));
+  };
+
+  const handleBlur = (key: string, value: any) => {
+    const isValid = validateField(key, value);
+    setValidationState(prev => ({
+      ...prev,
+      [key]: { isValid, isFocused: false },
+    }));
+  };
+
   const handleUpdateField = () => {
     if (!currentField) return;
 
     const { key: oldKey } = currentField;
     const newMetadata = { ...metadata };
-    let newValue = newMetadata[oldKey];
+    let newValue = newMetadata[oldKey]; // This value might be a string from the Textarea
 
-    // If the value is a string from a textarea, it might need parsing
-    if (typeof newValue === 'string' && (isArr || newType === 'json')) {
-      try {
+    // If the value is a string from editing a JSON/array field, parse it first.
+    if (typeof newValue === 'string' && (Array.isArray(currentField.value) || typeof currentField.value === 'object')) {
+        if (!validateField(oldKey, newValue)) {
+            alert(`The value for '${newKey}' is not valid JSON. Please correct it before saving.`);
+            return;
+        }
         newValue = JSON.parse(newValue);
-      } catch (e) {
-        alert(`Invalid JSON format for field '${newKey}'. Please fix it before saving.`);
-        return;
-      }
     }
 
-    // Handle array conversion
+    // Handle the "Is Array" toggle
     if (isArr && !Array.isArray(newValue)) {
-      newValue = [newValue];
+      newValue = newValue ? [newValue] : []; // Wrap non-empty value in array, or create empty array
     } else if (!isArr && Array.isArray(newValue)) {
-      newValue = newValue[0] ?? ''; // Use first element or empty string
+      newValue = newValue[0] ?? ""; // Use first element or empty string
     }
 
     // Handle key change
@@ -90,6 +119,7 @@ export default function MetadataEditor({
     }
 
     newMetadata[newKey] = newValue;
+
     onChange(newMetadata);
     setIsEditing(false);
     setCurrentField(null);
@@ -107,6 +137,26 @@ export default function MetadataEditor({
     onChange({ ...metadata, [name]: new Date(value).toISOString() });
   };
 
+  const [newItem, setNewItem] = useState("");
+  const handleItemChange = (key: string, index: number, value: string) => {
+    const newArray = [...(metadata[key] || [])];
+    newArray[index] = value;
+    onChange({ ...metadata, [key]: newArray });
+  };
+
+  const handleAddItem = (key: string) => {
+    if (newItem.trim() === "") return;
+    const newArray = [...(metadata[key] || []), newItem];
+    onChange({ ...metadata, [key]: newArray });
+    setNewItem("");
+  };
+
+  const handleRemoveItem = (key: string, index: number) => {
+    const newArray = [...(metadata[key] || [])];
+    newArray.splice(index, 1);
+    onChange({ ...metadata, [key]: newArray });
+  };
+
   const handleAddField = () => {
     const newField = prompt("Enter the new field name:");
     if (newField && !metadata.hasOwnProperty(newField)) {
@@ -117,22 +167,61 @@ export default function MetadataEditor({
   };
 
   const renderInput = (key: string, value: any) => {
+    const { isValid = true, isFocused } = validationState[key] || {};
+    const validationClass = !isValid
+      ? isFocused
+        ? "border-yellow-400"
+        : "border-red-500"
+      : "";
+
+    if (Array.isArray(value)) {
+      return (
+        <div className="space-y-2">
+          {value.map((item, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <Input
+                type="text"
+                value={item}
+                onChange={(e) => handleItemChange(key, index, e.target.value)}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleRemoveItem(key, index)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+          <div className="flex items-center gap-2">
+            <Input
+              type="text"
+              placeholder="Add new item"
+              value={newItem}
+              onChange={(e) => setNewItem(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddItem(key))}
+            />
+            <Button onClick={() => handleAddItem(key)}>Add</Button>
+          </div>
+        </div>
+      );
+    }
+
     if (typeof value === "object" && value !== null) {
       return (
         <Textarea
           id={`meta-${key}`}
           name={key}
           value={typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
+          onFocus={() => handleFocus(key)}
+          onBlur={(e) => handleBlur(key, e.target.value)}
           onChange={(e) => {
             const { name, value } = e.target;
-            try {
-              const parsed = JSON.parse(value);
-              onChange({ ...metadata, [name]: parsed });
-            } catch (err) {
-              onChange({ ...metadata, [name]: value });
-            }
+            onChange({ ...metadata, [name]: value });
+            const isValid = validateField(key, value);
+            setValidationState(prev => ({ ...prev, [key]: { ...prev[key], isValid } }));
           }}
-          className="h-24 font-mono"
+          className={`h-24 font-mono ${validationClass}`}
         />
       );
     }
@@ -227,7 +316,7 @@ export default function MetadataEditor({
                     <SelectItem value="url">URL</SelectItem>
                     <SelectItem value="tel">Telephone</SelectItem>
                     <SelectItem value="color">Color</SelectItem>
-                    <SelectItem value="json">JSON</SelectItem>
+                    <SelectItem value="object">Object (JSON)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

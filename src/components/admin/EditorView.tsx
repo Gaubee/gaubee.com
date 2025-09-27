@@ -39,6 +39,12 @@ export default function EditorView() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  useEffect(() => {
+    if (isMobile && viewMode === "split") {
+      setViewMode("editor");
+    }
+  }, [isMobile, viewMode]);
+
   const handleFormat = async () => {
     try {
       const formattedContent = await prettier.format(markdownContent, {
