@@ -1,26 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { PlusCircle, Pencil, GripVertical } from "lucide-react";
 import { useState } from "react";
-import { type EditorMetadata, type MetadataFieldSchema, type MetadataFieldType } from "./types";
+import { type EditorMetadata, type MetadataFieldSchema } from "./types";
 import { FieldMetadataEditDialog } from "./FieldMetadataEditDialog";
 import { ArrayRenderer } from "./renderers/ArrayRenderer";
-import { DateRenderer, validateDate } from "./renderers/DateRenderer";
-import { ObjectRenderer, validateObject } from "./renderers/ObjectRenderer";
-import { TextRenderer } from "./renderers/TextRenderer";
+import { getFieldHandler } from "./field-handler";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-
-const getValidator = (type: MetadataFieldType) => {
-  switch (type) {
-    case "date": case "datetime": return validateDate;
-    case "object": return validateObject;
-    default: return () => true;
-  }
-};
 
 function SortableField({ id, children }: { id: string; children: React.ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
@@ -77,14 +67,11 @@ export default function MetadataEditor({ metadata, onChange }: MetadataEditorPro
     const arrayStatusChanged = isNew || newSchema.isArray !== currentField.schema.isArray;
 
     if (typeChanged || arrayStatusChanged) {
-      if (newSchema.isArray) { value = []; }
-      else {
-        switch (newSchema.type) {
-          case 'number': value = 0; break;
-          case 'object': value = {}; break;
-          case 'date': case 'datetime': value = new Date().toISOString(); break;
-          default: value = ''; break;
-        }
+      const handler = getFieldHandler(newSchema.type);
+      if (newSchema.isArray) {
+        value = [];
+      } else {
+        value = handler.parse(''); // Get a default value for the new type
       }
     }
 
@@ -106,17 +93,17 @@ export default function MetadataEditor({ metadata, onChange }: MetadataEditorPro
   const handleBlur = (key: string) => {
     const schema = metadata.__editor_metadata?.[key];
     if (!schema) return;
-    const validator = getValidator(schema.type);
-    const isValid = validator(metadata[key]);
+    const { verify } = getFieldHandler(schema.type);
+    const isValid = verify(metadata[key]);
     setValidationState(prev => ({ ...prev, [key]: { isValid, isFocused: false } }));
   };
   const handleValueChange = (key: string, value: any) => {
     const newMetadata = { ...metadata, [key]: value };
     const schema = newMetadata.__editor_metadata?.[key];
     if (schema) {
-        const validator = getValidator(schema.type);
-        const isValid = validator(value);
-        setValidationState(prev => ({ ...prev, [key]: { ...prev[key], isValid } }));
+      const { verify } = getFieldHandler(schema.type);
+      const isValid = verify(value);
+      setValidationState(prev => ({ ...prev, [key]: { ...prev[key], isValid } }));
     }
     onChange(newMetadata);
   };
@@ -146,23 +133,34 @@ export default function MetadataEditor({ metadata, onChange }: MetadataEditorPro
     const { isValid = true, isFocused } = validationState[key] || {};
     const validationClass = !isValid ? (isFocused ? "border-yellow-400" : "border-red-500") : "";
 
-    const commonProps = { id, name: key, value, className: validationClass, onFocus: () => handleFocus(key), onBlur: () => handleBlur(key) };
-
     const itemChangeHandler = (itemValue: any) => {
       const newArr = [...(metadata[key] || [])];
-      newArr[index!] = itemValue;
+      const handler = getFieldHandler(schema.type);
+      newArr[index!] = handler.parse(itemValue);
       handleValueChange(key, newArr);
     };
 
-    const textProps = { ...commonProps, onChange: (e: React.ChangeEvent<HTMLInputElement>) => (index !== undefined ? itemChangeHandler(e.target.value) : handleValueChange(key, e.target.value)) };
-    const dateProps = { ...commonProps, type: schema.type, onChange: (e: React.ChangeEvent<HTMLInputElement>) => (index !== undefined ? itemChangeHandler(e.target.value) : handleValueChange(key, e.target.value)) };
-    const objectProps = { ...commonProps, onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => (index !== undefined ? itemChangeHandler(e.target.value) : handleValueChange(key, e.target.value)) };
+    const { render } = getFieldHandler(schema.type);
 
-    switch (schema.type) {
-      case 'object': return <ObjectRenderer {...objectProps} />;
-      case 'date': case 'datetime': return <DateRenderer {...dateProps} />;
-      default: return <TextRenderer {...textProps} />;
-    }
+    const commonProps = {
+      id,
+      name: key,
+      value,
+      className: validationClass,
+      onFocus: () => handleFocus(key),
+      onBlur: () => handleBlur(key),
+      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const handler = getFieldHandler(schema.type);
+        const parsedValue = handler.parse(e.target.value);
+        if (index !== undefined) {
+          itemChangeHandler(parsedValue);
+        } else {
+          handleValueChange(key, parsedValue);
+        }
+      }
+    };
+
+    return render(commonProps);
   };
 
   return (

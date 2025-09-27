@@ -41,7 +41,7 @@ export class ComYoutubePlayerElement extends LitElement {
       }
       const YT = await ComYoutubePlayerElement.youtubeApiIniter();
 
-      function onPlayerReady(event: any) {
+      function onPlayerReady() {
         // Autoplay is removed.
       }
 

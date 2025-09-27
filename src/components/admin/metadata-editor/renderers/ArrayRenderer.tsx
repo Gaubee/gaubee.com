@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { X, PlusCircle, GripVertical } from "lucide-react";
 import { useState } from "react";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
 function SortableArrayItem({ id, children }: { id: string; children: React.ReactNode }) {
