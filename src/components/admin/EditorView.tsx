@@ -2,10 +2,14 @@ import { Button } from "@/components/ui/button";
 import { upsertChange } from "@/lib/db";
 import { getFileContent } from "@/lib/github";
 import { matter } from "@gaubee/nodekit/front-matter";
-import { ArrowLeft, GitCommit } from "lucide-react";
-import { useEffect, useState } from "react";
-import MarkdownEditor from "./MarkdownEditor";
+import { ArrowLeft, GitCommit, Sparkles } from "lucide-react";
+import { useEffect, useState }from "react";
 import MetadataEditor from "./MetadataEditor";
+import CodeMirrorEditor from "./CodeMirrorEditor";
+import MarkdownPreview from "./MarkdownPreview";
+import TableOfContents from "./TableOfContents";
+import prettier from "prettier/standalone";
+import prettierPluginMarkdown from "prettier/plugins/markdown";
 
 export default function EditorView() {
   const [path, setPath] = useState<string | null>(null);
@@ -14,6 +18,19 @@ export default function EditorView() {
   const [markdownContent, setMarkdownContent] = useState("");
   const [isLoadingContent, setIsLoadingContent] = useState(true);
   const [isNewFile, setIsNewFile] = useState(false);
+
+  const handleFormat = async () => {
+    try {
+      const formattedContent = await prettier.format(markdownContent, {
+        parser: "markdown",
+        plugins: [prettierPluginMarkdown],
+      });
+      setMarkdownContent(formattedContent);
+    } catch (error) {
+      console.error("Failed to format markdown:", error);
+      alert("Error formatting markdown. See console for details.");
+    }
+  };
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -77,7 +94,12 @@ Start writing...
     if (!path) return;
 
     try {
-      const newContent = matter.stringify(markdownContent, metadata);
+      const updatedMetadata = {
+        ...metadata,
+        updated: new Date().toISOString(),
+      };
+
+      const newContent = matter.stringify(markdownContent, updatedMetadata);
       const status = isNewFile ? "created" : "updated";
       await upsertChange({
         path: path,
@@ -117,13 +139,31 @@ Start writing...
         <div className="order-last w-full truncate text-center font-mono text-sm sm:order-none sm:w-auto">
           {path}
         </div>
-        <Button onClick={handleStageChanges} disabled={!hasChanges}>
-          <GitCommit className="mr-2 h-4 w-4" />
-          Stage Changes
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleFormat}>
+            <Sparkles className="mr-2 h-4 w-4" />
+            Format
+          </Button>
+          <Button onClick={handleStageChanges} disabled={!hasChanges}>
+            <GitCommit className="mr-2 h-4 w-4" />
+            Stage Changes
+          </Button>
+        </div>
       </header>
       <MetadataEditor metadata={metadata} onChange={setMetadata} />
-      <MarkdownEditor content={markdownContent} onChange={setMarkdownContent} />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:col-span-2">
+          <CodeMirrorEditor
+            content={markdownContent}
+            onChange={setMarkdownContent}
+            path={path}
+          />
+          <MarkdownPreview content={markdownContent} />
+        </div>
+        <div className="lg:col-span-1">
+          <TableOfContents content={markdownContent} />
+        </div>
+      </div>
     </div>
   );
 }
