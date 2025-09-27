@@ -15,24 +15,17 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/components/ui/toggle-group";
-import MetadataEditor from "./MetadataEditor";
+import MetadataEditor from "./metadata-editor";
 import CodeMirrorEditor from "./CodeMirrorEditor";
 import MarkdownPreview from "./MarkdownPreview";
 import TableOfContents from "./TableOfContents";
 import prettier from "prettier/standalone";
 import prettierPluginMarkdown from "prettier/plugins/markdown";
 
-export type MetadataFieldSchema = {
-  type: "text" | "date" | "datetime" | "number" | "url" | "tel" | "color" | "object";
-  isArray: boolean;
-  order: number;
-  description: string;
-};
-
-export type EditorMetadata = {
-  __editor_metadata?: Record<string, MetadataFieldSchema>;
-  [key: string]: any;
-};
+import {
+  type EditorMetadata,
+  type MetadataFieldSchema,
+} from "./metadata-editor/types";
 
 function generateInitialSchema(data: Record<string, any>): Record<string, MetadataFieldSchema> {
   const schema: Record<string, MetadataFieldSchema> = {};

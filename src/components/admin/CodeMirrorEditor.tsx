@@ -203,7 +203,7 @@ export default function CodeMirrorEditor({
                 (l) => l.name === info || l.alias.includes(info)
               );
               if (lang) {
-                return lang.load();
+                return lang;
               }
               return null;
             },
