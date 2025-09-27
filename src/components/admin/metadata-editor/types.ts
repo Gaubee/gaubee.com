@@ -1,3 +1,5 @@
+import type { ChangeEvent } from "react";
+
 export type MetadataFieldType =
   | "text"
   | "date"
@@ -22,3 +24,22 @@ export type EditorMetadata = {
   __editor_metadata?: Record<string, MetadataFieldSchema>;
   [key: string]: any;
 };
+
+// --- Core Renderer & Handler Interfaces ---
+
+export interface RenderProps<T> {
+  id: string;
+  name: string;
+  value: T;
+  className: string;
+  onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onFocus: () => void;
+  onBlur: () => void;
+}
+
+export interface MetadataFieldHandler<T = any> {
+  typeName: MetadataFieldType;
+  parse: (value: string) => T | null;
+  verify: (value: any) => boolean;
+  render: (props: RenderProps<T>) => React.ReactNode;
+}

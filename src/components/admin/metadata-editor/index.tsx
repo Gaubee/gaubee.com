@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { PlusCircle, Pencil, GripVertical } from "lucide-react";
 import { useState } from "react";
 import { type EditorMetadata, type MetadataFieldSchema, type MetadataFieldType } from "./types";
@@ -29,8 +29,8 @@ function SortableField({ id, children }: { id: string; children: React.ReactNode
     transition,
   };
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-2">
-      <div {...attributes} {...listeners} className="cursor-grab"><GripVertical /></div>
+    <div ref={setNodeRef} style={style} className="flex items-start gap-2">
+      <div {...attributes} {...listeners} className="cursor-grab pt-2"><GripVertical /></div>
       <div className="flex-grow">{children}</div>
     </div>
   );
@@ -185,12 +185,7 @@ export default function MetadataEditor({ metadata, onChange }: MetadataEditorPro
                   <SortableField key={key} id={key}>
                     <div className="grid w-full gap-2">
                       <div className="flex items-center gap-2">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Label htmlFor={`meta-${key}`} className="capitalize">{key}</Label>
-                          </TooltipTrigger>
-                          <TooltipContent><p>{schema.description}</p></TooltipContent>
-                        </Tooltip>
+                        <Label htmlFor={`meta-${key}`} className="capitalize">{key}</Label>
                         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleEditField(key)}>
                           <Pencil className="h-3 w-3" />
                         </Button>
@@ -218,7 +213,7 @@ export default function MetadataEditor({ metadata, onChange }: MetadataEditorPro
                       ) : (
                         renderSingleInput(key, value, schema)
                       )}
-                      {schema.description && <p className="text-sm text-muted-foreground">{schema.description}</p>}
+                      {schema.description && <p className="text-sm text-muted-foreground pt-1">{schema.description}</p>}
                     </div>
                   </SortableField>
                 );

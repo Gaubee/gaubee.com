@@ -1,26 +1,13 @@
 import { Input } from "@/components/ui/input";
+import type { MetadataFieldHandler, RenderProps } from "../types";
 
-interface TextRendererProps {
-  id: string;
-  name: string;
-  value: any;
-  className: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onFocus: () => void;
-  onBlur: () => void;
+function TextRenderer({ value, className, ...props }: RenderProps<string>) {
+  return <Input type="text" value={String(value ?? '')} className={className} {...props} />;
 }
 
-export function TextRenderer({ id, name, value, className, onChange, onFocus, onBlur }: TextRendererProps) {
-  return (
-    <Input
-      id={id}
-      name={name}
-      type="text"
-      value={String(value ?? '')}
-      onChange={onChange}
-      onFocus={onFocus}
-      onBlur={onBlur}
-      className={className}
-    />
-  );
-}
+export const textHandler: MetadataFieldHandler<string> = {
+  typeName: "text",
+  parse: (value) => String(value),
+  verify: (value) => typeof value === 'string',
+  render: (props) => <TextRenderer {...props} />,
+};

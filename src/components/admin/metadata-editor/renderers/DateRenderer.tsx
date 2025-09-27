@@ -1,41 +1,40 @@
 import { Input } from "@/components/ui/input";
-import type { MetadataFieldType } from "../types";
+import type { MetadataFieldHandler, MetadataFieldType, RenderProps } from "../types";
 
-interface DateRendererProps {
-  id: string;
-  name: string;
-  value: any;
-  type: MetadataFieldType;
-  className: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onFocus: () => void;
-  onBlur: () => void;
-}
+function DateRenderer({ type, value, ...props }: RenderProps<string> & { type: MetadataFieldType }) {
+  // Ensure we handle potential invalid date values gracefully for the input.
+  const date = new Date(value);
+  const dateValue = !isNaN(+date) ? date.toISOString().slice(0, 16) : '';
 
-export function DateRenderer({ id, name, value, type, className, onChange, onFocus, onBlur }: DateRendererProps) {
-  const dateValue = value ? new Date(value).toISOString().slice(0, 16) : "";
   return (
     <Input
-      id={id}
-      name={name}
+      {...props}
       type={type === 'datetime' ? 'datetime-local' : 'date'}
       value={dateValue}
-      onChange={onChange}
-      onFocus={onFocus}
-      onBlur={onBlur}
-      className={className}
     />
   );
 }
 
-/**
- * Validates if a given value can be parsed into a valid Date.
- * @param value The value to validate.
- * @returns True if the value is a valid date, false otherwise.
- */
-export function validateDate(value: any): boolean {
-  // An empty value is considered valid until the user interacts with it.
-  if (!value) return true;
-  const date = new Date(value);
-  return !isNaN(+date);
+function verify(value: any): boolean {
+  if (!value || typeof value !== 'string') return true; // Allow empty values
+  return !isNaN(+new Date(value));
 }
+
+function parse(value: string): string | null {
+    if (!verify(value)) return null;
+    return new Date(value).toISOString();
+}
+
+export const dateHandler: MetadataFieldHandler<string> = {
+  typeName: "date",
+  parse,
+  verify,
+  render: (props) => <DateRenderer {...props} type="date" />,
+};
+
+export const datetimeHandler: MetadataFieldHandler<string> = {
+    typeName: "datetime",
+    parse,
+    verify,
+    render: (props) => <DateRenderer {...props} type="datetime" />,
+};
