@@ -3,15 +3,16 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { match, P } from "ts-pattern";
 import { visit } from "unist-util-visit";
+import { PUBLIC_DIR } from "./dirs";
 
-export const getLocalImgs = (publicDir: string, tree: Root) => {
+export const getLocalImgs = (tree: Root, publicDir: string = PUBLIC_DIR) => {
   const imageNodes: {
     imgSrc: string;
     imgFilepath: string;
     node: Element;
     index: number;
     parent: Root | Element;
-    updateImgeNode: (node?: Element) => void;
+    updateImageNode: (node?: Element) => void;
   }[] = [];
 
   visit(tree, "element", (node, index, parent) => {
@@ -37,7 +38,7 @@ export const getLocalImgs = (publicDir: string, tree: Root) => {
           if (!existsSync(imgFilepath)) {
             return;
           }
-          const updateImgeNode = (n: Element = node) => {
+          const updateImageNode = (n: Element = node) => {
             parent.children.splice(index, 1, { ...n });
           };
           imageNodes.push({
@@ -46,7 +47,7 @@ export const getLocalImgs = (publicDir: string, tree: Root) => {
             node,
             index,
             parent,
-            updateImgeNode,
+            updateImageNode,
           });
         })
         .otherwise(() => {

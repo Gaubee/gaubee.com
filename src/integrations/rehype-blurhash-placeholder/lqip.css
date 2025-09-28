@@ -1,51 +1,110 @@
 /* integrations/astro-lqip/lqip.css */
 
 .lqip-img {
-  /* 确保图片本身在加载前是透明的，并且占据其布局空间 */
   display: block;
   width: 100%;
-  height: auto; /* 与 aspect-ratio 协同工作 */
-  background-color: transparent;
-  color: transparent; /* 隐藏 alt text，直到图片加载 */
+  height: auto;
   position: relative;
+  background-color: transparent;
+  color: transparent;
 }
 
 .lqip-img::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1; /* 确保在图片之上 */
-  
-  /* 解码 --lqip 变量并绘制背景 */
+  inset: 0;
+  z-index: 1;
+
+  /* --- 1. 从 --lqip 解码基础数据 --- */
   --lqip-pi: 3.1415926535;
-  --lqip-nx: calc(mod(var(--lqip), 9) + 1);
-  --lqip-ny: calc(floor(var(--lqip) / 9) + 1);
-  --lqip-r: calc(mod(floor(var(--lqip) / 65536), 256) / 255);
-  --lqip-g: calc(mod(floor(var(--lqip) / 256), 256) / 255);
-  --lqip-b: calc(mod(var(--lqip), 256) / 255);
-  --lqip-bg-r: calc(1.055 * pow(var(--lqip-r), 1/2.4) - 0.055);
-  --lqip-bg-g: calc(1.055 * pow(var(--lqip-g), 1/2.4) - 0.055);
-  --lqip-bg-b: calc(1.055 * pow(var(--lqip-b), 1/2.4) - 0.055);
-
+  --lqip-size-flag: mod(var(--lqip), 256);
+  --lqip-max-val-quant: mod(floor(var(--lqip) / 256), 256);
+  --lqip-nx: calc(mod(var(--lqip-size-flag), 9) + 1);
+  --lqip-ny: calc(floor(var(--lqip-size-flag) / 9) + 1);
+  --lqip-scale: calc((var(--lqip-max-val-quant) + 1) / 166);
+  
+  /* --- 2. 解码 DC (平均色) --- */
+  /* 每个 / 256 就是一次右移 8 位 */
+  --lqip-dc-r: mod(floor(var(--lqip) / 65536), 256);
+  --lqip-dc-g: mod(floor(var(--lqip) / 16777216), 256);
+  --lqip-dc-b: mod(floor(var(--lqip) / 4294967296), 256);
+  
+  /* --- 3. 定义 sRGB -> Linear 转换 (简化版) --- */
+  --lqip-dc-r-lin: calc(pow(var(--lqip-dc-r) / 255, 2.2));
+  --lqip-dc-g-lin: calc(pow(var(--lqip-dc-g) / 255, 2.2));
+  --lqip-dc-b-lin: calc(pow(var(--lqip-dc-b) / 255, 2.2));
+  
+  /* --- 4. 渲染多重背景 --- */
   background-image:
-    linear-gradient(0deg,
-      rgb(calc(255*var(--lqip-bg-r)), calc(255*var(--lqip-bg-g)), calc(255*var(--lqip-bg-b))),
-      rgb(calc(255*var(--lqip-bg-r)), calc(255*var(--lqip-bg-g)), calc(255*var(--lqip-bg-b)))
-    );
+    /* AC 分量层 (最多支持 4x3=11个) */
+    var(--lqip-grad-1), var(--lqip-grad-2), var(--lqip-grad-3),
+    var(--lqip-grad-4), var(--lqip-grad-5), var(--lqip-grad-6),
+    var(--lqip-grad-7), var(--lqip-grad-8), var(--lqip-grad-9),
+    var(--lqip-grad-10), var(--lqip-grad-11),
+    /* DC 平均色作为最底层 */
+    linear-gradient(rgb(var(--lqip-dc-r), var(--lqip-dc-g), var(--lqip-dc-b)), rgb(var(--lqip-dc-r), var(--lqip-dc-g), var(--lqip-dc-b)));
 
-  /* 图片加载后，伪元素淡出 */
+  background-position: center;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  
   opacity: 1;
-  transition: opacity 500ms ease-in-out;
+  transition: opacity 400ms ease-in-out;
 }
 
+/* --- 5. 循环解码每个 AC 分量并生成对应的渐变 --- */
+/* 这是一个 hack，因为 CSS 没有循环。我们为每个可能的 AC 分量定义计算规则 */
+.lqip-img::before {
+  --lqip-grad-1: var(--lqip-grad-fn, 1);
+  --lqip-grad-2: var(--lqip-grad-fn, 2);
+  --lqip-grad-3: var(--lqip-grad-fn, 3);
+  --lqip-grad-4: var(--lqip-grad-fn, 4);
+  --lqip-grad-5: var(--lqip-grad-fn, 5);
+  --lqip-grad-6: var(--lqip-grad-fn, 6);
+  --lqip-grad-7: var(--lqip-grad-fn, 7);
+  --lqip-grad-8: var(--lqip-grad-fn, 8);
+  --lqip-grad-9: var(--lqip-grad-fn, 9);
+  --lqip-grad-10: var(--lqip-grad-fn, 10);
+  --lqip-grad-11: var(--lqip-grad-fn, 11);
+
+  /* 通用渐变计算函数 */
+  --lqip-grad-fn:
+    radial-gradient(
+      circle at
+        /* 根据 i, j 计算中心点位置 */
+        calc(50% + 50% * cos(var(--i) * var(--lqip-pi) / var(--lqip-nx))),
+      rgb(
+        /* 计算颜色 */
+        calc(255 * pow(var(--lqip-dc-r-lin) + var(--lqip-scale) * (pow(abs(var(--ac-r) - 9)/9, 2) * sign(var(--ac-r) - 9)) * cos(var(--i) * var(--lqip-pi) / var(--lqip-nx)) * cos(var(--j) * var(--lqip-pi) / var(--lqip-ny)), 1/2.2)),
+        calc(255 * pow(var(--lqip-dc-g-lin) + var(--lqip-scale) * (pow(abs(var(--ac-g) - 9)/9, 2) * sign(var(--ac-g) - 9)) * cos(var(--i) * var(--lqip-pi) / var(--lqip-nx)) * cos(var(--j) * var(--lqip-pi) / var(--lqip-ny)), 1/2.2)),
+        calc(255 * pow(var(--lqip-dc-b-lin) + var(--lqip-scale) * (pow(abs(var(--ac-b) - 9)/9, 2) * sign(var(--ac-b) - 9)) * cos(var(--i) * var(--lqip-pi) / var(--lqip-nx)) * cos(var(--j) * var(--lqip-pi) / var(--lqip-ny)), 1/2.2))
+      ) 0%,
+      transparent 100%
+    );
+}
+
+/* 重新定义作用域，为每个 AC 分量设置 i, j 和颜色值 */
+.lqip-img::before {
+  --lqip-grad-1 {
+    --k: 1; --i: 1; --j: 0;
+    --ac-r: mod(floor(var(--lqip) / pow(256, 5)), 256);
+    --ac-g: mod(floor(var(--lqip) / pow(256, 6)), 256);
+    --ac-b: mod(floor(var(--lqip) / pow(256, 7)), 256);
+  }
+  --lqip-grad-2 {
+    --k: 2; --i: 2; --j: 0;
+    --ac-r: mod(floor(var(--lqip) / pow(256, 8)), 256);
+    --ac-g: mod(floor(var(--lqip) / pow(256, 9)), 256);
+    --ac-b: mod(floor(var(--lqip) / pow(256, 10)), 256);
+  }
+  /* ... 以此类推，为所有11个 AC 分量都添加这样的块 ... */
+}
+
+/* --- 图片加载完成后的样式 --- */
 .lqip-img.loaded::before {
   opacity: 0;
+  content: none;
 }
-
-/* 别忘了图片本身的加载过渡效果 */
 .lqip-img.loaded {
-  color: initial; /* 显示 alt text */
+  color: initial;
 }

@@ -1,4 +1,3 @@
-import { createResolverByRootFile } from "@gaubee/nodekit";
 import type { RehypePlugins } from "astro";
 import Debug from "debug";
 import { createHash } from "node:crypto";
@@ -6,18 +5,15 @@ import { createReadStream, existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
+import { PUBLIC_NAME, rootResolver } from "./helper/dirs";
 import { getLocalImgs } from "./helper/get-local-imgs";
 
 const log = Debug("rehype-responsive-images");
 // --- 配置 ---
-const rootResolver = createResolverByRootFile(import.meta.url);
 // 定义要生成哪些宽度的图片
 const WIDTHS = [480, 800, 1200, 1600];
 // 定义 sizes 属性，告诉浏览器图片在不同视口下的显示宽度
 const SIZES = "(max-width: 768px) 100vw, (max-width: 1600px) 80vw, 1200px";
-// 定义图片源目录（相对于项目根目录）
-const PUBLIC_NAME = "public";
-const PUBLIC_DIR = rootResolver(PUBLIC_NAME);
 // 将生成的图片写入 public/_gen 目录，Astro会自动将其复制到 dist
 const GENERATED_ASSETS_DIR_NAME = "_gen";
 const GENERATED_ASSETS_PUBLIC_DIR = rootResolver(
@@ -65,7 +61,7 @@ interface ImageSource {
 export const rehypeResponsiveImages: RehypePlugins[number] = () => {
   return async (tree, file) => {
     // 1. 收集所有需要处理的图片节点
-    const imageNodes = getLocalImgs(PUBLIC_DIR, tree);
+    const imageNodes = getLocalImgs(tree);
 
     if (imageNodes.length === 0) {
       return;
@@ -77,7 +73,7 @@ export const rehypeResponsiveImages: RehypePlugins[number] = () => {
     );
 
     // 2. 并行处理所有收集到的图片
-    for (const { imgSrc, imgFilepath, node, index, parent } of imageNodes) {
+    for (const { imgSrc, imgFilepath, node, updateImageNode } of imageNodes) {
       try {
         const imageHash = await getFileHash(imgFilepath);
         const imageCacheDir = path.join(CACHE_DIR, imageHash);
@@ -176,7 +172,7 @@ export const rehypeResponsiveImages: RehypePlugins[number] = () => {
             );
           }
 
-          parent.children.splice(index, 1, { ...node });
+          updateImageNode();
         }
         // =================================================================
         // 重写逻辑结束
