@@ -242,6 +242,24 @@
   }
 }
 
+.prose ul {
+  /* background: linear-gradient(
+      90deg,
+      color-mix(in srgb, currentColor 15%, transparent),
+      color-mix(in srgb, currentColor 5%, transparent),
+      transparent
+    )
+    0px 0px no-repeat;
+  background-size: 1.5rem 100%;
+   */
+  padding-block-start: 0.25rem;
+  border-radius: 20px;
+  box-shadow: inset 4px 4px 6px -8px;
+}
+.prose img[style*="--lqip:"] {
+  border-radius: 8px;
+}
+
 /* 滚动条样式 */
 @layer components {
   * {

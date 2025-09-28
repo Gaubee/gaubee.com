@@ -4,9 +4,9 @@ import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
-import { PUBLIC_NAME, rootResolver } from "./helper/dirs";
-import { getFileHash } from "./helper/filehash";
-import { getLocalImgs } from "./helper/get-local-imgs";
+import { PUBLIC_NAME, rootResolver } from "../helper/dirs";
+import { getFileHash } from "../helper/filehash";
+import { getLocalImgs } from "../helper/get-local-imgs";
 
 const log = Debug("rehype-responsive-images");
 // --- 配置 ---

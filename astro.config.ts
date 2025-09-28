@@ -4,9 +4,10 @@ import tailwindcss from "@tailwindcss/vite";
 import AstroPWA from "@vite-pwa/astro";
 import { defineConfig } from "astro/config";
 import rehypeMermaid from "rehype-mermaid";
-import { astroLqip } from "./plugins/rehype-blurhash-placeholder/rehype-lqip-plugin";
-import { rehypeResponsiveImages } from "./plugins/rehype-responsive-images";
-import { rehypeWrapTables } from "./plugins/rehype-wrap-tables";
+import { astroLqip } from "./plugins/img-blurhash-placeholder/astro-lqip-plugin";
+import { astroPhotoSwipe } from "./plugins/photoswipe/astro-photoswipe-plugin";
+import { rehypeResponsiveImages } from "./plugins/responsive-images/rehype-images-plugin";
+import { rehypeWrapTables } from "./plugins/responsive-tables/rehype-tables-plugin";
 
 // https://astro.build/config
 export default defineConfig({
@@ -32,6 +33,7 @@ export default defineConfig({
     react(),
     mdx(),
     astroLqip(),
+    astroPhotoSwipe(),
     AstroPWA({
       registerType: "autoUpdate",
       injectRegister: "script-defer",

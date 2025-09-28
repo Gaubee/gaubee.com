@@ -1,7 +1,7 @@
 import type { RehypePlugins } from "astro";
 import { h } from "hastscript";
 import { visit } from "unist-util-visit";
-import { cn } from "../src/lib/utils";
+import { cn } from "../../src/lib/utils";
 
 // 这是我们的自定义 Rehype 插件
 export const rehypeWrapTables: RehypePlugins[number] = () => {

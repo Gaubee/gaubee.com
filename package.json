@@ -54,6 +54,7 @@
     "mermaid": "^11.12.0",
     "minisearch": "^7.2.0",
     "motion": "^12.23.18",
+    "photoswipe": "^5.4.4",
     "react": "^19.1.1",
     "react-diff-viewer": "^3.1.1",
     "react-dom": "^19.1.1",
