@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { PlusCircle, Pencil, GripVertical } from "lucide-react";
+import { PlusCircle, Pencil, GripVertical, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { type EditorMetadata, type MetadataFieldSchema } from "./types";
 import { FieldMetadataEditDialog } from "./FieldMetadataEditDialog";
@@ -80,24 +80,44 @@ export default function MetadataEditor({ metadata, onChange }: MetadataEditorPro
     const newEditorMeta = { ...newMetadata.__editor_metadata } as Record<string, MetadataFieldSchema>;
 
     if (!newKey) { alert("Field key cannot be empty."); return; }
-    if ((isNew || oldKey !== newKey) && metadata.hasOwnProperty(newKey)) { alert(`Field "${newKey}" already exists.`); return; }
+    if ((isNew || oldKey !== newKey) && newMetadata.hasOwnProperty(newKey)) {
+      alert(`Field "${newKey}" already exists.`);
+      return;
+    }
 
     let value = isNew ? undefined : newMetadata[oldKey];
-    const typeChanged = isNew || newSchema.type !== currentField.schema.type;
-    const arrayStatusChanged = isNew || newSchema.isArray !== currentField.schema.isArray;
+    const oldSchema = currentField.schema;
 
-    if (typeChanged || arrayStatusChanged) {
-      const handler = getFieldHandler(newSchema.type);
-      if (newSchema.isArray) {
-        value = [];
-      } else {
-        value = handler.parse(''); // Get a default value for the new type
-      }
+    // Smart data preservation on type/isArray change
+    if (!isNew && (newSchema.isArray !== oldSchema.isArray || newSchema.type !== oldSchema.type)) {
+        const handler = getFieldHandler(newSchema.type);
+        if (newSchema.isArray && !oldSchema.isArray) {
+            // from no-array to array
+            value = value === undefined || value === null ? [] : [value];
+        } else if (!newSchema.isArray && oldSchema.isArray) {
+            // from array to no-array
+            value = value?.[0] ?? handler.parse('');
+        }
+
+        // If type changed within an array, try to convert each item
+        if (newSchema.isArray && oldSchema.isArray && newSchema.type !== oldSchema.type) {
+             value = (value || []).map((item: any) => handler.parse(String(item)) ?? handler.parse(''));
+        }
+    } else if (isNew) {
+        const handler = getFieldHandler(newSchema.type);
+        value = newSchema.isArray ? [] : handler.parse('');
     }
+
 
     if (!isNew && oldKey !== newKey) {
       delete newMetadata[oldKey];
       delete newEditorMeta[oldKey];
+      // also delete from rawValues
+      setRawValues(prev => {
+          const newRaw = {...prev};
+          delete newRaw[oldKey];
+          return newRaw;
+      })
     }
 
     newMetadata[newKey] = value;
@@ -107,6 +127,26 @@ export default function MetadataEditor({ metadata, onChange }: MetadataEditorPro
     onChange(newMetadata);
     setIsDialogOpen(false);
     setCurrentField(null);
+  };
+
+  const handleDeleteField = (keyToDelete: string) => {
+    if (!window.confirm(`Are you sure you want to delete the field "${keyToDelete}"?`)) {
+        return;
+    }
+    const newMetadata = { ...metadata };
+    const newEditorMeta = { ...newMetadata.__editor_metadata } as Record<string, MetadataFieldSchema>;
+
+    delete newMetadata[keyToDelete];
+    delete newEditorMeta[keyToDelete];
+
+    // also delete from rawValues
+    setRawValues(prev => {
+        const newRaw = {...prev};
+        delete newRaw[keyToDelete];
+        return newRaw;
+    });
+
+    onChange({ ...newMetadata, __editor_metadata: newEditorMeta });
   };
 
   const handleFocus = (key: string) => setValidationState(prev => ({ ...prev, [key]: { ...prev[key], isFocused: true } }));
@@ -215,7 +255,7 @@ export default function MetadataEditor({ metadata, onChange }: MetadataEditorPro
           <PlusCircle className="mr-2 h-4 w-4" /> Add Field
         </Button>
       </CardHeader>
-      <CardContent className="grid gap-4 md:grid-cols-2">
+      <CardContent className="grid gap-4">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={sortedKeys} strategy={verticalListSortingStrategy}>
             <TooltipProvider>
@@ -229,6 +269,9 @@ export default function MetadataEditor({ metadata, onChange }: MetadataEditorPro
                         <Label htmlFor={`meta-${key}`} className="capitalize">{key}</Label>
                         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleEditField(key)}>
                           <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive" onClick={() => handleDeleteField(key)}>
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
                       {schema.isArray ? (
@@ -244,9 +287,11 @@ export default function MetadataEditor({ metadata, onChange }: MetadataEditorPro
                           onAddItem={() => {
                             const handler = getFieldHandler(schema.type);
                             const defaultValue = handler.parse('');
-                            const defaultRawValue = '';
-                            setRawValues(prev => ({...prev, [key]: [...(prev[key] || []), defaultRawValue]}));
-                            onChange({...metadata, [key]: [...(metadata[key] || []), defaultValue]});
+                            const defaultRawValue = ''; // Assuming raw value for new item is empty string
+                            const newMeta = {...metadata, [key]: [...(metadata[key] || []), defaultValue] };
+                            const newRaw = {...rawValues, [key]: [...(rawValues[key] || []), defaultRawValue] };
+                            setRawValues(newRaw)
+                            onChange(newMeta);
                           }}
                           onRemoveItem={(index) => {
                             const newArr = [...(metadata[key] || [])];

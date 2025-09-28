@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { X, PlusCircle, GripVertical } from "lucide-react";
-import { useState } from "react";
+import * as React from "react";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -9,13 +8,13 @@ import { CSS } from '@dnd-kit/utilities';
 function SortableArrayItem({ id, children }: { id: string; children: React.ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform), // Use Translate to avoid scaling issues
     transition,
   };
   return (
     <div ref={setNodeRef} style={style} {...attributes} className="flex items-center gap-2">
       <div {...listeners} className="cursor-grab"><GripVertical /></div>
-      <div className="flex-grow">{children}</div>
+      {children}
     </div>
   );
 }
@@ -35,36 +34,33 @@ export function ArrayRenderer({
   onRemoveItem,
   onReorder,
 }: ArrayRendererProps) {
-  const [newItem, setNewItem] = useState("");
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
-  const handleAddItem = () => {
-    // The parent component will handle creating the default value.
-    onAddItem();
-    setNewItem("");
-  };
+  // Generate stable, unique IDs for each item to ensure smooth animations.
+  const itemsWithIds = React.useMemo(() => value.map((_, index) => ({ id: `${index}-${value[index]}` })), [value]);
 
   function handleDragEnd(event: DragEndEvent) {
     const {active, over} = event;
     if (over && active.id !== over.id) {
-      const oldIndex = value.findIndex((_, index) => `${index}` === active.id);
-      const newIndex = value.findIndex((_, index) => `${index}` === over.id);
-      onReorder(oldIndex, newIndex);
+      const oldIndex = itemsWithIds.findIndex(item => item.id === active.id);
+      const newIndex = itemsWithIds.findIndex(item => item.id === over.id);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        onReorder(oldIndex, newIndex);
+      }
     }
   }
-
-  const itemsWithIds = value.map((_, index) => ({ id: `${index}` }));
 
   return (
     <div className="space-y-2">
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={itemsWithIds.map(i => i.id)} strategy={verticalListSortingStrategy}>
           {value.map((item, index) => (
-            <SortableArrayItem key={index} id={`${index}`}>
-                {renderItem(item, index)}
+            <SortableArrayItem key={itemsWithIds[index].id} id={itemsWithIds[index].id}>
+                <div className="flex-grow">{renderItem(item, index)}</div>
                 <Button
                   variant="ghost"
                   size="icon"
+                  className="flex-shrink-0"
                   onClick={() => onRemoveItem(index)}
                 >
                   <X className="h-4 w-4" />
@@ -73,16 +69,9 @@ export function ArrayRenderer({
           ))}
         </SortableContext>
       </DndContext>
-      <div className="flex items-center gap-2">
-        <Input
-          type="text"
-          placeholder="Add new item"
-          value={newItem}
-          onChange={(e) => setNewItem(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddItem())}
-        />
-        <Button variant="ghost" size="icon" onClick={handleAddItem}>
-          <PlusCircle className="h-5 w-5" />
+      <div className="flex">
+        <Button variant="outline" size="sm" onClick={onAddItem} className="mt-2">
+          <PlusCircle className="mr-2 h-4 w-4" /> Add Item
         </Button>
       </div>
     </div>

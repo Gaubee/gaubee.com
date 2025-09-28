@@ -16,6 +16,7 @@ import {
   ToggleGroupItem,
 } from "@/components/ui/toggle-group";
 import MetadataEditor from "./metadata-editor";
+import MetadataPreview from "./MetadataPreview";
 import CodeMirrorEditor from "./CodeMirrorEditor";
 import MarkdownPreview from "./MarkdownPreview";
 import TableOfContents from "./TableOfContents";
@@ -241,7 +242,22 @@ Start writing...
       <div className="w-full truncate text-center font-mono text-sm text-muted-foreground">
         {path}
       </div>
-      <MetadataEditor metadata={metadata} onChange={setMetadata} />
+
+      {/* New Metadata Section */}
+      <div className={`grid grid-cols-1 gap-4 ${ viewMode === "split" && !isMobile ? "md:grid-cols-2" : "" }`}>
+        {(viewMode === "editor" || (viewMode === "split" && !isMobile)) && (
+          <div className={ viewMode === "split" && !isMobile ? "" : "col-span-full" }>
+            <MetadataEditor metadata={metadata} onChange={setMetadata} />
+          </div>
+        )}
+        {(viewMode === "preview" || (viewMode === "split" && !isMobile)) && (
+          <div className={ viewMode === "split" && !isMobile ? "" : "col-span-full" }>
+            <MetadataPreview metadata={metadata} />
+          </div>
+        )}
+      </div>
+
+      {/* Markdown Section */}
       <div
         className={`grid grid-cols-1 gap-4 ${
           viewMode === "split" && !isMobile ? "md:grid-cols-2" : ""
