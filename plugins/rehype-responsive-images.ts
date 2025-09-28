@@ -1,11 +1,11 @@
 import type { RehypePlugins } from "astro";
 import Debug from "debug";
-import { createHash } from "node:crypto";
-import { createReadStream, existsSync } from "node:fs";
+import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 import { PUBLIC_NAME, rootResolver } from "./helper/dirs";
+import { getFileHash } from "./helper/filehash";
 import { getLocalImgs } from "./helper/get-local-imgs";
 
 const log = Debug("rehype-responsive-images");
@@ -33,18 +33,6 @@ async function ensureDirExists(dirPath: string) {
   if (!existsSync(dirPath)) {
     await fs.mkdir(dirPath, { recursive: true });
   }
-}
-
-/**
- * 根据文件路径和修改时间生成一个稳定的哈希值
- */
-async function getFileHash(filePath: string) {
-  const hash = createReadStream(filePath).pipe(createHash("sha256"));
-  const job = Promise.withResolvers<void>();
-  hash.on("finish", job.resolve);
-  hash.on("error", job.reject);
-  await job.promise;
-  return hash.digest("hex").slice(0, 16);
 }
 
 /**
