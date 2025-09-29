@@ -1,14 +1,14 @@
 import { Input } from "@/components/ui/input";
 import type { MetadataFieldHandler, RenderProps } from "../types";
 
-function UrlRenderer({ value, ...props }: RenderProps<string>) {
-  return <Input type="url" value={String(value ?? '')} {...props} />;
+function UrlRenderer({ value, ...props }: RenderProps) {
+  return <Input type="url" value={value} {...props} />;
 }
 
 export const urlHandler: MetadataFieldHandler<string> = {
   typeName: "url",
-  parse: (value) => String(value),
   verify: (value) => {
+    if (value === null || value === undefined || value === '') return true; // Allow empty
     if (typeof value !== 'string') return false;
     try {
       new URL(value);
@@ -17,5 +17,6 @@ export const urlHandler: MetadataFieldHandler<string> = {
       return false;
     }
   },
+  format: (value) => value,
   render: (props) => <UrlRenderer {...props} />,
 };

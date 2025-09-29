@@ -27,6 +27,7 @@ import {
   type EditorMetadata,
   type MetadataFieldSchema,
 } from "./metadata-editor/types";
+import { getFieldHandler } from "./metadata-editor/field-handler";
 
 function generateInitialSchema(data: Record<string, any>): Record<string, MetadataFieldSchema> {
   const schema: Record<string, MetadataFieldSchema> = {};
@@ -76,6 +77,7 @@ export default function EditorView() {
   }, [isMobile, viewMode]);
 
   const handleFormat = async () => {
+    // Format markdown content
     try {
       const formattedContent = await prettier.format(markdownContent, {
         parser: "markdown",
@@ -85,6 +87,31 @@ export default function EditorView() {
     } catch (error) {
       console.error("Failed to format markdown:", error);
       alert("Error formatting markdown. See console for details.");
+    }
+
+    // Format metadata
+    const newMetadata = { ...metadata };
+    let metadataChanged = false;
+    for (const key in newMetadata) {
+      if (key === '__editor_metadata') continue;
+
+      const schema = newMetadata.__editor_metadata?.[key];
+      if (schema) {
+        const handler = getFieldHandler(schema.type);
+        const value = newMetadata[key];
+
+        if (handler.verify(value)) {
+          const formattedValue = handler.format(value);
+          if (formattedValue !== value) {
+            newMetadata[key] = formattedValue;
+            metadataChanged = true;
+          }
+        }
+      }
+    }
+
+    if (metadataChanged) {
+      setMetadata(newMetadata);
     }
   };
 

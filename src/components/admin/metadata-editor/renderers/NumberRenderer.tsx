@@ -1,22 +1,24 @@
 import { Input } from "@/components/ui/input";
 import type { MetadataFieldHandler, RenderProps } from "../types";
 
-function NumberRenderer({ value, ...props }: RenderProps<number>) {
+function NumberRenderer({ value, ...props }: RenderProps) {
   return <Input type="number" value={value} {...props} />;
 }
 
 function verify(value: any): boolean {
-  return !isNaN(parseFloat(value)) && isFinite(value);
+  if (value === null || value === undefined || value === '') return true; // Allow empty
+  const num = Number(value);
+  return !isNaN(num) && isFinite(num);
 }
 
-function parse(value: string): number | null {
-  const num = parseFloat(value);
-  return verify(num) ? num : null;
+function format(value: number): number {
+  // Numbers don't need special formatting, just return the value.
+  return value;
 }
 
 export const numberHandler: MetadataFieldHandler<number> = {
   typeName: "number",
-  parse,
   verify,
+  format,
   render: (props) => <NumberRenderer {...props} />,
 };

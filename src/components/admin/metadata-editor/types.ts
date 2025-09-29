@@ -27,10 +27,10 @@ export type EditorMetadata = {
 
 // --- Core Renderer & Handler Interfaces ---
 
-export interface RenderProps<T> {
+export interface RenderProps {
   id: string;
   name: string;
-  value: T;
+  value: string;
   className: string;
   onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   onFocus: () => void;
@@ -39,7 +39,7 @@ export interface RenderProps<T> {
 
 export interface MetadataFieldHandler<T = any> {
   typeName: MetadataFieldType;
-  parse: (value: string) => T | null;
   verify: (value: any) => boolean;
-  render: (props: RenderProps<T>) => React.ReactNode;
+  format: (value: T) => T;
+  render: (props: RenderProps) => React.ReactNode;
 }
