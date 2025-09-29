@@ -74,7 +74,7 @@ export default function CodeMirrorEditor({
     }
   }, [onPaste, onDrop]);
 
-  const toggleFormatting = (controlSymbol: string, formatName: "bold" | "italic" | "strikethrough" | "code") => {
+  const handleFormatToggle = (controlSymbol: string, formatName: "bold" | "italic" | "strikethrough" | "code") => {
     const view = editor.current?.view;
     if (!view) return;
     const { state, dispatch } = view;
@@ -89,25 +89,20 @@ export default function CodeMirrorEditor({
 
     if (empty) {
       if (activeFormats[formatName]) {
-        let node = syntaxTree(state).resolve(from, -1);
-        let formatNode: SyntaxNode | null = null;
+        let node: SyntaxNode | null = syntaxTree(state).resolve(from, -1);
         while (node) {
           if (node.name === formatNodeName) {
-            formatNode = node;
-            break;
+            const startMarkerLength = controlSymbol.length;
+            const endMarkerLength = controlSymbol.length;
+            dispatch({
+              changes: [
+                { from: node.from, to: node.from + startMarkerLength },
+                { from: node.to - endMarkerLength, to: node.to },
+              ],
+            });
+            return;
           }
           node = node.parent;
-        }
-
-        if (formatNode) {
-          const startMarkerLength = controlSymbol.length;
-          const endMarkerLength = controlSymbol.length;
-          dispatch({
-            changes: [
-              { from: formatNode.from, to: formatNode.from + startMarkerLength },
-              { from: formatNode.to - endMarkerLength, to: formatNode.to },
-            ],
-          });
         }
       } else {
         const transaction = state.update({
@@ -181,10 +176,10 @@ export default function CodeMirrorEditor({
     view.focus();
   };
 
-  const handleBold = () => toggleFormatting("**", "bold");
-  const handleItalic = () => toggleFormatting("*", "italic");
-  const handleStrikethrough = () => toggleFormatting("~~", "strikethrough");
-  const handleCode = () => toggleFormatting("`", "code");
+  const handleBold = () => handleFormatToggle("**", "bold");
+  const handleItalic = () => handleFormatToggle("*", "italic");
+  const handleStrikethrough = () => handleFormatToggle("~~", "strikethrough");
+  const handleCode = () => handleFormatToggle("`", "code");
   const handleCodeBlock = () => {
     const view = editor.current?.view;
     if (!view) return;
@@ -214,7 +209,32 @@ export default function CodeMirrorEditor({
   };
   const handleQuote = () => toggleLinePrefix("> ");
   const handleList = () => toggleLinePrefix("- ");
-  const handleTaskList = () => toggleLinePrefix("- [ ] ");
+
+  const handleTaskList = () => {
+    const view = editor.current?.view;
+    if (!view) return;
+    const { state, dispatch } = view;
+    const { from, empty } = state.selection.main;
+
+    const line = state.doc.lineAt(from);
+    // If it's just a cursor and we are on a task list item, toggle its state
+    if (empty) {
+        const taskMatch = line.text.match(/^(\s*-\s*\[)([ x])(\]\s)/);
+        if (taskMatch) {
+            const newMark = taskMatch[2] === ' ' ? 'x' : ' ';
+            const change = {
+                from: line.from + taskMatch[1].length,
+                to: line.from + taskMatch[1].length + 1,
+                insert: newMark
+            };
+            dispatch({ changes: [change] });
+            view.focus();
+            return;
+        }
+    }
+    // If there's a selection or we are not on a task list item, use toggleLinePrefix
+    toggleLinePrefix('- [ ] ');
+  };
 
   const handleOrderedList = () => {
     const view = editor.current?.view;
@@ -225,25 +245,51 @@ export default function CodeMirrorEditor({
     const startLine = state.doc.lineAt(from);
     const endLine = state.doc.lineAt(to);
 
-    const changes = [];
-    let startNumber = 1;
-
-    // Check if the line before the selection is part of an ordered list
-    if (startLine.number > 1) {
-        const prevLine = state.doc.line(startLine.number - 1);
-        const match = prevLine.text.match(/^(\s*)(\d+)\.\s/);
-        if (match) {
-            startNumber = parseInt(match[2], 10) + 1;
+    let allAreOrdered = true;
+    for (let i = startLine.number; i <= endLine.number; i++) {
+        const line = state.doc.line(i);
+        if (line.length > 0 && !/^\s*\d+\.\s/.test(line.text)) {
+            allAreOrdered = false;
+            break;
         }
     }
 
-    for (let i = startLine.number; i <= endLine.number; i++) {
-        const line = state.doc.line(i);
-        if (line.length === 0 && endLine.number > startLine.number) continue;
-        const linePrefix = line.text.match(/^\s*/)?.[0] ?? '';
-        const prefix = `${startNumber}. `;
-        changes.push({ from: line.from + linePrefix.length, insert: prefix });
-        startNumber++;
+    const changes = [];
+    if (allAreOrdered) {
+        // Remove numbering
+        for (let i = startLine.number; i <= endLine.number; i++) {
+            const line = state.doc.line(i);
+            const match = line.text.match(/^(\s*)(\d+)\.\s/);
+            if (match) {
+                changes.push({ from: line.from + match[1].length, to: line.from + match[0].length });
+            }
+        }
+    } else {
+        // Add numbering
+        let startNumber = 1;
+        if (startLine.number > 1) {
+            const prevLine = state.doc.line(startLine.number - 1);
+            const match = prevLine.text.match(/^(\s*)(\d+)\.\s/);
+            if (match) {
+                startNumber = parseInt(match[2], 10) + 1;
+            }
+        }
+        for (let i = startLine.number; i <= endLine.number; i++) {
+            const line = state.doc.line(i);
+            if (line.length === 0 && endLine.number > startLine.number) continue;
+
+            const existingPrefixMatch = line.text.match(/^\s*(-|\*|\+)\s/);
+            if (existingPrefixMatch) {
+                const linePrefix = existingPrefixMatch[1];
+                const prefix = `${startNumber}. `;
+                changes.push({ from: line.from + line.text.indexOf(linePrefix), to: line.from + line.text.indexOf(linePrefix) + linePrefix.length, insert: prefix });
+            } else {
+                const linePrefix = line.text.match(/^\s*/)?.[0] ?? '';
+                const prefix = `${startNumber}. `;
+                changes.push({ from: line.from + linePrefix.length, insert: prefix });
+            }
+            startNumber++;
+        }
     }
 
     if (changes.length > 0) {
