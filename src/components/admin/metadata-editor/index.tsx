@@ -3,14 +3,21 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PlusCircle, Pencil, GripVertical, Trash2 } from "lucide-react";
-import { useState } from "react";
-import { type EditorMetadata, type MetadataFieldSchema } from "./types";
+import { useState, useCallback, memo } from "react";
+import { type EditorMetadata, type MetadataFieldSchema, type RenderProps } from "./types";
 import { FieldMetadataEditDialog } from "./FieldMetadataEditDialog";
 import { ArrayRenderer } from "./renderers/ArrayRenderer";
 import { getFieldHandler } from "./field-handler";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+
+const MemoizedInput = memo(function MemoizedInput({
+    id, name, value, className, onFocus, onBlur, onChange, schema
+}: RenderProps & { schema: MetadataFieldSchema, name: string }) {
+    const { render } = getFieldHandler(schema.type);
+    return render({ id, name, value, className, onFocus, onBlur, onChange });
+});
 
 function SortableField({ id, children }: { id: string; children: React.ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
@@ -34,7 +41,7 @@ interface MetadataEditorProps {
 export default function MetadataEditor({ metadata, onChange }: MetadataEditorProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentField, setCurrentField] = useState<{ key: string; schema: MetadataFieldSchema; isNew: boolean } | null>(null);
-  const [validationState, setValidationState] = useState<Record<string, { isValid: boolean }>>({});
+  const [validationState, setValidationState] = useState<Record<string, { isValid: boolean; isFocused: boolean }>>({});
 
   const handleEditField = (key: string) => {
     const schema = metadata.__editor_metadata?.[key];
@@ -103,24 +110,33 @@ export default function MetadataEditor({ metadata, onChange }: MetadataEditorPro
     onChange({ ...newMetadata, __editor_metadata: newEditorMeta });
   };
 
-  const handleValueChange = (key: string, value: string, index?: number) => {
-    const schema = metadata.__editor_metadata?.[key];
-    if (schema) {
-        const { verify } = getFieldHandler(schema.type);
-        const isValid = verify(value);
-        setValidationState(prev => ({ ...prev, [key]: { isValid } }));
-    }
+  const handleFocus = useCallback((key: string) => {
+    setValidationState(prev => ({ ...prev, [key]: { ...prev[key], isFocused: true } }));
+  }, []);
 
-    const newMetadata = { ...metadata };
-    if (index !== undefined) {
-        const newArray = [...(newMetadata[key] || [])];
-        newArray[index] = value;
-        newMetadata[key] = newArray;
-    } else {
-        newMetadata[key] = value;
-    }
-    onChange(newMetadata);
-  };
+  const handleBlur = useCallback((key: string) => {
+    setValidationState(prev => ({ ...prev, [key]: { ...prev[key], isFocused: false } }));
+  }, []);
+
+  const handleValueChange = useCallback((key: string, value: string, index?: number) => {
+    onChange((currentMetadata: EditorMetadata) => {
+      const schema = currentMetadata.__editor_metadata?.[key];
+      if (schema) {
+          const { verify } = getFieldHandler(schema.type);
+          const isValid = verify(value);
+          setValidationState(prev => ({ ...prev, [key]: { ...prev[key], isValid } }));
+      }
+      const newMetadata = { ...currentMetadata };
+      if (index !== undefined) {
+          const newArray = [...(newMetadata[key] || [])];
+          newArray[index] = value;
+          newMetadata[key] = newArray;
+      } else {
+          newMetadata[key] = value;
+      }
+      return newMetadata;
+    });
+  }, [onChange]);
 
   const sortedKeys = Object.keys(metadata).filter((key) => key !== "__editor_metadata").sort((a, b) => (metadata.__editor_metadata?.[a]?.order ?? 99) - (metadata.__editor_metadata?.[b]?.order ?? 99));
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
@@ -142,28 +158,25 @@ export default function MetadataEditor({ metadata, onChange }: MetadataEditorPro
     }
   }
 
-  const renderSingleInput = (key: string, schema: MetadataFieldSchema, index?: number) => {
+  const renderSingleInput = useCallback((key: string, schema: MetadataFieldSchema, index?: number) => {
     const id = `meta-${key}` + (index !== undefined ? `-${index}` : '');
-    const { isValid = true } = validationState[key] || {};
-    const validationClass = !isValid ? "border-red-500" : "";
-
+    const { isValid = true, isFocused = false } = validationState[key] || {};
+    const validationClass = !isValid ? (isFocused ? "border-yellow-400" : "border-red-500") : "";
     const value = index !== undefined ? metadata[key]?.[index] ?? '' : metadata[key] ?? '';
-    const { render } = getFieldHandler(schema.type);
 
-    const commonProps = {
-      id,
-      name: key,
-      value: String(value),
-      className: validationClass,
-      onFocus: () => {},
-      onBlur: () => {},
-      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        handleValueChange(key, e.target.value, index);
-      }
-    };
-
-    return render(commonProps);
-  };
+    return (
+        <MemoizedInput
+            id={id}
+            name={key}
+            value={String(value)}
+            className={validationClass}
+            onFocus={() => handleFocus(key)}
+            onBlur={() => handleBlur(key)}
+            onChange={(e) => handleValueChange(key, e.target.value, index)}
+            schema={schema}
+        />
+    );
+  }, [metadata, validationState, handleFocus, handleBlur, handleValueChange]);
 
   return (
     <Card>
@@ -196,12 +209,13 @@ export default function MetadataEditor({ metadata, onChange }: MetadataEditorPro
                         <ArrayRenderer
                           value={metadata[key] || []}
                           renderItem={(_, index) => renderSingleInput(key, { ...schema, isArray: false }, index)}
+                          verify={getFieldHandler(schema.type).verify}
                           onReorder={(oldIndex, newIndex) => {
                             const newArr = arrayMove((metadata[key] || []), oldIndex, newIndex);
                             onChange({...metadata, [key]: newArr});
                           }}
-                          onAddItem={() => {
-                            onChange({...metadata, [key]: [...(metadata[key] || []), '']});
+                          onAddItem={(newItem) => {
+                            onChange({...metadata, [key]: [...(metadata[key] || []), newItem]});
                           }}
                           onRemoveItem={(index) => {
                             const newArr = [...(metadata[key] || [])];

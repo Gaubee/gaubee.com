@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { X, PlusCircle, GripVertical } from "lucide-react";
 import * as React from "react";
+import { useState } from "react";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -22,9 +24,10 @@ function SortableArrayItem({ id, children }: { id: string; children: React.React
 interface ArrayRendererProps {
   value: any[];
   renderItem: (item: any, index: number) => React.ReactNode;
-  onAddItem: () => void;
+  onAddItem: (newItem: string) => void;
   onRemoveItem: (index: number) => void;
   onReorder: (oldIndex: number, newIndex: number) => void;
+  verify: (value: any) => boolean;
 }
 
 export function ArrayRenderer({
@@ -33,10 +36,20 @@ export function ArrayRenderer({
   onAddItem,
   onRemoveItem,
   onReorder,
+  verify,
 }: ArrayRendererProps) {
+  const [newItem, setNewItem] = useState("");
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
-  // Generate stable, unique IDs for each item to ensure smooth animations.
+  const handleAddItem = () => {
+    if (!verify(newItem)) {
+        alert("Invalid value for new item.");
+        return;
+    }
+    onAddItem(newItem);
+    setNewItem("");
+  };
+
   const itemsWithIds = React.useMemo(() => value.map((_, index) => ({ id: `${index}-${value[index]}` })), [value]);
 
   function handleDragEnd(event: DragEndEvent) {
@@ -69,9 +82,16 @@ export function ArrayRenderer({
           ))}
         </SortableContext>
       </DndContext>
-      <div className="flex">
-        <Button variant="outline" size="sm" onClick={onAddItem} className="mt-2">
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Item
+      <div className="flex items-center gap-2 pt-2">
+        <Input
+          type="text"
+          placeholder="Add new item"
+          value={newItem}
+          onChange={(e) => setNewItem(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddItem())}
+        />
+        <Button variant="ghost" size="icon" onClick={handleAddItem}>
+          <PlusCircle className="h-5 w-5" />
         </Button>
       </div>
     </div>
