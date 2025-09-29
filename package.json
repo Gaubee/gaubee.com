@@ -27,6 +27,7 @@
   "packageManager": "pnpm@10.17.0",
   "dependencies": {
     "@astrojs/react": "^4.3.1",
+    "@codemirror/autocomplete": "^6.19.0",
     "@codemirror/lang-markdown": "^6.3.4",
     "@codemirror/language": "^6.11.3",
     "@codemirror/language-data": "^6.5.1",

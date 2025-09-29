@@ -9,6 +9,7 @@ import { EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { EditorView, type ViewUpdate } from "@codemirror/view";
 import { type SyntaxNode } from "@lezer/common";
+import { closeBrackets } from "@codemirror/autocomplete";
 
 interface CodeMirrorEditorProps {
   content: string;
@@ -73,17 +74,66 @@ export default function CodeMirrorEditor({
     }
   }, [onPaste, onDrop]);
 
-  const toggleWrap = (start: string, end: string = start) => {
+  const toggleFormatting = (controlSymbol: string, formatName: "bold" | "italic" | "strikethrough" | "code") => {
     const view = editor.current?.view;
     if (!view) return;
     const { state, dispatch } = view;
-    const { from, to } = state.selection.main;
-    const selectionText = state.sliceDoc(from, to);
+    const { from, to, empty } = state.selection.main;
 
-    if (state.sliceDoc(from - start.length, from) === start && state.sliceDoc(to, to + end.length) === end) {
-      dispatch(state.update({ changes: [{ from: from - start.length, to: from }, { from: to, to: to + end.length, insert: '' }] }));
+    const formatNodeName = {
+        bold: "StrongEmphasis",
+        italic: "Emphasis",
+        strikethrough: "Strikethrough",
+        code: "InlineCode"
+    }[formatName];
+
+    if (empty) {
+      if (activeFormats[formatName]) {
+        let node = syntaxTree(state).resolve(from, -1);
+        let formatNode: SyntaxNode | null = null;
+        while (node) {
+          if (node.name === formatNodeName) {
+            formatNode = node;
+            break;
+          }
+          node = node.parent;
+        }
+
+        if (formatNode) {
+          const startMarkerLength = controlSymbol.length;
+          const endMarkerLength = controlSymbol.length;
+          dispatch({
+            changes: [
+              { from: formatNode.from, to: formatNode.from + startMarkerLength },
+              { from: formatNode.to - endMarkerLength, to: formatNode.to },
+            ],
+          });
+        }
+      } else {
+        const transaction = state.update({
+          changes: { from, insert: controlSymbol + controlSymbol },
+          selection: { anchor: from + controlSymbol.length },
+        });
+        dispatch(transaction);
+      }
     } else {
-      dispatch(state.update({ changes: { from, to, insert: `${start}${selectionText}${end}` } }));
+      const isWrapped =
+        state.sliceDoc(from - controlSymbol.length, from) === controlSymbol &&
+        state.sliceDoc(to, to + controlSymbol.length) === controlSymbol;
+
+      if (isWrapped) {
+        dispatch({
+          changes: [
+            { from: from - controlSymbol.length, to: from },
+            { from: to, to: to + controlSymbol.length },
+          ],
+        });
+      } else {
+        const selectionText = state.sliceDoc(from, to);
+        dispatch({
+          changes: { from, to, insert: `${controlSymbol}${selectionText}${controlSymbol}` },
+        });
+      }
     }
     view.focus();
   };
@@ -99,25 +149,30 @@ export default function CodeMirrorEditor({
 
     let allPrefixed = true;
     for (let i = startLine.number; i <= endLine.number; i++) {
-        const line = state.doc.line(i);
-        if (line.length > 0 && !line.text.startsWith(prefix)) {
-            allPrefixed = false;
-            break;
+      const line = state.doc.line(i);
+      if (line.length > 0) {
+        const lineText = line.text;
+        const linePrefix = lineText.match(/^\s*/)?.[0] ?? '';
+        if (!lineText.slice(linePrefix.length).startsWith(prefix)) {
+          allPrefixed = false;
+          break;
         }
+      }
     }
 
     const changes = [];
     for (let i = startLine.number; i <= endLine.number; i++) {
-        const line = state.doc.line(i);
-        if (line.length === 0 && endLine.number > startLine.number) continue;
+      const line = state.doc.line(i);
+      if (line.length === 0 && endLine.number > startLine.number) continue;
 
-        if (allPrefixed) {
-            if (line.text.startsWith(prefix)) {
-                changes.push({ from: line.from, to: line.from + prefix.length, insert: "" });
-            }
-        } else {
-            changes.push({ from: line.from, insert: prefix });
+      const linePrefix = line.text.match(/^\s*/)?.[0] ?? '';
+      if (allPrefixed) {
+        if (line.text.slice(linePrefix.length).startsWith(prefix)) {
+          changes.push({ from: line.from + linePrefix.length, to: line.from + linePrefix.length + prefix.length, insert: "" });
         }
+      } else {
+        changes.push({ from: line.from + linePrefix.length, insert: prefix });
+      }
     }
 
     if (changes.length > 0) {
@@ -126,12 +181,77 @@ export default function CodeMirrorEditor({
     view.focus();
   };
 
-  const handleBold = () => toggleWrap("**");
-  const handleItalic = () => toggleWrap("*");
-  const handleStrikethrough = () => toggleWrap("~~");
-  const handleCode = () => toggleWrap("\n```\n", "\n```\n"); // For code blocks
+  const handleBold = () => toggleFormatting("**", "bold");
+  const handleItalic = () => toggleFormatting("*", "italic");
+  const handleStrikethrough = () => toggleFormatting("~~", "strikethrough");
+  const handleCode = () => toggleFormatting("`", "code");
+  const handleCodeBlock = () => {
+    const view = editor.current?.view;
+    if (!view) return;
+    const { state, dispatch } = view;
+    const { from, to, empty } = state.selection.main;
+
+    const startLine = state.doc.lineAt(from);
+    const endLine = empty ? startLine : state.doc.lineAt(to);
+
+    const selectionText = state.sliceDoc(startLine.from, endLine.to);
+    const fences = selectionText.match(/^(\s*)`{3,}/gm) || [];
+    let maxTicks = 0;
+    for (const fence of fences) {
+      maxTicks = Math.max(maxTicks, fence.trim().length);
+    }
+
+    const newFence = '`'.repeat(Math.max(3, maxTicks + 1));
+
+    dispatch({
+      changes: [
+        { from: startLine.from, insert: newFence + '\n' },
+        { from: endLine.to, insert: '\n' + newFence }
+      ],
+      selection: { anchor: startLine.from + newFence.length + 1 }
+    });
+    view.focus();
+  };
   const handleQuote = () => toggleLinePrefix("> ");
   const handleList = () => toggleLinePrefix("- ");
+  const handleTaskList = () => toggleLinePrefix("- [ ] ");
+
+  const handleOrderedList = () => {
+    const view = editor.current?.view;
+    if (!view) return;
+    const { state, dispatch } = view;
+    const { from, to } = state.selection.main;
+
+    const startLine = state.doc.lineAt(from);
+    const endLine = state.doc.lineAt(to);
+
+    const changes = [];
+    let startNumber = 1;
+
+    // Check if the line before the selection is part of an ordered list
+    if (startLine.number > 1) {
+        const prevLine = state.doc.line(startLine.number - 1);
+        const match = prevLine.text.match(/^(\s*)(\d+)\.\s/);
+        if (match) {
+            startNumber = parseInt(match[2], 10) + 1;
+        }
+    }
+
+    for (let i = startLine.number; i <= endLine.number; i++) {
+        const line = state.doc.line(i);
+        if (line.length === 0 && endLine.number > startLine.number) continue;
+        const linePrefix = line.text.match(/^\s*/)?.[0] ?? '';
+        const prefix = `${startNumber}. `;
+        changes.push({ from: line.from + linePrefix.length, insert: prefix });
+        startNumber++;
+    }
+
+    if (changes.length > 0) {
+      dispatch({ changes });
+    }
+    view.focus();
+  };
+
   const handleLink = () => {
     const view = editor.current?.view;
     if (!view) return;
@@ -152,17 +272,25 @@ export default function CodeMirrorEditor({
     const tree = syntaxTree(state);
     const formats: Record<string, boolean> = {};
 
-    // Resolve the node at the cursor and walk up the tree to find all active formats.
-    let node: SyntaxNode | null = tree.resolve(from, -1); // -1 bias gets the node before the cursor, good for this use case
+    let node: SyntaxNode | null = tree.resolve(from, -1);
     while (node) {
       const nodeName = node.name;
       if (nodeName.includes("StrongEmphasis")) formats.bold = true;
       if (nodeName.includes("Emphasis")) formats.italic = true;
       if (nodeName.includes("Strikethrough")) formats.strikethrough = true;
       if (nodeName.includes("InlineCode")) formats.code = true;
-      if (nodeName.includes("FencedCode")) formats.code = true;
+      if (nodeName.includes("FencedCode")) formats["code-block"] = true;
       if (nodeName.includes("Blockquote")) formats.quote = true;
-      if (nodeName.includes("ListItem")) formats.list = true;
+      if (nodeName.includes("ListItem")) {
+        const listItemText = state.sliceDoc(node.from, node.to);
+        if (listItemText.match(/^\s*-\s*\[[ x]\]/)) {
+            formats["task-list"] = true;
+        } else if (listItemText.match(/^\s*\d+\.\s/)) {
+            formats["ordered-list"] = true;
+        } else {
+            formats.list = true;
+        }
+      }
       if (nodeName.includes("Link")) formats.link = true;
       node = node.parent;
     }
@@ -175,10 +303,13 @@ export default function CodeMirrorEditor({
         onBold={handleBold}
         onItalic={handleItalic}
         onList={handleList}
+        onOrderedList={handleOrderedList}
+        onTaskList={handleTaskList}
         onLink={handleLink}
         onStrikethrough={handleStrikethrough}
         onQuote={handleQuote}
         onCode={handleCode}
+        onCodeBlock={handleCodeBlock}
         activeFormats={activeFormats}
       />
       <CodeMirror
@@ -187,6 +318,7 @@ export default function CodeMirrorEditor({
         height="500px"
         theme={githubDark}
         extensions={[
+          closeBrackets(),
           // TODO: Add autocompletion and hinting functionality.
           // This would involve adding the @codemirror/autocomplete package
           // and configuring it with sources for markdown keywords, etc.

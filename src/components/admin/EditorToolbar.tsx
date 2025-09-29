@@ -1,14 +1,17 @@
-import { Bold, Italic, List, Link, Strikethrough, Quote, Code } from "lucide-react";
+import { Bold, Italic, List, Link, Strikethrough, Quote, Code, CodeSquare, ListOrdered, ListTodo } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export interface EditorToolbarProps {
   onBold: () => void;
   onItalic: () => void;
   onList: () => void;
+  onOrderedList: () => void;
+  onTaskList: () => void;
   onLink: () => void;
   onStrikethrough: () => void;
   onQuote: () => void;
   onCode: () => void;
+  onCodeBlock: () => void;
   activeFormats: Record<string, boolean>;
 }
 
@@ -16,10 +19,13 @@ export default function EditorToolbar({
   onBold,
   onItalic,
   onList,
+  onOrderedList,
+  onTaskList,
   onLink,
   onStrikethrough,
   onQuote,
   onCode,
+  onCodeBlock,
   activeFormats,
 }: EditorToolbarProps) {
   const activeValues = Object.entries(activeFormats)
@@ -38,8 +44,14 @@ export default function EditorToolbar({
         <ToggleGroupItem value="strikethrough" aria-label="Toggle strikethrough" onClick={onStrikethrough}>
           <Strikethrough className="h-4 w-4" />
         </ToggleGroupItem>
-        <ToggleGroupItem value="list" aria-label="Toggle list" onClick={onList}>
+        <ToggleGroupItem value="list" aria-label="Toggle unordered list" onClick={onList}>
           <List className="h-4 w-4" />
+        </ToggleGroupItem>
+        <ToggleGroupItem value="ordered-list" aria-label="Toggle ordered list" onClick={onOrderedList}>
+          <ListOrdered className="h-4 w-4" />
+        </ToggleGroupItem>
+        <ToggleGroupItem value="task-list" aria-label="Toggle task list" onClick={onTaskList}>
+          <ListTodo className="h-4 w-4" />
         </ToggleGroupItem>
         <ToggleGroupItem value="quote" aria-label="Toggle quote" onClick={onQuote}>
           <Quote className="h-4 w-4" />
@@ -49,6 +61,9 @@ export default function EditorToolbar({
         </ToggleGroupItem>
         <ToggleGroupItem value="code" aria-label="Toggle code" onClick={onCode}>
           <Code className="h-4 w-4" />
+        </ToggleGroupItem>
+        <ToggleGroupItem value="code-block" aria-label="Toggle code block" onClick={onCodeBlock}>
+          <CodeSquare className="h-4 w-4" />
         </ToggleGroupItem>
       </ToggleGroup>
     </div>
