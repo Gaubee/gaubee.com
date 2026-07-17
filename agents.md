@@ -1,3 +1,11 @@
+## Project Configuration
+
+- **Language**: TypeScript
+- **Package Manager**: pnpm
+- **Add-ons**: tailwindcss, vitest, playwright, mdsvex, sveltekit-adapter
+
+---
+
 ## 必读
 
 - [`TARGET.md`](./TARGET.md) 是我们的目标指南。

@@ -1,31 +1,36 @@
-node_modules/
+node_modules
 
-# Build artifacts
-/dist
-/dev-dist
-.astro/
-search-index.json
-/public/_gen/
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
 
-# Environment variables
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
 .env
+.env.*
+!.env.example
+!.env.test
 
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-jules-scratch/
-
-# IDEs and editors
-.idea/
-.vscode/
-*.swp
-*.swo
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
 
 # Playwright
-/test-results/
-/playwright-report/
-/blob-report/
-/playwright/.cache/
+test-results
+playwright-report
+blob-report
+playwright/.cache
+
+# AI 工具临时目录
+.zcode/
+jules-scratch/
+
+# Cloudflare Worker 本地状态
+.dev.vars
