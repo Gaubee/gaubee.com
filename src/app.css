@@ -129,3 +129,152 @@
 		@apply font-sans;
 	}
 }
+
+/* ---------------------------------------------------------------------------
+ * App layout - 响应式四区布局（容器查询，移植自 openspecui index.css）
+ *
+ * 区域：nav（左）/ main（右上）/ bottom（右下）/ pop（浮层）。
+ * 移动端（容器宽 < 768px）：竖排，侧栏隐藏，显示移动端顶栏/底栏。
+ * 桌面端（>= 768px）：横排，侧栏 + 主体，移动端组件隐藏。
+ * ------------------------------------------------------------------------- */
+
+.app-layout {
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+	height: 100dvh; /* dvh 处理移动端浏览器栏 */
+	overflow: hidden;
+}
+.app-body {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+	min-width: 0;
+}
+
+/* 移动端默认显示的组件 */
+.mobile-header,
+.mobile-tabbar {
+	display: flex;
+}
+/* 桌面端组件默认隐藏（容器查询切到桌面时再显示） */
+.desktop-sidebar,
+.desktop-status {
+	display: none;
+}
+.desktop-sidebar {
+	width: 14rem;
+	min-width: 14rem;
+	flex-direction: column;
+	border-right: 1px solid var(--border);
+	background: var(--sidebar);
+	overflow: hidden;
+	transition:
+		width 0.18s ease,
+		min-width 0.18s ease,
+		padding 0.18s ease;
+}
+.desktop-sidebar[data-collapsed='true'] {
+	width: 3.5rem;
+	min-width: 3.5rem;
+}
+
+.main-content {
+	flex: 1;
+	min-height: 0;
+	min-width: 0;
+	overflow: auto;
+}
+.main-content:empty {
+	display: none;
+}
+
+.bottom-area {
+	display: block;
+	min-height: 0;
+	min-width: 0;
+	border-top: 1px solid var(--border);
+	background: var(--card);
+}
+
+.pop-area-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 50;
+}
+
+/* 桌面：容器宽 >= 768px 时切换为横排 */
+@container app (min-width: 768px) {
+	.app-layout {
+		flex-direction: row;
+	}
+	.desktop-sidebar,
+	.desktop-status {
+		display: flex;
+	}
+	.mobile-header,
+	.mobile-tabbar {
+		display: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+ * CodeMirror Markdown WYSIWYG 样式（移植自 openspecui codemirror-markdown-preview.ts）
+ * ------------------------------------------------------------------------- */
+
+.cm-editor .cm-md-hidden {
+	display: none;
+}
+.cm-editor .cm-md-faded {
+	opacity: 0.55;
+}
+.cm-editor .cm-md-link {
+	color: var(--primary);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+.cm-editor .cm-md-image {
+	color: var(--muted-foreground);
+}
+.cm-editor .cm-md-codeblock-line,
+.cm-editor .cm-md-codeblock-line-start,
+.cm-editor .cm-md-codeblock-line-end {
+	background: var(--muted);
+	font-family: var(--font-mono, monospace);
+}
+.cm-editor .cm-md-codeblock-line-start {
+	border-radius: 8px 8px 0 0;
+}
+.cm-editor .cm-md-codeblock-line-end {
+	border-radius: 0 0 8px 8px;
+}
+.cm-editor .cm-md-olist {
+	color: var(--muted-foreground);
+	margin-right: 0.25em;
+}
+.cm-editor .cm-md-ulmark {
+	color: var(--muted-foreground);
+	margin-right: 0.25em;
+}
+.cm-editor .cm-md-task {
+	display: inline-block;
+	width: 1em;
+	height: 1em;
+	border: 1.5px solid var(--border);
+	border-radius: 3px;
+	vertical-align: middle;
+	position: relative;
+}
+.cm-editor .cm-md-task-checked::after {
+	content: '';
+	position: absolute;
+	left: 2px;
+	top: -2px;
+	width: 5px;
+	height: 10px;
+	border: solid var(--primary);
+	border-width: 0 2px 2px 0;
+	transform: rotate(45deg);
+}
+
