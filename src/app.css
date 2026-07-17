@@ -131,6 +131,27 @@
 }
 
 /* ---------------------------------------------------------------------------
+ * Shiki 双主题代码高亮（配合 defaultColor: false）
+ * 亮色模式用 --shiki-light，暗色（.dark）用 --shiki-dark
+ * ------------------------------------------------------------------------- */
+.shiki,
+.shiki span {
+	color: var(--shiki-light);
+	background-color: var(--shiki-light-bg);
+}
+.dark .shiki,
+.dark .shiki span {
+	color: var(--shiki-dark);
+	background-color: var(--shiki-dark-bg);
+}
+.shiki {
+	border-radius: 8px;
+	padding: 1rem;
+	overflow-x: auto;
+	font-size: 0.875em;
+}
+
+/* ---------------------------------------------------------------------------
  * App layout - 响应式四区布局（容器查询，移植自 openspecui index.css）
  *
  * 区域：nav（左）/ main（右上）/ bottom（右下）/ pop（浮层）。

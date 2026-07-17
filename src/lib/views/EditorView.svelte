@@ -10,6 +10,7 @@
   import { onMount } from 'svelte'
   import CodeMirror from '$lib/editor/CodeMirror.svelte'
   import MetadataEditor from '$lib/editor/MetadataEditor.svelte'
+  import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
   import { contentStore, type Post } from '$lib/data/content.svelte'
   import { navStore } from '$lib/nav/nav.svelte'
   import { getFileText } from '$lib/github/client'
@@ -181,15 +182,10 @@
         {#if view === 'split'}
           <div class="w-px bg-border"></div>
         {/if}
-        <!-- 预览区（阶段 6 接 MarkdownViewer） -->
+        <!-- 预览区（MarkdownViewer 渲染） -->
         {#if view === 'split' || view === 'preview'}
-          <div class="min-w-0 flex-1 overflow-auto p-6 prose prose-sm max-w-none">
-            {#if view === 'preview'}
-              <div class="text-muted-foreground mb-4 text-xs">
-                预览功能在阶段 6 接入 MarkdownViewer，当前显示原文。
-              </div>
-            {/if}
-            <pre class="whitespace-pre-wrap text-xs">{body}</pre>
+          <div class="min-w-0 flex-1 overflow-auto p-6">
+            <MarkdownViewer markdown={body} />
           </div>
         {/if}
       </div>

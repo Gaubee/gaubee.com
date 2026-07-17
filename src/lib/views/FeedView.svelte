@@ -8,6 +8,7 @@
   import { contentStore } from '$lib/data/content.svelte'
   import { authStore } from '$lib/auth/session.svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
+  import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
   import { Button } from '$lib/components/ui/button'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import * as Card from '$lib/components/ui/card'
@@ -115,6 +116,11 @@
           <h2 class="mb-2 text-lg font-semibold">
             {post.metadata.title ?? post.id.slug ?? post.id.stem}
           </h2>
+          {#if post.body.trim()}
+            <div class="text-muted-foreground text-sm">
+              <MarkdownViewer markdown={post.body} maxLines={6} inline />
+            </div>
+          {/if}
           {#if post.metadata.tags.length > 0}
             <div class="flex flex-wrap gap-1">
               {#each post.metadata.tags.slice(0, 5) as tag}
