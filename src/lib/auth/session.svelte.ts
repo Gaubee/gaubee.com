@@ -115,6 +115,11 @@ if (browser) {
 /**
  * 封装对 GitHub API 的调用（走 Worker 代理）。
  * 路径不带前导斜杠，如 fetchGithub('repos/gaubee/gaubee.com/contents/src/content')。
+ *
+ * Worker 行为：
+ * - GET/HEAD：无 token 时回退匿名请求（公开仓库可读，受 60/h 限速）
+ * - POST/PUT/PATCH/DELETE：必须有 token（未登录返回 401）
+ * - 路径限定 repos/gaubee/gaubee.com/（防 SSRF）
  */
 export async function fetchGithub(
   path: string,

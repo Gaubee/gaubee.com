@@ -6,9 +6,16 @@ compatibility_flags = ["nodejs_compat"]
 
 # 环境变量（非敏感，可提交）：
 # - APP_ORIGIN：静态站点的 origin，CORS 与重定向白名单用。部署时设置。
+# - ENVIRONMENT：dev 时允许 localhost CORS；生产设为 "production" 严格白名单。
 # 敏感变量（GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET）用 wrangler secret put 设置，不入库。
 [vars]
 APP_ORIGIN = "http://localhost:5173"
+ENVIRONMENT = "dev"
+
+# 生产环境配置（部署时用 --env production 或在 dashboard 设置）：
+# [env.production.vars]
+# APP_ORIGIN = "https://gaubee.com"
+# ENVIRONMENT = "production"
 
 # OAuth 回调路径必须与 GitHub OAuth App 配置的 Authorization callback URL 一致：
 # https://<worker-domain>/auth/github/callback

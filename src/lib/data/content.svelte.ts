@@ -6,6 +6,9 @@
  *
  * 保留原接口（articles/events/allPosts/postsByMonth/allTags/findPost），
  * 上层视图无需改动。
+ *
+ * 未登录也能读取：Worker 的 /api/proxy/* 对 GET 回退匿名 GitHub 请求（公开仓库可读），
+ * 编辑/提交需登录。
  */
 import { browser } from "$app/environment";
 import { vfsStore } from "$lib/vfs/vfs.svelte";

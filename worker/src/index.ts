@@ -21,6 +21,8 @@ export interface Env {
   GITHUB_CLIENT_ID: string;
   GITHUB_CLIENT_SECRET: string;
   APP_ORIGIN: string;
+  /** 部署环境：dev 时允许 localhost CORS，prod 严格白名单。 */
+  ENVIRONMENT?: string;
 }
 
 const GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize";
@@ -31,19 +33,24 @@ const COOKIE_NAME = "gh_token";
 const STATE_COOKIE = "gh_oauth_state";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 天
 
+/** 代理路径限定：只允许访问本仓库。防 SSRF 到其他仓库。 */
+const OWNER = "gaubee";
+const REPO = "gaubee.com";
+const ALLOWED_PROXY_PREFIX = `repos/${OWNER}/${REPO}/`;
+
 const app = new Hono<{ Bindings: Env }>();
 
-// CORS：开发时允许 localhost 任意端口，生产仅允许 APP_ORIGIN。
-// 用函数动态判断，支持 credentials。
+// CORS：dev 允许 localhost 任意端口，prod 严格 APP_ORIGIN。
 app.use(
   "*",
   cors({
     origin: (origin, c) => {
-      const allowed = c.env.APP_ORIGIN;
+      const isDev = c.env.ENVIRONMENT !== "production";
       // 开发环境：localhost/127.0.0.1 任意端口都允许
-      if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      if (isDev && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
         return origin;
       }
+      const allowed = c.env.APP_ORIGIN;
       return allowed === origin ? allowed : null;
     },
     allowHeaders: ["Content-Type", "Authorization"],
@@ -161,42 +168,66 @@ app.get("/auth/me", async (c) => {
 });
 
 // ---- 5. GitHub API 代理：前端所有 GitHub 调用走这里，token 从 cookie 取 ----
+// - 路径限定为 repos/gaubee/gaubee.com/（防 SSRF 到其他仓库）
+// - 写操作（POST/PUT/PATCH/DELETE）必须 token
+// - 只读（GET/HEAD）无 token 时回退匿名请求（公开仓库可读，受 60/h 限速）
 app.all("/api/proxy/*", async (c) => {
-  const token = getCookie(c, COOKIE_NAME);
-  if (!token) {
-    return c.json({ error: "unauthorized" }, 401);
-  }
-  // /api/proxy/repos/gaubee/... → https://api.github.com/repos/gaubee/...
-  const ghPath = c.req.path.replace(/^\/api\/proxy/, "");
-  const url = `${GITHUB_API}${ghPath}${c.req.url.includes("?") ? "?" + c.req.url.split("?")[1] : ""}`;
+  // 解析目标路径：/api/proxy/repos/gaubee/.../contents → repos/gaubee/.../contents
+  const url = new URL(c.req.url)
+  // 去掉 /api/proxy 前缀与前导斜杠，规范化
+  const ghPath = c.req.path.replace(/^\/api\/proxy\/?/, "")
 
-  const headers = new Headers(c.req.raw.headers);
-  headers.delete("host");
-  headers.delete("cookie");
-  headers.delete("origin");
-  headers.set("Authorization", `Bearer ${token}`);
-  headers.set("Accept", "application/vnd.github+json");
-  if (c.req.method !== "GET" && c.req.method !== "HEAD") {
-    headers.set("Content-Type", "application/json");
+  // 路径白名单校验：必须以 ALLOWED_PROXY_PREFIX 开头（防 SSRF 到其他仓库）
+  const isAllowed =
+    ghPath === ALLOWED_PROXY_PREFIX.slice(0, -1) || ghPath.startsWith(ALLOWED_PROXY_PREFIX)
+  if (!isAllowed) {
+    return c.json({ error: "forbidden: path not allowed" }, 403)
   }
 
-  const resp = await fetch(url, {
-    method: c.req.method,
+  const token = getCookie(c, COOKIE_NAME)
+  const method = c.req.method
+  const isWrite = method !== "GET" && method !== "HEAD"
+  // 写操作必须有 token（匿名不能写）
+  if (isWrite && !token) {
+    return c.json({ error: "unauthorized: write requires login" }, 401)
+  }
+
+  const targetUrl = `${GITHUB_API}/${ghPath}${url.search}`
+
+  // 构造干净的请求头（白名单，删掉所有 proxy/client headers）
+  const headers = new Headers()
+  headers.set("Accept", "application/vnd.github+json")
+  headers.set("User-Agent", "gaubee-auth-worker")
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`)
+  }
+  if (isWrite) {
+    headers.set("Content-Type", "application/json")
+  }
+
+  const resp = await fetch(targetUrl, {
+    method,
     headers,
-    body:
-      c.req.method !== "GET" && c.req.method !== "HEAD"
-        ? await c.req.text()
-        : undefined,
-  });
+    body: isWrite ? await c.req.text() : undefined,
+  })
 
-  // 透传响应，保留状态码
+  // 透传响应
+  const respHeaders = new Headers()
+  respHeaders.set(
+    "Content-Type",
+    resp.headers.get("Content-Type") ?? "application/json",
+  )
+  respHeaders.set("Cache-Control", "no-store")
+  // 透传 GitHub 的 rate limit 头（前端可据此提示）
+  for (const h of ["X-RateLimit-Limit", "X-RateLimit-Remaining", "ETag"]) {
+    const v = resp.headers.get(h)
+    if (v) respHeaders.set(h, v)
+  }
+
   return new Response(resp.body, {
     status: resp.status,
-    headers: {
-      "Content-Type": resp.headers.get("Content-Type") ?? "application/json",
-      "Cache-Control": "no-store",
-    },
-  });
-});
+    headers: respHeaders,
+  })
+})
 
 export default app;
