@@ -1,24 +1,20 @@
 <!--
 	EditorView：编辑器主页。
 	- 从 main location 路径解析要编辑的文章（/editor/{collection}/{stem}）
-	- 加载文章内容（contentStore 缓存优先，否则从 GitHub 拉）
-	- 三视图：编辑 / 分屏 / 预览（预览在阶段 6 接入 MarkdownViewer，这里占位）
-	- 自动保存到 IndexedDB（stagedChanges），debounce 1s
+	- 加载文章内容（VFS 三层读取：本地修改 > 远程缓存 > 在线拉取）
+	- 三视图：编辑 / 分屏 / 预览
+	- 自动保存到 VFS（dirty 标记），debounce 1s
 	- 顶部工具栏：视图切换、元数据编辑、保存
 -->
 <script lang="ts">
-  import { onMount } from 'svelte'
   import CodeMirror from '$lib/editor/CodeMirror.svelte'
   import MetadataEditor from '$lib/editor/MetadataEditor.svelte'
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
-  import { contentStore, type Post } from '$lib/data/content.svelte'
+  import { vfsStore } from '$lib/vfs/vfs.svelte'
   import { navStore } from '$lib/nav/nav.svelte'
-  import { getFileText } from '$lib/github/client'
   import { parseMarkdown, serializeMarkdown, type ArticleMetadata } from '$lib/data/frontmatter'
-  import { stageChange } from '$lib/db'
   import { Button } from '$lib/components/ui/button'
   import * as Dialog from '$lib/components/ui/dialog'
-  import * as Tabs from '$lib/components/ui/tabs'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { toast } from 'svelte-sonner'
   import EyeIcon from '@lucide/svelte/icons/eye'
@@ -34,12 +30,17 @@
   let metadataOpen = $state(false)
   let loading = $state(false)
   let error = $state<string | null>(null)
-  let currentPost = $state<Post | null>(null)
+  /** 当前编辑的文件 VFS 路径（如 src/content/articles/0057.tc39-signals.md）。 */
+  let currentPath = $state<string | null>(null)
   let metadata = $state<ArticleMetadata>({ date: new Date(), tags: [] })
   let body = $state('')
   /** 文档身份标识（切换文章时变化，触发 CodeMirror 重载）。 */
   let docId = $state('')
   let saveTimer: ReturnType<typeof setTimeout> | null = null
+  /** 竞态防护：每次 loadPost 递增，回调比对 seq 决定是否应用结果。 */
+  let loadSeq = 0
+  /** 是否有未保存修改（用于提示）。 */
+  let dirty = $state(false)
 
   // 从路径解析文章：/editor/articles/0057.tc39-signals
   const targetPost = $derived.by(() => {
@@ -51,37 +52,33 @@
 
   async function loadPost() {
     if (!targetPost) {
-      currentPost = null
+      currentPath = null
+      body = ''
+      metadata = { date: new Date(), tags: [] }
       return
     }
+    const mySeq = ++loadSeq
+    const path = `src/content/${targetPost.collection}/${targetPost.stem}.md`
     loading = true
     error = null
+    // 立即清空，避免切换期间显示旧内容（审查 #8 闪烁）
+    body = ''
     try {
-      // 先从 contentStore 找缓存
-      let post = contentStore.findPost(targetPost.collection, targetPost.stem)
-      if (!post) {
-        // contentStore 没加载，直接拉文件
-        const path = `src/content/${targetPost.collection}/${targetPost.stem}.md`
-        const text = await getFileText(path)
-        const parsed = parseMarkdown(text)
-        post = {
-          path,
-          collection: targetPost.collection,
-          filename: `${targetPost.stem}.md`,
-          id: { seq: '', slug: '', stem: targetPost.stem },
-          metadata: parsed.metadata ?? { date: new Date(0), tags: [] },
-          body: parsed.body,
-          sha: '',
-        }
-      }
-      currentPost = post
-      metadata = structuredClone(post.metadata)
-      body = post.body
-      docId = post.path // 切换文档身份
+      // VFS.read：三层自动取本地修改 > 缓存 > 在线拉
+      const text = await vfsStore.read(path)
+      if (mySeq !== loadSeq) return // 已切到别的文章，丢弃结果（竞态防护）
+      const { metadata: meta, body: parsedBody } = parseMarkdown(text)
+      currentPath = path
+      metadata = structuredClone(meta ?? { date: new Date(0), tags: [] })
+      body = parsedBody
+      docId = path
+      dirty = false
     } catch (e) {
+      if (mySeq !== loadSeq) return
       error = e instanceof Error ? e.message : '加载失败'
+      currentPath = null
     } finally {
-      loading = false
+      if (mySeq === loadSeq) loading = false
     }
   }
 
@@ -90,21 +87,23 @@
     if (targetPost) {
       loadPost()
     } else {
-      currentPost = null
+      currentPath = null
     }
   })
 
   function handleInput(value: string) {
     body = value
+    dirty = true
     scheduleSave()
   }
 
   function scheduleSave() {
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(async () => {
-      if (!currentPost) return
+      if (!currentPath) return
       const content = serializeMarkdown(metadata, body)
-      await stageChange(currentPost.path, content)
+      await vfsStore.write(currentPath, content)
+      dirty = false
       toast.success('已暂存', { duration: 1500 })
     }, 1000)
   }
@@ -114,7 +113,7 @@
       clearTimeout(saveTimer)
       saveTimer = null
     }
-    if (!currentPost) return
+    if (!currentPath) return
     scheduleSave()
   }
 </script>
@@ -123,7 +122,7 @@
   <!-- 工具栏 -->
   <div class="flex items-center gap-2 border-b border-border px-3 py-1.5">
     <span class="text-muted-foreground truncate text-xs">
-      {currentPost ? `${currentPost.collection}/${currentPost.id.stem}` : '未选择文章'}
+      {targetPost ? `${targetPost.collection}/${targetPost.stem}` : '未选择文章'}
     </span>
 
     <div class="ml-auto flex items-center gap-1">
@@ -147,7 +146,7 @@
         <TagsIcon data-icon="inline-start" />
         <span class="hidden sm:inline">元数据</span>
       </Button>
-      <Button size="sm" variant="default" onclick={handleSave} disabled={!currentPost}>
+      <Button size="sm" variant="default" onclick={handleSave} disabled={!currentPath}>
         <SaveIcon data-icon="inline-start" />
         <span class="hidden sm:inline">保存</span>
       </Button>
@@ -172,7 +171,7 @@
         <p class="font-medium">加载失败</p>
         <p class="text-muted-foreground mt-1 text-sm">{error}</p>
       </div>
-    {:else if currentPost}
+    {:else if currentPath}
       <div class="flex h-full">
         <!-- 编辑区 -->
         <div class="min-w-0 flex-1 {view === 'preview' ? 'hidden' : ''}">

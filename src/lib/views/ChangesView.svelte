@@ -1,37 +1,31 @@
 <!--
 	ChangesView：暂存变更 + commit 到 GitHub。
-	- 列出 IndexedDB 里的 stagedChanges
-	- 每条可预览 diff（简化：显示路径 + 内容片段）
-	- commit 按钮：输入 message，调 commitChanges（Git Data API）
-	- commit 成功后清空 stagedChanges
+	- 列出 VFS 里所有 dirty 文件（vfsStore.dirtyFiles）
+	- 每条可预览内容片段，可撤销（vfs.revert）
+	- commit 按钮：输入 message，调 vfsStore.commit（Git Data API）
+	- commit 成功后 dirty 清除
 -->
 <script lang="ts">
   import { onMount } from 'svelte'
-  import {
-    getAllStagedChanges,
-    unstageChange,
-    clearStagedChanges,
-    type StagedChangeShape,
-  } from '$lib/db'
-  import { commitChanges } from '$lib/github/client'
+  import { vfs, vfsStore, type VfsNode } from '$lib/vfs/vfs.svelte'
   import { contentStore } from '$lib/data/content.svelte'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import * as Card from '$lib/components/ui/card'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import GitCommitHorizontalIcon from '@lucide/svelte/icons/git-commit-horizontal'
-  import Trash2Icon from '@lucide/svelte/icons/trash-2'
+  import Undo2Icon from '@lucide/svelte/icons/undo-2'
   import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw'
   import { toast } from 'svelte-sonner'
 
-  let changes = $state<StagedChangeShape[]>([])
+  let changes = $state<VfsNode[]>([])
   let loading = $state(true)
   let committing = $state(false)
   let message = $state('')
 
   async function load() {
     loading = true
-    changes = await getAllStagedChanges()
+    changes = await vfs.dirtyFiles()
     loading = false
   }
 
@@ -45,15 +39,11 @@
     const msg = message.trim() || `更新 ${changes.length} 个文件`
     committing = true
     try {
-      const sha = await commitChanges(
-        msg,
-        changes.map((c) => ({ path: c.path, content: c.content }))
-      )
+      const sha = await vfsStore.commit(msg)
       toast.success(`已提交（${sha.slice(0, 7)}）`)
-      await clearStagedChanges()
       await load()
       message = ''
-      // 刷新内容缓存（拉取新版本）
+      // 刷新内容派生视图（commit 后 VFS 已 sync）
       contentStore.refresh()
     } catch (e) {
       toast.error('提交失败', { description: e instanceof Error ? e.message : String(e) })
@@ -62,9 +52,10 @@
     }
   }
 
-  async function handleRemove(path: string) {
-    await unstageChange(path)
+  async function handleRevert(path: string) {
+    await vfsStore.revert(path)
     await load()
+    toast.success('已撤销修改')
   }
 </script>
 
@@ -95,19 +86,19 @@
           <div class="mb-2 flex items-center gap-2">
             <code class="bg-muted rounded px-1.5 py-0.5 text-xs">{change.path}</code>
             <span class="text-muted-foreground text-xs">
-              {new Date(change.updatedAt).toLocaleString('zh-CN')}
+              {new Date(change.mtime).toLocaleString('zh-CN')}
             </span>
             <Button
               size="icon-sm"
               variant="ghost"
               class="ml-auto"
-              onclick={() => handleRemove(change.path)}
-              aria-label="移除变更"
+              onclick={() => handleRevert(change.path)}
+              aria-label="撤销修改"
             >
-              <Trash2Icon />
+              <Undo2Icon />
             </Button>
           </div>
-          {#if change.content}
+          {#if change.content !== null}
             <pre class="bg-muted max-h-24 overflow-auto rounded p-2 text-xs">{change.content.slice(0, 300)}{change.content.length > 300 ? '…' : ''}</pre>
           {:else}
             <span class="text-destructive text-sm">（删除）</span>

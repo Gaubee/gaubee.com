@@ -1,24 +1,15 @@
 /**
- * 内容聚合层（runes）：拉取并解析 articles/events，提供派生视图。
+ * 内容聚合层（runes）：基于 VFS 的派生视图。
  *
- * 数据流：
- * 1. GitHub 列出 src/content/{articles,events}/*.md 文件清单
- * 2. 逐个读取（命中 IndexedDB 缓存则跳过网络）
- * 3. 解析 frontmatter + body
- * 4. 派生：allPosts（合并按 date 排序）/ postsByMonth / allTags
+ * v2：底层从"GitHub API + 自管缓存"改为"读 VFS + 解析 frontmatter"。
+ * VFS 负责拉取/缓存/同步，本层只负责把 VFS 文件解析成 Post 派生视图。
  *
- * 注意：未登录时也能拉取公开仓库内容（Worker 代理未认证时用匿名请求，
- * 受 GitHub 速率限制 60/小时；登录后 5000/小时）。
+ * 保留原接口（articles/events/allPosts/postsByMonth/allTags/findPost），
+ * 上层视图无需改动。
  */
 import { browser } from "$app/environment";
+import { vfsStore } from "$lib/vfs/vfs.svelte";
 import {
-  getFileText,
-  listCollectionFiles,
-  type GhContentEntry,
-} from "$lib/github/client";
-import { getCachedContent, setCachedContent } from "$lib/db";
-import {
-  inferCollection,
   parseArticleId,
   parseMarkdown,
   type ArticleMetadata,
@@ -50,6 +41,13 @@ interface ContentState {
   posts: Post[];
 }
 
+/** 从 VFS 文件路径提取集合。路径形如 src/content/articles/xxx.md。 */
+function collectionFromPath(path: string): Collection | null {
+  if (path.startsWith("src/content/articles/")) return "articles";
+  if (path.startsWith("src/content/events/")) return "events";
+  return null;
+}
+
 class ContentStore {
   state = $state<ContentState>({
     loaded: false,
@@ -60,7 +58,7 @@ class ContentStore {
 
   private inFlight: Promise<void> | null = null;
 
-  /** 拉取并解析所有内容（幂等，并发合并）。 */
+  /** 拉取并解析所有内容（幂等，并发合并）。底层委托 VFS.fetch。 */
   async refresh(): Promise<void> {
     if (!browser) return;
     if (this.inFlight) return this.inFlight;
@@ -76,37 +74,10 @@ class ContentStore {
     this.state.loading = true;
     this.state.error = null;
     try {
-      // 并发拉取两个集合的文件清单
-      const [articleEntries, eventEntries] = await Promise.all([
-        listCollectionFiles("articles"),
-        listCollectionFiles("events"),
-      ]);
-
-      // 逐个读取（带缓存）
-      const allEntries = [
-        ...articleEntries.map((e) => ({
-          entry: e,
-          collection: "articles" as Collection,
-        })),
-        ...eventEntries.map((e) => ({
-          entry: e,
-          collection: "events" as Collection,
-        })),
-      ];
-
-      const posts: Post[] = [];
-      // 串行读取避免触发 GitHub 速率限制（并发太多会被限）
-      for (const { entry, collection } of allEntries) {
-        try {
-          const post = await this.loadPost(entry, collection);
-          if (post) posts.push(post);
-        } catch (e) {
-          // 单篇失败不阻塞整体
-          console.warn(`读取 ${entry.path} 失败:`, e);
-        }
-      }
-
-      this.state.posts = posts;
+      // 委托 VFS 同步（增量，Trees API）
+      await vfsStore.sync("src/content");
+      // 从 VFS 解析所有内容文件
+      await this.reparse();
       this.state.loaded = true;
     } catch (e) {
       this.state.error = e instanceof Error ? e.message : "内容加载失败";
@@ -115,34 +86,25 @@ class ContentStore {
     }
   }
 
-  private async loadPost(
-    entry: GhContentEntry,
-    collection: Collection,
-  ): Promise<Post | null> {
-    // 先查缓存（sha 匹配则跳过网络）
-    const cached = await getCachedContent(entry.path);
-    let text: string;
-    if (cached && cached.sha === entry.sha) {
-      text = cached.content;
-    } else {
-      text = await getFileText(entry.path);
-      await setCachedContent(entry.path, text, entry.sha);
+  /** 从 vfsStore.files 重新解析 posts（VFS 变更后调用）。 */
+  async reparse(): Promise<void> {
+    const posts: Post[] = [];
+    for (const node of vfsStore.files) {
+      const collection = collectionFromPath(node.path);
+      if (!collection) continue;
+      const filename = node.path.split("/").pop() ?? node.path;
+      const { metadata, body } = parseMarkdown(node.content ?? "");
+      posts.push({
+        path: node.path,
+        collection,
+        filename,
+        id: parseArticleId(filename),
+        metadata: metadata ?? { date: new Date(0), tags: [] },
+        body,
+        sha: node.sha ?? "",
+      });
     }
-
-    const { metadata, body } = parseMarkdown(text);
-    const id = parseArticleId(entry.name);
-    return {
-      path: entry.path,
-      collection,
-      filename: entry.name,
-      id,
-      metadata: metadata ?? {
-        date: new Date(0),
-        tags: [],
-      },
-      body,
-      sha: entry.sha,
-    };
+    this.state.posts = posts;
   }
 
   // ---- 派生视图 ----
@@ -191,7 +153,7 @@ class ContentStore {
     return new Map([...map.entries()].sort((a, b) => b[1] - a[1]));
   }
 
-  /** 根据 collection + seq/slug 查找单篇。 */
+  /** 根据 collection + stem 查找单篇。 */
   findPost(collection: Collection, stem: string): Post | undefined {
     return this.state.posts.find(
       (p) => p.collection === collection && p.id.stem === stem,

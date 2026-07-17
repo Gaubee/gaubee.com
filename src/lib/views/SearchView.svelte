@@ -33,9 +33,12 @@
     else contentStore.refresh().then(buildIndex)
   })
 
-  // 内容刷新后重建索引
+  // 内容变化时重建索引（修复审查 #7：commit 后索引不更新）
+  // 追踪 posts 数组引用 + 长度，任一变化都重建
   $effect(() => {
-    if (contentStore.state.loaded && contentStore.state.posts.length > 0 && !miniSearch) {
+    const posts = contentStore.state.posts
+    const loaded = contentStore.state.loaded
+    if (loaded && posts.length > 0) {
       buildIndex()
     }
   })

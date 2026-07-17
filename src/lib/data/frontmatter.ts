@@ -106,7 +106,7 @@ export function serializeFrontmatter(metadata: ArticleMetadata): string {
  * 把原始 YAML 对象归一化为 ArticleMetadata（类型转换 + 默认值）。
  * 字段顺序完全跟随原文（JS 对象键按插入顺序保序），确保往返序列化不改变格式。
  */
-function normalizeMetadata(raw: Record<string, unknown>): ArticleMetadata {
+export function normalizeMetadata(raw: Record<string, unknown>): ArticleMetadata {
   // 用 Record 构建（保证键顺序跟随 raw），最后断言为 ArticleMetadata
   const result: Record<string, unknown> = {};
 

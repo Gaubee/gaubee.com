@@ -16,7 +16,7 @@
   import FormInputIcon from '@lucide/svelte/icons/form-input'
   import XIcon from '@lucide/svelte/icons/x'
   import PlusIcon from '@lucide/svelte/icons/plus'
-  import type { ArticleMetadata } from '$lib/data/frontmatter'
+  import { normalizeMetadata, type ArticleMetadata } from '$lib/data/frontmatter'
 
   let {
     metadata = $bindable(),
@@ -62,19 +62,15 @@
   }
 
   function applyYamlToMetadata(raw: Record<string, unknown>) {
-    // 保留 __editor_metadata 与透传字段，更新标准字段
-    if (typeof raw.title === 'string') metadata.title = raw.title
-    if (raw.date != null) {
-      const d = new Date(raw.date as string)
-      if (!Number.isNaN(d.getTime())) metadata.date = d
+    // 用 frontmatter.ts 的完整 normalizeMetadata 合并，保留所有字段
+    // （title/date/updated/tags/scripts/__editor_metadata/passthrough），
+    // 避免旧版只回填标准字段导致丢字段（审查 #8）。
+    const normalized = normalizeMetadata(raw)
+    // 原地清空再赋值，保持 $bindable 的响应式引用
+    for (const key of Object.keys(metadata as object)) {
+      delete (metadata as Record<string, unknown>)[key]
     }
-    if (raw.updated != null) {
-      const d = new Date(raw.updated as string)
-      if (!Number.isNaN(d.getTime())) metadata.updated = d
-    }
-    if (Array.isArray(raw.tags)) {
-      metadata.tags = raw.tags.filter((t): t is string => typeof t === 'string')
-    }
+    Object.assign(metadata, normalized)
   }
 
   function addTag() {

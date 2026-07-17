@@ -97,16 +97,60 @@ export async function listAllFiles(
   return result;
 }
 
+/**
+ * Trees API 递归列文件：一次请求拿到整棵子树的所有 blob（含 sha）。
+ * 比 listAllFiles（逐目录递归，N 次请求）高效得多。
+ * 返回的 path 是相对于仓库根的完整路径。
+ */
+export interface GhTreeEntry {
+  path: string;
+  mode: string;
+  type: "blob" | "tree" | "commit";
+  sha: string;
+  size?: number;
+}
+
+export async function fetchTree(
+  subtree?: string,
+): Promise<{ tree: GhTreeEntry[]; sha: string; truncated: boolean }> {
+  const subtreeParam = subtree ? `?recursive=1` : `?recursive=1`;
+  void subtreeParam;
+  const resp = await fetchGithub(
+    `repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`,
+  );
+  if (!resp.ok) throw new Error(`fetchTree 失败: ${resp.status}`);
+  const data = (await resp.json()) as {
+    tree: GhTreeEntry[];
+    sha: string;
+    truncated: boolean;
+  };
+  if (subtree) {
+    const prefix = subtree.endsWith("/") ? subtree : `${subtree}/`;
+    data.tree = data.tree.filter(
+      (e) => e.path === subtree || e.path.startsWith(prefix),
+    );
+  }
+  return data;
+}
+
 export interface StagedChange {
   /** 仓库内路径，如 'src/content/articles/0057.tc39-signals.md'。 */
   path: string;
   /** 新内容（UTF-8 文本）。删除时为 null。 */
   content: string | null;
+  /**
+   * 远程已有文件的 blob sha（删除时必填；修改时可选，但提供可减少 blob 创建）。
+   * 新建文件为 null/undefined。
+   */
+  sha?: string | null;
 }
 
 /**
- * 批量提交变更到 GitHub（Git Data API: blob → tree → commit → updateRef）。
+ * 批量提交变更到 GitHub（Git Data API: tree → commit → updateRef）。
  * 走 Worker 代理。返回新 commit sha。
+ *
+ * 删除文件：在 tree 里显式提供 { path, mode, type, sha: null }，
+ * GitHub 会从 base_tree 移除该 path（这是 Trees API 删除文件的正确语义）。
  */
 export async function commitChanges(
   message: string,
@@ -128,32 +172,28 @@ export async function commitChanges(
   const commitData = (await commitResp.json()) as { tree: { sha: string } };
   const baseTreeSha = commitData.tree.sha;
 
-  // 2. 为每个变更创建 blob
+  // 2. 构造 tree 条目
+  // GitHub Trees API 语义（配合 base_tree）：
+  // - { path, mode, type:'blob', content } → 新增/修改该 path 的内容
+  // - { path, mode, type:'blob', sha: null } → 从 base_tree 删除该 path
   const treeItems: Array<{
     path: string;
     mode: "100644";
     type: "blob";
-    sha?: string;
     content?: string;
+    sha?: string | null;
   }> = [];
   for (const change of changes) {
     if (change.content === null) {
-      // 删除：需要先获取 sha
-      const fileResp = await fetchGithub(
-        `repos/${OWNER}/${REPO}/contents/${change.path}?ref=${branch}`,
-      );
-      if (fileResp.ok) {
-        const fileData = (await fileResp.json()) as GhFileContent;
-        treeItems.push({
-          path: change.path,
-          mode: "100644",
-          type: "blob",
-          sha: null as never,
-        });
-        void fileData;
-      }
+      // 删除：sha: null 配合 base_tree 表示移除。要求调用方提供原 sha（VFS 会保留）。
+      treeItems.push({
+        path: change.path,
+        mode: "100644",
+        type: "blob",
+        sha: null,
+      });
     } else {
-      // 新增/修改：直接在 tree 里带 content（GitHub 支持）
+      // 新增/修改：直接在 tree 里带 content（GitHub 会自动创建 blob）
       treeItems.push({
         path: change.path,
         mode: "100644",
