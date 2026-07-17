@@ -14,9 +14,9 @@
     area: Area
   } = $props()
 
-  const state = $derived(navStore.current)
+  const navState = $derived(navStore.current)
   const location = $derived(
-    area === 'main' ? state.mainLocation : area === 'bottom' ? state.bottomLocation : state.popLocation
+    area === 'main' ? navState.mainLocation : area === 'bottom' ? navState.bottomLocation : navState.popLocation
   )
 </script>
 

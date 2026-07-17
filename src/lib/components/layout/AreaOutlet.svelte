@@ -12,21 +12,21 @@
 
   let { area }: { area: Area } = $props()
 
-  const state = $derived(navStore.current)
+  const navState = $derived(navStore.current)
 
   // 该 area 的 location 与 tab 列表
   const location = $derived(
     area === 'main'
-      ? state.mainLocation
+      ? navState.mainLocation
       : area === 'bottom'
-        ? state.bottomLocation
-        : state.popLocation
+        ? navState.bottomLocation
+        : navState.popLocation
   )
   const tabIdsInArea = $derived(
-    area === 'main' ? state.mainTabs : area === 'bottom' ? state.bottomTabs : []
+    area === 'main' ? navState.mainTabs : area === 'bottom' ? navState.bottomTabs : []
   )
   const isActive = $derived(
-    area === 'main' || (area === 'bottom' ? state.bottomActive : state.popActive)
+    area === 'main' || (area === 'bottom' ? navState.bottomActive : navState.popActive)
   )
 
   // 所有已注册的 tab view（常驻渲染）
@@ -37,7 +37,7 @@
 
   // pop view（按需）
   const popView = $derived(
-    area === 'pop' && state.popActive ? getPopView(location.pathname) : undefined
+    area === 'pop' && navState.popActive ? getPopView(location.pathname) : undefined
   )
 
   // Svelte 5 runes：动态组件用一个包装组件渲染（避免 <svelte:component> 废弃警告）
@@ -45,7 +45,7 @@
 </script>
 
 {#if area === 'pop'}
-  {#if state.popActive && popView}
+  {#if navState.popActive && popView}
     {@const PopView = popView}
     <PopView />
   {/if}
