@@ -7,6 +7,7 @@
  * 后续阶段（5/6/7）会替换这里的占位组件为真实功能 view。
  */
 import Archive from './ArchiveView.svelte'
+import ArticleView from './ArticleView.svelte'
 import ChangesView from './ChangesView.svelte'
 import EditorView from './EditorView.svelte'
 import FilesView from './FilesView.svelte'
@@ -15,7 +16,12 @@ import GitView from './GitView.svelte'
 import PreviewServerView from './PreviewServerView.svelte'
 import SearchView from './SearchView.svelte'
 import SettingsView from './SettingsView.svelte'
-import { registerPopView, registerTabView } from './registry'
+import TagsView from './TagsView.svelte'
+import {
+  registerDeepLinkView,
+  registerPopView,
+  registerTabView,
+} from './registry'
 
 let registered = false
 
@@ -36,9 +42,13 @@ export function ensureViewsRegistered(): void {
   registerTabView('/git', GitView)
   registerTabView('/preview-server', PreviewServerView)
 
+  // 深链接 views（main 区非 tab 路径）
+  registerDeepLinkView('/article', ArticleView)
+  registerDeepLinkView('/tags', TagsView)
+
   // pop views
   registerPopView('/search', SearchView)
-  registerPopView('/notifications', SearchView) // 暂用 SearchView 占位
+  registerPopView('/notifications', SearchView)
 }
 
 // 模块加载时立即注册

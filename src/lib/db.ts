@@ -50,6 +50,13 @@ function getDB(): Promise<IDBPDatabase<GaubeeDB>> {
 
 // ---- 暂存变更 ----
 
+/** 暂存变更的运行时类型（IndexedDB 存储格式）。 */
+export interface StagedChangeShape {
+  path: string
+  content: string | null
+  updatedAt: number
+}
+
 export async function stageChange(path: string, content: string | null): Promise<void> {
   const db = await getDB()
   await db.put('stagedChanges', { path, content, updatedAt: Date.now() })

@@ -2,11 +2,17 @@
 	AreaOutlet：区域出口组件。
 	接收 area prop，渲染该 area 当前激活的 view。
 	- main/bottom：所有已注册的 tab view 常驻 DOM，用 CSS display 切换显示（组件保活）。
+	  当 activeTabId 为 null（非 tab 路径，如 /article/...）时，渲染深链接 view。
 	- pop：不常驻，按需渲染（弹层打开时挂载）。
 -->
 <script lang="ts">
   import { navStore } from '$lib/nav/nav.svelte'
-  import { getAllTabViews, activeTabIdForLocation, getPopView } from '$lib/views/registry'
+  import {
+    getAllTabViews,
+    activeTabIdForLocation,
+    getPopView,
+    getDeepLinkView,
+  } from '$lib/views/registry'
   import type { Area, TabId } from '$lib/nav/controller'
   import type { Component } from 'svelte'
 
@@ -14,7 +20,6 @@
 
   const navState = $derived(navStore.current)
 
-  // 该 area 的 location 与 tab 列表
   const location = $derived(
     area === 'main'
       ? navState.mainLocation
@@ -29,18 +34,18 @@
     area === 'main' || (area === 'bottom' ? navState.bottomActive : navState.popActive)
   )
 
-  // 所有已注册的 tab view（常驻渲染）
   const allTabViews = $derived(getAllTabViews())
-
-  // 当前激活的 tab id
   const activeTabId = $derived(activeTabIdForLocation(location, area, tabIdsInArea))
 
-  // pop view（按需）
+  // 深链接 view（activeTabId 为 null 时）
+  const deepLinkView = $derived(
+    area === 'main' && !activeTabId ? getDeepLinkView(location.pathname) : undefined
+  )
+
   const popView = $derived(
     area === 'pop' && navState.popActive ? getPopView(location.pathname) : undefined
   )
 
-  // Svelte 5 runes：动态组件用一个包装组件渲染（避免 <svelte:component> 废弃警告）
   const tabEntries = $derived(allTabViews as ReadonlyArray<{ tabId: TabId; component: Component }>)
 </script>
 
@@ -49,8 +54,12 @@
     {@const PopView = popView}
     <PopView />
   {/if}
+{:else if area === 'main' && !activeTabId && deepLinkView}
+  {@const DeepView = deepLinkView}
+  <div class="h-full">
+    <DeepView />
+  </div>
 {:else}
-  <!-- main/bottom：常驻所有 tab view，CSS 切换显示 -->
   <div class="h-full">
     {#each tabEntries as { tabId, component } (tabId)}
       {@const inThisArea = tabIdsInArea.includes(tabId)}
