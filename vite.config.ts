@@ -13,10 +13,18 @@ export default defineConfig({
 				// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
 				runes: ({ filename }) => filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
-			// SPA 模式：所有路由由 NavController 接管，SvelteKit 只输出一个 index.html fallback。
+			// SPA 模式：编辑器路由由 NavController 接管，SvelteKit 只输出一个 index.html fallback。
 			adapter: adapter({ fallback: 'index.html', strict: false }),
 			preprocess: [mdsvex({ extensions: ['.svx', '.md'] })],
-			extensions: ['.svelte', '.svx', '.md']
+			extensions: ['.svelte', '.svx', '.md'],
+			// 预渲染时遇到坏链接（文章正文里的相对 .md 链接等）不中断构建，只警告。
+			prerender: {
+				handleHttpError: ({ path, referrer, message }) => {
+					console.warn(`prerender 跳过坏链接: ${path}（来自 ${referrer}）— ${message}`)
+				},
+				handleMissingId: 'warn',
+				entries: ['*']
+			}
 		})
 	],
 	test: {
