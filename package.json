@@ -61,7 +61,6 @@
 		"@lezer/highlight": "^1.2.3",
 		"@lezer/markdown": "^1.7.2",
 		"@octokit/rest": "^22.0.1",
-		"@uiw/codemirror-theme-github": "^4.25.11",
 		"codemirror": "^6.0.2",
 		"idb": "^8.0.3",
 		"js-yaml": "^5.2.1",
