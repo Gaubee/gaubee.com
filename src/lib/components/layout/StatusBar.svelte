@@ -8,9 +8,12 @@
   import { navController } from '$lib/nav/nav-controller-instance'
   import { getNavItem } from '$lib/nav/nav-items'
   import { pathToTabIdSafe } from '$lib/nav/path-utils'
+  import { mode, toggleMode } from 'mode-watcher'
 
   import UserIcon from '@lucide/svelte/icons/user'
   import CircleIcon from '@lucide/svelte/icons/circle'
+  import SunIcon from '@lucide/svelte/icons/sun'
+  import MoonIcon from '@lucide/svelte/icons/moon'
 
   const navState = $derived(navStore.current)
   const authState = $derived(authStore.state)
@@ -48,7 +51,7 @@
   <!-- 当前视图 -->
   <span class="truncate">{mainLabel} · {navState.mainLocation.pathname}</span>
 
-  <!-- 右侧：bottom 状态 -->
+  <!-- 右侧：bottom 状态 + 暗色切换 -->
   <span class="ml-auto flex items-center gap-1">
     {#if navState.bottomActive}
       <CircleIcon class="text-primary size-2 fill-current" />
@@ -57,5 +60,18 @@
       <CircleIcon class="size-2" />
       <span>底栏已收起</span>
     {/if}
+    <span class="text-border mx-1">·</span>
+    <button
+      class="hover:text-foreground cursor-pointer transition-colors"
+      onclick={toggleMode}
+      aria-label={mode.current === 'dark' ? '切换到亮色' : '切换到暗色'}
+      title={mode.current === 'dark' ? '亮色' : '暗色'}
+    >
+      {#if mode.current === 'dark'}
+        <SunIcon class="size-3.5" />
+      {:else}
+        <MoonIcon class="size-3.5" />
+      {/if}
+    </button>
   </span>
 </footer>

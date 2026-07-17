@@ -6,50 +6,50 @@
  *
  * 后续阶段（5/6/7）会替换这里的占位组件为真实功能 view。
  */
-import Archive from './ArchiveView.svelte'
-import ArticleView from './ArticleView.svelte'
-import ChangesView from './ChangesView.svelte'
-import EditorView from './EditorView.svelte'
-import FilesView from './FilesView.svelte'
-import FeedView from './FeedView.svelte'
-import GitView from './GitView.svelte'
-import PreviewServerView from './PreviewServerView.svelte'
-import SearchView from './SearchView.svelte'
-import SettingsView from './SettingsView.svelte'
-import TagsView from './TagsView.svelte'
+import Archive from "./ArchiveView.svelte";
+import ArticleView from "./ArticleView.svelte";
+import ChangesView from "./ChangesView.svelte";
+import EditorView from "./EditorView.svelte";
+import FilesView from "./FilesView.svelte";
+import FeedView from "./FeedView.svelte";
+import GitView from "./GitView.svelte";
+import PreviewServerView from "./PreviewServerView.svelte";
+import SearchView from "./SearchView.svelte";
+import SettingsView from "./SettingsView.svelte";
+import TagsView from "./TagsView.svelte";
 import {
   registerDeepLinkView,
   registerPopView,
   registerTabView,
-} from './registry'
+} from "./registry";
 
-let registered = false
+let registered = false;
 
 /** 注册所有 view（幂等，多次调用安全）。 */
 export function ensureViewsRegistered(): void {
-  if (registered) return
-  registered = true
+  if (registered) return;
+  registered = true;
 
   // main tab views
-  registerTabView('/feed', FeedView)
-  registerTabView('/editor', EditorView)
-  registerTabView('/files', FilesView)
-  registerTabView('/changes', ChangesView)
-  registerTabView('/archive', Archive)
-  registerTabView('/settings', SettingsView)
+  registerTabView("/feed", FeedView);
+  registerTabView("/editor", EditorView);
+  registerTabView("/files", FilesView);
+  registerTabView("/changes", ChangesView);
+  registerTabView("/archive", Archive);
+  registerTabView("/settings", SettingsView);
 
   // bottom tab views
-  registerTabView('/git', GitView)
-  registerTabView('/preview-server', PreviewServerView)
+  registerTabView("/git", GitView);
+  registerTabView("/preview-server", PreviewServerView);
 
   // 深链接 views（main 区非 tab 路径）
-  registerDeepLinkView('/article', ArticleView)
-  registerDeepLinkView('/tags', TagsView)
+  registerDeepLinkView("/article", ArticleView);
+  registerDeepLinkView("/tags", TagsView);
 
   // pop views
-  registerPopView('/search', SearchView)
-  registerPopView('/notifications', SearchView)
+  registerPopView("/search", SearchView);
+  registerPopView("/notifications", SearchView);
 }
 
 // 模块加载时立即注册
-ensureViewsRegistered()
+ensureViewsRegistered();

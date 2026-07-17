@@ -6,62 +6,71 @@
  * - deepLink view：main 区的非 tab 路径（如 /article/...、/tags/...），非常驻，
  *   activeTabId 为 null 时按路径匹配渲染。
  */
-import type { Component } from 'svelte'
-import type { Area, HistoryLocation, TabId } from '$lib/nav/controller'
+import type { Component } from "svelte";
+import type { Area, HistoryLocation, TabId } from "$lib/nav/controller";
 
 export interface ViewEntry {
   /** 匹配的 TabId（tab view）或 pop 路由前缀（pop view）。 */
-  id: string
-  component: Component
+  id: string;
+  component: Component;
 }
 
 /** tab view 注册表（按 TabId）。 */
-const tabViews = new Map<TabId, Component>()
+const tabViews = new Map<TabId, Component>();
 
 /** pop view 注册表（按 POP_ROUTES 前缀）。 */
-const popViews = new Map<string, Component>()
+const popViews = new Map<string, Component>();
 
 /** 深链接 view 注册表（按路径前缀，按注册顺序匹配）。 */
-const deepLinkViews: Array<{ pattern: string; component: Component }> = []
+const deepLinkViews: Array<{ pattern: string; component: Component }> = [];
 
 export function registerTabView(tabId: TabId, component: Component): void {
-  tabViews.set(tabId, component)
+  tabViews.set(tabId, component);
 }
 
 export function registerPopView(route: string, component: Component): void {
-  popViews.set(route, component)
+  popViews.set(route, component);
 }
 
 /** 注册深链接 view。pattern 是路径前缀（如 '/article'），匹配 pathname 以此开头。 */
-export function registerDeepLinkView(pattern: string, component: Component): void {
-  deepLinkViews.push({ pattern, component })
+export function registerDeepLinkView(
+  pattern: string,
+  component: Component,
+): void {
+  deepLinkViews.push({ pattern, component });
 }
 
 export function getTabView(tabId: TabId): Component | undefined {
-  return tabViews.get(tabId)
+  return tabViews.get(tabId);
 }
 
 export function getPopView(route: string): Component | undefined {
-  if (popViews.has(route)) return popViews.get(route)
+  if (popViews.has(route)) return popViews.get(route);
   for (const [prefix, component] of popViews) {
-    if (route.startsWith(prefix + '/') || route === prefix) return component
+    if (route.startsWith(prefix + "/") || route === prefix) return component;
   }
-  return undefined
+  return undefined;
 }
 
 /** 按路径查找深链接 view（第一个匹配的 pattern）。 */
 export function getDeepLinkView(pathname: string): Component | undefined {
   for (const { pattern, component } of deepLinkViews) {
-    if (pathname === pattern || pathname.startsWith(pattern + '/')) {
-      return component
+    if (pathname === pattern || pathname.startsWith(pattern + "/")) {
+      return component;
     }
   }
-  return undefined
+  return undefined;
 }
 
 /** 所有已注册的 tab view（供 area-outlet 常驻渲染）。 */
-export function getAllTabViews(): ReadonlyArray<{ tabId: TabId; component: Component }> {
-  return Array.from(tabViews.entries()).map(([tabId, component]) => ({ tabId, component }))
+export function getAllTabViews(): ReadonlyArray<{
+  tabId: TabId;
+  component: Component;
+}> {
+  return Array.from(tabViews.entries()).map(([tabId, component]) => ({
+    tabId,
+    component,
+  }));
 }
 
 /**
@@ -73,14 +82,14 @@ export function getAllTabViews(): ReadonlyArray<{ tabId: TabId; component: Compo
 export function activeTabIdForLocation(
   location: HistoryLocation,
   area: Area,
-  tabIdsInArea: readonly TabId[]
+  tabIdsInArea: readonly TabId[],
 ): TabId | null {
-  if (area === 'pop') return null
-  const path = location.pathname
+  if (area === "pop") return null;
+  const path = location.pathname;
   for (const tabId of tabIdsInArea) {
-    if (path === tabId || path.startsWith(tabId + '/')) {
-      return tabId
+    if (path === tabId || path.startsWith(tabId + "/")) {
+      return tabId;
     }
   }
-  return null
+  return null;
 }
