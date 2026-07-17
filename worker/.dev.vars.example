@@ -1,0 +1,5 @@
+# Worker 本地开发密钥（复制为 .dev.vars，不提交）
+# 创建 GitHub OAuth App: https://github.com/settings/developers
+# Authorization callback URL 填: http://localhost:8787/auth/github/callback
+GITHUB_CLIENT_ID=your_github_oauth_app_client_id
+GITHUB_CLIENT_SECRET=your_github_oauth_app_client_secret

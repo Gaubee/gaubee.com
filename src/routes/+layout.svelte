@@ -14,6 +14,7 @@
   // import placeholders 触发模块加载时的 view 注册
   import '$lib/views/placeholders'
   import { navStore } from '$lib/nav/nav.svelte'
+  import { authStore } from '$lib/auth/session.svelte'
   import AreaOutlet from '$lib/components/layout/AreaOutlet.svelte'
   import DesktopSidebar from '$lib/components/layout/DesktopSidebar.svelte'
   import MobileHeader from '$lib/components/layout/MobileHeader.svelte'
@@ -22,11 +23,40 @@
   import PopAreaRouter from '$lib/components/layout/PopAreaRouter.svelte'
   import StatusBar from '$lib/components/layout/StatusBar.svelte'
   import { Toaster } from '$lib/components/ui/sonner'
+  import { toast } from 'svelte-sonner'
   import { ModeWatcher } from 'mode-watcher'
 
-  // navStore 在浏览器侧订阅 navController
+  // navStore 在浏览器侧订阅 navController；处理 OAuth 回调 query
+  let { children } = $props()
+
   onMount(() => {
     navStore.start()
+
+    // OAuth 回调：Worker 重定向回来时带 ?auth=success 或 ?auth_error=xxx
+    const params = new URLSearchParams(window.location.search)
+    const authStatus = params.get('auth')
+    const authError = params.get('auth_error')
+    if (authStatus === 'success') {
+      toast.success('登录成功')
+      authStore.refresh()
+    } else if (authError) {
+      const messages: Record<string, string> = {
+        invalid_state: '登录失败：状态校验错误，请重试',
+        token_exchange: '登录失败：无法与 GitHub 交换令牌',
+        no_token: '登录失败：GitHub 未返回令牌',
+      }
+      toast.error(messages[authError] ?? `登录失败：${authError}`)
+    }
+    // 清掉 auth query（避免刷新重复 toast）
+    if (authStatus || authError) {
+      params.delete('auth')
+      params.delete('auth_error')
+      const remaining = params.toString()
+      const newUrl =
+        window.location.pathname + (remaining ? `?${remaining}` : '') + window.location.hash
+      window.history.replaceState(window.history.state, '', newUrl)
+    }
+
     return () => navStore.stop()
   })
 </script>
@@ -64,6 +94,9 @@
 
 <!-- pop 区浮层（任何视口） -->
 <PopAreaRouter />
+
+<!-- SvelteKit children（+page.svelte 输出空，隐藏不占空间；必须渲染否则路由报错） -->
+<div style="display: none">{@render children?.()}</div>
 
 <Toaster />
 <ModeWatcher />
