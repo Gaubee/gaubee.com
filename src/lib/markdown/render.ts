@@ -36,7 +36,9 @@ export function renderMarkdown(src: string): string {
     // Shiki 同步高亮（需预先加载 highlighter）
     try {
       // 动态 require 避免在未加载时硬依赖
-      const mod = globalThis as unknown as { __shikiHighlightCode?: (c: string, l: string) => string | null };
+      const mod = globalThis as unknown as {
+        __shikiHighlightCode?: (c: string, l: string) => string | null;
+      };
       if (mod.__shikiHighlightCode) {
         const highlighted = mod.__shikiHighlightCode(text, lang ?? "");
         if (highlighted) return highlighted;

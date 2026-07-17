@@ -12,11 +12,19 @@ import { IDBFactory } from "fake-indexeddb";
 
 // mock GitHub client（VFS 依赖 fetchGithub → fetch，这里全替换）
 const mockGetFileText = vi.fn<(p: string) => Promise<string>>();
-const mockFetchTree = vi.fn<() => Promise<{
-  tree: Array<{ path: string; mode: string; type: "blob"; sha: string; size?: number }>;
-  sha: string;
-  truncated: boolean;
-}>>();
+const mockFetchTree = vi.fn<
+  () => Promise<{
+    tree: Array<{
+      path: string;
+      mode: string;
+      type: "blob";
+      sha: string;
+      size?: number;
+    }>;
+    sha: string;
+    truncated: boolean;
+  }>
+>();
 const mockCommitChanges = vi.fn();
 
 vi.mock("$lib/github/client", () => ({
@@ -153,7 +161,9 @@ describe("VFS readdir", () => {
   it("过滤掉删除的文件", async () => {
     await vfs.unlink("src/content/articles/0001.a.md");
     const all = await vfs.readdir("");
-    expect(all.find((n) => n.path === "src/content/articles/0001.a.md")).toBeUndefined();
+    expect(
+      all.find((n) => n.path === "src/content/articles/0001.a.md"),
+    ).toBeUndefined();
   });
 });
 
@@ -176,7 +186,12 @@ describe("VFS fetch（增量同步）", () => {
   it("远程有 VFS 无 → 拉取", async () => {
     mockFetchTree.mockResolvedValue({
       tree: [
-        { path: "src/content/articles/0001.a.md", mode: "100644", type: "blob", sha: "sha1" },
+        {
+          path: "src/content/articles/0001.a.md",
+          mode: "100644",
+          type: "blob",
+          sha: "sha1",
+        },
       ],
       sha: "root",
       truncated: false,
@@ -193,9 +208,7 @@ describe("VFS fetch（增量同步）", () => {
   it("sha 未变 → 跳过拉取", async () => {
     // 第一次 fetch
     mockFetchTree.mockResolvedValue({
-      tree: [
-        { path: "a.md", mode: "100644", type: "blob", sha: "sha1" },
-      ],
+      tree: [{ path: "a.md", mode: "100644", type: "blob", sha: "sha1" }],
       sha: "root",
       truncated: false,
     });

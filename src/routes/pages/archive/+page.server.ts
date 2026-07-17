@@ -1,6 +1,10 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { parseMarkdown, parseArticleId, type Collection } from "$lib/data/frontmatter";
+import {
+  parseMarkdown,
+  parseArticleId,
+  type Collection,
+} from "$lib/data/frontmatter";
 
 export const prerender = true;
 

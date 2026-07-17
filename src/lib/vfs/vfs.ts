@@ -63,12 +63,15 @@ async function pool<T, R>(
 ): Promise<R[]> {
   const results: R[] = new Array(items.length);
   let cursor = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (cursor < items.length) {
-      const i = cursor++;
-      results[i] = await fn(items[i], i);
-    }
-  });
+  const workers = Array.from(
+    { length: Math.min(limit, items.length) },
+    async () => {
+      while (cursor < items.length) {
+        const i = cursor++;
+        results[i] = await fn(items[i], i);
+      }
+    },
+  );
   await Promise.all(workers);
   return results;
 }
@@ -217,7 +220,8 @@ export class Vfs {
     }
 
     // 2. 并发拉取内容（已登录 5000/h，并发 6 安全；未登录 60/h，并发 2）
-    const authed = typeof document !== "undefined" && document.cookie.includes("gh_token");
+    const authed =
+      typeof document !== "undefined" && document.cookie.includes("gh_token");
     const limit = authed ? 6 : 2;
     await pool(toFetch, limit, async (entry) => {
       try {

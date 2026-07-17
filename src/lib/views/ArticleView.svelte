@@ -90,7 +90,7 @@
           {/each}
         </div>
       {/if}
-      <div class="mt-3">
+      <div class="mt-3 flex gap-2">
         <Button
           size="sm"
           variant="outline"
@@ -98,6 +98,14 @@
         >
           <PencilIcon data-icon="inline-start" />
           编辑
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          href={`/pages/article/${post.collection}/${post.id.stem}`}
+          target="_blank"
+        >
+          公开预览
         </Button>
       </div>
     </header>
