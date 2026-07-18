@@ -69,3 +69,7 @@
 - [x] **优化 Markdown 编辑器体验**:
   - [x] 为元数据（Frontmatter）提供专门的表单编辑 UI。
   - [x] 支持在可视化和原始 Markdown 模式之间切换。
+
+## OpenTray 技术文章
+
+- [x] 总结 OpenTray Windows WebView2 与 pnpm-pub 的桌面窗口经验文章

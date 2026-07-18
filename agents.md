@@ -75,3 +75,13 @@
 
 2. 提交之前要更新 `TODO.md`，来将完成的任务补充进去。
 3. 提交之前需要使用 `pnpm fmt` 脚本来统一格式化要提交的问题。
+
+## OpenTray Windows 技术文章（2026-07-18）
+
+- 用户修订需求：两篇文章先按口语听觉顺序讲故事，再转成文字。第一听众是一位可信赖的跨领域同行朋友；术语首次出现时照顾小白，实验边界、调用顺序和伪代码供大牛复核。
+- 文章文件：`src/content/articles/0062.opentray-windows-dwm-webview2.md`。
+- 第二篇文章：`src/content/articles/0063.opentray-retained-tray-window.md`。第一听众是托盘应用开发者，小白通过 Show/Hide 事例理解状态，大牛可读取 operational visibility、Win32 style、single-flight polling 和 Promise 边界。
+- 技术主线：HWND 客户区/非客户区 -> DWM redirection surface -> Windowed WebView2 child HWND -> material host paint -> parent-before-child cold start/resize。
+- 案例边界：pnpm-pub 用于验证 retained tray lifecycle、taskbar projection、AppWindow COM ordering、发布包与 WebView2 profile；底层缺陷仍回到 OpenTray 修复。
+- 写作约束：遵循 blader/humanizer 与 Humanizer-zh，删除模板化结论、三段式堆叠、宣传措辞、机械转场和破折号；保留具体实验数据与不确定性。
+- 证据边界：实验确认残影责任位于顶层 HWND/DWM 宿主路径，但不声称已经证明 DWM 内部具体缓存算法。
