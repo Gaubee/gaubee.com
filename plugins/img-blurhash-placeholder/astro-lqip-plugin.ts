@@ -1,6 +1,6 @@
 import type { AstroIntegration } from "astro";
 import path from "path";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 import { rehypeLqip } from "./rehype-lqip-plugin";
 
 // --- Astro 集成 ---
@@ -23,7 +23,7 @@ export function astroLqip(): AstroIntegration {
           fileURLToPath(import.meta.url),
           "../lqip.css",
         );
-        injectScript("page-ssr", `import "${stylePath}";`);
+        injectScript("page-ssr", `import "${pathToFileURL(stylePath).href}";`);
       },
     },
   };

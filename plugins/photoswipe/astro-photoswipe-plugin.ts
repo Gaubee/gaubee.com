@@ -1,6 +1,6 @@
 import type { AstroIntegration } from "astro";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { rehypePhotoSwipe } from "./rehype-photoswipe-plugin";
 
 // --- Astro 集成定义 ---
@@ -22,7 +22,7 @@ export function astroPhotoSwipe(): AstroIntegration {
           fileURLToPath(import.meta.url),
           "../photoswipe-loader.ts",
         );
-        injectScript("page", `import "${scriptPath}";`);
+        injectScript("page", `import "${pathToFileURL(scriptPath).href}";`);
       },
     },
   };
