@@ -40,6 +40,7 @@
     <Dialog.Header class="flex-row items-center gap-2 border-b px-4 py-3">
       <TitleIcon class="size-4" />
       <Dialog.Title>{title}</Dialog.Title>
+      <Dialog.Description class="sr-only">{title}</Dialog.Description>
     </Dialog.Header>
     <div class="max-h-[70vh] overflow-auto p-4">
       <AreaOutlet area="pop" />

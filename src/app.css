@@ -30,7 +30,7 @@
   --chart-3: oklch(0.586 0.253 17.585);
   --chart-4: oklch(0.514 0.222 16.935);
   --chart-5: oklch(0.455 0.188 13.697);
-  --radius: 0rem;
+  --radius: 0.5rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0.008 326);
   --sidebar-primary: oklch(0.586 0.253 17.585);
@@ -127,6 +127,12 @@
   }
   html {
     @apply font-sans;
+  }
+  /* 全局键盘焦点环：自定义可点击元素（div[role=button]、Card onclick 等）兜底 */
+  :where([role="button"], [tabindex]):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
   }
 }
 

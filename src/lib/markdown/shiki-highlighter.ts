@@ -45,6 +45,20 @@ export function getHighlighterSync(): Highlighter | null {
 }
 
 /**
+ * 确保同步缓存的 highlighter 已就绪（构建期 SSG 用）。
+ *
+ * 必要性：模块顶层 `getHighlighter().then(h => cached = h)` 的赋值是另一条
+ * promise 链的续延，与外层 `await getHighlighter()` 的续延不在同一个微任务。
+ * 实测 await 返回时 cached 可能仍未赋值。本函数显式 await 并直接设置 cached，
+ * 保证后续同步 highlightCode() 能拿到实例。
+ */
+export async function primeHighlighter(): Promise<Highlighter> {
+  const h = await getHighlighter();
+  cached = h;
+  return h;
+}
+
+/**
  * 同步高亮代码块（用于 marked renderer，首帧可能返回 null → 退回 plain code）。
  * 双主题输出：同时渲染 light + dark，CSS 根据当前主题显示对应块。
  */

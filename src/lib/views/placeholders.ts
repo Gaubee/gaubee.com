@@ -13,10 +13,10 @@ import EditorView from "./EditorView.svelte";
 import FilesView from "./FilesView.svelte";
 import FeedView from "./FeedView.svelte";
 import GitView from "./GitView.svelte";
-import PreviewServerView from "./PreviewServerView.svelte";
 import SearchView from "./SearchView.svelte";
 import SettingsView from "./SettingsView.svelte";
 import TagsView from "./TagsView.svelte";
+import TerminalView from "./TerminalView.svelte";
 import {
   registerDeepLinkView,
   registerPopView,
@@ -40,7 +40,7 @@ export function ensureViewsRegistered(): void {
 
   // bottom tab views
   registerTabView("/git", GitView);
-  registerTabView("/preview-server", PreviewServerView);
+  registerTabView("/terminal", TerminalView);
 
   // 深链接 views（main 区非 tab 路径）
   registerDeepLinkView("/article", ArticleView);

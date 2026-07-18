@@ -39,7 +39,15 @@
     {#each posts as post (post.path)}
       <Card.Root
         class="mb-3 cursor-pointer transition-colors hover:bg-accent/40"
+        role="button"
+        tabindex={0}
         onclick={() => navController.navigateMain(`/article/${post.collection}/${post.id.stem}`)}
+        onkeydown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            navController.navigateMain(`/article/${post.collection}/${post.id.stem}`)
+          }
+        }}
       >
         <Card.Content class="pt-5">
           <div class="text-muted-foreground mb-1 text-xs">

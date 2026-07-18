@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { error } from "@sveltejs/kit";
 import { parseMarkdown, type Collection } from "$lib/data/frontmatter";
-import { renderMarkdown } from "$lib/markdown/render";
+import { ensureShikiLoaded, renderMarkdown } from "$lib/markdown/render";
 
 export const prerender = true;
 
@@ -32,6 +32,8 @@ export async function load({ params }): Promise<ArticleData> {
     error(404, "Article not found");
   }
   const { metadata, body } = parseMarkdown(raw);
+  // 确保 Shiki highlighter 已加载（构建期一次性），再同步渲染（代码块才能高亮）
+  await ensureShikiLoaded();
   const html = renderMarkdown(body);
   return {
     collection,

@@ -44,6 +44,46 @@
 - 18 个 E2E 测试（10 桌面 SPA + 2 移动 + 6 SSG 含 2 个 no-JS）
 - 73 个单元测试（nav + frontmatter + VFS）
 
+### ✅ 批次 7：纯前端 bash 工具 + Bug 修复 + 体验打磨 + SW
+
+#### Bug 修复
+- `--radius: 0rem → 0.5rem`（shadcn luma style 正确值，圆角全部失效已修复）
+- SSG 代码块 Shiki 高亮失效：根因是 `render.ts` 的 renderer 只实例化未 `marked.use`
+  注册，修正后 44 篇含代码块文章全部正确高亮（Kotlin/Mermaid 走 plain fallback）
+- `MarkdownViewer`/`render.ts` 图片 renderer 补 HTML 转义（防 XSS 属性逃逸）
+- 清理 `frontmatter.ts` 死代码 `FRONTMATTER_RE`（用了 JS 不支持的 `\A`）
+
+#### 体验打磨（UI 规范 + a11y）
+- Feed/Tags 卡片补 `role=button` + `tabindex` + Enter/Space keydown（键盘可达）
+- Editor/Pop Dialog 补 `Dialog.Description`（消除 aria 警告）
+- 全局 `:focus-visible` 焦点环（自定义可点击元素兜底）
+- 注：CodeMirror 暗色联动经实测**早已通过 CSS 变量自动跟随**，无需 Compartment，划掉此项
+
+#### 纯前端 bash 工具（基于 VFS，接入 bottom 区）
+- `src/lib/terminal/shell.ts`：命令内核 + tokenizer（空格/单双引号/转义）
+- 15 个命令：ls/cat/echo/rm/touch/write/stat/find/pwd/cd/clear/help + git status/commit/pull
+  （git 复用 `vfs.commit`/`dirtyFiles`，一行完成提交闭环）
+- 设计：git 子命令不进通用 registry（避免 Tab 补全污染），由 runLine 的 git 分发器路由
+- `src/lib/terminal/TerminalController.ts`：xterm readline 循环
+  （光标移动、历史 ↑↓、Tab 补全、Ctrl+A/E/U/K/W/L/C）
+- `src/lib/views/TerminalView.svelte`：bottom 区视图 + Svelte 移动端输入条
+  （文本框 + Tab/^C/Clr/↵ 快捷键，弥补触屏 xterm 输入体验）
+- 路由：替换占位的 `/preview-server` 为 `/terminal`（TabId/ALL_TABS/nav-items/placeholders）
+- 删除未实现的 `PreviewServerView.svelte`（5 行占位）
+- `/_test/terminal` 独立全屏测试页（Playwright 验证用）
+- 50 个单元测试覆盖 tokenize/resolvePath/各命令/git/补全
+
+#### Service Worker（仅加速 SSG 阅读站，无 PWA manifest）
+- `static/sw.js`：stale-while-revalidate，仅缓存 `/pages/*`（跳过 raw）
+  预缓存 `/pages` + `/pages/archive`，保证首次离线可用
+- `src/lib/sw/register.ts`：仅 production + browser 注册（dev 不注册避免破坏 HMR）
+- 支持 `VITE_DISABLE_SW=true` 应急禁用
+- E2E 离线测试：`context.setOffline(true)` 后 `/pages` 仍返回 200
+
+#### 验证
+- 类型检查 0 错误，单元测试 130 个（+50 bash），E2E 19 个（+1 SW 离线）
+- Playwright 截图验证：终端命令执行、暗色主题、圆角恢复、SSG 高亮全部正常
+
 ## 当前架构（第二阶段改造后）
 
 ```
@@ -66,11 +106,14 @@ gaubee.com/
 
 ## 后续阶段（未来规划）
 
-### 纯前端 bash 工具（下一轮，VFS 已铺好挂载点）
-- [ ] 基于 VFS 的 bash 命令（ls/cat/echo/grep/git 等）
-- [ ] 终端 UI（xterm.js，接入 bottom 区）
-- [ ] 管道、重定向、脚本执行
-- [ ] 安全沙箱（纯前端，无后端执行）
+### 纯前端 bash 工具（批次 7 已完成基础，可继续扩展）
+- [x] 基于 VFS 的 bash 命令（ls/cat/echo/rm/touch/stat/find/git 等，15 个）
+- [x] 终端 UI（xterm.js + Svelte 输入条，接入 bottom 区）
+- [ ] 管道 `|` / 重定向 `>` `>>`（批次 7 范围外，后续按需）
+- [ ] grep、脚本执行（.sh 文件批处理）
+- [ ] 更完整的 shell 语义（环境变量 `$`、通配符 `*`、命令链 `&&` `||`）
+- [x] 安全沙箱（纯前端，无后端执行 —— VFS 天然沙箱）
+- [ ] 升级为 openspecui 原版 xterm-input-panel（触屏虚拟键盘/触控板，需引入 lit+pixi）
 
 ### 实时协同（第三阶段）
 - [ ] Yjs/CRDT 多人实时编辑
@@ -83,14 +126,15 @@ gaubee.com/
 - [ ] AI 翻译（Gemini）
 
 ### 体验打磨（持续）
-- [ ] CodeMirror 暗色模式联动（编辑器代码高亮跟随 .dark）
+- [x] ~~CodeMirror 暗色模式联动~~（实测已通过 CSS 变量自动跟随，无需额外工作）
 - [ ] 图片 LQIP / 响应式 srcset / PhotoSwipe（SSG + SPA 通用）
 - [ ] 移动端 bottom 区浮层化（Sheet/Drawer 承载，支持 touch resize）
-- [ ] shadcn-svelte 规范修正（space-y→gap、focus-visible 焦点环、Dialog Description）
-- [ ] 可访问性（Card onclick 键盘可达、aria-live 动态通告）
-- [ ] 性能（view 懒加载、Shiki 动态 import、Feed 虚拟滚动）
-- [ ] --radius 确认（当前 0rem 让所有圆角失效）
-- [ ] PWA（manifest + service worker，移动端离线）
+- [x] shadcn-svelte 规范修正（focus-visible 焦点环、Dialog Description 已补）
+- [x] 可访问性（Card onclick 键盘可达已修；aria-live 动态通告待补）
+- [ ] 性能（view 懒加载、Feed 虚拟滚动；Shiki 已是构建期一次性 + 客户端懒加载）
+- [x] ~~--radius 确认~~（已修复为 0.5rem）
+- [ ] PWA（manifest；批次 7 已实现 SW 加速，manifest 待补）
+- [ ] 扩展 Shiki CORE_LANGS（加 Kotlin/Rust/Go 等减少 fallback）
 
 ### 部署
 - [ ] Cloudflare Pages（静态主体）+ Workers（OAuth）正式部署

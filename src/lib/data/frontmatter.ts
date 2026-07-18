@@ -51,8 +51,6 @@ export interface ParsedMarkdown {
   rawFrontmatter: string;
 }
 
-const FRONTMATTER_RE = /\A---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
-
 /** 解析 markdown 文本为 frontmatter + body。 */
 export function parseMarkdown(raw: string): ParsedMarkdown {
   const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);

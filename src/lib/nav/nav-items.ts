@@ -7,9 +7,9 @@ import FileText from "@lucide/svelte/icons/file-text";
 import Files from "@lucide/svelte/icons/files";
 import GitBranch from "@lucide/svelte/icons/git-branch";
 import ListTodo from "@lucide/svelte/icons/list-todo";
-import MonitorPlay from "@lucide/svelte/icons/monitor-play";
 import Newspaper from "@lucide/svelte/icons/newspaper";
 import Settings from "@lucide/svelte/icons/settings";
+import TerminalSquare from "@lucide/svelte/icons/terminal-square";
 import type { Component } from "svelte";
 import type { TabId } from "./controller";
 
@@ -36,9 +36,9 @@ export const allNavItems: NavItem[] = [
   // bottom
   { to: "/git", icon: GitBranch, label: "Git", defaultArea: "bottom" },
   {
-    to: "/preview-server",
-    icon: MonitorPlay,
-    label: "预览",
+    to: "/terminal",
+    icon: TerminalSquare,
+    label: "终端",
     defaultArea: "bottom",
   },
 ];

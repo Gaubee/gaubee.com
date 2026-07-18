@@ -56,7 +56,7 @@ export type TabId =
   | "/settings"
   // bottom
   | "/git"
-  | "/preview-server";
+  | "/terminal";
 
 /** pop 区路由集合（不是 tab，是独立的弹层路由）。 */
 export const POP_ROUTES = ["/search", "/notifications"] as const;
@@ -153,7 +153,7 @@ export const ALL_TABS: readonly TabId[] = [
   "/archive",
   "/settings",
   "/git",
-  "/preview-server",
+  "/terminal",
 ];
 
 /** 默认 main 区 tab（用户可拖拽改变）。 */
@@ -167,7 +167,7 @@ export const DEFAULT_MAIN_TABS: TabId[] = [
 ];
 
 /** 默认 bottom 区 tab。 */
-export const DEFAULT_BOTTOM_TABS: TabId[] = ["/git", "/preview-server"];
+export const DEFAULT_BOTTOM_TABS: TabId[] = ["/git", "/terminal"];
 
 const PERSIST_DEBOUNCE_MS = 300;
 const STORAGE_KEY = "gaubee:nav-layout";

@@ -197,6 +197,9 @@
   <Dialog.Content class="max-h-[85vh] max-w-lg overflow-hidden p-0">
     <Dialog.Header class="px-4 pt-4">
       <Dialog.Title>元数据</Dialog.Title>
+      <Dialog.Description class="sr-only">
+        编辑文章的标题、日期、标签等元数据字段。
+      </Dialog.Description>
     </Dialog.Header>
     <div class="max-h-[70vh] overflow-hidden">
       <MetadataEditor bind:metadata oncommit={scheduleSave} />

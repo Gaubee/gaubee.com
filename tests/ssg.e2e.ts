@@ -96,3 +96,43 @@ test.describe("SSG no-JS 友好（禁用 JS）", () => {
     expect(await articles.count()).toBeGreaterThan(5);
   });
 });
+
+test.describe("Service Worker 离线加速", () => {
+  test("离线后 /pages 仍可访问（SW 缓存）", async ({ page, context }) => {
+    // 第一次在线访问：触发 SW 注册 + install 预缓存
+    await page.goto("/pages", { waitUntil: "networkidle" });
+    await expect(page.getByRole("heading", { name: "阅读" })).toBeVisible();
+
+    // 等待 SW 注册并激活
+    await page.waitForFunction(
+      async () => {
+        if (!("serviceWorker" in navigator)) return false;
+        const reg = await navigator.serviceWorker.ready;
+        return !!reg;
+      },
+      undefined,
+      { timeout: 8000 },
+    );
+
+    // 第二次访问：确保响应进入 SW 缓存
+    await page.reload({ waitUntil: "networkidle" });
+
+    // 模拟离线，再访问（应命中 SW 缓存）
+    await context.setOffline(true);
+    try {
+      const response = await page.goto("/pages", {
+        waitUntil: "domcontentloaded",
+      });
+      // SW 缓存应返回 200（非离线的 503 兜底）
+      expect(response?.status()).toBe(200);
+      const hasContent = await page
+        .locator("h1, article")
+        .first()
+        .isVisible()
+        .catch(() => false);
+      expect(hasContent).toBe(true);
+    } finally {
+      await context.setOffline(false);
+    }
+  });
+});

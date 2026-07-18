@@ -49,7 +49,7 @@
     text?: string | null
   }) => {
     const t = title ?? ''
-    return `<img src="${href}" alt="${text ?? ''}"${t ? ` title="${t}"` : ''} loading="lazy" style="max-width:100%;height:auto;border-radius:8px" />`
+    return `<img src="${escapeHtml(href)}" alt="${escapeHtml(text ?? '')}"${t ? ` title="${escapeHtml(t)}"` : ''} loading="lazy" style="max-width:100%;height:auto;border-radius:8px" />`
   }
   marked.use({ renderer })
 

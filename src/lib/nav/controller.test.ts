@@ -89,7 +89,7 @@ describe("areaForPath", () => {
   it("bottom tab 路径", () => {
     expect(areaForPath(layout, "/git")).toBe("bottom");
     expect(areaForPath(layout, "/git/uncommitted")).toBe("bottom");
-    expect(areaForPath(layout, "/preview-server")).toBe("bottom");
+    expect(areaForPath(layout, "/terminal")).toBe("bottom");
   });
 
   it("其余归 main（含非 tab 的深链接，如 /article/0001）", () => {
