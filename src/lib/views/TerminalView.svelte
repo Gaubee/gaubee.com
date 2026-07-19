@@ -8,25 +8,31 @@
 	避免引入 lit + pixi.js 的重量级依赖。
 -->
 <script lang="ts">
-  import { onMount, tick } from 'svelte'
-  import { navStore } from '$lib/nav/nav.svelte'
-  import { activeTabIdForLocation } from '$lib/views/registry'
+  import { tick } from 'svelte'
   import { TerminalController } from '$lib/terminal/TerminalController'
   import { mode } from 'mode-watcher'
   import '@xterm/xterm/css/xterm.css'
+
+  /**
+   * AreaOutlet 注入的 props：
+   * - area：本实例所在的 area（'main' | 'bottom'）。AreaOutlet 会让所有 tab
+   *   view 在 main 和 bottom 各渲染一份（非归属的用 display:none 隐藏），
+   *   用于跨 area 拖拽时的平滑过渡。对普通 view 无害，但 xterm 状态敏感，
+   *   不能重复实例化，故用 area 判断只在自己归属的 area mount。
+   * - isActive：本 tab 是否在所在 area 当前激活。
+   */
+  let {
+    area = 'bottom',
+    isActive = false,
+  }: {
+    area?: 'main' | 'bottom'
+    isActive?: boolean
+  } = $props()
 
   let container = $state<HTMLDivElement | null>(null)
   let inputBar = $state<HTMLInputElement | null>(null)
   let inputValue = $state('')
   let controller: TerminalController | null = null
-  let mounted = false
-
-  // 判断本 tab 是否当前激活（用于变可见时 fit）
-  const navState = $derived(navStore.current)
-  const isActive = $derived(
-    navState.bottomActive &&
-      activeTabIdForLocation(navState.bottomLocation, 'bottom', navState.bottomTabs) === '/terminal',
-  )
 
   function syncTheme() {
     if (controller && mode.current) {
@@ -34,9 +40,35 @@
     }
   }
 
-  // 当本 tab 变激活时，等 DOM 布局完成后重新 fit（容器从 display:none 恢复尺寸）
+  /**
+   * xterm 生命周期：只在"归属本 area + 当前激活"时 mount。
+   * - main 区那份 TerminalView（area='main'）永远不会 mount（终端不属于 main）
+   * - bottom 区那份在 isActive=true 时 mount 一次，之后保留状态不重复 mount
+   */
+  const shouldMount = $derived(area === 'bottom' && isActive)
+
   $effect(() => {
-    if (mounted && isActive) {
+    if (!shouldMount) return
+    if (!container || controller) return
+    controller = new TerminalController({
+      theme: mode.current === 'dark' ? 'dark' : 'light',
+    })
+    controller.mount(container)
+    // 容器刚变可见，等布局完成再 fit
+    void tick().then(() => requestAnimationFrame(() => controller?.fit()))
+  })
+
+  /** 组件销毁时清理 */
+  $effect(() => {
+    return () => {
+      controller?.unmount()
+      controller = null
+    }
+  })
+
+  // 变激活时重新 fit（容器从 display:none 恢复后尺寸变化）
+  $effect(() => {
+    if (shouldMount && controller) {
       void tick().then(() => requestAnimationFrame(() => controller?.fit()))
     }
   })
@@ -51,7 +83,6 @@
     const text = inputValue
     inputValue = ''
     controller?.submitFromInputBar(text)
-    // 提交后焦点回到 xterm（桌面）或保持输入框焦点（移动）
     if (!isTouchDevice()) {
       controller?.focus()
     } else {
@@ -72,7 +103,6 @@
   }
 
   function onInputKeydown(e: KeyboardEvent) {
-    // 输入框里的快捷键透传到终端
     if (e.key === 'Enter') {
       e.preventDefault()
       submit()
@@ -86,7 +116,6 @@
       e.preventDefault()
       sendClear()
     } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-      // 上下方向键透传给终端切历史
       e.preventDefault()
       controller?.sendRaw(e.key === 'ArrowUp' ? '\x1b[A' : '\x1b[B')
     }
@@ -95,73 +124,62 @@
   function isTouchDevice(): boolean {
     return typeof window !== 'undefined' && 'ontouchstart' in window
   }
-
-  onMount(() => {
-    if (!container) return
-    controller = new TerminalController({
-      theme: mode.current === 'dark' ? 'dark' : 'light',
-    })
-    controller.mount(container)
-    mounted = true
-    // 容器可能初始隐藏，激活后 fit
-    void tick().then(() => requestAnimationFrame(() => controller?.fit()))
-
-    return () => {
-      controller?.unmount()
-      controller = null
-      mounted = false
-    }
-  })
 </script>
 
-<div class="flex h-full flex-col bg-background">
-  <!-- 终端区 -->
-  <div class="relative flex-1 overflow-hidden p-1">
-    <div bind:this={container} class="h-full w-full"></div>
-  </div>
+{#if area === 'bottom'}
+  <div class="flex h-full min-h-0 flex-col bg-background">
+    <!-- 终端区：relative + overflow-hidden 严格约束 xterm 不溢出覆盖 StatusBar -->
+    <div class="relative min-h-0 flex-1 overflow-hidden p-1">
+      <div bind:this={container} class="h-full w-full"></div>
+    </div>
 
-  <!-- 移动端输入条（始终显示，桌面也可用） -->
-  <div class="flex items-center gap-1 border-t border-border bg-background p-1.5">
-    <input
-      bind:this={inputBar}
-      bind:value={inputValue}
-      onkeydown={onInputKeydown}
-      type="text"
-      enterkeyhint="send"
-      autocomplete="off"
-      autocapitalize="off"
-      autocorrect="off"
-      spellcheck="false"
-      placeholder="输入命令，回车执行…（↑↓ 历史，Tab 补全）"
-      class="min-w-0 flex-1 rounded-md border border-border bg-transparent px-2 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    />
-    <button
-      type="button"
-      onclick={sendTab}
-      title="补全 (Tab)"
-      aria-label="补全"
-      class="shrink-0 rounded-md border border-border px-2 py-1 text-xs hover:bg-accent"
-    >Tab</button>
-    <button
-      type="button"
-      onclick={sendCtrlC}
-      title="中断 (Ctrl+C)"
-      aria-label="中断"
-      class="shrink-0 rounded-md border border-border px-2 py-1 text-xs hover:bg-accent"
-    >^C</button>
-    <button
-      type="button"
-      onclick={sendClear}
-      title="清屏 (Ctrl+L)"
-      aria-label="清屏"
-      class="shrink-0 rounded-md border border-border px-2 py-1 text-xs hover:bg-accent"
-    >Clr</button>
-    <button
-      type="button"
-      onclick={submit}
-      title="发送 (Enter)"
-      aria-label="发送"
-      class="bg-primary text-primary-foreground shrink-0 rounded-md px-3 py-1 text-xs hover:bg-primary/90"
-    >↵</button>
+    <!-- 移动端输入条（始终显示，桌面也可用） -->
+    <div class="flex items-center gap-1 border-t border-border bg-background p-1.5">
+      <input
+        bind:this={inputBar}
+        bind:value={inputValue}
+        onkeydown={onInputKeydown}
+        type="text"
+        enterkeyhint="send"
+        autocomplete="off"
+        autocapitalize="off"
+        autocorrect="off"
+        spellcheck="false"
+        placeholder="输入命令，回车执行…（↑↓ 历史，Tab 补全）"
+        class="min-w-0 flex-1 rounded-md border border-border bg-transparent px-2 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
+      <button
+        type="button"
+        onclick={sendTab}
+        title="补全 (Tab)"
+        aria-label="补全"
+        class="shrink-0 rounded-md border border-border px-2 py-1 text-xs hover:bg-accent"
+      >Tab</button>
+      <button
+        type="button"
+        onclick={sendCtrlC}
+        title="中断 (Ctrl+C)"
+        aria-label="中断"
+        class="shrink-0 rounded-md border border-border px-2 py-1 text-xs hover:bg-accent"
+      >^C</button>
+      <button
+        type="button"
+        onclick={sendClear}
+        title="清屏 (Ctrl+L)"
+        aria-label="清屏"
+        class="shrink-0 rounded-md border border-border px-2 py-1 text-xs hover:bg-accent"
+      >Clr</button>
+      <button
+        type="button"
+        onclick={submit}
+        title="发送 (Enter)"
+        aria-label="发送"
+        class="bg-primary text-primary-foreground shrink-0 rounded-md px-3 py-1 text-xs hover:bg-primary/90"
+      >↵</button>
+    </div>
   </div>
-</div>
+{:else}
+  <!-- 非 bottom 区（AreaOutlet 跨 area 常驻渲染的副本）：不渲染任何 UI，
+       避免 main 区出现无用的终端输入条。xterm 也不会 mount（shouldMount=false）。 -->
+  <div class="hidden" aria-hidden="true"></div>
+{/if}

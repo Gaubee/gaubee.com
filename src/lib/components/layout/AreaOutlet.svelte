@@ -66,7 +66,7 @@
       {@const isThisActive = inThisArea && isActive && activeTabId === tabId}
       {@const View = component}
       <div class="h-full" class:hidden={!isThisActive}>
-        <View />
+        <View {area} {tabId} isActive={isThisActive} />
       </div>
     {/each}
   </div>

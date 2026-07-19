@@ -60,7 +60,7 @@
 
 {#if navState.bottomActive}
   <div
-    class="bottom-area flex flex-col {resizing ? 'ring-primary/40 ring-1' : ''}"
+    class="bottom-area flex shrink-0 flex-col {resizing ? 'ring-primary/40 ring-1' : ''}"
     style="height: {height}px"
   >
     <!-- 拖拽手柄 + 标题栏。IDE 风格 resize handle：div + mousedown，关闭按钮提供键盘可达性 -->
