@@ -2,7 +2,7 @@
  * 说说应用（系统内置，不可卸载）。
  *
  * 功能：浏览短评/碎碎念列表。
- * 数据来自 VFS 只读层（events 目录）。
+ * 数据来自 ReadonlyVFS（构建时静态数据），无需登录即可阅读。
  */
 import MessageSquare from "@lucide/svelte/icons/message-square";
 import type { AppEntry } from "../types";

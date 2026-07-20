@@ -1,25 +1,26 @@
 <!--
-	ShoutView：说说/短评列表。
-	从 contentStore 的 events 获取数据，按时间展示。
-	数据来自 VFS 只读层（构建时静态数据）。
+	ShoutView：说说/短评列表（纯只读）。
+	
+	从 ReadonlyVFS（构建时静态数据）读取，无需登录即可阅读。
+	数据在构建时预解析，运行时零延迟。
 -->
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { contentStore } from '$lib/data/content.svelte'
+  import { readonlyVfs } from '$lib/vfs/readonly'
   import { navController } from '$lib/nav/nav-controller-instance'
-  import { Button } from '$lib/components/ui/button'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import * as Card from '$lib/components/ui/card'
   import MessageSquareIcon from '@lucide/svelte/icons/message-square'
-  import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw'
 
-  const state = $derived(contentStore.state)
-  const shouts = $derived(contentStore.events)
+  let shouts = $state(readonlyVfs.getPostsByCollection('events'))
+  let loading = $state(true)
 
   onMount(() => {
-    if (!state.loaded && !state.loading) {
-      contentStore.refresh()
-    }
+    // 从只读 VFS 获取说说（无需登录，零延迟）
+    const events = readonlyVfs.getPostsByCollection('events')
+    // 按日期降序排序
+    shouts = events.sort((a, b) => b.metadata.date.getTime() - a.metadata.date.getTime())
+    loading = false
   })
 
   function formatDate(d: Date): string {
@@ -30,18 +31,9 @@
 <div class="mx-auto max-w-3xl p-4 sm:p-6">
   <div class="mb-4 flex items-center justify-between">
     <h1 class="text-2xl font-semibold">说说</h1>
-    <Button
-      variant="outline"
-      size="sm"
-      onclick={() => contentStore.refresh()}
-      disabled={state.loading}
-    >
-      <RefreshCwIcon data-icon="inline-start" />
-      {state.loading ? '加载中' : '刷新'}
-    </Button>
   </div>
 
-  {#if state.loading && shouts.length === 0}
+  {#if loading}
     {#each Array(3) as _}
       <Card.Root class="mb-3">
         <Card.Content class="pt-6">

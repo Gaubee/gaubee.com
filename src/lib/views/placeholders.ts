@@ -16,6 +16,7 @@ import TagsView from "./TagsView.svelte";
 import TerminalView from "./TerminalView.svelte";
 import ArticlesView from "$lib/apps/views/ArticlesView.svelte";
 import ShoutView from "$lib/apps/views/ShoutView.svelte";
+import WriterView from "$lib/apps/views/WriterView.svelte";
 import NotificationsView from "$lib/apps/views/NotificationsView.svelte";
 import {
   registerDeepLinkView,

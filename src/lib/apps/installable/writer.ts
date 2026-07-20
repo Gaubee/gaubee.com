@@ -18,5 +18,5 @@ export const writerApp: AppEntry = {
     vfsOwnership: ["src/content/articles/", "src/content/events/", "src/content/draft/"],
     cliCommands: [],
   },
-  view: () => import("$lib/views/EditorView.svelte"),
+  view: () => import("$lib/apps/views/WriterView.svelte"),
 };
