@@ -40,6 +40,11 @@ class NavStore {
     this.ready = true;
   }
 
+  /** 手动触发一次更新（用于 initNavController 后）。 */
+  refresh(): void {
+    this.current = navController.getSnapshot();
+  }
+
   /** 取消订阅（测试 / SSR 用）。 */
   stop(): void {
     this.unsubscribe?.();

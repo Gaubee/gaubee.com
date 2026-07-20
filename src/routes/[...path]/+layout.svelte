@@ -46,8 +46,9 @@
       popRoutes,
     })
 
-    // 2. navStore 订阅 NavController
+    // 2. navStore 订阅 NavController + 刷新快照
     navStore.start()
+    navStore.refresh()
 
     // 3. OAuth 回调处理
     const params = new URLSearchParams(window.location.search)

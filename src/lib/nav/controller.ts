@@ -823,9 +823,14 @@ export class NavController {
     this.state = createInitialState();
   }
 
-  /** 在浏览器环境初始化：从 localStorage 恢复 + parseBrowserLocation + 注册 popstate。 */
+  /** 在浏览器环境初始化：从 localStorage 恢复 + parseBrowserLocation + 注册 popstate。
+   * 注意：必须在 setTabRegistry 后调用，否则初始状态为空。
+   */
   init(): void {
     if (typeof window === "undefined") return;
+
+    // 0. 重新创建初始状态（setTabRegistry 之后）
+    this.state = createInitialState();
 
     // 1. 从 localStorage 恢复 layout（tabs），location 留给 URL 决定。
     const persisted = readLocalStorage();
