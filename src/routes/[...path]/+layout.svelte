@@ -14,6 +14,8 @@
   import { appManager } from '$lib/apps/AppManager.svelte'
   // import registry 触发模块加载时的应用注册
   import '$lib/apps/registry'
+  // import placeholders 触发模块加载时的 view 注册
+  import '$lib/views/placeholders'
   import { initNavController } from '$lib/nav/nav-controller-instance'
   import { navStore } from '$lib/nav/nav.svelte'
   import { authStore } from '$lib/auth/session.svelte'
