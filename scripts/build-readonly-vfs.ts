@@ -7,7 +7,7 @@
  * 或在 package.json 的 build 脚本中调用。
  */
 
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -45,18 +45,9 @@ async function main() {
     fileMap[relativePath] = content;
   }
 
-  // 生成 TypeScript 文件
-  const tsContent = `/**
- * 只读 VFS 数据 —— 构建时自动生成。
- * 
- * 由 scripts/build-readonly-vfs.ts 生成，不要手动修改。
- * 数据来自 src/content 下的 markdown 文件。
- */
+  const tsContent = `/**\n * 只读 VFS 数据 —— 构建时自动生成。\n * \n * 由 scripts/build-readonly-vfs.ts 生成，不要手动修改。\n * 数据来自 src/content 下的 markdown 文件。\n */\n\nexport const readonlyFiles: Record<string, string> = ${JSON.stringify(fileMap, null, 2)};\n`;
 
-export const readonlyFiles: Record<string, string> = ${JSON.stringify(fileMap, null, 2)};
-`;
-
-  await Bun.write(OUTPUT_FILE, tsContent);
+  await writeFile(OUTPUT_FILE, tsContent, "utf-8");
   console.log(`✅ 已生成 ${relative(join(__dirname, ".."), OUTPUT_FILE)}`);
   console.log(`   包含 ${Object.keys(fileMap).length} 个文件`);
 }

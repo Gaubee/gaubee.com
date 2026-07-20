@@ -9,6 +9,7 @@
  */
 
 import { parseMarkdown, parseArticleId, type ArticleMetadata } from "$lib/data/frontmatter";
+import { readonlyFiles } from "./readonly-data";
 
 // ---------------------------------------------------------------------------
 // 类型定义
@@ -54,21 +55,14 @@ let postsCache: ReadonlyPost[] | null = null;
 function initFileMap(): Map<string, string> {
   if (fileMap) return fileMap;
   fileMap = new Map();
-  
-  // 尝试读取构建时注入的数据
-  try {
-    const data = (globalThis as unknown as Record<string, unknown>).__READONLY_FILES__;
-    if (data && typeof data === "object") {
-      for (const [path, content] of Object.entries(data)) {
-        if (typeof content === "string") {
-          fileMap.set(path, content);
-        }
-      }
+
+  // 读取构建时生成的静态数据
+  for (const [path, content] of Object.entries(readonlyFiles)) {
+    if (typeof content === "string") {
+      fileMap.set(path, content);
     }
-  } catch {
-    // 构建时数据未注入，忽略
   }
-  
+
   return fileMap;
 }
 
