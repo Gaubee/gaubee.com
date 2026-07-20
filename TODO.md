@@ -176,3 +176,89 @@ gaubee.com/
 - [ ] Cloudflare Pages（静态主体）+ Workers（OAuth）正式部署
 - [ ] GitHub OAuth App 配置（Client ID/Secret）
 - [ ] CI/CD（替换旧的 Astro workflow）
+
+## 第三阶段：GaubeeOS 应用系统架构重构（已完成）
+
+### 架构理念
+- **虚拟文件系统**：只读层（构建时静态数据）+ 可写层（IndexedDB）+ 授权机制
+- **Everything is File**：应用通过 VFS 路径共享数据
+- **硬装（静态）+ 软装（应用）**：前端框架固定，应用按需加载
+- **应用即文件**：每个应用 manifest 声明 VFS 所有权、CLI 命令、路由
+
+### 应用分类
+| 类别 | 应用 | 状态 |
+|---|---|---|
+| 系统内置（不可卸载） | 文章、说说、搜索、设置、通知 | ✅ 全部完成 |
+| 默认安装（可卸载） | Github、Terminal | ✅ 全部完成 |
+| 可选安装 | 写作 | ✅ 基础框架完成 |
+
+### 已完成工作
+
+#### 1. 应用基础设施
+- `src/lib/apps/types.ts`：AppManifest、CliCommand、AppEntry 类型
+- `src/lib/apps/AppManager.svelte.ts`：应用安装/卸载/持久化/按需加载
+- `src/lib/apps/registry.ts`：统一注册所有应用
+- `src/lib/apps/PathManager.ts`：PATH/bin 命令注册管理
+
+#### 2. NavController 动态化
+- TabRegistry 注入机制（setTabRegistry/getTabRegistry）
+- 动态 TabId（从静态枚举改为运行时字符串）
+- 新旧路径兼容（localStorage 旧数据过滤 + POP_ROUTES 兼容）
+
+#### 3. 路径统一
+- 旧路径 `/feed`、`/editor`、`/git`、`/terminal` 等 → 新路径 `/app/*`
+- 仅保留 `/app/articles`、`/app/shout`、`/app/settings`、`/app/search`、`/app/notifications`、`/app/github`、`/app/terminal`、`/app/writer`
+
+#### 4. 文章应用（纯只读）
+- `ArticlesView`：从 `ReadonlyVFS`（构建时静态数据）读取
+- 无需登录，零延迟加载
+- 按日期排序，卡片式布局
+
+#### 5. 说说应用（纯只读）
+- `ShoutView`：从 `ReadonlyVFS` 读取 events 目录
+- 无需登录，零延迟加载
+
+#### 6. Github 应用（基于 isomorphic-git）
+- `GitStore.svelte.ts`：封装 isomorphic-git（clone/pull/commit/push）
+- `GithubView.svelte`：支持绑定任意仓库、查看提交历史
+- 内存文件系统适配器（MemFS）
+- CORS 代理处理 GitHub 请求
+
+#### 7. Terminal PATH 机制
+- `shell.ts`：新增 `registerPathCommand`/`unregisterPathCommand`
+- `AppManager`：安装/卸载时自动注册/注销 CLI 命令
+- 应用 manifest 声明 `cliCommands`，安装后自动暴露到 PATH
+
+#### 8. 视图注册系统
+- `placeholders.ts`：统一注册所有 tab/pop/deep-link 视图
+- 支持新旧路径双轨运行（已废弃旧路径）
+
+#### 9. 组件测试
+- `ArticlesView.svelte.spec.ts`：挂载 + 标题验证
+- `ShoutView.svelte.spec.ts`：挂载 + 标题验证
+- `WriterView.svelte.spec.ts`：挂载 + 标题验证
+- `GithubView.svelte.spec.ts`：挂载 + 标题验证
+- 共 **138 个测试全部通过**
+
+### 架构图
+```
+GaubeeOS/
+├── 硬装（静态框架）
+│   ├── SPA 布局（DesktopSidebar / MobileHeader / MobileTabBar / StatusBar）
+│   ├── NavController（多区域 tab 路由）
+│   └── VFS 分层（只读层 + 可写层）
+│
+├── 软装（应用系统）
+│   ├── 系统应用：文章、说说、搜索、设置、通知
+│   ├── 默认安装：Github（isomorphic-git）、Terminal（PATH/bin）
+│   └── 可选安装：写作
+│
+├── 数据流
+│   ├── 只读层：构建时 → ReadonlyVFS → 文章/说说
+│   ├── 可写层：IndexedDB → VFS → 写作/Github
+│   └── 提交器：GitHub API → 异步任务编号
+│
+└── 扩展点
+    ├── CLI：PATH/bin 注册（gh、git、自定义命令）
+    └── VFS 授权：应用间路径权限共享
+```
