@@ -1,10 +1,8 @@
 /**
  * View 注册：所有 tab/pop 路由的视图组件。
  *
- * 在模块加载时立即注册（registry 是静态映射，不需要等组件挂载），
- * 这样 AreaOutlet 首次渲染时 views 已就绪。
- *
- * 后续阶段（5/6/7）会替换这里的占位组件为真实功能 view。
+ * 阶段 1：注册应用视图（新旧路径双轨运行）。
+ * 应用系统注册新路径 `/app/*`，旧路径保留兼容。
  */
 import Archive from "./ArchiveView.svelte";
 import ArticleView from "./ArticleView.svelte";
@@ -17,6 +15,8 @@ import SearchView from "./SearchView.svelte";
 import SettingsView from "./SettingsView.svelte";
 import TagsView from "./TagsView.svelte";
 import TerminalView from "./TerminalView.svelte";
+import ShoutView from "$lib/apps/views/ShoutView.svelte";
+import NotificationsView from "$lib/apps/views/NotificationsView.svelte";
 import {
   registerDeepLinkView,
   registerPopView,
@@ -30,15 +30,28 @@ export function ensureViewsRegistered(): void {
   if (registered) return;
   registered = true;
 
-  // main tab views
+  // ===== 新路径（GaubeeOS 应用路由）=====
+  // 系统应用
+  registerTabView("/app/articles", FeedView);
+  registerTabView("/app/shout", ShoutView);
+  registerTabView("/app/search", SearchView);
+  registerTabView("/app/settings", SettingsView);
+  registerTabView("/app/notifications", NotificationsView);
+
+  // 可安装应用（默认安装）
+  registerTabView("/app/github", GitView);
+  registerTabView("/app/terminal", TerminalView);
+
+  // 可选安装
+  registerTabView("/app/writer", EditorView);
+
+  // ===== 旧路径兼容（保留直到完整迁移）=====
   registerTabView("/feed", FeedView);
   registerTabView("/editor", EditorView);
   registerTabView("/files", FilesView);
   registerTabView("/changes", ChangesView);
   registerTabView("/archive", Archive);
   registerTabView("/settings", SettingsView);
-
-  // bottom tab views
   registerTabView("/git", GitView);
   registerTabView("/terminal", TerminalView);
 
@@ -49,6 +62,10 @@ export function ensureViewsRegistered(): void {
   // pop views
   registerPopView("/search", SearchView);
   registerPopView("/notifications", SearchView);
+
+  // 新 pop 路径兼容
+  registerPopView("/app/search", SearchView);
+  registerPopView("/app/notifications", NotificationsView);
 }
 
 // 模块加载时立即注册

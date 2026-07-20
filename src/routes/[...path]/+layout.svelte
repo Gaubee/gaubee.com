@@ -1,8 +1,8 @@
 <!--
 	根布局：挂载 NavController，用独立组件渲染四区骨架。
-	- 桌面（容器宽 >= 768px）：DesktopSidebar 左 + 主体右（main + bottom 堆叠）+ 底部 StatusBar
-	- 移动端：MobileHeader 顶 + main 中 + MobileTabBar 底（bottom 区默认隐藏）
-	- pop 区：PopAreaRouter 浮层（Dialog），任何视口都可用
+	桌面（容器宽 >= 768px）：DesktopSidebar 左 + 主体右（main + bottom 堆叠）+ 底部 StatusBar
+	移动端：MobileHeader 顶 + main 中 + MobileTabBar 底（bottom 区默认不显示）
+	pop 区：PopAreaRouter 浮层（Dialog），任何视口都可用
 
 	响应式由 CSS 容器查询驱动（.app-layout 父容器带 container-name: app），
 	DesktopSidebar / MobileHeader / MobileTabBar / StatusBar 通过 display: none/flex 互斥切换。
@@ -11,8 +11,10 @@
   import '../../app.css'
   import favicon from '$lib/assets/favicon.svg'
   import { onMount } from 'svelte'
-  // import placeholders 触发模块加载时的 view 注册
-  import '$lib/views/placeholders'
+  import { appManager } from '$lib/apps/AppManager.svelte'
+  // import registry 触发模块加载时的应用注册
+  import '$lib/apps/registry'
+  import { initNavController } from '$lib/nav/nav-controller-instance'
   import { navStore } from '$lib/nav/nav.svelte'
   import { authStore } from '$lib/auth/session.svelte'
   import AreaOutlet from '$lib/components/layout/AreaOutlet.svelte'
@@ -26,13 +28,28 @@
   import { toast } from 'svelte-sonner'
   import { ModeWatcher } from 'mode-watcher'
 
-  // navStore 在浏览器侧订阅 navController；处理 OAuth 回调 query
   let { children } = $props()
 
   onMount(() => {
+    // 1. 从 AppManager 构建 TabRegistry 并初始化 NavController
+    const allRoutes = appManager.allRoutes
+    const mainRoutes = appManager.mainApps.map(a => a.route)
+    const bottomRoutes = appManager.bottomApps.map(a => a.route)
+    const popRoutes = appManager.allInstalled
+      .filter(a => a.defaultArea === 'pop')
+      .map(a => a.route)
+
+    initNavController({
+      allTabs: allRoutes,
+      defaultMainTabs: mainRoutes,
+      defaultBottomTabs: bottomRoutes,
+      popRoutes,
+    })
+
+    // 2. navStore 订阅 NavController
     navStore.start()
 
-    // OAuth 回调：Worker 重定向回来时带 ?auth=success 或 ?auth_error=xxx
+    // 3. OAuth 回调处理
     const params = new URLSearchParams(window.location.search)
     const authStatus = params.get('auth')
     const authError = params.get('auth_error')
@@ -47,7 +64,6 @@
       }
       toast.error(messages[authError] ?? `登录失败：${authError}`)
     }
-    // 清掉 auth query（避免刷新重复 toast）
     if (authStatus || authError) {
       params.delete('auth')
       params.delete('auth_error')

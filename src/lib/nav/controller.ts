@@ -1,28 +1,33 @@
 /**
  * NavController 内核 —— 多区域 tab 路由状态机。
  *
- * 移植自 openspecui（../jixoai-labs/openspecui/packages/web/src/lib/nav-controller.ts），
- * 去掉了 TanStack Router 依赖、远端 KV 同步、hosted session、static mode。
- *
  * 核心思想：
  * - 单条浏览器 URL 编码三个虚拟 area（main / bottom / pop）的 location。
- *   main → pathname，bottom → `?_b=`，pop → `?_p=`。
  * - 所有状态变更走纯函数 reducer（reduceKernel），返回 KernelTransition
- *   （含 nextState + 副作用预算 urlAction/notify/persist），副作用在 dispatch 外执行。
- * - Tab = 预定义路由 id（不是动态对象）。tab 列表 = "哪些 id 当前可见 + 在哪个 area"。
+ * - Tab = 应用路由 id（动态，由 AppManager 注册）。
  *
- * 框架无关：本文件不依赖 Svelte / React / 浏览器 API（单例与浏览器初始化在
- * `nav-controller-instance.ts` 中，便于纯函数测试）。
+ * 框架无关：不依赖任何 UI 框架。
  */
 
 // ---------------------------------------------------------------------------
-// 类型定义
+// TabRegistry：动态 Tab 注册表
 // ---------------------------------------------------------------------------
 
-/**
- * 等价于 TanStack Router 的 HistoryLocation，但不依赖它。
- * 描述一个虚拟的"位置"，含路径、查询、哈希、状态。
- */
+export interface TabRegistry {
+  /** 所有已注册 tab。 */
+  allTabs: readonly string[];
+  /** 默认 main 区 tab。 */
+  defaultMainTabs: readonly string[];
+  /** 默认 bottom 区 tab。 */
+  defaultBottomTabs: readonly string[];
+  /** pop 区路由。 */
+  popRoutes: readonly string[];
+}
+
+/** 兼容性：旧静态 TabId 现为动态 string。 */
+export type TabId = string;
+
+/** 等价于 TanStack Router 的 HistoryLocation。 */
 export interface HistoryLocation {
   href: string;
   pathname: string;
@@ -33,33 +38,16 @@ export interface HistoryLocation {
 
 export interface HistoryLocationState {
   key: string;
-  /** 自定义滚动恢复等任意用户状态 */
   [key: string]: unknown;
 }
 
-/**
- * 本项目的 tab 路由 id 枚举。
- * - main 区：内容浏览与编辑的主舞台。
- * - bottom 区：辅助工具面板（git、预览服务器）。
- * - pop 区：模态弹层路由（搜索、通知）单独声明在 POP_ROUTES。
- *
- * 注意：/article/$id、/tags/$tag、/archive/$year/$month 是 main 区的"深链接"，
- * 不作为独立 tab（在 feed/editor 等 tab 内通过链接跳转，仍归属 main area）。
- */
-export type TabId =
-  // main
-  | "/feed"
-  | "/editor"
-  | "/files"
-  | "/changes"
-  | "/archive"
-  | "/settings"
-  // bottom
-  | "/git"
-  | "/terminal";
-
-/** pop 区路由集合（不是 tab，是独立的弹层路由）。 */
-export const POP_ROUTES = ["/search", "/notifications"] as const;
+/** pop 区路由集合（兼容旧路径 + 新路径）。 */
+export const POP_ROUTES = [
+  "/app/search",
+  "/app/notifications",
+  "/search",
+  "/notifications",
+] as const;
 export type PopRoute = (typeof POP_ROUTES)[number];
 
 export interface NavLayout {
@@ -142,42 +130,49 @@ type KernelBehaviorPlugin = (ctx: {
 }) => KernelState;
 
 // ---------------------------------------------------------------------------
-// 常量与默认布局
+// 常量
 // ---------------------------------------------------------------------------
-
-export const ALL_TABS: readonly TabId[] = [
-  "/feed",
-  "/editor",
-  "/files",
-  "/changes",
-  "/archive",
-  "/settings",
-  "/git",
-  "/terminal",
-];
-
-/** 默认 main 区 tab（用户可拖拽改变）。 */
-export const DEFAULT_MAIN_TABS: TabId[] = [
-  "/feed",
-  "/editor",
-  "/files",
-  "/changes",
-  "/archive",
-  "/settings",
-];
-
-/** 默认 bottom 区 tab。 */
-export const DEFAULT_BOTTOM_TABS: TabId[] = ["/git", "/terminal"];
 
 const PERSIST_DEBOUNCE_MS = 300;
 const STORAGE_KEY = "gaubee:nav-layout";
+
+// 动态 TabRegistry，从外部注入
+// 默认值兼容旧路径（测试用）
+const OLD_TABS = [
+  "/feed", "/editor", "/files", "/changes", "/archive", "/settings",
+  "/git", "/terminal",
+] as const;
+
+let tabRegistry: TabRegistry = {
+  allTabs: [...OLD_TABS],
+  defaultMainTabs: ["/feed", "/editor", "/files", "/changes", "/archive", "/settings"],
+  defaultBottomTabs: ["/git", "/terminal"],
+  popRoutes: ["/search", "/notifications"],
+};
+
+/** 兼容性导出：旧静态常量（指向 tabRegistry 默认值）。
+ * @deprecated 使用 setTabRegistry/getTabRegistry 替代
+ */
+export const ALL_TABS: readonly TabId[] = tabRegistry.allTabs;
+export const DEFAULT_MAIN_TABS: readonly TabId[] = tabRegistry.defaultMainTabs;
+export const DEFAULT_BOTTOM_TABS: readonly TabId[] = tabRegistry.defaultBottomTabs;
+
+/** 设置 TabRegistry（应用注册时调用）。 */
+export function setTabRegistry(registry: TabRegistry): void {
+  tabRegistry = registry;
+}
+
+/** 获取当前 TabRegistry。 */
+export function getTabRegistry(): TabRegistry {
+  return tabRegistry;
+}
 
 // ---------------------------------------------------------------------------
 // 工具函数
 // ---------------------------------------------------------------------------
 
 function isTabId(value: string): value is TabId {
-  return (ALL_TABS as readonly string[]).includes(value);
+  return tabRegistry.allTabs.includes(value);
 }
 
 function normalizeTabList(value: unknown): TabId[] {
@@ -226,7 +221,7 @@ export function parseHref(href: string, state?: unknown): HistoryLocation {
 }
 
 function pathToTabId(path: string): TabId | null {
-  for (const tab of ALL_TABS) {
+  for (const tab of tabRegistry.allTabs) {
     if (path === tab || path.startsWith(tab + "/")) {
       return tab;
     }
@@ -259,6 +254,8 @@ export function areaForPath(layout: NavLayout, path: string): Area {
 
 /** 合并 layout：去重 + 保证 ALL_TABS 全覆盖 + mainTabs/bottomTabs 互斥。 */
 function mergeLayout(layout: NavLayout): NavLayout {
+  const allTabs = tabRegistry.allTabs;
+  const defaultBottom = tabRegistry.defaultBottomTabs;
   const placed = new Set<TabId>();
   const mainTabs: TabId[] = [];
   const bottomTabs: TabId[] = [];
@@ -275,9 +272,9 @@ function mergeLayout(layout: NavLayout): NavLayout {
       placed.add(tab);
     }
   }
-  for (const tab of ALL_TABS) {
+  for (const tab of allTabs) {
     if (!placed.has(tab)) {
-      if (DEFAULT_BOTTOM_TABS.includes(tab)) {
+      if (defaultBottom.includes(tab)) {
         bottomTabs.push(tab);
       } else {
         mainTabs.push(tab);
@@ -805,10 +802,10 @@ export type NavListener = () => void;
 
 function createInitialState(): KernelState {
   return {
-    mainTabs: [...DEFAULT_MAIN_TABS],
-    bottomTabs: [...DEFAULT_BOTTOM_TABS],
+    mainTabs: [...tabRegistry.defaultMainTabs],
+    bottomTabs: [...tabRegistry.defaultBottomTabs],
     updatedAt: 0,
-    mainLocation: parseHref("/feed"),
+    mainLocation: parseHref(tabRegistry.defaultMainTabs[0] ?? "/"),
     bottomLocation: parseHref("/"),
     popLocation: parseHref("/"),
   };
@@ -1087,3 +1084,4 @@ export class NavController {
     return this.state.bottomTabs;
   }
 }
+

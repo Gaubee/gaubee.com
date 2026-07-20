@@ -1,15 +1,15 @@
 <!--
 	AreaNav：某 area 的 tab 列表组件。
+	- 从 AppManager 获取应用元数据（图标、名称）。
 	- main area：点击 tab 走 navigateMain（router push）。
 	- bottom area：点击 tab 是 toggle（activate/deactivate）。
 	- HTML5 拖拽：跨 area moveTab + 同 area reorder，带落点指示线。
-	- 关闭按钮：hover 显示（阶段 1 的 nav 简化版无此功能，这里补上）。
 -->
 <script lang="ts">
   import { navStore } from '$lib/nav/nav.svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
   import { draggedTabId, setDraggedTab } from '$lib/nav/drag-state.svelte'
-  import { getNavItem } from '$lib/nav/nav-items'
+  import { appManager } from '$lib/apps/AppManager.svelte'
   import type { Area, TabId } from '$lib/nav/controller'
   import XIcon from '@lucide/svelte/icons/x'
 
@@ -34,6 +34,11 @@
     }
     return null
   })
+
+  // 从 AppManager 获取应用信息
+  function getAppInfo(route: string) {
+    return appManager.findByRoute(route)
+  }
 
   // 落点指示：{ index, position: 'before' | 'after' }，用 state + ref（drop 时 state 可能滞后）
   let dropIndicator = $state<{ index: number; position: 'before' | 'after' } | null>(null)
@@ -153,10 +158,10 @@
   ondrop={handleDrop}
 >
   {#each tabs as tabId, index (tabId)}
-    {@const item = getNavItem(tabId)}
+    {@const app = getAppInfo(tabId)}
     {@const isActive = tabId === activeTabId}
     {@const showLineBefore = dropIndicator?.index === index && dropIndicator.position === 'before'}
-    {#if item}
+    {#if app}
       <li
         class="group relative flex items-center"
         draggable="true"
@@ -176,11 +181,12 @@
             ? 'bg-accent text-accent-foreground font-medium'
             : 'text-muted-foreground'}"
           onclick={() => handleClick(tabId, isActive)}
-          title={collapsed ? item.label : undefined}
+          title={collapsed ? app.name : undefined}
         >
-          <item.icon class="size-4 shrink-0" />
+          <!-- svelte-ignore ownership_invalid_mutation -->
+          <app.icon class="size-4 shrink-0" />
           {#if !collapsed}
-            <span class="truncate">{item.label}</span>
+            <span class="truncate">{app.name}</span>
           {/if}
         </button>
 

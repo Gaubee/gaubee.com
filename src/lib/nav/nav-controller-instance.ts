@@ -5,10 +5,14 @@
  * 不触发 `$app/environment` 与 window 副作用）。
  */
 import { browser } from "$app/environment";
-import { NavController } from "./controller";
+import { NavController, setTabRegistry, type TabRegistry } from "./controller";
 
 export const navController = new NavController();
 
-if (browser) {
-  navController.init();
+/** 从 AppManager 构建 TabRegistry 并注入 NavController。 */
+export function initNavController(registry: TabRegistry): void {
+  setTabRegistry(registry);
+  if (browser) {
+    navController.init();
+  }
 }
