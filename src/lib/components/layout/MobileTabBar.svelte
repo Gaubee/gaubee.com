@@ -19,7 +19,6 @@
 
 <nav
   class="mobile-tabbar sticky bottom-0 z-30 items-center gap-1 border-t border-border bg-background/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur supports-[backdrop-filter]:bg-background/80"
-  style="display: flex"
   aria-label="主导航"
 >
   {#each quickTabs as tabId (tabId)}

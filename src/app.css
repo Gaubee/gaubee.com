@@ -232,10 +232,15 @@
 }
 
 /* 桌面：容器宽 >= 768px 时切换为横排 */
-@container app (min-width: 768px) {
+/* 注意：.app-layout 自身是容器（container-type: inline-size），不能用 @container
+   改变它自己的 flex-direction（浏览器为避免循环依赖会忽略该声明）。
+   因此 flex-direction 用 @media（视口级），display 切换仍用 @container（组件级）。 */
+@media (min-width: 768px) {
   .app-layout {
     flex-direction: row;
   }
+}
+@container app (min-width: 768px) {
   .desktop-sidebar,
   .desktop-status {
     display: flex;

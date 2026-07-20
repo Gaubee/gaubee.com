@@ -27,7 +27,6 @@
 
 <footer
   class="desktop-status items-center gap-3 border-t border-border bg-background px-3 py-1 text-muted-foreground text-xs"
-  style="display: flex"
 >
   <!-- 登录态（点击进设置） -->
   <button

@@ -84,6 +84,42 @@
 - 类型检查 0 错误，单元测试 130 个（+50 bash），E2E 19 个（+1 SW 离线）
 - Playwright 截图验证：终端命令执行、暗色主题、圆角恢复、SSG 高亮全部正常
 
+### ✅ 批次 8：响应式布局严重 bug 修复 + 终端布局修复 + E2E 补全
+
+#### agent-browser 走查发现的严重预存 bug（生产桌面布局完全损坏）
+- **根因 1（容器查询自循环）**：`.app-layout` 既是容器（`container-type: inline-size`），
+  又是 `@container app (min-width: 768px)` 规则改变自身 `flex-direction` 的目标。
+  浏览器为避免循环依赖，**忽略了对容器自身尺寸相关属性的声明**（实测 `!important`
+  也无效）。结果桌面视口下 `.app-layout` 始终是 `flex-direction: column`（移动布局）。
+- **根因 2（内联样式覆盖容器查询）**：`MobileHeader`/`MobileTabBar`/`StatusBar`
+  三个组件有 `style="display: flex"` 内联样式，优先级高于容器查询的 `display: none`，
+  导致桌面视口下移动端组件（汉堡菜单、底部 tab bar）与桌面侧栏**同时显示**。
+- **影响**：生产环境桌面端 sidebar + mobile-header 重叠、app-body 被挤压到视口底部
+  1/3、终端展开后 xterm 溢出覆盖 StatusBar（暗色按钮无法点击）。
+
+#### 修复
+- `app.css`：`.app-layout` 的 `flex-direction: row` 改用 `@media (min-width: 768px)`
+  （视口级，不依赖容器查询自循环）；`display` 切换仍用 `@container`（组件级）。
+- `MobileHeader.svelte`/`MobileTabBar.svelte`/`StatusBar.svelte`：移除 `style="display: flex"`
+  内联样式，完全交给 `app.css` 的容器查询控制。
+
+#### 终端布局修复（批次 7 遗留）
+- `BottomAreaRouter.svelte`：bottom-area 加 `shrink-0`（原作为 flex item 默认
+  `flex-shrink:1`，被 main 压缩成 1px，导致 xterm 溢出覆盖 StatusBar）。
+- `AreaOutlet.svelte`：给 view 注入 `{area, tabId, isActive}` props。
+- `TerminalView.svelte`：只在 `area === 'bottom'` 渲染 UI + 挂载 xterm（修复 AreaOutlet
+  跨 area 常驻渲染导致 2 个 xterm 实例冲突）；容器加 `min-h-0` 约束 xterm 不溢出。
+
+#### E2E 补全（+14 个测试，共 33 个 E2E）
+- `tests/layout.e2e.ts`（4 个）：桌面/移动布局切换断言、组件不重叠、bottom 展开后
+  暗色按钮可点击（历史 bug 回归保护）。
+- `tests/terminal.e2e.ts`（10 个）：xterm 单实例、命令执行、收起/展开恢复、
+  移动端抽屉切终端、输入条交互等。
+
+#### 验证
+- 类型检查 0 错误，单元测试 130/130，E2E 33/33
+- agent-browser 截图：桌面 row 布局 + 侧栏 + 移动端组件正确隐藏；移动 column 布局正常
+
 ## 当前架构（第二阶段改造后）
 
 ```

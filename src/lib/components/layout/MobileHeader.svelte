@@ -29,7 +29,6 @@
 
 <header
   class="mobile-header sticky top-0 z-30 items-center gap-1 border-b border-border bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80"
-  style="display: flex"
 >
   <button
     class="hover:bg-accent flex size-10 items-center justify-center rounded-md"
