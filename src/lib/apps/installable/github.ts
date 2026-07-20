@@ -1,8 +1,8 @@
 /**
  * Github 应用（默认安装，可卸载）。
  *
- * 功能：Git 操作、仓库管理、文件变更提交。
- * 提供 CLI 命令：gh, git
+ * 功能：基于 isomorphic-git 的完整 Git 能力。
+ * 可以绑定任意仓库，支持 clone/log/diff/commit/push。
  */
 import GitBranch from "@lucide/svelte/icons/git-branch";
 import type { AppEntry } from "../types";
@@ -17,8 +17,8 @@ export const githubApp: AppEntry = {
     route: "/app/github",
     vfsOwnership: [".git/"],
     cliCommands: [
-      // 在 path.ts 中注册
+      // gh 命令在 path.ts 中注册
     ],
   },
-  view: () => import("$lib/views/GitView.svelte"),
+  view: () => import("$lib/apps/views/GithubView.svelte"),
 };

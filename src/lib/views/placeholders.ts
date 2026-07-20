@@ -17,6 +17,7 @@ import TerminalView from "./TerminalView.svelte";
 import ArticlesView from "$lib/apps/views/ArticlesView.svelte";
 import ShoutView from "$lib/apps/views/ShoutView.svelte";
 import WriterView from "$lib/apps/views/WriterView.svelte";
+import GithubView from "$lib/apps/views/GithubView.svelte";
 import NotificationsView from "$lib/apps/views/NotificationsView.svelte";
 import {
   registerDeepLinkView,
@@ -39,7 +40,7 @@ export function ensureViewsRegistered(): void {
   registerTabView("/app/notifications", NotificationsView);
 
   // ===== 可安装应用（默认安装）=====
-  registerTabView("/app/github", GitView);
+  registerTabView("/app/github", GithubView);
   registerTabView("/app/terminal", TerminalView);
 
   // ===== 可选安装 =====

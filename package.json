@@ -67,6 +67,7 @@
 		"@xterm/xterm": "^6.0.0",
 		"codemirror": "^6.0.2",
 		"idb": "^8.0.3",
+		"isomorphic-git": "^1.38.9",
 		"js-yaml": "^5.2.1",
 		"marked": "^18.0.6",
 		"marked-gfm-heading-id": "^4.1.4",
