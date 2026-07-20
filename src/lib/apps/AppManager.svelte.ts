@@ -10,6 +10,27 @@
  */
 import type { Component } from "svelte";
 import type { AppEntry, AppManifest, InstalledApp } from "./types";
+import { pathManager } from "./PathManager";
+import type { Command, CommandContext } from "../terminal/shell";
+import { registerPathCommand, unregisterPathCommand } from "../terminal/shell";
+
+// ---------------------------------------------------------------------------
+// 工具：将 CliCommand 转换为 shell Command
+// ---------------------------------------------------------------------------
+
+function cliToShellCommand(cli: AppEntry["manifest"]["cliCommands"][number]): Command {
+  return {
+    name: cli.name,
+    usage: cli.usage,
+    description: cli.description,
+    async run(ctx: CommandContext, args: string[]) {
+      const result = await cli.run(ctx, args);
+      // CliCommand 返回 { exit, newCwd }，但 shell Command.run 只返回 ExitCode
+      // newCwd 由 shell 内部处理（cd 命令特判）
+      return result.exit;
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // 常量
@@ -184,6 +205,16 @@ class AppManager {
 
     this.installedIds = [...this.installedIds, id];
     this.writeStorage();
+
+    // 注册 CLI 命令到 PATH
+    if (entry.manifest.cliCommands) {
+      for (const cli of entry.manifest.cliCommands) {
+        pathManager.register(id, cli);
+        // 同时注册到 shell 命令注册表
+        registerPathCommand(cliToShellCommand(cli));
+      }
+    }
+
     return true;
   }
 
@@ -201,6 +232,15 @@ class AppManager {
     this.loadingPromises.delete(id);
     this.errors = new Map(this.errors);
     this.errors.delete(id);
+
+    // 从 PATH 注销 CLI 命令
+    const entry = this.registry.get(id);
+    if (entry?.manifest.cliCommands) {
+      for (const cli of entry.manifest.cliCommands) {
+        pathManager.unregisterApp(id);
+        unregisterPathCommand(cli.name);
+      }
+    }
 
     const next = [...this.installedIds];
     next.splice(idx, 1);

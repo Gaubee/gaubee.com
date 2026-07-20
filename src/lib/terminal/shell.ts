@@ -561,8 +561,11 @@ const gitSubcommands = new Map<string, Command>([
 ]);
 
 // ---------------------------------------------------------------------------
-// 注册表
+// 注册表（内置命令 + PATH 注册命令）
 // ---------------------------------------------------------------------------
+
+/** PATH 注册的命令（应用安装时注册）。 */
+const pathCommands = new Map<string, Command>();
 
 const builtins: Command[] = [
   lsCommand,
@@ -582,8 +585,23 @@ const builtins: Command[] = [
 const registry = new Map<string, Command>();
 for (const cmd of builtins) registry.set(cmd.name, cmd);
 
+/** 注册 PATH 命令（应用安装时调用）。 */
+export function registerPathCommand(command: Command): void {
+  pathCommands.set(command.name, command);
+}
+
+/** 注销 PATH 命令（应用卸载时调用）。 */
+export function unregisterPathCommand(name: string): void {
+  pathCommands.delete(name);
+}
+
+/** 获取合并后的注册表（内置 + PATH）。 */
 export function getRegistry(): Map<string, Command> {
-  return registry;
+  const merged = new Map<string, Command>(registry);
+  for (const [name, cmd] of pathCommands) {
+    merged.set(name, cmd);
+  }
+  return merged;
 }
 
 // ---------------------------------------------------------------------------
@@ -649,7 +667,7 @@ export async function runLine(
     return { exit: 0, newCwd: target };
   }
 
-  const cmd = registry.get(name);
+  const cmd = getRegistry().get(name);
   if (!cmd) {
     ctx.write(
       Term.err(`${name}: 命令未找到。输入 help 查看可用命令。`) + Term.newline,
@@ -676,8 +694,9 @@ export async function tabComplete(
   const isCommandPosition = line.trim() === current && !line.includes(" ");
 
   if (isCommandPosition) {
-    // 补全命令名
-    return [...registry.keys()].filter((n) => n.startsWith(current));
+    // 补全命令名（内置 + PATH 命令）
+    const reg = getRegistry();
+    return [...reg.keys()].filter((n) => n.startsWith(current));
   }
 
   // 路径补全：基于 cwd 解析 current 的目录部分
