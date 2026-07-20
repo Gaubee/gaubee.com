@@ -9,12 +9,12 @@ import ArticleView from "./ArticleView.svelte";
 import ChangesView from "./ChangesView.svelte";
 import EditorView from "./EditorView.svelte";
 import FilesView from "./FilesView.svelte";
-import FeedView from "./FeedView.svelte";
 import GitView from "./GitView.svelte";
 import SearchView from "./SearchView.svelte";
 import SettingsView from "./SettingsView.svelte";
 import TagsView from "./TagsView.svelte";
 import TerminalView from "./TerminalView.svelte";
+import ArticlesView from "$lib/apps/views/ArticlesView.svelte";
 import ShoutView from "$lib/apps/views/ShoutView.svelte";
 import NotificationsView from "$lib/apps/views/NotificationsView.svelte";
 import {
@@ -31,7 +31,7 @@ export function ensureViewsRegistered(): void {
   registered = true;
 
   // ===== 系统应用（不可卸载）=====
-  registerTabView("/app/articles", FeedView);
+  registerTabView("/app/articles", ArticlesView);
   registerTabView("/app/shout", ShoutView);
   registerTabView("/app/search", SearchView);
   registerTabView("/app/settings", SettingsView);
