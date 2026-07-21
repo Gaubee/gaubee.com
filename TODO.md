@@ -240,6 +240,15 @@ gaubee.com/
 - `GithubView.svelte.spec.ts`：挂载 + 标题验证
 - 共 **138 个测试全部通过**
 
+#### 10. 内容阅读与搜索体验（2026-07-21）
+
+- [x] 文章列表按年份分组，桌面侧栏与移动 Sheet 使用同一组年份入口。
+- [x] 长文目录复用 GFM heading id；桌面固定目录与移动 Sheet 均可定位正文。
+- [x] 短评改为时间线，完整渲染 Markdown，长内容可原地展开。
+- [x] 搜索以应用服务协议扩展；构建期生成按应用和时间排序的 MiniSearch 分片。
+- [x] 移动抽屉改为读取 AppManager，已安装应用在移动端可访问。
+- [x] Playwright 测试通道使用 pnpm 生产预览，并支持 `PLAYWRIGHT_BASE_URL` 复用既有服务。
+
 ### 架构图
 ```
 GaubeeOS/

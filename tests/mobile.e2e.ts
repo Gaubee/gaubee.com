@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * 移动端 E2E 测试。
- * 通过 playwright.config.ts 的 projects 配置 iPhone 14 Pro viewport（如未配，这里用 page.setViewportSize）。
+ * 正交意图：
+ * 1. 原始需求（2026-07-21）：移动端应用导航须覆盖当前 `/app/*` 路由。
+ * 2. 验证顶栏、底栏和抽屉中的应用切换可用。
  */
 
 test.describe("移动端布局", () => {
@@ -11,7 +12,7 @@ test.describe("移动端布局", () => {
   });
 
   test("竖排布局 + 顶栏 + 底栏", async ({ page }) => {
-    await page.goto("/feed");
+    await page.goto("/app/articles");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(1500);
 
@@ -27,7 +28,7 @@ test.describe("移动端布局", () => {
   });
 
   test("抽屉导航打开与切换", async ({ page }) => {
-    await page.goto("/feed");
+    await page.goto("/app/articles");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(1500);
 
@@ -38,10 +39,10 @@ test.describe("移动端布局", () => {
       timeout: 3000,
     });
 
-    // 点抽屉里的"编辑"（在抽屉 sheet 内）
+    // 点抽屉里的"说说"（在抽屉 sheet 内）
     const drawer = page.locator('[data-slot="sheet-content"]');
-    await drawer.getByRole("button", { name: "编辑" }).click();
+    await drawer.getByRole("button", { name: "说说" }).click();
     await page.waitForTimeout(500);
-    expect(page.url()).toContain("/editor");
+    expect(page.url()).toContain("/app/shout");
   });
 });

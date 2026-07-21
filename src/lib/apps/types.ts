@@ -6,6 +6,7 @@
  * 有统一的接口和生命周期。
  */
 import type { Component } from "svelte";
+import type { SearchServiceFactory } from "$lib/search/types";
 
 // ---------------------------------------------------------------------------
 // 应用分类
@@ -42,7 +43,10 @@ export interface CliCommand {
   usage: string;
   /** 执行命令。
    * @returns { newCwd: string | null } 如果命令改变了 cwd，返回新的 cwd */
-  run: (ctx: CliCommandContext, args: string[]) => Promise<{ exit: number; newCwd: string | null }>;
+  run: (
+    ctx: CliCommandContext,
+    args: string[],
+  ) => Promise<{ exit: number; newCwd: string | null }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,7 +60,7 @@ export interface AppManifest {
   /** 显示名称。 */
   name: string;
   /** Lucide 图标组件。 */
-  icon: unknown /* Component */;
+  icon: Component;
   /** 应用分类。 */
   category: AppCategory;
   /** 默认归属区域。 */
@@ -71,6 +75,8 @@ export interface AppManifest {
   vfsOwnership?: string[];
   /** 对其它应用的 VFS 路径权限请求。 */
   vfsPermissions?: { path: string; mode: "read" | "write" }[];
+  /** 可选搜索适配闭包；搜索应用仅通过此协议发现能力。 */
+  searchService?: SearchServiceFactory;
 }
 
 /** 已安装应用实例（含运行时状态）。 */

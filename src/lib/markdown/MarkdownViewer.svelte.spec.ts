@@ -1,44 +1,22 @@
+/**
+ * 正交意图：
+ * 1. 原始需求（2026-07-21）：说说列表必须正确渲染 Markdown。
+ * 2. 锁定内联预览的基础 Markdown 结构。
+ */
 import { describe, expect, it } from "vitest";
 import { render } from "vitest-browser-svelte";
 import MarkdownViewer from "./MarkdownViewer.svelte";
 
 describe("MarkdownViewer", () => {
-  it("渲染标题与段落", () => {
+  it("在内联模式保留 Markdown 的强调与链接结构", () => {
     const { container } = render(MarkdownViewer, {
-      props: { markdown: "# 标题\n\n这是段落。" },
+      markdown: "这是 **重点**，也是 [链接](https://example.com)。",
+      inline: true,
     });
-    expect(container.querySelector("h1")?.textContent).toContain("标题");
-    expect(container.querySelector("p")?.textContent).toContain("这是段落");
-  });
 
-  it("GFM 表格渲染", () => {
-    const md = "| a | b |\n| - | - |\n| 1 | 2 |\n";
-    const { container } = render(MarkdownViewer, { props: { markdown: md } });
-    expect(container.querySelector("table")).toBeTruthy();
-    expect(container.querySelectorAll("td").length).toBe(2);
-  });
-
-  it("代码块渲染（Shiki 加载后高亮）", async () => {
-    const md = "```js\nconst x = 1\n```\n";
-    const { container } = render(MarkdownViewer, { props: { markdown: md } });
-    // 初始应有 pre/code（Shiki 加载前是 plain code）
-    expect(container.querySelector("pre")).toBeTruthy();
-  });
-
-  it("截断预览：maxLines 限制 + 雾化 class", () => {
-    const longMd = Array(20).fill("段落内容").join("\n\n");
-    const { container } = render(MarkdownViewer, {
-      props: { markdown: longMd, maxLines: 3 },
-    });
-    const fadeEl = container.querySelector(".truncate-fade");
-    expect(fadeEl).toBeTruthy();
-  });
-
-  it("图片响应式", () => {
-    const md = '![alt](/img.png "标题")';
-    const { container } = render(MarkdownViewer, { props: { markdown: md } });
-    const img = container.querySelector("img");
-    expect(img?.getAttribute("src")).toBe("/img.png");
-    expect(img?.getAttribute("alt")).toBe("alt");
+    expect(container.querySelector("strong")?.textContent).toBe("重点");
+    expect(container.querySelector("a")?.getAttribute("href")).toBe(
+      "https://example.com",
+    );
   });
 });

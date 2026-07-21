@@ -5,6 +5,7 @@
  * 数据来自 ReadonlyVFS（构建时静态数据），无需登录即可阅读。
  */
 import MessageSquare from "@lucide/svelte/icons/message-square";
+import { createFileSearchService } from "$lib/search/file-service";
 import type { AppEntry } from "../types";
 
 export const shoutApp: AppEntry = {
@@ -17,6 +18,8 @@ export const shoutApp: AppEntry = {
     route: "/app/shout",
     supportsDeepLink: true,
     vfsOwnership: ["src/content/events/"],
+    searchService: () =>
+      createFileSearchService({ appId: "shout", appName: "说说" }),
   },
   view: () => import("$lib/apps/views/ShoutView.svelte"),
 };

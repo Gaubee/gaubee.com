@@ -9,16 +9,17 @@
  * 5. 管理应用加载状态（视图组件按需加载）。
  */
 import type { Component } from "svelte";
-import type { AppEntry, AppManifest, InstalledApp } from "./types";
+import type { AppEntry, AppManifest, CliCommand, InstalledApp } from "./types";
 import { pathManager } from "./PathManager";
 import type { Command, CommandContext } from "../terminal/shell";
 import { registerPathCommand, unregisterPathCommand } from "../terminal/shell";
+import { searchServiceRegistry } from "$lib/search/registry";
 
 // ---------------------------------------------------------------------------
 // 工具：将 CliCommand 转换为 shell Command
 // ---------------------------------------------------------------------------
 
-function cliToShellCommand(cli: AppEntry["manifest"]["cliCommands"][number]): Command {
+function cliToShellCommand(cli: CliCommand): Command {
   return {
     name: cli.name,
     usage: cli.usage,
@@ -185,6 +186,7 @@ class AppManager {
     }
 
     this.installedIds = installed;
+    this.syncSearchServices();
     this.initialized = true;
   }
 
@@ -205,6 +207,7 @@ class AppManager {
 
     this.installedIds = [...this.installedIds, id];
     this.writeStorage();
+    this.registerSearchService(entry);
 
     // 注册 CLI 命令到 PATH
     if (entry.manifest.cliCommands) {
@@ -235,6 +238,7 @@ class AppManager {
 
     // 从 PATH 注销 CLI 命令
     const entry = this.registry.get(id);
+    searchServiceRegistry.unregister(id);
     if (entry?.manifest.cliCommands) {
       for (const cli of entry.manifest.cliCommands) {
         pathManager.unregisterApp(id);
@@ -284,7 +288,10 @@ class AppManager {
     return promise;
   }
 
-  private async doLoadView(id: string, entry: AppEntry): Promise<Component | null> {
+  private async doLoadView(
+    id: string,
+    entry: AppEntry,
+  ): Promise<Component | null> {
     try {
       const mod = await entry.view();
       this.loadedViews.set(id, mod.default);
@@ -327,6 +334,19 @@ class AppManager {
     } catch {
       // ignore
     }
+  }
+
+  /** 将已安装应用的搜索闭包投影到通用搜索注册表。 */
+  private syncSearchServices(): void {
+    for (const id of this.installedIds) {
+      const entry = this.registry.get(id);
+      if (entry) this.registerSearchService(entry);
+    }
+  }
+
+  private registerSearchService(entry: AppEntry): void {
+    const service = entry.manifest.searchService?.();
+    if (service) searchServiceRegistry.register(service);
   }
 
   // ---- 内部工具 ----

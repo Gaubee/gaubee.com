@@ -1,71 +1,70 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * 桌面端核心 E2E 测试：导航切换、暗色模式、pop 搜索、深链接。
- * 运行：pnpm test（会先 build + preview）。
+ * 正交意图：
+ * 1. 原始需求（2026-07-21）：当前 GaubeeOS 应用路由必须由桌面端真实导航覆盖。
+ * 2. 验证主区、底栏、主题和深链接在 `/app/*` 路由模型下保持一致。
  */
 
 test.describe("桌面端核心流程", () => {
-  test("侧栏 tab 切换 + URL 同步", async ({ page }) => {
-    await page.goto("/feed");
+  test("主区应用 tab 切换 + URL 同步", async ({ page }) => {
+    await page.goto("/app/articles");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1500);
+    await expect(page.getByRole("heading", { name: "文章" })).toBeVisible();
+    expect(page.url()).toContain("/app/articles");
 
-    expect(page.url()).toContain("/feed");
+    await page
+      .getByRole("tab", { name: /说说/ })
+      .getByRole("button", { name: "说说", exact: true })
+      .click();
+    await expect(page.getByRole("heading", { name: "说说" })).toBeVisible();
+    expect(page.url()).toContain("/app/shout");
 
-    // 点击"编辑"
-    await page.getByRole("tab", { name: "编辑" }).click();
-    await page.waitForTimeout(500);
-    expect(page.url()).toContain("/editor");
-
-    // 点击"归档"
-    await page.getByRole("tab", { name: "归档" }).click();
-    await page.waitForTimeout(500);
-    expect(page.url()).toContain("/archive");
+    await page
+      .getByRole("tab", { name: /文章/ })
+      .getByRole("button", { name: "文章", exact: true })
+      .click();
+    await expect(page.getByRole("heading", { name: "文章" })).toBeVisible();
+    expect(page.url()).toContain("/app/articles");
   });
 
   test("根路径 / 能正常渲染（非空白）", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(2000);
-    // 页面应渲染（侧栏可见，非空白 body）
-    await expect(page.getByRole("tab", { name: "阅读" })).toBeVisible({
-      timeout: 5000,
-    });
-    // NavController 可能规范 URL 到 /feed，也可能保持 /（均接受）
+    await expect(page.getByRole("heading", { name: "文章" })).toBeVisible();
     const bodyLen = await page.evaluate(() => document.body.innerText.length);
     expect(bodyLen).toBeGreaterThan(50);
   });
 
-  test("pop 搜索打开与关闭", async ({ page }) => {
-    await page.goto("/feed");
+  test("搜索应用在主区激活", async ({ page }) => {
+    await page.goto("/app/articles");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1500);
 
-    // 点击搜索（浮层区）
-    await page.getByRole("button", { name: "搜索" }).first().click();
-    await page.waitForTimeout(500);
-    expect(page.url()).toContain("_p=%2Fsearch");
-
-    // Esc 关闭
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(500);
-    expect(page.url()).not.toContain("_p=");
+    await page
+      .getByRole("tab", { name: /搜索/ })
+      .getByRole("button", { name: "搜索", exact: true })
+      .click();
+    await expect(
+      page.getByRole("searchbox", { name: "搜索内容" }),
+    ).toBeVisible();
+    expect(page.url()).toContain("/app/search");
   });
 
   test("bottom 区激活与收起", async ({ page }) => {
-    await page.goto("/feed");
+    await page.goto("/app/articles");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1500);
 
-    // 激活 Git bottom
-    await page.getByRole("tab", { name: "Git" }).click();
-    await page.waitForTimeout(500);
-    expect(page.url()).toContain("_b=%2Fgit");
+    await page
+      .getByRole("tab", { name: /Github/ })
+      .getByRole("button", { name: "Github", exact: true })
+      .click();
+    await expect(page.getByRole("heading", { name: "Github" })).toBeVisible();
+    expect(page.url()).toContain("_b=%2Fapp%2Fgithub");
 
-    // 收起（再点 Git）
-    await page.getByRole("tab", { name: "Git" }).click();
-    await page.waitForTimeout(500);
+    await page
+      .getByRole("tab", { name: /Github/ })
+      .getByRole("button", { name: "Github", exact: true })
+      .click();
     expect(page.url()).not.toContain("_b=");
   });
 
@@ -79,17 +78,16 @@ test.describe("桌面端核心流程", () => {
     });
   });
 
-  test("深链接刷新恢复：URL 含 _b/_p 时刷新后状态保持", async ({ page }) => {
-    await page.goto("/editor?_b=%2Fgit&_p=%2Fsearch");
+  test("深链接刷新恢复：URL 含当前底栏应用时状态保持", async ({ page }) => {
+    await page.goto("/app/articles?_b=%2Fapp%2Fgithub");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(2000);
-    expect(page.url()).toContain("_b=%2Fgit");
+    await expect(page.getByRole("heading", { name: "Github" })).toBeVisible();
+    expect(page.url()).toContain("_b=%2Fapp%2Fgithub");
   });
 
   test("暗色模式切换", async ({ page }) => {
-    await page.goto("/feed");
+    await page.goto("/app/articles");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1500);
 
     const htmlClassBefore = await page.evaluate(
       () => document.documentElement.className,
@@ -106,9 +104,8 @@ test.describe("桌面端核心流程", () => {
   });
 
   test("侧栏折叠", async ({ page }) => {
-    await page.goto("/feed");
+    await page.goto("/app/articles");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1500);
 
     const collapseBtn = page.getByRole("button", { name: "折叠侧栏" });
     if (await collapseBtn.isVisible().catch(() => false)) {

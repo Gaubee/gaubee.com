@@ -5,6 +5,7 @@
  * 数据来自 ReadonlyVFS（构建时静态数据），无需登录即可阅读。
  */
 import Newspaper from "@lucide/svelte/icons/newspaper";
+import { createFileSearchService } from "$lib/search/file-service";
 import type { AppEntry } from "../types";
 
 export const articlesApp: AppEntry = {
@@ -17,6 +18,8 @@ export const articlesApp: AppEntry = {
     route: "/app/articles",
     supportsDeepLink: true,
     vfsOwnership: ["src/content/articles/"],
+    searchService: () =>
+      createFileSearchService({ appId: "articles", appName: "文章" }),
   },
   view: () => import("$lib/apps/views/ArticlesView.svelte"),
 };

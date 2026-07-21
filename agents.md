@@ -83,3 +83,35 @@
 
 2. 提交之前要更新 `TODO.md`，来将完成的任务补充进去。
 3. 提交之前需要使用 `pnpm fmt` 脚本来统一格式化要提交的问题。
+
+## 内容阅读与搜索架构（2026-07-21）
+
+### 决策
+
+- 文章与短评应用各自在 manifest 声明 `searchService` 工厂；搜索应用不得导入具体内容应用。
+- 静态索引按应用、发布时间倒序和约 500 KiB 分片生成；浏览器只加载命中应用的分片。
+- 移动导航必须从 `AppManager` 的已安装应用投影，不能回退到静态 `nav-items`。
+
+```
+src/content/{articles,events}
+          │ build
+          ▼
+ static/search-index/{manifest,shards}
+          │ lazy fetch
+          ▼
+AppManifest.searchService ──► Search registry ──► SearchView
+          │                                      (Lucene + progressive batches)
+          └── AppManager install / uninstall
+```
+
+### 阅读契约
+
+- Markdown 目录与正文共用 `marked-gfm-heading-id` 结果；不得自行生成 slug。
+- 目录、年份入口和长短内容展开均须提供桌面与移动的可访问交互。
+- 对内容的搜索结果按日期优先显示；首个非空批次立即渲染，后续结果以窗口合并降低列表抖动。
+
+### 验证入口
+
+- `pnpm content:prepare` 生成只读 VFS 与搜索索引。
+- `pnpm build` 是静态产物事实来源；SSG E2E 应在 production preview 中运行。
+- `PLAYWRIGHT_BASE_URL` 用于复用已有服务器；未设置时 Playwright 自行运行 `pnpm build && pnpm preview`。

@@ -130,11 +130,11 @@ test.describe("响应式布局切换", () => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(1500);
 
-    // 激活终端 tab
+    // 激活 Terminal tab
     await page
       .locator('[role="tab"]')
-      .filter({ hasText: "终端" })
-      .locator("button", { hasText: "终端" })
+      .filter({ hasText: "Terminal" })
+      .locator("button", { hasText: "Terminal" })
       .first()
       .click();
     await page.waitForTimeout(1500);

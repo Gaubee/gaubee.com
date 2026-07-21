@@ -4,14 +4,15 @@
 	- 代码块用 Shiki 高亮（双主题，CSS .dark 切换）
 	- 图片响应式（max-width: 100%）
 	- 可选截断预览（maxLines + 底部雾化，feed 卡片用）
+	- 原始需求（2026-07-21）：长文 TOC 与正文必须使用同一套标题 ID
 
 	用法：<MarkdownViewer markdown="# Hello" /> 或 <MarkdownViewer markdown={post.body} maxLines={8} />
 -->
 <script lang="ts">
   import { marked } from 'marked'
-  import { gfmHeadingId } from 'marked-gfm-heading-id'
   import { onMount } from 'svelte'
   import { highlightCode, getHighlighter } from './shiki-highlighter'
+  import { configureMarkdownHeadingIds } from './headings'
 
   let {
     markdown = '',
@@ -28,8 +29,8 @@
   let rendered = $state('')
   let truncated = $state(false)
 
-  // 配置 marked（一次性）
-  marked.use(gfmHeadingId())
+  // 配置 marked（一次性）；目录从同一规则提取标题 ID。
+  configureMarkdownHeadingIds()
 
   // 自定义 renderer：代码块用 Shiki
   const renderer = new marked.Renderer()

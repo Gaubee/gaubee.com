@@ -18,13 +18,13 @@ async function waitForSpa(page: import("@playwright/test").Page) {
   await page.waitForTimeout(1500);
 }
 
-// 激活 bottom 区的终端 tab（点击右侧 tab 栏的"终端"按钮）
+// 激活 bottom 区的 Terminal tab（名称来自应用 manifest）。
 async function activateTerminal(page: import("@playwright/test").Page) {
-  // 右侧 tab 栏的 terminal 按钮（不含关闭按钮）
+  // 右侧 tab 栏的 Terminal 按钮（不含关闭按钮）
   await page
     .locator('[role="tab"]')
-    .filter({ hasText: "终端" })
-    .locator("button", { hasText: "终端" })
+    .filter({ hasText: "Terminal" })
+    .locator("button", { hasText: "Terminal" })
     .first()
     .click();
   await page.waitForTimeout(1500);
@@ -110,8 +110,8 @@ test.describe("桌面端终端", () => {
     // 点终端 tab 收起（toggle）
     await page
       .locator('[role="tab"]')
-      .filter({ hasText: "终端" })
-      .locator("button", { hasText: "终端" })
+      .filter({ hasText: "Terminal" })
+      .locator("button", { hasText: "Terminal" })
       .first()
       .click();
     await page.waitForTimeout(1000);
@@ -134,11 +134,11 @@ test.describe("桌面端终端", () => {
     await activateTerminal(page);
     expect(await page.locator(".xterm").count()).toBe(1);
 
-    // 切到"阅读"（main tab）—— 不影响 bottom 区
+    // 切到“文章”（main tab）—— 不影响 bottom 区
     await page
       .locator('[role="tab"]')
-      .filter({ hasText: "阅读" })
-      .locator("button", { hasText: "阅读" })
+      .filter({ hasText: "文章" })
+      .locator("button", { hasText: "文章" })
       .first()
       .click();
     await page.waitForTimeout(800);
@@ -192,7 +192,7 @@ test.describe("移动端终端", () => {
   });
 
   test("抽屉切终端，xterm 适配移动端宽度", async ({ page }) => {
-    await page.goto("/feed");
+    await page.goto("/app/articles");
     await waitForSpa(page);
 
     // 移动端没有桌面 tab 栏，通过抽屉切终端
@@ -203,7 +203,7 @@ test.describe("移动端终端", () => {
     });
 
     const drawer = page.locator('[data-slot="sheet-content"]');
-    await drawer.getByRole("button", { name: "终端" }).click();
+    await drawer.getByRole("button", { name: "Terminal" }).click();
     await page.waitForTimeout(1800);
 
     // xterm 挂载
@@ -220,13 +220,13 @@ test.describe("移动端终端", () => {
   });
 
   test("移动端输入条按钮可点击执行命令", async ({ page }) => {
-    await page.goto("/feed");
+    await page.goto("/app/articles");
     await waitForSpa(page);
 
     await page.getByRole("button", { name: "打开菜单" }).click();
     await page.waitForTimeout(500);
     const drawer = page.locator('[data-slot="sheet-content"]');
-    await drawer.getByRole("button", { name: "终端" }).click();
+    await drawer.getByRole("button", { name: "Terminal" }).click();
     await page.waitForTimeout(1800);
 
     // 输入命令并用"发送"按钮（↵）提交（force 绕过底部 tab bar 可能的遮挡）

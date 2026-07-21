@@ -1,13 +1,13 @@
 <!--
-	ArticleDetailView：文章详情页（纯只读）。
-	
-	从 ReadonlyVFS 读取，无需登录即可阅读。
-	支持上一篇/下一篇导航。
+	正交意图：
+	1. 原始需求（2026-07-21）：长文需要桌面和移动 TOC。
+	2. 从 ReadonlyVFS 阅读文章，并保持前后文章导航。
 -->
 <script lang="ts">
   import { readonlyVfs, type ReadonlyPost } from '$lib/vfs/readonly'
   import { navController } from '$lib/nav/nav-controller-instance'
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
+  import TocTree from './TocTree.svelte'
   import { Badge } from '$lib/components/ui/badge'
   import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left'
   import ChevronRightIcon from '@lucide/svelte/icons/chevron-right'
@@ -75,7 +75,7 @@
   }
 </script>
 
-<div class="mx-auto max-w-3xl">
+<div class="mx-auto max-w-5xl">
   {#if !target || !post}
     <div class="flex h-64 items-center justify-center">
       <p class="text-muted-foreground text-sm">文章未找到</p>
@@ -90,74 +90,96 @@
       <span>返回{post.collection === 'events' ? '说说' : '文章'}列表</span>
     </button>
 
-    <!-- 文章头部 -->
-    <header class="mb-8">
-      <h1 class="mb-4 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
-        {post.metadata.title ?? post.id.slug ?? post.id.stem}
-      </h1>
+    <div class="flex gap-8">
+      <!-- 桌面端 TOC -->
+      <aside class="hidden lg:block lg:w-64 shrink-0">
+        <TocTree markdown={post.body} />
+      </aside>
 
-      <div class="text-muted-foreground flex flex-wrap items-center gap-4 text-sm">
-        <div class="flex items-center gap-1.5">
-          <CalendarIcon class="size-4" />
-          <time>{formatDate(post.metadata.date)}</time>
-        </div>
+      <!-- 主内容区 -->
+      <div class="flex-1 min-w-0">
+        <!-- 文章头部 -->
+        <header class="mb-8">
+          <h1 class="mb-4 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
+            {post.metadata.title ?? post.id.slug ?? post.id.stem}
+          </h1>
 
-        {#if post.metadata.updated && post.metadata.updated.getTime() !== post.metadata.date.getTime()}
-          <div class="flex items-center gap-1.5">
-            <ClockIcon class="size-4" />
-            <span>更新于 {formatDate(post.metadata.updated)}</span>
+          <div class="text-muted-foreground flex flex-wrap items-center gap-4 text-sm">
+            <div class="flex items-center gap-1.5">
+              <CalendarIcon class="size-4" />
+              <time>{formatDate(post.metadata.date)}</time>
+            </div>
+
+            {#if post.metadata.updated && post.metadata.updated.getTime() !== post.metadata.date.getTime()}
+              <div class="flex items-center gap-1.5">
+                <ClockIcon class="size-4" />
+                <span>更新于 {formatDate(post.metadata.updated)}</span>
+              </div>
+            {/if}
           </div>
-        {/if}
+
+          {#if post.metadata.tags.length > 0}
+            <div class="mt-4 flex flex-wrap items-center gap-2">
+              <TagIcon class="text-muted-foreground size-4" />
+              {#each post.metadata.tags as tag}
+                <Badge variant="secondary" class="text-xs">{tag}</Badge>
+              {/each}
+            </div>
+          {/if}
+        </header>
+
+        <!-- 正文 -->
+        <article class="article-content prose dark:prose-invert prose-zinc max-w-none">
+          <MarkdownViewer markdown={post.body} />
+        </article>
+
+        <!-- 上一篇/下一篇 -->
+        <nav class="mt-12 flex gap-4 border-t pt-6">
+          {#if newer}
+            <button
+              class="hover:bg-accent/50 flex flex-1 flex-col items-start rounded-lg border p-4 text-left transition-colors"
+              onclick={() => gotoPost(newer)}
+            >
+              <span class="text-muted-foreground mb-1 flex items-center gap-1 text-xs">
+                <ChevronLeftIcon class="size-3" /> 上一篇
+              </span>
+              <span class="font-medium">
+                {newer.metadata.title ?? newer.id.slug ?? newer.id.stem}
+              </span>
+            </button>
+          {:else}
+            <div class="flex-1"></div>
+          {/if}
+
+          {#if older}
+            <button
+              class="hover:bg-accent/50 flex flex-1 flex-col items-end rounded-lg border p-4 text-right transition-colors"
+              onclick={() => gotoPost(older)}
+            >
+              <span class="text-muted-foreground mb-1 flex items-center gap-1 text-xs">
+                下一篇 <ChevronRightIcon class="size-3" />
+              </span>
+              <span class="font-medium">
+                {older.metadata.title ?? older.id.slug ?? older.id.stem}
+              </span>
+            </button>
+          {:else}
+            <div class="flex-1"></div>
+          {/if}
+        </nav>
       </div>
+    </div>
 
-      {#if post.metadata.tags.length > 0}
-        <div class="mt-4 flex flex-wrap items-center gap-2">
-          <TagIcon class="text-muted-foreground size-4" />
-          {#each post.metadata.tags as tag}
-            <Badge variant="secondary" class="text-xs">{tag}</Badge>
-          {/each}
-        </div>
-      {/if}
-    </header>
-
-    <!-- 正文 -->
-    <article class="prose dark:prose-invert prose-zinc max-w-none">
-      <MarkdownViewer markdown={post.body} />
-    </article>
-
-    <!-- 上一篇/下一篇 -->
-    <nav class="mt-12 flex gap-4 border-t pt-6">
-      {#if newer}
-        <button
-          class="hover:bg-accent/50 flex flex-1 flex-col items-start rounded-lg border p-4 text-left transition-colors"
-          onclick={() => gotoPost(newer)}
-        >
-          <span class="text-muted-foreground mb-1 flex items-center gap-1 text-xs">
-            <ChevronLeftIcon class="size-3" /> 上一篇
-          </span>
-          <span class="font-medium">
-            {newer.metadata.title ?? newer.id.slug ?? newer.id.stem}
-          </span>
-        </button>
-      {:else}
-        <div class="flex-1" />
-      {/if}
-
-      {#if older}
-        <button
-          class="hover:bg-accent/50 flex flex-1 flex-col items-end rounded-lg border p-4 text-right transition-colors"
-          onclick={() => gotoPost(older)}
-        >
-          <span class="text-muted-foreground mb-1 flex items-center gap-1 text-xs">
-            下一篇 <ChevronRightIcon class="size-3" />
-          </span>
-          <span class="font-medium">
-            {older.metadata.title ?? older.id.slug ?? older.id.stem}
-          </span>
-        </button>
-      {:else}
-        <div class="flex-1" />
-      {/if}
-    </nav>
+    <!-- 移动端 TOC（浮动按钮 + Sheet） -->
+    <div class="lg:hidden">
+      <TocTree markdown={post.body} />
+    </div>
   {/if}
 </div>
+
+<style>
+  .article-content :global(h2[id]),
+  .article-content :global(h3[id]) {
+    scroll-margin-top: 5rem;
+  }
+</style>
