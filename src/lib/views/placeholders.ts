@@ -5,7 +5,7 @@
  * 旧路径（/feed, /editor 等）已废弃，不再注册。
  */
 import Archive from "./ArchiveView.svelte";
-import ArticleView from "./ArticleView.svelte";
+import ArticleView from "$lib/apps/views/ArticleDetailView.svelte";
 import ChangesView from "./ChangesView.svelte";
 import EditorView from "./EditorView.svelte";
 import FilesView from "./FilesView.svelte";
@@ -18,6 +18,7 @@ import ArticlesView from "$lib/apps/views/ArticlesView.svelte";
 import ShoutView from "$lib/apps/views/ShoutView.svelte";
 import WriterView from "$lib/apps/views/WriterView.svelte";
 import GithubView from "$lib/apps/views/GithubView.svelte";
+import ArticleDetailView from "$lib/apps/views/ArticleDetailView.svelte";
 import NotificationsView from "$lib/apps/views/NotificationsView.svelte";
 import {
   registerDeepLinkView,
