@@ -57,7 +57,7 @@
 {:else if area === 'main' && !activeTabId && deepLinkView}
   {@const DeepView = deepLinkView}
   <div class="h-full">
-    <DeepView />
+    <DeepView pathname={location.pathname} />
   </div>
 {:else}
   <div class="h-full">

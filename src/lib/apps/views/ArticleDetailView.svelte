@@ -18,14 +18,14 @@
 
   interface Props {
     /** 路径：/article/{collection}/{stem} */
-    path: string;
+    pathname: string;
   }
 
-  let { path }: Props = $props();
+  let { pathname }: Props = $props();
 
   /** 解析路径参数。 */
   const target = $derived.by(() => {
-    const match = path.match(/^\/article\/(articles|events)\/(.+)$/)
+    const match = pathname.match(/^\/article\/(articles|events)\/(.+)$/)
     if (!match) return null
     return { collection: match[1] as 'articles' | 'events', stem: match[2] }
   })
