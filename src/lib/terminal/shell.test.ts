@@ -24,6 +24,41 @@ vi.mock("$lib/github/client", () => ({
 
 vi.mock("$app/environment", () => ({ browser: true }));
 
+// mock 应用服务总线：git 命令走 gaubeeos.requestAppService('git')，
+// 返回一个委托真实 vfs 的 git service（鉴权守卫绕过：requireAuthenticated 不抛）。
+// vfs 在方法调用时动态获取（vi.mock 工厂提升到顶部，此时 vfs 尚未 import）。
+vi.mock("$lib/os/services", () => ({
+  gaubeeos: {
+    getAppService: () => null,
+    requestAppService: async (id: string) => {
+      if (id !== "git") throw new Error(`service ${id} not mocked`);
+      const { vfs } = await import("$lib/vfs/vfs");
+      return {
+        id: "git",
+        appId: "github",
+        requireAuthenticated() {},
+        async dirtyFiles() {
+          return vfs.dirtyFiles();
+        },
+        async commit(message: string) {
+          return vfs.commit(message);
+        },
+        async sync(subtree?: string) {
+          return vfs.fetch(subtree);
+        },
+      };
+    },
+    hasService: () => true,
+  },
+  NotAuthenticatedError: class extends Error {},
+  NoChangesError: class extends Error {
+    constructor() {
+      super("没有待提交的变更");
+    }
+  },
+  AppServiceNotInstalled: class extends Error {},
+}));
+
 const { vfs } = await import("$lib/vfs/vfs");
 const { vfsClear } = await import("$lib/db");
 const { runLine, tokenize, resolvePath, prettyCwd, tabComplete } =

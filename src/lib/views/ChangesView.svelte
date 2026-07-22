@@ -9,6 +9,10 @@
   import { onMount } from 'svelte'
   import { vfs, vfsStore, type VfsNode } from '$lib/vfs/vfs.svelte'
   import { contentStore } from '$lib/data/content.svelte'
+  import { gaubeeos } from '$lib/os/services'
+  import { handlePublishError } from '$lib/os/services/publish-helper'
+  import { navController } from '$lib/nav/nav-controller-instance'
+  import { notifySuccess, notifyWarning } from '$lib/apps/builtin/notifications/service.svelte'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import * as Card from '$lib/components/ui/card'
@@ -16,7 +20,6 @@
   import GitCommitHorizontalIcon from '@lucide/svelte/icons/git-commit-horizontal'
   import Undo2Icon from '@lucide/svelte/icons/undo-2'
   import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw'
-  import { notifySuccess, notifyError, notifyWarning } from '$lib/apps/builtin/notifications/service.svelte'
   import { toast } from 'svelte-sonner'
 
   let changes = $state<VfsNode[]>([])
@@ -40,14 +43,17 @@
     const msg = message.trim() || `更新 ${changes.length} 个文件`
     committing = true
     try {
-      const sha = await vfsStore.commit(msg)
+      // 统一经 GitService 提交（带鉴权守卫 + 类型化错误）
+      const git = await gaubeeos.requestAppService('git')
+      const sha = await git.commit(msg)
       notifySuccess(`已提交（${sha.slice(0, 7)}）`)
       await load()
       message = ''
       // 刷新内容派生视图（commit 后 VFS 已 sync）
       contentStore.refresh()
     } catch (e) {
-      notifyError('提交失败', e instanceof Error ? e.message : String(e))
+      // 复用发表流程的错误处理（未登录引导 /app/account，未装提示安装等）
+      handlePublishError(e, navController)
     } finally {
       committing = false
     }

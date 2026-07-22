@@ -343,4 +343,24 @@ GaubeeOS/
   - `vfs.ts` commit 空 dirty 改抛 `NoChangesError`（统一错误类型，单一可信源）。
 - [x] 验证：类型检查零新增错误（20 个预存错误）；142 个单元测试全过（含更新的 controller pop 路径测试）；Playwright 视觉验证移动端 tab 栏/顶栏、桌面侧栏浮层、编辑器深链接、通知中心均正常。
 
+#### 15. 统一 commit 路径 + git 命令正式声明（2026-07-23）
+
+消除「两条 commit 路径」（GitService 带鉴权 vs 直接调 vfsStore 无鉴权），统一所有写操作经 GitService；把 git 命令正式声明为 github 应用的 cliCommands。
+
+- [x] **git 命令迁移到 cliCommands 声明**：
+  - 新建 `installable/github/commands.ts`：git status/commit/pull 实现为 CliCommand，内部走 `gaubeeos.requestAppService('git')`（鉴权守卫 + 类型化错误）。
+  - github manifest 的 `cliCommands` 从空数组改为 `gitCommands`；删除指向不存在的 path.ts 的死注释。
+  - shell.ts 删除 95 行硬编码 git 命令实现；runLine 的 git 分发器改为动态 import github/commands 的 gitSubcommandMap（延迟 import 避免循环依赖）。
+  - 未登录时 `git commit` 提示「需要先登录账户」，而非裸 GitHub API 错误。
+- [x] **ChangesView 走 GitService**：
+  - handleCommit 从 `vfsStore.commit`（无鉴权）改为 `gaubeeos.requestAppService('git')` + `git.commit`（带鉴权）。
+  - 复用 `handlePublishError` 统一错误处理（未登录引导 /app/account）。
+  - 至此所有写操作（EditorView 发表、WriterView 批量发表、ChangesView 提交、shell git commit）统一经 GitService.commit，都带鉴权守卫。
+- [x] **vfsStore.commit 并发互斥**：
+  - 加 `commitInFlight` 锁（仿 sync 的 inFlight 模式），并发 commit 合并为同一 Promise，消除重复提交竞态。
+  - 连点发表/提交按钮时，第二次调用复用第一次的 Promise（同一批变更只提交一次）。
+- [x] **代码卫生**：writer manifest 删除「提供 CLI 命令：write」的矛盾注释（cliCommands 实为空）。
+- [x] 验证：类型检查零新增错误（20 个预存不变）；142 个单元测试全过（含 mock gaubeeos 的 shell git 测试）；Playwright 验证终端 git status 正常、git commit 未登录提示登录。
+
+
 

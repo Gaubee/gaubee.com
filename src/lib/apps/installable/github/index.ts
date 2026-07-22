@@ -9,6 +9,7 @@
 import GitBranch from "@lucide/svelte/icons/git-branch";
 import type { AppEntry } from "../../types";
 import { gitService } from "./service";
+import { gitCommands } from "./commands";
 
 export const githubApp: AppEntry = {
   manifest: {
@@ -19,9 +20,9 @@ export const githubApp: AppEntry = {
     defaultArea: "bottom",
     route: "/app/github",
     vfsOwnership: [".git/"],
-    cliCommands: [
-      // gh 命令在 path.ts 中注册
-    ],
+    // git 聚合命令（status/commit/pull），实现走 GitService（鉴权 + 类型化错误）。
+    // 注意：git 是聚合命令，shell runLine 对 "git" 特判分发，不进 PathManager 扁平注册。
+    cliCommands: gitCommands,
     // 向 GaubeeOS 暴露 git 服务（gaubeeos.getAppService('git')）
     services: {
       git: () => gitService,

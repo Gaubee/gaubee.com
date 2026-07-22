@@ -459,106 +459,28 @@ const helpCommand: Command = {
   },
 };
 
-// ---- git 子命令（复用 vfs 现有能力）----
-// 注意：git-* 不进通用 registry，避免 Tab 补全在命令位吐出 "git-commit"
-// 这种连字符名。git 通过 runLine 的 git 分发器路由到 gitSubcommands。
-
-const gitStatusCommand: Command = {
-  name: "git status",
-  usage: "git status",
-  description: "显示未提交的修改列表。",
-  async run(ctx) {
-    const dirty = await ctx.vfs.dirtyFiles();
-    if (dirty.length === 0) {
-      ctx.write(
-        `${ANSI.green}工作区干净，没有未提交的修改。${ANSI.reset}${Term.newline}`,
-      );
-      return 0;
-    }
-    ctx.write(
-      `${ANSI.bold}未提交的修改（${dirty.length}）：${ANSI.reset}${Term.newline}`,
-    );
-    for (const f of dirty.sort((a, b) => a.path.localeCompare(b.path))) {
-      const tag =
-        f.content === null
-          ? `${ANSI.red}deleted ${ANSI.reset}`
-          : `${ANSI.yellow}modified${ANSI.reset}`;
-      ctx.write(`  ${tag}  ${f.path}${Term.newline}`);
-    }
-    return 0;
-  },
-};
-
-const gitCommitCommand: Command = {
-  name: "git commit",
-  usage: "git commit <-m message>",
-  description: "提交所有未提交修改到 GitHub（复用 VFS commit）。",
-  async run(ctx, args) {
-    // 解析 -m "message" 或 -m message
-    let message: string | null = null;
-    for (let i = 1; i < args.length; i++) {
-      if (args[i] === "-m") {
-        message = args[i + 1] ?? null;
-        i++;
-      }
-    }
-    if (!message) {
-      ctx.write(Term.err("git commit: 缺少 -m <message>") + Term.newline);
-      return 1;
-    }
-    const dirty = await ctx.vfs.dirtyFiles();
-    if (dirty.length === 0) {
-      ctx.write(Term.err("git commit: 没有待提交的变更") + Term.newline);
-      return 1;
-    }
-    try {
-      ctx.write(
-        `${ANSI.gray}正在提交 ${dirty.length} 个变更…${ANSI.reset}${Term.newline}`,
-      );
-      const sha = await ctx.vfs.commit(message);
-      ctx.write(
-        `${ANSI.green}✓ 已提交${ANSI.reset} ${sha.slice(0, 7)}：${message}${Term.newline}`,
-      );
-      return 0;
-    } catch (e) {
-      ctx.write(
-        Term.err(`git commit: ${e instanceof Error ? e.message : "提交失败"}`) +
-          Term.newline,
-      );
-      return 1;
-    }
-  },
-};
-
-const gitPullCommand: Command = {
-  name: "git pull",
-  usage: "git pull",
-  description:
-    "从 GitHub 同步 src/content 内容子树到 VFS（不覆盖本地未提交修改）。",
-  async run(ctx) {
-    try {
-      ctx.write(`${ANSI.gray}正在同步内容…${ANSI.reset}${Term.newline}`);
-      // 按子树同步比拉整个仓库高效（Trees API 增量比对）
-      await ctx.vfs.fetch("src/content");
-      ctx.write(`${ANSI.green}✓ 已同步${ANSI.reset}${Term.newline}`);
-      return 0;
-    } catch (e) {
-      ctx.write(
-        Term.err(`git pull: ${e instanceof Error ? e.message : "同步失败"}`) +
-          Term.newline,
-      );
-      return 1;
-    }
-  },
-};
-
-/** git 子命令分发表（runLine 的 git 分支用）。 */
-const gitSubcommands = new Map<string, Command>([
-  ["status", gitStatusCommand],
-  ["commit", gitCommitCommand],
-  ["pull", gitPullCommand],
-  ["sync", gitPullCommand], // sync 作为 pull 的别名
-]);
+// ---- git 子命令 ----
+// git 命令实现归属 github 应用（installable/github/commands.ts），
+// 通过 manifest.cliCommands 声明，实现走 GitService（鉴权 + 类型化错误）。
+// git 是聚合命令，runLine 对 "git" 特判分发到 gitSubcommandMap，不进通用 registry。
+// 延迟 import 避免循环依赖（commands.ts → gitService → os/services → AppManager → shell）。
+type GitSubMap = Map<
+  string,
+  {
+    run: (
+      ctx: CommandContext,
+      args: string[],
+    ) => Promise<{ exit: number; newCwd: string | null }>;
+  }
+>;
+let _gitSubmapCache: GitSubMap | null = null;
+async function getGitSubmap(): Promise<GitSubMap> {
+  if (!_gitSubmapCache) {
+    const mod = await import("$lib/apps/installable/github/commands");
+    _gitSubmapCache = mod.gitSubcommandMap as unknown as GitSubMap;
+  }
+  return _gitSubmapCache;
+}
 
 // ---------------------------------------------------------------------------
 // 注册表（内置命令 + PATH 注册命令）
@@ -632,10 +554,11 @@ export async function runLine(
 
   const name = args[0];
 
-  // git 作为聚合命令分发到 gitSubcommands
+  // git 作为聚合命令分发到 gitSubcommandMap（命令实现归属 github 应用）
   if (name === "git") {
     const sub = args[1] ?? "status";
-    const target = gitSubcommands.get(sub);
+    const submap = await getGitSubmap();
+    const target = submap.get(sub);
     if (!target) {
       ctx.write(
         Term.err(`git: 不支持子命令 '${sub}'。可用：status / commit / pull`) +
@@ -645,8 +568,9 @@ export async function runLine(
     }
     // 重写 args 让目标命令看到正确 argv：[git, sub, ...rest]
     const rest = [name, sub, ...args.slice(2)];
-    const exit = await target.run(ctx, rest);
-    return { exit, newCwd: null };
+    // CliCommand.run 返回 { exit, newCwd }；git 命令不改 cwd
+    const result = await target.run(ctx, rest);
+    return { exit: result.exit, newCwd: null };
   }
 
   // cd 特判（mutate cwd）

@@ -24,6 +24,8 @@ class VfsStore {
   dirtyCount = $state(0);
 
   private inFlight: Promise<void> | null = null;
+  /** commit 互斥锁：并发 commit 合并为同一 Promise，避免重复提交（竞态）。 */
+  private commitInFlight: Promise<string> | null = null;
 
   /**
    * 从 GitHub 同步（fetch）。幂等，并发合并。
@@ -85,7 +87,21 @@ class VfsStore {
     await this.refresh();
   }
 
+  /**
+   * 提交所有 dirty 变更到 GitHub。
+   * 并发合并：连点提交按钮时，第二次调用复用第一次的 Promise（同一批变更只提交一次）。
+   */
   async commit(message: string): Promise<string> {
+    if (this.commitInFlight) return this.commitInFlight;
+    this.commitInFlight = this.doCommit(message);
+    try {
+      return await this.commitInFlight;
+    } finally {
+      this.commitInFlight = null;
+    }
+  }
+
+  private async doCommit(message: string): Promise<string> {
     const sha = await vfs.commit(message);
     await this.refresh();
     // commit 后重新同步（更新 sha）
