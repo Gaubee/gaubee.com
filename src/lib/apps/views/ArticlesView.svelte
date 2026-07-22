@@ -1,7 +1,8 @@
 <!--
 	正交意图：
 	1. 原始需求（2026-07-21）：文章列表需要按年份 TOC，移动端也必须有项目。
-	2. 从 ReadonlyVFS 读取并按发布时间分组展示文章。
+	2. 原始需求（2026-07-22）：宽桌面将年份 TOC 放在列表右侧，独立滚动并吸顶。
+	3. 从 ReadonlyVFS 读取并按发布时间分组展示文章。
 -->
 <script lang="ts">
   import { onMount } from 'svelte'
@@ -65,24 +66,17 @@
   }
 </script>
 
-<div class="mx-auto max-w-5xl">
-  <div class="flex gap-8">
-    <!-- 桌面端年份 TOC -->
-    <aside class="hidden lg:block lg:w-64 shrink-0">
-      {#if !loading && posts.length > 0}
-        <YearToc posts={posts} onSelectYear={scrollToYear} />
-      {/if}
-    </aside>
-
+<div class="mx-auto max-w-[78rem] px-4 py-8 sm:px-6 lg:px-8">
+  <div class="xl:grid xl:grid-cols-[minmax(0,44rem)_14rem] xl:justify-center xl:gap-x-10">
     <!-- 主内容区 -->
-    <div class="flex-1 min-w-0 px-4 py-8 sm:px-6">
+    <div class="min-w-0" data-article-list-content>
       <!-- 页面头部 -->
       <header class="mb-10">
         <div class="flex items-center gap-3 mb-2">
           <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
             <FileTextIcon class="text-primary size-5" />
           </div>
-          <h1 class="text-3xl font-bold tracking-tight">文章</h1>
+          <h1 class="text-balance text-3xl font-bold">文章</h1>
         </div>
         <p class="text-muted-foreground text-sm ml-[52px]">
           共 {posts.length} 篇文章
@@ -116,7 +110,7 @@
             <section use:yearAnchor={year} aria-labelledby={`year-${year}`}>
               <!-- 年份标题 -->
               <div class="flex items-center gap-4 mb-6">
-                <h2 id={`year-${year}`} class="text-2xl font-bold tracking-tight">{year}</h2>
+                <h2 id={`year-${year}`} class="text-balance text-2xl font-bold">{year}</h2>
                 <div class="flex-1 h-px bg-border"></div>
                 <span class="text-muted-foreground text-sm">{yearPosts.length} 篇</span>
               </div>
@@ -178,11 +172,18 @@
         </div>
       {/if}
     </div>
+
+    <!-- 桌面端年份 TOC：全局应用导航在左，列表时间导航固定在右。 -->
+    <aside class="hidden xl:block xl:self-start">
+      {#if !loading && posts.length > 0}
+        <YearToc posts={posts} onSelectYear={scrollToYear} />
+      {/if}
+    </aside>
   </div>
 
   <!-- 移动端年份 TOC -->
   {#if !loading && posts.length > 0}
-    <div class="lg:hidden">
+    <div class="xl:hidden">
       <YearToc posts={posts} onSelectYear={scrollToYear} />
     </div>
   {/if}

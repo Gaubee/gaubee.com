@@ -3,6 +3,7 @@
  * 1. 原始需求（2026-07-21）：文章目录、短评 Markdown 与应用搜索必须可在真实浏览器使用。
  * 2. 锁定桌面/移动断点下的目录 Sheet、短评展开和 app: 筛选搜索契约。
  * 3. 原始需求（2026-07-22）：宽桌面目录在正文右侧独立滚动，中等宽度收纳到 Sheet。
+ * 4. 原始需求（2026-07-22）：文章列表年份 TOC 也须在右侧独立滚动、吸顶。
  */
 import { expect, test } from "@playwright/test";
 
@@ -57,6 +58,51 @@ test.describe("内容阅读体验", () => {
     ).toBeVisible();
     await expect(
       page.locator('nav[aria-label="文章目录"]:visible'),
+    ).toHaveCount(0);
+  });
+
+  test("宽桌面文章列表在右侧显示独立滚动的年份目录", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/app/articles");
+    await expect(page.getByRole("heading", { name: "文章" })).toBeVisible();
+
+    const toc = page.locator('nav[aria-label="按年份浏览文章"]:visible');
+    await expect(toc).toHaveCount(1);
+    expect(await toc.getByRole("button").count()).toBeGreaterThan(1);
+
+    const [tocBox, contentBox] = await Promise.all([
+      toc.boundingBox(),
+      page.locator("[data-article-list-content]").boundingBox(),
+    ]);
+    if (!tocBox || !contentBox) {
+      throw new Error("文章列表或年份目录未渲染");
+    }
+    expect(tocBox.x).toBeGreaterThan(contentBox.x + contentBox.width);
+
+    const scrollRegion = toc.locator("[data-year-toc-scroll-region]");
+    await expect(scrollRegion).toHaveCSS("position", "sticky");
+    await expect(scrollRegion).toHaveCSS("overflow-y", "auto");
+
+    await page
+      .locator(".main-content")
+      .evaluate((element) => element.scrollTo({ top: 600, behavior: "auto" }));
+    await expect
+      .poll(
+        async () => (await toc.boundingBox())?.y ?? Number.POSITIVE_INFINITY,
+      )
+      .toBeLessThanOrEqual(40);
+  });
+
+  test("中等宽度将年份目录收纳到 Sheet", async ({ page }) => {
+    await page.setViewportSize({ width: 1180, height: 800 });
+    await page.goto("/app/articles");
+    await expect(page.getByRole("heading", { name: "文章" })).toBeVisible();
+
+    await expect(
+      page.getByRole("button", { name: "按年份浏览文章" }),
+    ).toBeVisible();
+    await expect(
+      page.locator('nav[aria-label="按年份浏览文章"]:visible'),
     ).toHaveCount(0);
   });
 
