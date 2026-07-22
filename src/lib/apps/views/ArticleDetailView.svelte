@@ -130,7 +130,7 @@
         </article>
 
         <!-- 上一篇/下一篇 -->
-        <nav class="mt-12 flex gap-4 border-t pt-6">
+        <nav class="mt-12 flex gap-4 border-t pt-6" aria-label="文章导航">
           {#if newer}
             <button
               class="hover:bg-accent/50 flex flex-1 flex-col items-start rounded-lg border p-4 text-left transition-colors"

@@ -36,14 +36,14 @@
   // 从 AppManager 获取应用名称（不依赖已废弃的静态 nav-items）
   const activeLabel = $derived((activeTab && appManager.findByRoute(activeTab)?.name) ?? '底栏')
 
-  function startResize(e: MouseEvent) {
+  function startResize(e: PointerEvent) {
     e.preventDefault()
     resizing = true
     const startY = e.clientY
     const startHeight = height
     const maxHeight = window.innerHeight * MAX_HEIGHT_RATIO
 
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: PointerEvent) => {
       const delta = startY - ev.clientY // 向上拖增大
       const next = Math.max(MIN_HEIGHT, Math.min(maxHeight, startHeight + delta))
       height = next
@@ -51,11 +51,11 @@
     const onUp = () => {
       resizing = false
       localStorage.setItem(HEIGHT_KEY, String(height))
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
     }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
   }
 </script>
 
@@ -64,11 +64,12 @@
     class="bottom-area flex shrink-0 flex-col {resizing ? 'ring-primary/40 ring-1' : ''}"
     style="height: {height}px"
   >
-    <!-- 拖拽手柄 + 标题栏。IDE 风格 resize handle：div + mousedown，关闭按钮提供键盘可达性 -->
+    <!-- 拖拽手柄 + 标题栏。IDE 风格 resize handle：pointerdown 兼容鼠标/触屏/触控笔 -->
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
       class="hover:bg-accent/50 flex cursor-row-resize items-center gap-2 border-b border-border px-3 py-1.5 select-none"
-      onmousedown={startResize}
+      style="touch-action: none"
+      onpointerdown={startResize}
       role="separator"
       aria-orientation="horizontal"
       aria-label="拖拽调整底栏高度"
@@ -87,8 +88,8 @@
       </button>
     </div>
 
-    <!-- bottom 内容 -->
-    <div class="min-h-0 flex-1 overflow-auto">
+    <!-- bottom 内容。移动端 padding-bottom 让出 MobileTabBar 高度（sticky 会盖住 bottom 区底部） -->
+    <div class="bottom-area-content min-h-0 flex-1 overflow-auto">
       <AreaOutlet area="bottom" />
     </div>
   </div>

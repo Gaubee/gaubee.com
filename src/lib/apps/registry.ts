@@ -15,6 +15,8 @@ import { searchApp } from "./builtin/search";
 import { settingsApp } from "./builtin/settings";
 import { notificationsApp } from "./builtin/notifications";
 import { accountApp } from "./builtin/account";
+// 外观设置（主题切换）注册到设置页——非应用，仅注册 settings section
+import "./builtin/appearance";
 
 // 可安装应用（动态 import，按需加载）
 import { githubApp } from "./installable/github";

@@ -218,11 +218,17 @@
 }
 
 .bottom-area {
-  display: block;
   min-height: 0;
   min-width: 0;
   border-top: 1px solid var(--border);
   background: var(--card);
+}
+/* 移动端（<768px）：bottom 区内容底部留出 MobileTabBar 高度（sticky 会盖住 bottom 区底部）。
+   桌面端 tab 栏在侧边，无遮挡，无需 padding。 */
+@media (max-width: 767px) {
+  .bottom-area-content {
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+  }
 }
 
 .pop-area-overlay {

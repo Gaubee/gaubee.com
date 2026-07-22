@@ -78,7 +78,7 @@
       <Button
         variant="outline"
         size="icon"
-        class="fixed right-4 bottom-20 z-30 rounded-lg shadow-sm"
+        class="fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 rounded-lg shadow-sm md:bottom-20"
         aria-label="打开文章目录"
         onclick={() => (mobileOpen = true)}
       >

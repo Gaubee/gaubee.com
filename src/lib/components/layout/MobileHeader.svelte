@@ -28,7 +28,7 @@
 </script>
 
 <header
-  class="mobile-header sticky top-0 z-30 items-center gap-1 border-b border-border bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+  class="mobile-header sticky top-0 z-30 items-center gap-1 border-b border-border bg-background/95 px-1 pb-1 pt-[calc(env(safe-area-inset-top)+0.25rem)] backdrop-blur supports-[backdrop-filter]:bg-background/80"
 >
   <button
     class="hover:bg-accent flex size-10 items-center justify-center rounded-md"
@@ -44,6 +44,7 @@
     class="hover:bg-accent flex size-10 items-center justify-center rounded-md"
     onclick={() => navController.activatePop('/app/search')}
     aria-label="搜索"
+    aria-haspopup="dialog"
   >
     <SearchIcon class="size-5" />
   </button>
@@ -51,6 +52,7 @@
     class="hover:bg-accent flex size-10 items-center justify-center rounded-md"
     onclick={() => navController.activatePop('/app/notifications')}
     aria-label="通知"
+    aria-haspopup="dialog"
   >
     <BellIcon class="size-5" />
   </button>

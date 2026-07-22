@@ -88,6 +88,7 @@
           <button
             class="hover:bg-accent flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground"
             onclick={() => navController.activatePop(app.route)}
+            aria-haspopup="dialog"
             title={collapsed ? app.name : undefined}
           >
             <!-- svelte-ignore ownership_invalid_mutation -->

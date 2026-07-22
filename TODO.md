@@ -417,6 +417,31 @@ GaubeeOS/
   - 加「最近文章」按钮：取序号最大的文章直接跳转编辑器（TARGET.md：最近文章按序号即可知道）。
 - [x] 验证：类型检查 0 错误（从 19 清零）；220 个单元测试全过；Playwright 验证 /app/changes 路由修复、/app/files 四按钮齐全、通知弹层正常。
 
+#### 18. 双端 UI 走查 + 移动端布局/入口修复（2026-07-23）
+
+用 agent-browser（headless Chromium）对桌面端（1440×900）和移动端（390×844 iPhone 12/13）做基础功能可用性走查，两个子代理并行执行。桌面端基本健康（仅 P2 瑕疵），问题集中在移动端，按用户决策分三批修复。
+
+**走查发现的问题（移动端为主）**：
+- P0：移动端无主题切换入口（唯一入口在桌面 StatusBar）
+- P0：bottom 区（Terminal/Github）被 tab 栏遮挡，输入条/表单不可达；拖拽只有 mouse 事件
+- P0：bottom 区 `display:block`（app.css）覆盖组件的 `flex flex-col`，导致内容溢出父容器
+- P1：登录入口深埋（设置→账户）；MobileHeader 顶部缺 safe-area；TOC 浮钮与 tab 栏间距临界
+
+- [x] **批次 A — 入口可达性（用户决策：入口由 SettingsApp 提供）**：
+  - 新增 `builtin/appearance/`：AppearanceSection.svelte（复用 mode-watcher 的 toggleMode）+ index.ts 注册到 settingsSectionsRegistry（render 型，order:1）。
+  - registry.ts import 触发注册；设置页现含「外观」面板，移动端/桌面端均可切换明暗主题（与桌面 StatusBar 联动同一主题状态）。
+  - app.html viewport meta 加 `viewport-fit=cover`（让 env(safe-area-inset-*) 生效）。
+  - MobileHeader 顶部 `py-1` → `pt-[calc(env(safe-area-inset-top)+0.25rem)]`（处理刘海/灵动岛遮挡）。
+- [x] **批次 B — bottom 区共存（用户决策：共存+让出空间）**：
+  - app.css `.bottom-area` 删除 `display:block`（与组件 flex flex-col 冲突，导致内容溢出）；保留 border/background。
+  - app.css 移动端规则：`.bottom-area-content` 加 `padding-bottom: calc(3.5rem + env(safe-area-inset-bottom))`（让出 MobileTabBar 高度）。
+  - BottomAreaRouter resize 从 mouse 事件改为 pointer 事件（pointerdown/pointermove/pointerup），手柄加 `touch-action:none`，兼容鼠标/触屏/触控笔。
+- [x] **批次 C — 瑕疵**：
+  - TocTree 浮钮移动端 `bottom-20` → `bottom-[calc(4.5rem+env(safe-area-inset-bottom))]`（移动端避开 tab 栏，md: 以上回到 bottom-20）。
+  - pop 入口按钮（DesktopSidebar + MobileHeader）补 `aria-haspopup="dialog"`（a11y，与 radix popover 规范一致）。
+  - ArticleDetailView 前后文章导航 nav 补 `aria-label="文章导航"`。
+- [x] 验证：类型检查 0 错误；220 单元测试全过；agent-browser 双端复验——桌面端无回归（三栏/TOC吸顶/跳转链路/resize 正常），移动端 5 个修复点全部生效（主题切换/bottom区让出空间 display:flex 修复/触屏拖拽/TOC浮钮/safe-area）。xterm 不再溢出 tab 栏（bottom 686 vs tab top 790，余量 104px）。
+
 
 
 
