@@ -10,6 +10,7 @@
   import CodeMirror from '$lib/editor/CodeMirror.svelte'
   import MetadataEditor from '$lib/editor/MetadataEditor.svelte'
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
+  import { untrack } from 'svelte'
   import { vfsStore } from '$lib/vfs/vfs.svelte'
   import { navStore } from '$lib/nav/nav.svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
@@ -58,8 +59,6 @@
   })
 
   async function loadPost() {
-    // 切换文章前，先把上一篇未保存的 debounce 内容落盘（避免丢用户输入/写错路径）
-    await flushSave()
     if (!targetPost) {
       currentPath = null
       body = ''
@@ -73,7 +72,7 @@
     // 立即清空，避免切换期间显示旧内容（审查 #8 闪烁）
     body = ''
     try {
-      // VFS.read：三层自动取本地修改 > 缓存 > 在线拉
+      // VFS.read：三层自动取本地修改 > 只读层 > 在线拉
       const text = await vfsStore.read(path)
       if (mySeq !== loadSeq) return // 已切到别的文章，丢弃结果（竞态防护）
       const { metadata: meta, body: parsedBody } = parseMarkdown(text)
@@ -91,13 +90,28 @@
     }
   }
 
-  // 监听目标文章变化
+  // 监听目标文章变化。
+  // effect 只追踪 targetPost（同步读取建立依赖）。旧文章状态（currentPath/body 等）
+  // 的捕获与 loadPost 调用都放进 untrack，避免它们被注册为依赖导致无限重跑（闪烁 bug）。
+  // 切换文章前，非阻塞地 flush 旧内容（同步捕获旧值，不阻塞新文章加载）。
   $effect(() => {
-    if (targetPost) {
-      loadPost()
-    } else {
-      currentPath = null
-    }
+    const next = targetPost
+    untrack(() => {
+      // 同步捕获旧文章状态，用于切换后非阻塞落盘
+      const prevPath = currentPath
+      const prevBody = body
+      const prevMeta = metadata
+      const prevDirty = dirty
+      if (next) {
+        // 若有未保存的旧内容，非阻塞写入（不 await，不阻塞新文章加载）
+        if (prevPath && prevDirty) {
+          vfsStore.write(prevPath, serializeMarkdown(prevMeta, prevBody))
+        }
+        loadPost()
+      } else {
+        currentPath = null
+      }
+    })
   })
 
   function handleInput(value: string) {

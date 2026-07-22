@@ -16,16 +16,29 @@ export const REPO = "gaubee.com";
 export const BRANCH = "main";
 
 /**
- * 统一 HTTP 响应检查：401/403 映射为 NotAuthenticatedError（会话过期），
- * 其它非 ok 抛带 status 的 Error。
+ * 统一 HTTP 响应检查。
+ * - 401 → NotAuthenticatedError（明确未认证 / 会话过期），下游引导重新登录。
+ * - 403 → 读响应体判断：rate limit 抛带提示的普通 Error（非鉴权问题）；
+ *   其它 403（权限不足）抛 NotAuthenticatedError。
+ * - 其它非 ok → 抛带 status 的 Error。
  *
- * 这样下游（handlePublishError 等）的 instanceof NotAuthenticatedError 分支
- * 能在「会话中途过期」时命中，引导用户重新登录，而非显示通用失败。
+ * 注意：公开仓库的匿名 GET 会触发 GitHub 60/h rate limit，返回 403 —— 这不是
+ * 鉴权失败，不应引导登录。只有真正的鉴权失败（401 或非限速的 403）才映射。
  */
-function assertOk(resp: Response, context: string): void {
+async function assertOk(resp: Response, context: string): Promise<void> {
   if (resp.ok) return;
-  if (resp.status === 401 || resp.status === 403) {
+  if (resp.status === 401) {
     throw new NotAuthenticatedError(`${context}失败：会话已过期，请重新登录`);
+  }
+  if (resp.status === 403) {
+    // rate limit 的 403 不是鉴权问题，抛普通错误提示限速
+    const body = await resp.text().catch(() => "");
+    if (body.includes("rate limit")) {
+      throw new Error(
+        `${context} 失败：GitHub API 限速（匿名 60/h），请登录提升额度`,
+      );
+    }
+    throw new NotAuthenticatedError(`${context}失败：无权限，可能需要登录`);
   }
   throw new Error(`${context} 失败: ${resp.status}`);
 }
@@ -64,7 +77,7 @@ export async function listContents(path: string): Promise<GhContentEntry[]> {
   );
   if (!resp.ok) {
     if (resp.status === 404) return [];
-    assertOk(resp, `listContents(${path})`);
+    await assertOk(resp, `listContents(${path})`);
   }
   const data = (await resp.json()) as GhContentEntry[] | GhFileContent;
   if (Array.isArray(data)) return data;
@@ -76,7 +89,7 @@ export async function getFileText(path: string): Promise<string> {
   const resp = await fetchGithub(
     `repos/${OWNER}/${REPO}/contents/${path}?ref=${BRANCH}`,
   );
-  assertOk(resp, `getFileText(${path})`);
+  await assertOk(resp, `getFileText(${path})`);
   const data = (await resp.json()) as GhFileContent;
   if (data.type !== "file" || data.encoding !== "base64") {
     throw new Error(`getFileText(${path}): 非文本文件或编码异常`);
@@ -134,7 +147,7 @@ export async function fetchTree(
   const resp = await fetchGithub(
     `repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`,
   );
-  assertOk(resp, "fetchTree");
+  await assertOk(resp, "fetchTree");
   const data = (await resp.json()) as {
     tree: GhTreeEntry[];
     sha: string;
@@ -177,14 +190,14 @@ export async function commitChanges(
   const refResp = await fetchGithub(
     `repos/${OWNER}/${REPO}/git/refs/heads/${branch}`,
   );
-  assertOk(refResp, "获取 ref");
+  await assertOk(refResp, "获取 ref");
   const refData = (await refResp.json()) as { object: { sha: string } };
   const latestSha = refData.object.sha;
 
   const commitResp = await fetchGithub(
     `repos/${OWNER}/${REPO}/git/commits/${latestSha}`,
   );
-  assertOk(commitResp, "获取 commit");
+  await assertOk(commitResp, "获取 commit");
   const commitData = (await commitResp.json()) as { tree: { sha: string } };
   const baseTreeSha = commitData.tree.sha;
 
@@ -225,7 +238,7 @@ export async function commitChanges(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ base_tree: baseTreeSha, tree: treeItems }),
   });
-  assertOk(treeResp, "创建 tree");
+  await assertOk(treeResp, "创建 tree");
   const treeData = (await treeResp.json()) as { sha: string };
 
   // 4. 创建 commit
@@ -241,7 +254,7 @@ export async function commitChanges(
       }),
     },
   );
-  assertOk(newCommitResp, "创建 commit");
+  await assertOk(newCommitResp, "创建 commit");
   const newCommitData = (await newCommitResp.json()) as { sha: string };
 
   // 5. 更新分支引用
@@ -253,7 +266,7 @@ export async function commitChanges(
       body: JSON.stringify({ sha: newCommitData.sha }),
     },
   );
-  assertOk(updateResp, "更新 ref");
+  await assertOk(updateResp, "更新 ref");
 
   return newCommitData.sha;
 }

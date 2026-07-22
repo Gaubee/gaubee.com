@@ -12,6 +12,7 @@
 import { browser } from "$app/environment";
 import { accountService } from "$lib/apps/builtin/account/service";
 import { NoChangesError } from "$lib/os/services";
+import { readonlyVfs } from "./readonly";
 import {
   vfsAll,
   vfsClear,
@@ -85,9 +86,11 @@ export class Vfs {
   /**
    * 读取文件文本内容。三层优先级：
    * 1. IndexedDB 里的 VFS 记录（含本地修改）→ 直接返回 content
-   * 2. 无记录 → 在线拉取（getFileText），写入 VFS 作为 remote 缓存
+   * 2. 只读层（构建时静态数据，无需登录）→ 直接返回，不在线拉取
+   * 3. 都没有 → 在线拉取（getFileText），写入 VFS 作为 remote 缓存
    *
    * 这是修复"EditorView 不读暂存"Bug 的关键：本地修改自动优先返回。
+   * 只读层 fallback 避免读公开内容时打 GitHub API（被 rate limit / 需登录）。
    */
   async readFile(path: string): Promise<string> {
     const p = normalizePath(path);
@@ -96,7 +99,10 @@ export class Vfs {
       if (rec.content === null) throw new Error(`ENOENT: ${p} 已删除`);
       return rec.content;
     }
-    // 无缓存记录，在线拉取（fetch 未覆盖到的文件）
+    // 只读层（构建时静态数据）：公开内容无需登录即可读，不触发 GitHub API
+    const readonlyContent = readonlyVfs.readFile(p);
+    if (readonlyContent !== null) return readonlyContent;
+    // 只读层无此文件（如 draft 或只读层未覆盖），在线拉取
     const content = await getFileText(p);
     await vfsPut({
       path: p,

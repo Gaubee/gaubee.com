@@ -19,12 +19,14 @@ vi.mock("$app/environment", () => ({ browser: true }));
 const { getFileText, commitChanges } = await import("./client");
 const { NotAuthenticatedError } = await import("$lib/os/services");
 
-/** 构造 fake Response。 */
+/** 构造 fake Response。body 同时供 json() 和 text()（assertOk 读 text 判断 rate limit）。 */
 function makeResp(ok: boolean, status: number, body: unknown = {}): Response {
+  const bodyStr = typeof body === "string" ? body : JSON.stringify(body);
   return {
     ok,
     status,
-    json: async () => body,
+    json: async () => (typeof body === "string" ? JSON.parse(body) : body),
+    text: async () => bodyStr,
   } as Response;
 }
 
@@ -36,8 +38,17 @@ describe("client assertOk — 401/403 映射", () => {
     );
   });
 
-  it("getFileText 403 → NotAuthenticatedError", async () => {
-    mockFetchGithub.mockResolvedValueOnce(makeResp(false, 403));
+  it("getFileText 403 rate limit → 普通 Error（非鉴权，不引导登录）", async () => {
+    mockFetchGithub.mockResolvedValueOnce(
+      makeResp(false, 403, "API rate limit exceeded for anonymous"),
+    );
+    await expect(getFileText("src/content/articles/x.md")).rejects.not.toThrow(
+      NotAuthenticatedError,
+    );
+  });
+
+  it("getFileText 403 权限不足 → NotAuthenticatedError", async () => {
+    mockFetchGithub.mockResolvedValueOnce(makeResp(false, 403, "forbidden"));
     await expect(getFileText("src/content/articles/x.md")).rejects.toThrow(
       NotAuthenticatedError,
     );
