@@ -74,9 +74,10 @@ describe("parseHref", () => {
 // ---------------------------------------------------------------------------
 
 describe("areaForPath", () => {
+  // DEFAULT_*_TABS 是 readonly，NavLayout 期望可变数组，复制一份。
   const layout = {
-    mainTabs: DEFAULT_MAIN_TABS,
-    bottomTabs: DEFAULT_BOTTOM_TABS,
+    mainTabs: [...DEFAULT_MAIN_TABS],
+    bottomTabs: [...DEFAULT_BOTTOM_TABS],
   };
 
   it("pop 路径优先", () => {
@@ -427,8 +428,8 @@ describe("URL 序列化往返", () => {
   it("纯 main URL：往返保持一致", () => {
     mockWindow("http://localhost/app/articles");
     const layout = {
-      mainTabs: DEFAULT_MAIN_TABS,
-      bottomTabs: DEFAULT_BOTTOM_TABS,
+      mainTabs: [...DEFAULT_MAIN_TABS],
+      bottomTabs: [...DEFAULT_BOTTOM_TABS],
     };
     const parsed = parseBrowserLocation(window.location, layout);
     expect(parsed.main.pathname).toBe("/app/articles");
@@ -439,8 +440,8 @@ describe("URL 序列化往返", () => {
   it("带 _b 的 URL：bottom location 解析", () => {
     mockWindow("http://localhost/app/articles?_b=/app/github");
     const layout = {
-      mainTabs: DEFAULT_MAIN_TABS,
-      bottomTabs: DEFAULT_BOTTOM_TABS,
+      mainTabs: [...DEFAULT_MAIN_TABS],
+      bottomTabs: [...DEFAULT_BOTTOM_TABS],
     };
     const parsed = parseBrowserLocation(window.location, layout);
     expect(parsed.main.pathname).toBe("/app/articles");
@@ -451,8 +452,8 @@ describe("URL 序列化往返", () => {
   it("带 _p 的 URL：pop location 解析", () => {
     mockWindow("http://localhost/app/articles?_p=/app/search");
     const layout = {
-      mainTabs: DEFAULT_MAIN_TABS,
-      bottomTabs: DEFAULT_BOTTOM_TABS,
+      mainTabs: [...DEFAULT_MAIN_TABS],
+      bottomTabs: [...DEFAULT_BOTTOM_TABS],
     };
     const parsed = parseBrowserLocation(window.location, layout);
     expect(parsed.main.pathname).toBe("/app/articles");
@@ -462,8 +463,8 @@ describe("URL 序列化往返", () => {
   it("深链接推断：URL 直接是 bottom 路径且无 _b，推断为 bottom", () => {
     mockWindow("http://localhost/app/github");
     const layout = {
-      mainTabs: DEFAULT_MAIN_TABS,
-      bottomTabs: DEFAULT_BOTTOM_TABS,
+      mainTabs: [...DEFAULT_MAIN_TABS],
+      bottomTabs: [...DEFAULT_BOTTOM_TABS],
     };
     const parsed = parseBrowserLocation(window.location, layout);
     // /app/github 被识别为 bottom，main 回 /
@@ -474,8 +475,8 @@ describe("URL 序列化往返", () => {
   it("深链接推断：URL 直接是 pop 路径且无 _p，推断为 pop", () => {
     mockWindow("http://localhost/app/search");
     const layout = {
-      mainTabs: DEFAULT_MAIN_TABS,
-      bottomTabs: DEFAULT_BOTTOM_TABS,
+      mainTabs: [...DEFAULT_MAIN_TABS],
+      bottomTabs: [...DEFAULT_BOTTOM_TABS],
     };
     const parsed = parseBrowserLocation(window.location, layout);
     expect(parsed.pop.pathname).toBe("/app/search");
@@ -485,8 +486,8 @@ describe("URL 序列化往返", () => {
   it("buildCanonicalUrl：main + bottom + pop 全编码（/ 会被编码为 %2F）", () => {
     mockWindow("http://localhost/app/articles");
     const state: KernelState = {
-      mainTabs: DEFAULT_MAIN_TABS,
-      bottomTabs: DEFAULT_BOTTOM_TABS,
+      mainTabs: [...DEFAULT_MAIN_TABS],
+      bottomTabs: [...DEFAULT_BOTTOM_TABS],
       updatedAt: 0,
       mainLocation: makeLocation("/article/0001"),
       bottomLocation: makeLocation("/app/github"),
@@ -506,8 +507,8 @@ describe("URL 序列化往返", () => {
   it("buildCanonicalUrl：bottom/pop 未激活时不编码 _b/_p", () => {
     mockWindow("http://localhost/app/articles");
     const state: KernelState = {
-      mainTabs: DEFAULT_MAIN_TABS,
-      bottomTabs: DEFAULT_BOTTOM_TABS,
+      mainTabs: [...DEFAULT_MAIN_TABS],
+      bottomTabs: [...DEFAULT_BOTTOM_TABS],
       updatedAt: 0,
       mainLocation: makeLocation("/app/articles"),
       bottomLocation: makeLocation("/"),

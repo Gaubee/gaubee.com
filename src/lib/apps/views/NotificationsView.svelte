@@ -4,16 +4,24 @@
 -->
 <script lang="ts">
   import { gaubeeos } from '$lib/os/services'
+  import { navController } from '$lib/nav/nav-controller-instance'
   import { Button } from '$lib/components/ui/button'
   import * as Card from '$lib/components/ui/card'
   import BellIcon from '@lucide/svelte/icons/bell'
   import CheckCheckIcon from '@lucide/svelte/icons/check-check'
   import TrashIcon from '@lucide/svelte/icons/trash'
+  import ChevronRightIcon from '@lucide/svelte/icons/chevron-right'
 
   // 系统应用 notification 始终可用
   const service = $derived(gaubeeos.getAppService('notification'))
   const history = $derived(service?.history ?? [])
   const unreadCount = $derived(service?.unreadCount ?? 0)
+
+  /** 点击通知卡片：有 action 则跳转，并标记全部已读。 */
+  function handleClick(action?: { href: string }): void {
+    service?.markAllRead()
+    if (action) navController.navigateMain(action.href)
+  }
 
   function severityColor(sev: string): string {
     switch (sev) {
@@ -82,7 +90,13 @@
     <div class="flex flex-col gap-2">
       {#each history as n (n.id)}
         <Card.Root class={!n.read ? 'border-primary/40' : ''}>
-          <Card.Content class="py-3">
+          <Card.Content
+            class={['py-3', n.action ? 'cursor-pointer transition-colors hover:bg-accent' : '']}
+            role={n.action ? 'button' : undefined}
+            tabindex={n.action ? 0 : undefined}
+            onclick={n.action ? () => handleClick(n.action) : undefined}
+            onkeydown={n.action ? (e) => (e.key === 'Enter' || e.key === ' ') && handleClick(n.action) : undefined}
+          >
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2">
@@ -94,8 +108,19 @@
                 {#if n.message}
                   <p class="text-muted-foreground mt-0.5 text-sm break-words">{n.message}</p>
                 {/if}
+                {#if n.action}
+                  <span class="text-primary mt-1 inline-flex items-center gap-0.5 text-xs">
+                    {n.action.label}
+                    <ChevronRightIcon class="size-3" />
+                  </span>
+                {/if}
               </div>
-              <span class="text-muted-foreground shrink-0 text-xs">{formatTime(n.timestamp)}</span>
+              <div class="flex shrink-0 items-center gap-1">
+                <span class="text-muted-foreground text-xs">{formatTime(n.timestamp)}</span>
+                {#if n.action}
+                  <ChevronRightIcon class="text-muted-foreground size-4" />
+                {/if}
+              </div>
             </div>
           </Card.Content>
         </Card.Root>

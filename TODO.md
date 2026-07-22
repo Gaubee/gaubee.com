@@ -385,6 +385,38 @@ GaubeeOS/
 - [x] **AGENTS.md 更新**：修正技术栈（react→svelte）、类型检查命令（pnpm ts→pnpm -w run check）、补应用服务总线架构说明（声明三步流程、依赖方向、contentStore 例外）。
 - [x] 验证：类型检查零新增错误（19 个预存）；193 个单元测试全过；Playwright 验证编辑器保存、GithubView 只读说明正常。
 
+#### 17. 健康扫雷 + 补完半成品功能（2026-07-23）
+
+经三轮深度审查（测试/类型健康、架构耦合、TARGET.md 对比）发现真实风险与半成品，按「先扫雷、再补功能」推进。
+
+- [x] **CI/CD 修复**（最高优先级，原 Astro action 对 SvelteKit 项目无效）：
+  - 重写 `.github/workflows/main.yml`：用 pnpm + setup-node + `pnpm build`（adapter-static 输出 build/）+ upload-pages-artifact + deploy-pages；注入 `VITE_AUTH_BASE`（生产 Worker 域名）。
+  - 新增 `.github/workflows/deploy-worker.yml`：worker/ 目录变更时部署 Cloudflare Worker（wrangler-action@v3，--env production）。
+  - 补 `worker/wrangler.toml` 生产配置（`[env.production.vars]` APP_ORIGIN/ENVIRONMENT 取消注释）。
+- [x] **类型错误清零（19→0）**：
+  - controller.test.ts 18 个 readonly 错误：测试里 `[...DEFAULT_*_TABS]` 复制（NavLayout 期望可变数组）。
+  - placeholders.ts:52 registerDeepLinkView 类型缺口：ArticleView 有 pathname props 但注册函数期望无 props；受 Svelte Component 逆变特性限制，用 `as Component` 断言 + 文档说明契约（AreaOutlet 运行时保证传 pathname）。registry.ts 补 DeepLinkViewProps 文档类型。
+- [x] **死代码清理 + /app/changes 路由断链修复（真实 bug）**：
+  - **bug**：GithubView「变更」按钮跳转 /app/changes，但 ChangesView 从未注册到该路由 → 点击落空白（刚做完 diff 预览的视图完全不可达）。注册 `/app/changes` deep link 修复。
+  - 注册 `/app/files` deep link 让文件管理可达；GithubView/WriterView 加「文件」入口。
+  - 删 4 个死文件：GitView/ArchiveView（placeholders 死 import）、FeedView/PlaceholderView（零引用孤儿）。placeholders.ts 清理所有未使用 import。
+- [x] **终端写命令鉴权收口**：
+  - shell.ts 的 rm/touch/write 之前直接调 vfs.writeFile/unlink，绕过鉴权（未登录可污染暂存区）。
+  - 加 `requireWriteAuth` 守卫（动态 import gaubeeos 避免）：service 可用且明确未登录时拦截；不可用时放行（无法判定不阻塞）。
+  - 扩展 shell.test.ts：5 个鉴权用例（未登录拦截 rm/touch/write、已登录放行、service 不可用放行）。
+- [x] **核心测试补齐（+27 用例，193→220）**：
+  - `views/registry.test.ts`（16）：tab/pop/deepLink 注册查询、前缀匹配、注册顺序、activeTabIdForLocation 分支。
+  - `nav/path-utils.test.ts`（6）：pathToTabIdSafe 精确/子路径/无匹配/相似前缀不误判。
+- [x] **通知中心跳转 + action**：
+  - NotificationRecord 加 `action?: {label, href}` 字段；push/notifySuccess/Error/Info/Warning 加可选 action 参数。
+  - NotificationsView 卡片加 onclick：有 action 跳转 + 标记已读；可点击视觉提示（cursor/箭头/action label）。
+  - 迁移关键通知：发表成功→action 指向 /app/changes；鉴权失败→/app/account；未装 Github→/app/settings。
+- [x] **FilesView 草稿支持 + 打开最近文章**：
+  - filesInCollection 扩展支持 'draft'；EditorView 路径正则支持 draft collection。
+  - FilesView 加草稿分区 + 「新建草稿」按钮（时间戳命名，无序号规范）。
+  - 加「最近文章」按钮：取序号最大的文章直接跳转编辑器（TARGET.md：最近文章按序号即可知道）。
+- [x] 验证：类型检查 0 错误（从 19 清零）；220 个单元测试全过；Playwright 验证 /app/changes 路由修复、/app/files 四按钮齐全、通知弹层正常。
+
 
 
 

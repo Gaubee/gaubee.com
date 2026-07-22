@@ -4,12 +4,11 @@
  * GaubeeOS 应用系统：所有视图通过 `/app/*` 路径注册。
  * 旧路径（/feed, /editor 等）已废弃，不再注册。
  */
-import Archive from "./ArchiveView.svelte";
+import type { Component } from "svelte";
 import ArticleView from "$lib/apps/views/ArticleDetailView.svelte";
 import ChangesView from "./ChangesView.svelte";
 import EditorView from "./EditorView.svelte";
 import FilesView from "./FilesView.svelte";
-import GitView from "./GitView.svelte";
 import SearchView from "./SearchView.svelte";
 import SettingsView from "./SettingsView.svelte";
 import TagsView from "./TagsView.svelte";
@@ -19,7 +18,6 @@ import ArticlesView from "$lib/apps/views/ArticlesView.svelte";
 import ShoutView from "$lib/apps/views/ShoutView.svelte";
 import WriterView from "$lib/apps/views/WriterView.svelte";
 import GithubView from "$lib/apps/views/GithubView.svelte";
-import ArticleDetailView from "$lib/apps/views/ArticleDetailView.svelte";
 import NotificationsView from "$lib/apps/views/NotificationsView.svelte";
 import {
   registerDeepLinkView,
@@ -49,10 +47,18 @@ export function ensureViewsRegistered(): void {
   registerTabView("/app/writer", WriterView);
 
   // ===== 深链接 views（main 区非 tab 路径）=====
-  registerDeepLinkView("/article", ArticleView);
+  // AreaOutlet 渲染深链接视图时统一传入 { pathname }（见 AreaOutlet.svelte）。
+  // ArticleView 声明了 pathname props 并实际使用它；其余视图忽略该 prop。
+  // 受 Svelte Component 逆变特性限制，此处用 as Component 断言绕过类型不兼容
+  // （运行时契约由 AreaOutlet 保证，所有深链接视图都会收到 pathname）。
+  registerDeepLinkView("/article", ArticleView as unknown as Component);
   registerDeepLinkView("/tags", TagsView);
   registerDeepLinkView("/app/account", AccountView);
   registerDeepLinkView("/app/editor", EditorView);
+  // 变更管理：GithubView 的「变更」入口、发表成功通知的跳转目标都指向 /app/changes。
+  registerDeepLinkView("/app/changes", ChangesView);
+  // 文件管理：浏览/新建文章/短评/草稿。
+  registerDeepLinkView("/app/files", FilesView);
 
   // ===== pop views =====
   registerPopView("/app/search", SearchView);

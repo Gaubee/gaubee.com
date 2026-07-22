@@ -34,7 +34,10 @@ export interface PublishNavLike {
  */
 export function handlePublishError(e: unknown, nav: PublishNavLike): boolean {
   if (e instanceof NotAuthenticatedError) {
-    notifyError("请先登录账户", "即将跳转到账户页面");
+    notifyError("请先登录账户", "即将跳转到账户页面", {
+      label: "去登录",
+      href: "/app/account",
+    });
     nav.navigateMain("/app/account");
     return true;
   }
@@ -42,6 +45,7 @@ export function handlePublishError(e: unknown, nav: PublishNavLike): boolean {
     notifyError(
       "需要安装 Github 应用",
       "发表功能依赖 Github 应用提供仓库操作能力，请在设置中安装。",
+      { label: "去设置", href: "/app/settings" },
     );
     nav.navigateMain("/app/settings");
     return true;

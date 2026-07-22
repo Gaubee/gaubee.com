@@ -20,6 +20,7 @@
   import { Skeleton } from '$lib/components/ui/skeleton'
   import * as Card from '$lib/components/ui/card'
   import FileTextIcon from '@lucide/svelte/icons/file-text'
+  import FolderIcon from '@lucide/svelte/icons/folder'
   import LogInIcon from '@lucide/svelte/icons/log-in'
   import SendIcon from '@lucide/svelte/icons/send'
   import GitCommitHorizontalIcon from '@lucide/svelte/icons/git-commit-horizontal'
@@ -63,7 +64,10 @@
     try {
       const git = await gaubeeos.requestAppService('git')
       const sha = await git.commit(`发表 ${dirtyCount} 个变更`)
-      notifySuccess(`已发表 ${dirtyCount} 个变更（${sha.slice(0, 7)}）`)
+      notifySuccess(`已发表 ${dirtyCount} 个变更（${sha.slice(0, 7)}）`, undefined, {
+        label: '查看变更',
+        href: '/app/changes',
+      })
       await contentStore.refresh()
     } catch (e) {
       handlePublishError(e, navController)
@@ -76,11 +80,17 @@
 <div class="mx-auto max-w-3xl p-4 sm:p-6">
   <div class="mb-4 flex items-center justify-between">
     <h1 class="text-2xl font-semibold">写作</h1>
-    {#if accountState.authenticated}
-      <Button size="sm" variant="outline" onclick={() => contentStore.refresh()}>
-        刷新
+    <div class="flex gap-2">
+      <Button size="sm" variant="outline" onclick={() => navController.navigateMain('/app/files')}>
+        <FolderIcon data-icon="inline-start" />
+        文件
       </Button>
-    {/if}
+      {#if accountState.authenticated}
+        <Button size="sm" variant="outline" onclick={() => contentStore.refresh()}>
+          刷新
+        </Button>
+      {/if}
+    </div>
   </div>
 
   {#if !accountState.authenticated}

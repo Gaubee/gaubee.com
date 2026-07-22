@@ -109,8 +109,8 @@ class VfsStore {
     return sha;
   }
 
-  /** 按 collection 筛选文件。 */
-  filesInCollection(collection: "articles" | "events"): VfsNode[] {
+  /** 按 collection 筛选文件（articles/events 为正式内容，draft 为私有草稿）。 */
+  filesInCollection(collection: "articles" | "events" | "draft"): VfsNode[] {
     return this.files.filter((f) =>
       f.path.startsWith(`src/content/${collection}/`),
     );

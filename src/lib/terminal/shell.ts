@@ -13,6 +13,7 @@
  */
 
 import type { Vfs, VfsNode } from "$lib/vfs/vfs";
+import { gaubeeos } from "$lib/os/services";
 
 // ---------------------------------------------------------------------------
 // Tokenizer：空格分词 + 单/双引号
@@ -164,6 +165,32 @@ export const Term = {
   err: (s: string) => `${ANSI.red}${s}${ANSI.reset}`,
 };
 
+/**
+ * 写操作鉴权守卫：检查账户登录态。
+ *
+ * 终端的 rm/touch/write 等命令直接写 VFS 暂存区，绕过 GitService。
+ * 为避免未登录用户污染暂存区（虽真正持久化靠 commit 时的 GitService 鉴权兜底），
+ * 在写命令前调用本守卫。
+ *
+ * 语义：当 AccountService 可用且明确判定未登录时拦截；service 不可用时（如
+ * account 应用未加载、测试环境）默认放行——本守卫只做「能确认未登录则阻止」，
+ * 不做「无法确认则阻止」。这与 EditorView/FilesView 的写行为对齐（它们也只动暂存）。
+ *
+ * 返回 true 表示允许写，false 表示已拒绝（并已向终端输出提示）。
+ */
+async function requireWriteAuth(ctx: CommandContext): Promise<boolean> {
+  const account = gaubeeos.getAppService("account");
+  // service 不可用 → 无法判定，放行（不阻塞功能）
+  if (!account) return true;
+  if (account.isAuthenticated) return true;
+  // 明确未登录 → 拦截
+  ctx.write(
+    Term.err("需要先登录账户才能修改文件（登录后修改可提交到 GitHub）") +
+      Term.newline,
+  );
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // 内置命令实现
 // ---------------------------------------------------------------------------
@@ -271,6 +298,7 @@ const rmCommand: Command = {
       ctx.write(Term.err("rm: 缺少文件参数") + Term.newline);
       return 1;
     }
+    if (!(await requireWriteAuth(ctx))) return 1;
     const path = resolvePath(ctx.cwd, args[1]);
     const stat = await ctx.vfs.stat(path);
     if (!stat) {
@@ -291,6 +319,7 @@ const touchCommand: Command = {
       ctx.write(Term.err("touch: 缺少文件参数") + Term.newline);
       return 1;
     }
+    if (!(await requireWriteAuth(ctx))) return 1;
     const path = resolvePath(ctx.cwd, args[1]);
     const stat = await ctx.vfs.stat(path);
     if (!stat) {
@@ -314,6 +343,7 @@ const writeCommand: Command = {
       ctx.write(Term.err("write: 用法: write <path> <content>") + Term.newline);
       return 1;
     }
+    if (!(await requireWriteAuth(ctx))) return 1;
     const path = resolvePath(ctx.cwd, args[1]);
     const content = args.slice(2).join(" ");
     await ctx.vfs.writeFile(path, content);

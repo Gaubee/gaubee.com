@@ -73,6 +73,8 @@
       <button class="text-primary underline" onclick={() => navController.navigateMain('/app/writer')}>写作</button>
       或
       <button class="text-primary underline" onclick={() => navController.navigateMain('/app/changes')}>变更</button>
+      应用；浏览与新建文件用
+      <button class="text-primary underline" onclick={() => navController.navigateMain('/app/files')}>文件</button>
       应用。
     </Card.Content>
   </Card.Root>

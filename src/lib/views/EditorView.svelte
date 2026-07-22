@@ -49,12 +49,12 @@
   /** 是否正在发表（提交到 GitHub）。 */
   let publishing = $state(false)
 
-  // 从路径解析文章：/app/editor/articles/0057.tc39-signals
+  // 从路径解析文章：/app/editor/articles/0057.tc39-signals 或 /app/editor/draft/xxx
   const targetPost = $derived.by(() => {
     const path = navState.mainLocation.pathname
-    const match = path.match(/^\/app\/editor\/(articles|events)\/(.+)$/)
+    const match = path.match(/^\/app\/editor\/(articles|events|draft)\/(.+)$/)
     if (!match) return null
-    return { collection: match[1] as 'articles' | 'events', stem: match[2] }
+    return { collection: match[1] as 'articles' | 'events' | 'draft', stem: match[2] }
   })
 
   async function loadPost() {
@@ -155,7 +155,10 @@
       // 3. 提交（内部 require account 鉴权）
       const title = metadata.title ?? currentPath.split('/').pop() ?? '文章'
       const sha = await git.commit(`发表：${title}`)
-      notifySuccess(`已发表（${sha.slice(0, 7)}）`)
+      notifySuccess(`已发表（${sha.slice(0, 7)}）`, undefined, {
+        label: '查看变更',
+        href: '/app/changes',
+      })
     } catch (e) {
       handlePublishError(e, navController)
     } finally {

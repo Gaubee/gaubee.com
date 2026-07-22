@@ -9,6 +9,22 @@
 import type { Component } from "svelte";
 import type { Area, HistoryLocation, TabId } from "$lib/nav/controller";
 
+/**
+ * 各类视图的 props 契约（与 AreaOutlet.svelte 的渲染调用对齐）：
+ * - tab view：AreaOutlet 总是传入 { area, tabId, isActive }，但多数组件忽略它们
+ *   （Svelte 允许传入未声明的 props）。
+ * - pop view：无 props。
+ * - deep link view：AreaOutlet 总是传入 { pathname }；需要路径的组件（如
+ *   ArticleDetailView）应声明并使用它，不需要的（如 AccountView）可忽略。
+ *
+ * 注意：受 Svelte Component 逆变特性限制，此处不通过类型参数强制约束 props
+ * （否则无法同时容纳"声明 pathname"与"不声明任何 props"的组件）。
+ * DeepLinkViewProps 仅供文档与消费方参考。
+ */
+export interface DeepLinkViewProps {
+  pathname: string;
+}
+
 export interface ViewEntry {
   /** 匹配的 TabId（tab view）或 pop 路由前缀（pop view）。 */
   id: string;

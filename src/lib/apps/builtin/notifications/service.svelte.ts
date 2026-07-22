@@ -17,6 +17,14 @@ import { toast } from "svelte-sonner";
 /** 通知严重级别。 */
 export type NotificationSeverity = "success" | "error" | "info" | "warning";
 
+/** 通知的可选操作（点击通知卡片可跳转）。 */
+export interface NotificationAction {
+  /** 按钮文案，如「查看」「去登录」。 */
+  label: string;
+  /** 跳转路径（main 区），如 /app/changes、/app/account。 */
+  href: string;
+}
+
 /** 一条通知记录。 */
 export interface NotificationRecord {
   id: string;
@@ -25,6 +33,8 @@ export interface NotificationRecord {
   severity: NotificationSeverity;
   read: boolean;
   timestamp: number;
+  /** 可选操作：点击通知卡片跳转到此路径。 */
+  action?: NotificationAction;
 }
 
 /** 通知服务接口。 */
@@ -40,6 +50,7 @@ export interface NotificationService extends AppService {
     title: string;
     message?: string;
     severity: NotificationSeverity;
+    action?: NotificationAction;
   }): void;
   /** 标记全部已读。 */
   markAllRead(): void;
@@ -79,6 +90,7 @@ class NotificationServiceImpl implements NotificationService {
     title: string;
     message?: string;
     severity: NotificationSeverity;
+    action?: NotificationAction;
   }): void {
     const record: NotificationRecord = {
       id: genId(),
@@ -87,6 +99,7 @@ class NotificationServiceImpl implements NotificationService {
       severity: n.severity,
       read: false,
       timestamp: Date.now(),
+      action: n.action,
     };
     // 即时 toast
     this.showToast(record);
@@ -172,30 +185,46 @@ export const notificationService: NotificationService =
 // 便捷函数：消费方优先用这些，自动经 service（不可用时降级到直接 toast）
 // ---------------------------------------------------------------------------
 
-/** 推送成功通知。 */
-export function notifySuccess(title: string, message?: string): void {
+/** 推送成功通知。action 可选：提供后通知卡片可点击跳转。 */
+export function notifySuccess(
+  title: string,
+  message?: string,
+  action?: NotificationAction,
+): void {
   const svc = gaubeeos.getAppService("notification");
-  if (svc) svc.push({ title, message, severity: "success" });
+  if (svc) svc.push({ title, message, severity: "success", action });
   else toast.success(title, message ? { description: message } : undefined);
 }
 
-/** 推送错误通知。 */
-export function notifyError(title: string, message?: string): void {
+/** 推送错误通知。action 可选：提供后通知卡片可点击跳转。 */
+export function notifyError(
+  title: string,
+  message?: string,
+  action?: NotificationAction,
+): void {
   const svc = gaubeeos.getAppService("notification");
-  if (svc) svc.push({ title, message, severity: "error" });
+  if (svc) svc.push({ title, message, severity: "error", action });
   else toast.error(title, message ? { description: message } : undefined);
 }
 
-/** 推送信息通知。 */
-export function notifyInfo(title: string, message?: string): void {
+/** 推送信息通知。action 可选：提供后通知卡片可点击跳转。 */
+export function notifyInfo(
+  title: string,
+  message?: string,
+  action?: NotificationAction,
+): void {
   const svc = gaubeeos.getAppService("notification");
-  if (svc) svc.push({ title, message, severity: "info" });
+  if (svc) svc.push({ title, message, severity: "info", action });
   else toast.info(title, message ? { description: message } : undefined);
 }
 
-/** 推送警告通知。 */
-export function notifyWarning(title: string, message?: string): void {
+/** 推送警告通知。action 可选：提供后通知卡片可点击跳转。 */
+export function notifyWarning(
+  title: string,
+  message?: string,
+  action?: NotificationAction,
+): void {
   const svc = gaubeeos.getAppService("notification");
-  if (svc) svc.push({ title, message, severity: "warning" });
+  if (svc) svc.push({ title, message, severity: "warning", action });
   else toast.warning(title, message ? { description: message } : undefined);
 }

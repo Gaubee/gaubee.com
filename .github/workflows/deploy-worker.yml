@@ -1,0 +1,49 @@
+name: Deploy Auth Worker to Cloudflare
+
+# 部署 Gaubee Auth Worker（GitHub OAuth + API 代理）到 Cloudflare Workers。
+#
+# 前置（在 GitHub Secrets 配置一次）：
+#   - CLOUDFLARE_API_TOKEN：Cloudflare API Token（需 Workers Scripts:Edit 权限）
+#   - CLOUDFLARE_ACCOUNT_ID：Cloudflare Account ID
+#
+# 前置（在本地一次性执行，敏感变量不入库不入 CI）：
+#   cd worker && npx wrangler secret put GITHUB_CLIENT_ID --env production
+#   cd worker && npx wrangler secret put GITHUB_CLIENT_SECRET --env production
+#
+# Worker 生产域名 / APP_ORIGIN / OAuth 回调 URL 在 worker/wrangler.toml [env.production.vars] 配置。
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - worker/**
+      - .github/workflows/deploy-worker.yml
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Worker dependencies
+        working-directory: worker
+        # worker 目录无 lock 文件，用 install 而非 ci
+        run: npm install
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          environment: production
+          # package.json 的 deploy 脚本 = wrangler deploy，wrangler-action 默认也跑 deploy
+          command: deploy

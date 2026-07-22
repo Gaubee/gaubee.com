@@ -26,10 +26,25 @@ vi.mock("$app/environment", () => ({ browser: true }));
 
 // mock 应用服务总线：git 命令走 gaubeeos.requestAppService('git')，
 // 返回一个委托真实 vfs 的 git service（鉴权守卫绕过：requireAuthenticated 不抛）。
+// account service 默认不可用（null）→ 写命令守卫放行；用 setAccountAuthenticated 可控。
 // vfs 在方法调用时动态获取（vi.mock 工厂提升到顶部，此时 vfs 尚未 import）。
+const accountState = { authenticated: false, available: false };
+function setAccountAuthenticated(authenticated: boolean): void {
+  accountState.available = true;
+  accountState.authenticated = authenticated;
+}
+function resetAccount(): void {
+  accountState.available = false;
+  accountState.authenticated = false;
+}
 vi.mock("$lib/os/services", () => ({
   gaubeeos: {
-    getAppService: () => null,
+    getAppService: (id: string) => {
+      if (id === "account" && accountState.available) {
+        return { isAuthenticated: accountState.authenticated };
+      }
+      return null;
+    },
     requestAppService: async (id: string) => {
       if (id !== "git") throw new Error(`service ${id} not mocked`);
       const { vfs } = await import("$lib/vfs/vfs");
@@ -79,6 +94,7 @@ beforeEach(async () => {
   mockGetFileText.mockReset();
   mockFetchTree.mockReset();
   mockCommitChanges.mockReset();
+  resetAccount();
 });
 
 /** 构造一个 ctx，输出捕获到 out 数组。cwd 默认 src/content。 */
@@ -338,6 +354,65 @@ describe("runLine - 基础命令", () => {
     const { ctx } = makeCtx();
     const res = await runLine(ctx, "");
     expect(res.exit).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 写命令鉴权守卫：未登录时 rm/touch/write 被拦截
+// ---------------------------------------------------------------------------
+
+describe("写命令鉴权守卫", () => {
+  beforeEach(async () => {
+    await seedFixture();
+  });
+
+  it("未登录时 rm 被拦截，不删除文件", async () => {
+    setAccountAuthenticated(false);
+    const { ctx, out } = makeCtx();
+    const res = await runLine(ctx, "rm articles/0001.first.md");
+    expect(res.exit).toBe(1);
+    expect(text(out)).toContain("需要先登录");
+    // 文件仍在（未被软删除）
+    const stat = await vfs.stat("src/content/articles/0001.first.md");
+    expect(stat?.content).toBe("first body");
+  });
+
+  it("未登录时 touch 被拦截，不创建文件", async () => {
+    setAccountAuthenticated(false);
+    const { ctx, out } = makeCtx();
+    const res = await runLine(ctx, "touch articles/0099.new.md");
+    expect(res.exit).toBe(1);
+    expect(text(out)).toContain("需要先登录");
+    const stat = await vfs.stat("src/content/articles/0099.new.md");
+    expect(stat).toBeNull();
+  });
+
+  it("未登录时 write 被拦截，不写入文件", async () => {
+    setAccountAuthenticated(false);
+    const { ctx, out } = makeCtx();
+    const res = await runLine(ctx, "write articles/0099.x.md hello");
+    expect(res.exit).toBe(1);
+    expect(text(out)).toContain("需要先登录");
+    const stat = await vfs.stat("src/content/articles/0099.x.md");
+    expect(stat).toBeNull();
+  });
+
+  it("已登录时写命令正常工作", async () => {
+    setAccountAuthenticated(true);
+    const { ctx } = makeCtx();
+    const res = await runLine(ctx, "write articles/0099.x.md hello content");
+    expect(res.exit).toBe(0);
+    const content = await vfs.readFile("src/content/articles/0099.x.md");
+    expect(content).toBe("hello content");
+  });
+
+  it("account service 不可用时写命令放行（无法判定登录态）", async () => {
+    // resetAccount 已在全局 beforeEach 调用，accountState.available = false
+    const { ctx } = makeCtx();
+    const res = await runLine(ctx, "write articles/0099.x.md ok");
+    expect(res.exit).toBe(0);
+    const content = await vfs.readFile("src/content/articles/0099.x.md");
+    expect(content).toBe("ok");
   });
 });
 

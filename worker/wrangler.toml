@@ -12,13 +12,19 @@ compatibility_flags = ["nodejs_compat"]
 APP_ORIGIN = "http://localhost:5173"
 ENVIRONMENT = "dev"
 
-# 生产环境配置（部署时用 --env production 或在 dashboard 设置）：
-# [env.production.vars]
-# APP_ORIGIN = "https://gaubee.com"
-# ENVIRONMENT = "production"
+# 生产环境配置（CI 用 wrangler deploy --env production 触发）：
+# APP_ORIGIN 必须与静态站（GitHub Pages）实际域名一致，用于 CORS 与 OAuth 回调重定向。
+# 部署前请确认下面两个值与你的实际域名匹配。
+[env.production.vars]
+APP_ORIGIN = "https://gaubee.com"
+ENVIRONMENT = "production"
 
 # OAuth 回调路径必须与 GitHub OAuth App 配置的 Authorization callback URL 一致：
 # https://<worker-domain>/auth/github/callback
+# 生产 Worker 域名请在 Cloudflare Dashboard 确认（默认 *.workers.dev，或绑定自定义域名），
+# 然后到 GitHub OAuth App 把 Authorization callback URL 设为：
+#   https://<worker-domain>/auth/github/callback
+# 同时确保前端（APP_ORIGIN）调用 Worker 的地址正确（见 src/lib 中 Worker URL 配置）。
 
 # 本地开发：wrangler dev 默认 http://localhost:8787
 # 生产：部署到 *.workers.dev 或自定义域名
