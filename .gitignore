@@ -32,6 +32,7 @@ playwright/.cache
 # AI 工具临时目录
 .zcode/
 jules-scratch/
+CHAT.md
 
 # Cloudflare Worker 本地状态
 .dev.vars

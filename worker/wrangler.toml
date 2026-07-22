@@ -9,14 +9,21 @@ compatibility_flags = ["nodejs_compat"]
 # - ENVIRONMENT：dev 时允许 localhost CORS；生产设为 "production" 严格白名单。
 # 敏感变量（GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET）用 wrangler secret put 设置，不入库。
 [vars]
-APP_ORIGIN = "http://localhost:5173"
+# 本地开发：前端经 portless 暴露为 https://gaubee.com.localhost，Worker 经 vite proxy 同源转发。
+# APP_ORIGIN：OAuth 成功后重定向回前端的 origin（worker/src/index.ts 的回调 redirect 用）。
+# WORKER_ORIGIN：构造 OAuth redirect_uri 的 origin（反代下 c.req.url 不可靠，必须显式指定）。
+# 本地因 vite proxy，/auth/github/callback 经前端同源地址转发到 Worker，故 WORKER_ORIGIN = 前端 portless URL。
+APP_ORIGIN = "https://gaubee.com.localhost"
+WORKER_ORIGIN = "https://gaubee.com.localhost"
 ENVIRONMENT = "dev"
 
 # 生产环境配置（CI 用 wrangler deploy --env production 触发）：
 # APP_ORIGIN 必须与静态站（GitHub Pages）实际域名一致，用于 CORS 与 OAuth 回调重定向。
-# 部署前请确认下面两个值与你的实际域名匹配。
+# WORKER_ORIGIN 是生产 Worker 的对外域名（用于构造 OAuth redirect_uri）。
+# 部署前请确认下面三个值与你的实际域名匹配（WORKER_ORIGIN 用你选定的 Worker 域名，含 https 无尾斜杠）。
 [env.production.vars]
 APP_ORIGIN = "https://gaubee.com"
+WORKER_ORIGIN = "https://gaubee-auth-production.gaubeebangeel.workers.dev"
 ENVIRONMENT = "production"
 
 # OAuth 回调路径必须与 GitHub OAuth App 配置的 Authorization callback URL 一致：

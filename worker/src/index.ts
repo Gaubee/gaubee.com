@@ -21,6 +21,12 @@ export interface Env {
   GITHUB_CLIENT_ID: string;
   GITHUB_CLIENT_SECRET: string;
   APP_ORIGIN: string;
+  /**
+   * Worker 自身的对外 origin，用于构造 OAuth redirect_uri。
+   * 反代（portless / Cloudflare）下 c.req.url 的 Host 不可靠，必须显式指定。
+   * 未配置时回退到 c.req.url.origin（仅适合无反代的直连场景）。
+   */
+  WORKER_ORIGIN?: string;
   /** 部署环境：dev 时允许 localhost CORS，prod 严格白名单。 */
   ENVIRONMENT?: string;
 }
@@ -32,6 +38,17 @@ const GITHUB_API = "https://api.github.com";
 const COOKIE_NAME = "gh_token";
 const STATE_COOKIE = "gh_oauth_state";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 天
+
+/**
+ * 是否为生产环境。
+ * dev 模式（ENVIRONMENT !== "production"）下 cookie 不加 Secure 标记：
+ * 本地经 vite proxy（HTTP 内部转发）时，带 Secure 的 cookie 浏览器会拒绝存储。
+ * portless 虽顶层是 HTTPS，但 vite→Worker 的内部连接是 HTTP，Secure cookie 丢失。
+ * 生产（真 HTTPS 终端）保留 Secure。
+ */
+function isProd(env: Env): boolean {
+  return env.ENVIRONMENT === "production";
+}
 
 /** 代理路径限定：只允许访问本仓库。防 SSRF 到其他仓库。 */
 const OWNER = "gaubee";
@@ -64,16 +81,19 @@ app.get("/", (c) => c.json({ name: "gaubee-auth", ok: true }));
 // ---- 1. 发起 OAuth：重定向到 GitHub ----
 app.get("/auth/github", (c) => {
   const state = crypto.randomUUID();
+  // redirect_uri 必须显式指定：反代（portless / Cloudflare）下 c.req.url 的 Host 不可靠，
+  // 用 WORKER_ORIGIN 构造；未配置时回退到 c.req.url.origin（仅无反代直连场景安全）。
+  const workerOrigin = c.env.WORKER_ORIGIN ?? new URL(c.req.url).origin;
   const params = new URLSearchParams({
     client_id: c.env.GITHUB_CLIENT_ID,
-    redirect_uri: `${new URL(c.req.url).origin}/auth/github/callback`,
+    redirect_uri: `${workerOrigin}/auth/github/callback`,
     scope: "repo user",
     state,
   });
   // state 存 cookie，回调时校验防 CSRF
   setCookie(c, STATE_COOKIE, state, {
     httpOnly: true,
-    secure: true,
+    secure: isProd(c.env),
     sameSite: "Lax",
     path: "/",
     maxAge: 600, // 10 分钟内必须完成回调
@@ -122,7 +142,7 @@ app.get("/auth/github/callback", async (c) => {
   // token 存 httpOnly cookie
   setCookie(c, COOKIE_NAME, tokenData.access_token, {
     httpOnly: true,
-    secure: true,
+    secure: isProd(c.env),
     sameSite: "Lax",
     path: "/",
     maxAge: COOKIE_MAX_AGE,
@@ -145,7 +165,11 @@ app.get("/auth/me", async (c) => {
     return c.json({ authenticated: false }, 401);
   }
   const userResp = await fetch(`${GITHUB_API}/user`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      // GitHub API 强制要求 User-Agent，否则返回 403
+      "User-Agent": "gaubee-auth-worker",
+    },
   });
   if (!userResp.ok) {
     return c.json({ authenticated: false }, 401);
