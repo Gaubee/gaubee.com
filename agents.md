@@ -45,6 +45,10 @@
         2. 或者自己执行 `pnpm -w run playwright` 去做更加仔细更加可控的的测试运行
      2. 使用 `pnpm -w run test:unit --run` 来执行 vitest 测试脚本
         > server project（node）测纯逻辑用 `*.test.ts`；client project（浏览器）测含 runes/组件用 `*.svelte.test.ts`
+     3. **headless 登录态**（agent-browser 走查需登录的应用时）：headless 浏览器默认无会话。
+        运行 `./scripts/dev-login.sh` 可从 `gh auth token` 取 token 并注入 Worker 的 gh_token cookie，
+        让 headless 浏览器进入登录态（不碰用户浏览器 Profile，token 仅存于临时 session）。
+        前置：`gh auth login` 已完成 + Worker 在跑（`cd worker && pnpm dev`）。
    - **单元测试**: 在`src/lib`下与源码同目录开发 vitest 测试代码来验证基础功能（参照 `*.test.ts` / `*.svelte.test.ts`）。也可以开发 Playwright 脚本，用来做组件可用性可靠性验证。
    - **技术验证**: 在`tests/jules-scratch`文件夹下，使用 Playwright 脚本 + 截图的方式进行验证。这套流程（启动服务 -> 编写/运行脚本 -> 生成截图 -> 分析截图 -> 修复 -> 再次验证）被证明是定位和解决布局等视觉问题的有效方法。
 4. 分支与提交
