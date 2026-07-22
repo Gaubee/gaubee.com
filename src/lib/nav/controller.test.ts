@@ -80,10 +80,10 @@ describe("areaForPath", () => {
   };
 
   it("pop 路径优先", () => {
-    expect(areaForPath(layout, "/search")).toBe("pop");
-    expect(areaForPath(layout, "/notifications")).toBe("pop");
+    expect(areaForPath(layout, "/app/search")).toBe("pop");
+    expect(areaForPath(layout, "/app/notifications")).toBe("pop");
     // 注意：areaForPath 接收 pathname（已剥离 query），不处理带 query 的字符串。
-    // /search/sub 是 pop（子路径），但 /search?q=foo 由调用方先剥离 query。
+    // /app/search/sub 是 pop（子路径），但 /app/search?q=foo 由调用方先剥离 query。
   });
 
   it("bottom tab 路径", () => {
@@ -153,9 +153,9 @@ describe("reduceKernel: NAVIGATE", () => {
       type: "NAVIGATE",
       sourceArea: "main",
       action: "PUSH",
-      location: makeLocation("/search"),
+      location: makeLocation("/app/search"),
     });
-    expect(result.nextState.popLocation.pathname).toBe("/search");
+    expect(result.nextState.popLocation.pathname).toBe("/app/search");
     expect(result.notify).toEqual([{ area: "pop", type: "PUSH" }]);
   });
 
@@ -165,9 +165,9 @@ describe("reduceKernel: NAVIGATE", () => {
       type: "NAVIGATE",
       sourceArea: "pop",
       action: "PUSH",
-      location: makeLocation("/notifications"),
+      location: makeLocation("/app/notifications"),
     });
-    expect(result.nextState.popLocation.pathname).toBe("/notifications");
+    expect(result.nextState.popLocation.pathname).toBe("/app/notifications");
   });
 });
 
@@ -219,13 +219,20 @@ describe("reduceKernel: MOVE_TAB", () => {
 describe("reduceKernel: REORDER", () => {
   it("重排 main tabs", () => {
     const state = makeInitialState();
-    const newOrder: TabId[] = ["/app/shout", "/app/articles", ...state.mainTabs.slice(2)];
+    const newOrder: TabId[] = [
+      "/app/shout",
+      "/app/articles",
+      ...state.mainTabs.slice(2),
+    ];
     const result = reduceKernel(state, {
       type: "REORDER",
       area: "main",
       tabIds: newOrder,
     });
-    expect(result.nextState.mainTabs.slice(0, 2)).toEqual(["/app/shout", "/app/articles"]);
+    expect(result.nextState.mainTabs.slice(0, 2)).toEqual([
+      "/app/shout",
+      "/app/articles",
+    ]);
     expect(result.persist).toBe("local");
   });
 
@@ -273,13 +280,19 @@ describe("reduceKernel: CLOSE_TAB", () => {
   it("关闭非活动 tab：无变化（tab 列表不在 CLOSE_TAB 职责内，仅清 location）", () => {
     const state = makeInitialState();
     // /files 不是当前 main 活动 tab（/feed 才是）
-    const result = reduceKernel(state, { type: "CLOSE_TAB", tabId: "/app/settings" });
+    const result = reduceKernel(state, {
+      type: "CLOSE_TAB",
+      tabId: "/app/settings",
+    });
     expect(result.changed).toBe(false);
   });
 
   it("关闭当前活动 main tab：location 回 /", () => {
     const state = makeInitialState();
-    const result = reduceKernel(state, { type: "CLOSE_TAB", tabId: "/app/articles" });
+    const result = reduceKernel(state, {
+      type: "CLOSE_TAB",
+      tabId: "/app/articles",
+    });
     expect(result.changed).toBe(true);
     expect(result.nextState.mainLocation.pathname).toBe("/");
   });
@@ -345,9 +358,9 @@ describe("reduceKernel: ACTIVATE_POP / DEACTIVATE_POP", () => {
     const state = makeInitialState();
     const r1 = reduceKernel(state, {
       type: "ACTIVATE_POP",
-      location: makeLocation("/search"),
+      location: makeLocation("/app/search"),
     });
-    expect(r1.nextState.popLocation.pathname).toBe("/search");
+    expect(r1.nextState.popLocation.pathname).toBe("/app/search");
 
     const r2 = reduceKernel(state, {
       type: "ACTIVATE_POP",
@@ -359,7 +372,7 @@ describe("reduceKernel: ACTIVATE_POP / DEACTIVATE_POP", () => {
   it("关闭 pop", () => {
     const state: KernelState = {
       ...makeInitialState(),
-      popLocation: makeLocation("/search"),
+      popLocation: makeLocation("/app/search"),
     };
     const result = reduceKernel(state, { type: "DEACTIVATE_POP" });
     expect(result.nextState.popLocation.pathname).toBe("/");
@@ -377,11 +390,11 @@ describe("reduceKernel: POPSTATE", () => {
       type: "POPSTATE",
       mainLocation: makeLocation("/article/0001"),
       bottomLocation: makeLocation("/app/github"),
-      popLocation: makeLocation("/search"),
+      popLocation: makeLocation("/app/search"),
     });
     expect(result.nextState.mainLocation.pathname).toBe("/article/0001");
     expect(result.nextState.bottomLocation.pathname).toBe("/app/github");
-    expect(result.nextState.popLocation.pathname).toBe("/search");
+    expect(result.nextState.popLocation.pathname).toBe("/app/search");
     expect(result.notify).toEqual([
       { area: "main", type: "BACK" },
       { area: "bottom", type: "BACK" },
@@ -436,14 +449,14 @@ describe("URL 序列化往返", () => {
   });
 
   it("带 _p 的 URL：pop location 解析", () => {
-    mockWindow("http://localhost/app/articles?_p=/search");
+    mockWindow("http://localhost/app/articles?_p=/app/search");
     const layout = {
       mainTabs: DEFAULT_MAIN_TABS,
       bottomTabs: DEFAULT_BOTTOM_TABS,
     };
     const parsed = parseBrowserLocation(window.location, layout);
     expect(parsed.main.pathname).toBe("/app/articles");
-    expect(parsed.pop.pathname).toBe("/search");
+    expect(parsed.pop.pathname).toBe("/app/search");
   });
 
   it("深链接推断：URL 直接是 bottom 路径且无 _b，推断为 bottom", () => {
@@ -459,13 +472,13 @@ describe("URL 序列化往返", () => {
   });
 
   it("深链接推断：URL 直接是 pop 路径且无 _p，推断为 pop", () => {
-    mockWindow("http://localhost/search");
+    mockWindow("http://localhost/app/search");
     const layout = {
       mainTabs: DEFAULT_MAIN_TABS,
       bottomTabs: DEFAULT_BOTTOM_TABS,
     };
     const parsed = parseBrowserLocation(window.location, layout);
-    expect(parsed.pop.pathname).toBe("/search");
+    expect(parsed.pop.pathname).toBe("/app/search");
     expect(parsed.main.pathname).toBe("/");
   });
 
@@ -477,17 +490,17 @@ describe("URL 序列化往返", () => {
       updatedAt: 0,
       mainLocation: makeLocation("/article/0001"),
       bottomLocation: makeLocation("/app/github"),
-      popLocation: makeLocation("/search"),
+      popLocation: makeLocation("/app/search"),
     };
     const url = buildCanonicalUrl(state);
     expect(url).toContain("/article/0001");
     // URLSearchParams 会把 / 编码为 %2F
     expect(url).toContain("_b=%2Fapp%2Fgithub");
-    expect(url).toContain("_p=%2Fsearch");
+    expect(url).toContain("_p=%2Fapp%2Fsearch");
     // 解码后能还原
     const parsedUrl = new URL(url, "http://localhost");
     expect(parsedUrl.searchParams.get("_b")).toBe("/app/github");
-    expect(parsedUrl.searchParams.get("_p")).toBe("/search");
+    expect(parsedUrl.searchParams.get("_p")).toBe("/app/search");
   });
 
   it("buildCanonicalUrl：bottom/pop 未激活时不编码 _b/_p", () => {
@@ -563,7 +576,9 @@ describe("NavController 实例", () => {
   it("navigate 到非 tab 深链接（/article/0001）保留在 main，不被插件重置", () => {
     const controller = new NavController();
     // 初始 mainLocation 是 /feed（DEFAULT_MAIN_TABS[0]）
-    expect(controller.getSnapshot().mainLocation.pathname).toBe("/app/articles");
+    expect(controller.getSnapshot().mainLocation.pathname).toBe(
+      "/app/articles",
+    );
     controller.navigateMain("/article/0001");
     const snap = controller.getSnapshot();
     expect(snap.mainLocation.pathname).toBe("/article/0001");
@@ -576,11 +591,11 @@ describe("NavController 实例", () => {
       callCount++;
     });
     const snap1 = controller.getSnapshot();
-    controller.navigateMain("/app/search");
+    controller.navigateMain("/app/settings");
     expect(callCount).toBe(1);
     const snap2 = controller.getSnapshot();
     expect(snap2).not.toBe(snap1); // 引用变化
-    expect(snap2.mainLocation.pathname).toBe("/app/search");
+    expect(snap2.mainLocation.pathname).toBe("/app/settings");
   });
 
   it("未变化的 dispatch 不触发 listener", () => {

@@ -41,8 +41,8 @@ export interface HistoryLocationState {
   [key: string]: unknown;
 }
 
-/** pop 区路由集合（兼容旧路径）。 */
-export const POP_ROUTES = ["/search", "/notifications"] as const;
+/** pop 区路由集合（搜索、通知为浮层应用，走 /app/* 新路径）。 */
+export const POP_ROUTES = ["/app/search", "/app/notifications"] as const;
 export type PopRoute = (typeof POP_ROUTES)[number];
 
 export interface NavLayout {
@@ -132,15 +132,18 @@ const PERSIST_DEBOUNCE_MS = 300;
 const STORAGE_KEY = "gaubee:os:nav-layout";
 
 // 动态 TabRegistry，从外部注入
-// 默认值使用新路径
-const OLD_TABS = [
-  "/app/articles", "/app/shout", "/app/settings", "/app/search", "/app/notifications",
-  "/app/github", "/app/terminal",
+// 默认值使用新路径（search/notifications 为 pop 浮层，不在 main/bottom tab）
+const DEFAULT_ALL_TABS = [
+  "/app/articles",
+  "/app/shout",
+  "/app/settings",
+  "/app/github",
+  "/app/terminal",
 ] as const;
 
 let tabRegistry: TabRegistry = {
-  allTabs: [...OLD_TABS],
-  defaultMainTabs: ["/app/articles", "/app/shout", "/app/settings", "/app/search", "/app/notifications"],
+  allTabs: [...DEFAULT_ALL_TABS],
+  defaultMainTabs: ["/app/articles", "/app/shout", "/app/settings"],
   defaultBottomTabs: ["/app/github", "/app/terminal"],
   popRoutes: ["/app/search", "/app/notifications"],
 };
@@ -150,7 +153,8 @@ let tabRegistry: TabRegistry = {
  */
 export const ALL_TABS: readonly TabId[] = tabRegistry.allTabs;
 export const DEFAULT_MAIN_TABS: readonly TabId[] = tabRegistry.defaultMainTabs;
-export const DEFAULT_BOTTOM_TABS: readonly TabId[] = tabRegistry.defaultBottomTabs;
+export const DEFAULT_BOTTOM_TABS: readonly TabId[] =
+  tabRegistry.defaultBottomTabs;
 
 /** 设置 TabRegistry（应用注册时调用）。 */
 export function setTabRegistry(registry: TabRegistry): void {
@@ -831,12 +835,18 @@ export class NavController {
     const persisted = readLocalStorage();
     if (persisted) {
       // 过滤掉不再 tabRegistry.allTabs 中的旧 tab（路径变更后兼容）
-      const validMainTabs = persisted.mainTabs.filter((t) => tabRegistry.allTabs.includes(t));
-      const validBottomTabs = persisted.bottomTabs.filter((t) => tabRegistry.allTabs.includes(t));
+      const validMainTabs = persisted.mainTabs.filter((t) =>
+        tabRegistry.allTabs.includes(t),
+      );
+      const validBottomTabs = persisted.bottomTabs.filter((t) =>
+        tabRegistry.allTabs.includes(t),
+      );
       this.state = {
         ...this.state,
-        mainTabs: validMainTabs.length > 0 ? validMainTabs : this.state.mainTabs,
-        bottomTabs: validBottomTabs.length > 0 ? validBottomTabs : this.state.bottomTabs,
+        mainTabs:
+          validMainTabs.length > 0 ? validMainTabs : this.state.mainTabs,
+        bottomTabs:
+          validBottomTabs.length > 0 ? validBottomTabs : this.state.bottomTabs,
         updatedAt: persisted.updatedAt,
       };
     }
@@ -1090,4 +1100,3 @@ export class NavController {
     return this.state.bottomTabs;
   }
 }
-

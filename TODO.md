@@ -313,3 +313,34 @@ GaubeeOS/
   - 三方松耦合：写作 → git service → account service，经总线通信。
 - [x] 验证：类型检查零新增错误（22 个预存错误不变）；142 个单元测试全过；Playwright 视觉验证设置页/账户页/编辑器发表按钮均正常。
 
+#### 14. 路径分裂修复 + NotificationService（2026-07-23）
+
+修复迁移到 /app/* 新路径体系时遗留的导航/编辑器/pop 三处路径分裂 bug，并建立 NotificationService。
+
+- [x] **导航层路径分裂修复**（移动端 tab 栏空白等）：
+  - 根因：`nav-items.ts` 用旧路径（/feed、/editor），而 mainTabs 是 /app/* 新路径，`getNavItem()` 恒返回 undefined。
+  - 删除 `nav-items.ts`，MobileTabBar/MobileHeader/StatusBar/BottomAreaRouter 改用 `appManager.findByRoute()`（对齐 AreaNav 已有范式）。
+  - 修复后：移动端 tab 栏显示「文章/说说/设置」，顶栏标题随应用变化（不再恒为 "Gaubee"）。
+- [x] **编辑器路由断链修复**：
+  - 根因：`/editor/...` 既非 tab 也未注册深链接，所有「打开编辑器」入口指向死路径。
+  - 新增 `registerDeepLinkView("/app/editor", EditorView)`，EditorView 正则改为 `/app/editor/...`。
+  - 统一 WriterView/FilesView/ArticleView/SSG 文章页的跳转为 `/app/editor/{collection}/{stem}`。
+  - 修正 `/app/writer` tab 归属：渲染 WriterView（文件列表），`/app/editor/...` 深链接渲染 EditorView。
+- [x] **pop 弹层路径分裂修复**：
+  - 根因：`POP_ROUTES` 硬编码旧路径 /search、/notifications，但 pop view 注册在 /app/search、/app/notifications。
+  - `POP_ROUTES` 改为 `["/app/search", "/app/notifications"]`；search/notifications manifest 的 defaultArea 改 "pop" + hiddenFromNav。
+  - controller.ts 默认 tabRegistry 移除 search/notifications（它们是浮层，不进 main tab）。
+  - 修复后：桌面侧栏「浮层」分区显示搜索/通知入口，移动端铃铛弹层正常。
+- [x] **NotificationService（架构演进）**：
+  - `builtin/notifications/service.svelte.ts`：NotificationService（push/markAllRead/clear/history/unreadCount），即时 toast + 持久化历史（localStorage）。
+  - 导出便捷函数 notifySuccess/notifyError/notifyInfo/notifyWarning（经 service，不可用时降级直接 toast）。
+  - notifications manifest 声明 services.notification；bus.ts ServiceTypeMap 注册。
+  - NotificationsView 从空壳改为渲染 service.history（未读角标、全部已读、清空）。
+  - 迁移 19 处散落 toast：登录/发表/安装/提交等重要事件走 notify*（进历史），暂存/撤销等高频操作保留直接 toast（不噪音化历史）。
+- [x] **健壮性修复**：
+  - `requestAppService` 删除空 `loadView`（对 account/git 都是空操作且有负作用，改为只保证已安装 + 工厂懒构造）。
+  - 降级快照语义修复：6 处 `?? { loaded: true }` 改为共享常量 `ACCOUNT_UNAVAILABLE`（loaded:false，显示骨架态而非伪装未登录）。
+  - `vfs.ts` commit 空 dirty 改抛 `NoChangesError`（统一错误类型，单一可信源）。
+- [x] 验证：类型检查零新增错误（20 个预存错误）；142 个单元测试全过（含更新的 controller pop 路径测试）；Playwright 视觉验证移动端 tab 栏/顶栏、桌面侧栏浮层、编辑器深链接、通知中心均正常。
+
+

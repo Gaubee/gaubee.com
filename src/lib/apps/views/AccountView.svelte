@@ -11,6 +11,7 @@
 -->
 <script lang="ts">
   import { gaubeeos } from '$lib/os/services'
+  import { ACCOUNT_UNAVAILABLE } from '$lib/apps/builtin/account/service'
   import { Button } from '$lib/components/ui/button'
   import * as Card from '$lib/components/ui/card'
   import { Avatar, AvatarImage, AvatarFallback } from '$lib/components/ui/avatar'
@@ -21,11 +22,11 @@
   import ShieldCheckIcon from '@lucide/svelte/icons/shield-check'
   import LockIcon from '@lucide/svelte/icons/lock'
   import KeyRoundIcon from '@lucide/svelte/icons/key-round'
-  import { toast } from 'svelte-sonner'
+  import { notifySuccess } from '$lib/apps/builtin/notifications/service.svelte'
 
   // 系统应用 account 始终可用；若意外不可用则降级为未登录
   const account = $derived(gaubeeos.getAppService('account'))
-  const accountState = $derived(account?.state ?? { loaded: true, authenticated: false, user: null, error: null })
+  const accountState = $derived(account?.state ?? ACCOUNT_UNAVAILABLE)
   let loggingOut = $state(false)
   let refreshing = $state(false)
 
@@ -38,7 +39,7 @@
     loggingOut = true
     try {
       await account.logout()
-      toast.success('已登出')
+      notifySuccess('已登出')
     } finally {
       loggingOut = false
     }

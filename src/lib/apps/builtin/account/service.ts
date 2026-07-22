@@ -33,6 +33,17 @@ export interface AccountUser {
   id: number;
 }
 
+/**
+ * 账户服务不可用时的降级快照。
+ * loaded:false 表示"尚未确认登录态"，视图据此显示骨架态而非伪装成"未登录"。
+ */
+export const ACCOUNT_UNAVAILABLE: AccountSnapshot = {
+  loaded: false,
+  authenticated: false,
+  user: null,
+  error: "账户服务不可用",
+};
+
 /** 账户服务接口。 */
 export interface AccountService extends AppService {
   readonly id: "account";

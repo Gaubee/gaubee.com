@@ -11,6 +11,7 @@
  */
 import { browser } from "$app/environment";
 import { accountService } from "$lib/apps/builtin/account/service";
+import { NoChangesError } from "$lib/os/services";
 import {
   vfsAll,
   vfsClear,
@@ -260,7 +261,7 @@ export class Vfs {
   async commit(message: string): Promise<string> {
     const dirty = await this.dirtyFiles();
     if (dirty.length === 0) {
-      throw new Error("没有待提交的变更");
+      throw new NoChangesError();
     }
     // content=null（unlink 标记）→ StagedChange.content=null（删除）
     // content=string → 新增/修改

@@ -24,6 +24,7 @@ import type { AppService } from "./types";
 // ---- service 接口类型注册（import type：仅类型，不产生运行时依赖）----
 import type { AccountService } from "$lib/apps/builtin/account/service";
 import type { GitService } from "$lib/apps/installable/github/service";
+import type { NotificationService } from "$lib/apps/builtin/notifications/service.svelte";
 
 /**
  * 全局 service id → 接口类型映射。
@@ -32,6 +33,7 @@ import type { GitService } from "$lib/apps/installable/github/service";
 export interface ServiceTypeMap {
   account: AccountService;
   git: GitService;
+  notification: NotificationService;
 }
 
 /** 所有已注册的 service id。 */
@@ -83,9 +85,9 @@ export const gaubeeos = {
    * 1. 若 service 已注册（应用已安装）→ 直接 request 返回（触发懒构造）。
    * 2. 否则抛 AppServiceNotInstalled（应用未安装，调用方引导安装）。
    *
-   * 「按需启动应用」：对需要 view 才能初始化 service 的场景，
-   * 各 service 工厂自行在构造时完成初始化（如订阅、拉取）。
-   * 此处保证 service 对应应用已安装。
+   * 「按需启动应用」语义：保证 service 对应应用已安装，并触发 service 工厂懒构造。
+   * 不主动加载应用 view（account/git 等现有 service 工厂自包含，不依赖 view）；
+   * 若未来某 service 工厂依赖 view 副作用，应在工厂闭包内自行 await loadView。
    *
    * @throws AppServiceNotInstalled 提供该 service 的应用未安装。
    */
@@ -100,12 +102,7 @@ export const gaubeeos = {
       throw new AppServiceNotInstalled(id);
     }
 
-    // 触发 view 加载（按需启动应用，副作用是应用视图就绪）
-    // 失败不阻塞 service 获取（service 可能不依赖 view）
-    void appManager.loadView(appId).catch(() => {
-      // view 加载失败不阻断 service，service 工厂自包含
-    });
-
+    // 触发 service 工厂懒构造（工厂内部按需完成初始化）
     return appServiceRegistry.request<ServiceTypeMap[K]>(id);
   },
 };

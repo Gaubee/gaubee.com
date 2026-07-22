@@ -8,7 +8,7 @@
   import AreaOutlet from './AreaOutlet.svelte'
   import { navStore } from '$lib/nav/nav.svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
-  import { getNavItem } from '$lib/nav/nav-items'
+  import { appManager } from '$lib/apps/AppManager.svelte'
   import { pathToTabIdSafe } from '$lib/nav/path-utils'
   import ChevronsDownIcon from '@lucide/svelte/icons/chevrons-down'
   import XIcon from '@lucide/svelte/icons/x'
@@ -33,7 +33,8 @@
   const activeTab = $derived(
     pathToTabIdSafe(navState.bottomLocation.pathname, navState.bottomTabs)
   )
-  const activeLabel = $derived((activeTab && getNavItem(activeTab)?.label) ?? '底栏')
+  // 从 AppManager 获取应用名称（不依赖已废弃的静态 nav-items）
+  const activeLabel = $derived((activeTab && appManager.findByRoute(activeTab)?.name) ?? '底栏')
 
   function startResize(e: MouseEvent) {
     e.preventDefault()

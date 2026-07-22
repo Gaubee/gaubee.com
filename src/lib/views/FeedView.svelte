@@ -7,6 +7,7 @@
   import { onMount } from 'svelte'
   import { contentStore } from '$lib/data/content.svelte'
   import { gaubeeos } from '$lib/os/services'
+  import { ACCOUNT_UNAVAILABLE } from '$lib/apps/builtin/account/service'
   import { navController } from '$lib/nav/nav-controller-instance'
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
   import { Button } from '$lib/components/ui/button'
@@ -22,7 +23,7 @@
   const posts = $derived(contentStore.allPosts)
   // 通过账户服务获取登录态（不再直接 import authStore）
   const account = $derived(gaubeeos.getAppService('account'))
-  const accountState = $derived(account?.state ?? { loaded: true, authenticated: false, user: null, error: null })
+  const accountState = $derived(account?.state ?? ACCOUNT_UNAVAILABLE)
 
   // 首次进入且未加载时拉取
   onMount(() => {

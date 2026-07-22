@@ -17,7 +17,7 @@
   import ChevronRightIcon from '@lucide/svelte/icons/chevron-right'
   import DownloadIcon from '@lucide/svelte/icons/download'
   import TrashIcon from '@lucide/svelte/icons/trash'
-  import { toast } from 'svelte-sonner'
+  import { notifySuccess, notifyError } from '$lib/apps/builtin/notifications/service.svelte'
 
   // 已注册的设置面板入口（账户、关于等由各应用自行注册）
   const sections = $derived(settingsSectionsRegistry.all())
@@ -35,18 +35,18 @@
   function handleInstall(appId: string) {
     const ok = appManager.install(appId)
     if (ok) {
-      toast.success(`应用已安装`)
+      notifySuccess(`应用已安装`)
     } else {
-      toast.error('安装失败')
+      notifyError('安装失败')
     }
   }
 
   function handleUninstall(appId: string) {
     const ok = appManager.uninstall(appId)
     if (ok) {
-      toast.success('应用已卸载')
+      notifySuccess('应用已卸载')
     } else {
-      toast.error('卸载失败')
+      notifyError('卸载失败')
     }
   }
 </script>

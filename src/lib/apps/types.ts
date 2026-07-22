@@ -65,7 +65,7 @@ export interface AppManifest {
   /** 应用分类。 */
   category: AppCategory;
   /** 默认归属区域。 */
-  defaultArea: "main" | "bottom";
+  defaultArea: "main" | "bottom" | "pop";
   /** Tab 路由路径（如 '/app/articles'，用于 NavController）。 */
   route: string;
   /** 是否支持深链接（如 '/app/articles/article/xxx'）。 */

@@ -12,6 +12,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { gaubeeos } from '$lib/os/services'
+  import { ACCOUNT_UNAVAILABLE } from '$lib/apps/builtin/account/service'
   import { gitStore, type RepoConfig } from '$lib/apps/GitStore.svelte'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
@@ -29,7 +30,7 @@
 
   // 通过账户服务获取登录态（不再直接 import authStore）
   const account = $derived(gaubeeos.getAppService('account'))
-  const accountState = $derived(account?.state ?? { loaded: true, authenticated: false, user: null, error: null })
+  const accountState = $derived(account?.state ?? ACCOUNT_UNAVAILABLE)
   const repoState = $derived(gitStore.repo)
   const commits = $derived(gitStore.commits)
   const loading = $derived(gitStore.loading)

@@ -16,6 +16,7 @@
   import GitCommitHorizontalIcon from '@lucide/svelte/icons/git-commit-horizontal'
   import Undo2Icon from '@lucide/svelte/icons/undo-2'
   import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw'
+  import { notifySuccess, notifyError, notifyWarning } from '$lib/apps/builtin/notifications/service.svelte'
   import { toast } from 'svelte-sonner'
 
   let changes = $state<VfsNode[]>([])
@@ -33,20 +34,20 @@
 
   async function handleCommit() {
     if (changes.length === 0) {
-      toast.warning('没有待提交的变更')
+      notifyWarning('没有待提交的变更')
       return
     }
     const msg = message.trim() || `更新 ${changes.length} 个文件`
     committing = true
     try {
       const sha = await vfsStore.commit(msg)
-      toast.success(`已提交（${sha.slice(0, 7)}）`)
+      notifySuccess(`已提交（${sha.slice(0, 7)}）`)
       await load()
       message = ''
       // 刷新内容派生视图（commit 后 VFS 已 sync）
       contentStore.refresh()
     } catch (e) {
-      toast.error('提交失败', { description: e instanceof Error ? e.message : String(e) })
+      notifyError('提交失败', e instanceof Error ? e.message : String(e))
     } finally {
       committing = false
     }

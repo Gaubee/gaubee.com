@@ -94,7 +94,7 @@
         <Button
           size="sm"
           variant="outline"
-          onclick={() => navController.navigateMain(`/editor/${post.collection}/${post.id.stem}`)}
+          onclick={() => navController.navigateMain(`/app/editor/${post.collection}/${post.id.stem}`)}
         >
           <PencilIcon data-icon="inline-start" />
           编辑

@@ -1,10 +1,10 @@
 <!--
 	EditorView：编辑器主页。
-	- 从 main location 路径解析要编辑的文章（/editor/{collection}/{stem}）
+	- 从 main location 路径解析要编辑的文章（/app/editor/{collection}/{stem}）
 	- 加载文章内容（VFS 三层读取：本地修改 > 远程缓存 > 在线拉取）
 	- 三视图：编辑 / 分屏 / 预览
 	- 自动保存到 VFS（dirty 标记），debounce 1s
-	- 顶部工具栏：视图切换、元数据编辑、保存
+	- 顶部工具栏：视图切换、元数据编辑、保存、发表
 -->
 <script lang="ts">
   import CodeMirror from '$lib/editor/CodeMirror.svelte'
@@ -15,6 +15,7 @@
   import { navController } from '$lib/nav/nav-controller-instance'
   import { gaubeeos } from '$lib/os/services'
   import { handlePublishError } from '$lib/os/services/publish-helper'
+  import { notifySuccess } from '$lib/apps/builtin/notifications/service.svelte'
   import { parseMarkdown, serializeMarkdown, type ArticleMetadata } from '$lib/data/frontmatter'
   import { Button } from '$lib/components/ui/button'
   import * as Dialog from '$lib/components/ui/dialog'
@@ -48,10 +49,10 @@
   /** 是否正在发表（提交到 GitHub）。 */
   let publishing = $state(false)
 
-  // 从路径解析文章：/editor/articles/0057.tc39-signals
+  // 从路径解析文章：/app/editor/articles/0057.tc39-signals
   const targetPost = $derived.by(() => {
     const path = navState.mainLocation.pathname
-    const match = path.match(/^\/editor\/(articles|events)\/(.+)$/)
+    const match = path.match(/^\/app\/editor\/(articles|events)\/(.+)$/)
     if (!match) return null
     return { collection: match[1] as 'articles' | 'events', stem: match[2] }
   })
@@ -148,9 +149,9 @@
       // 3. 提交（内部 require account 鉴权）
       const title = metadata.title ?? currentPath.split('/').pop() ?? '文章'
       const sha = await git.commit(`发表：${title}`)
-      toast.success(`已发表（${sha.slice(0, 7)}）`)
+      notifySuccess(`已发表（${sha.slice(0, 7)}）`)
     } catch (e) {
-      handlePublishError(e, navController, toast)
+      handlePublishError(e, navController)
     } finally {
       publishing = false
     }

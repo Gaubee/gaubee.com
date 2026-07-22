@@ -27,7 +27,7 @@
   import PopAreaRouter from '$lib/components/layout/PopAreaRouter.svelte'
   import StatusBar from '$lib/components/layout/StatusBar.svelte'
   import { Toaster } from '$lib/components/ui/sonner'
-  import { toast } from 'svelte-sonner'
+  import { notifySuccess, notifyError } from '$lib/apps/builtin/notifications/service.svelte'
   import { ModeWatcher } from 'mode-watcher'
 
   let { children } = $props()
@@ -57,7 +57,7 @@
     const authStatus = params.get('auth')
     const authError = params.get('auth_error')
     if (authStatus === 'success') {
-      toast.success('登录成功')
+      notifySuccess('登录成功')
       // 通过账户服务刷新登录态（account 是系统应用，此时已注册）
       gaubeeos.getAppService('account')?.refresh()
     } else if (authError) {
@@ -66,7 +66,7 @@
         token_exchange: '登录失败：无法与 GitHub 交换令牌',
         no_token: '登录失败：GitHub 未返回令牌',
       }
-      toast.error(messages[authError] ?? `登录失败：${authError}`)
+      notifyError(messages[authError] ?? `登录失败：${authError}`)
     }
     if (authStatus || authError) {
       params.delete('auth')

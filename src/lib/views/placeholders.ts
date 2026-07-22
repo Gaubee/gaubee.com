@@ -46,12 +46,13 @@ export function ensureViewsRegistered(): void {
   registerTabView("/app/terminal", TerminalView);
 
   // ===== 可选安装 =====
-  registerTabView("/app/writer", EditorView);
+  registerTabView("/app/writer", WriterView);
 
   // ===== 深链接 views（main 区非 tab 路径）=====
   registerDeepLinkView("/article", ArticleView);
   registerDeepLinkView("/tags", TagsView);
   registerDeepLinkView("/app/account", AccountView);
+  registerDeepLinkView("/app/editor", EditorView);
 
   // ===== pop views =====
   registerPopView("/app/search", SearchView);

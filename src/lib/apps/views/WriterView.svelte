@@ -11,6 +11,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { gaubeeos } from '$lib/os/services'
+  import { ACCOUNT_UNAVAILABLE } from '$lib/apps/builtin/account/service'
   import { handlePublishError } from '$lib/os/services/publish-helper'
   import { vfsStore } from '$lib/vfs/vfs.svelte'
   import { contentStore } from '$lib/data/content.svelte'
@@ -22,7 +23,7 @@
   import LogInIcon from '@lucide/svelte/icons/log-in'
   import SendIcon from '@lucide/svelte/icons/send'
   import GitCommitHorizontalIcon from '@lucide/svelte/icons/git-commit-horizontal'
-  import { toast } from 'svelte-sonner'
+  import { notifySuccess } from '$lib/apps/builtin/notifications/service.svelte'
 
   let files = $state<string[]>([])
   let loading = $state(true)
@@ -30,7 +31,7 @@
 
   // 通过账户服务获取登录态（不再直接 import authStore）
   const account = $derived(gaubeeos.getAppService('account'))
-  const accountState = $derived(account?.state ?? { loaded: true, authenticated: false, user: null, error: null })
+  const accountState = $derived(account?.state ?? ACCOUNT_UNAVAILABLE)
   // VFS dirty 文件数（待发表的本地变更）
   const dirtyCount = $derived(vfsStore.dirtyCount)
 
@@ -49,7 +50,7 @@
     if (match) {
       const collection = match[2]
       const stem = match[3]
-      navController.navigateMain(`/editor/${collection}/${stem}`)
+      navController.navigateMain(`/app/editor/${collection}/${stem}`)
     }
   }
 
@@ -62,10 +63,10 @@
     try {
       const git = await gaubeeos.requestAppService('git')
       const sha = await git.commit(`发表 ${dirtyCount} 个变更`)
-      toast.success(`已发表 ${dirtyCount} 个变更（${sha.slice(0, 7)}）`)
+      notifySuccess(`已发表 ${dirtyCount} 个变更（${sha.slice(0, 7)}）`)
       await contentStore.refresh()
     } catch (e) {
-      handlePublishError(e, navController, toast)
+      handlePublishError(e, navController)
     } finally {
       publishing = false
     }

@@ -5,8 +5,9 @@
 <script lang="ts">
   import { navStore } from '$lib/nav/nav.svelte'
   import { gaubeeos } from '$lib/os/services'
+  import { appManager } from '$lib/apps/AppManager.svelte'
+  import { ACCOUNT_UNAVAILABLE } from '$lib/apps/builtin/account/service'
   import { navController } from '$lib/nav/nav-controller-instance'
-  import { getNavItem } from '$lib/nav/nav-items'
   import { pathToTabIdSafe } from '$lib/nav/path-utils'
   import { mode, toggleMode } from 'mode-watcher'
 
@@ -18,9 +19,10 @@
   const navState = $derived(navStore.current)
   // 通过账户服务获取登录态（不再直接 import authStore）
   const account = $derived(gaubeeos.getAppService('account'))
-  const accountState = $derived(account?.state ?? { loaded: true, authenticated: false, user: null, error: null })
+  const accountState = $derived(account?.state ?? ACCOUNT_UNAVAILABLE)
   const activeMain = $derived(pathToTabIdSafe(navState.mainLocation.pathname, navState.mainTabs))
-  const mainLabel = $derived((activeMain && getNavItem(activeMain)?.label) ?? '未知')
+  // 从 AppManager 获取应用名称（不依赖已废弃的静态 nav-items）
+  const mainLabel = $derived((activeMain && appManager.findByRoute(activeMain)?.name) ?? '未知')
 
   function gotoAccount() {
     navController.navigateMain('/app/account')

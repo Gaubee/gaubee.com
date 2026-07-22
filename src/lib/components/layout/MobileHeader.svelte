@@ -7,7 +7,7 @@
 <script lang="ts">
   import { navStore } from '$lib/nav/nav.svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
-  import { getNavItem } from '$lib/nav/nav-items'
+  import { appManager } from '$lib/apps/AppManager.svelte'
   import { pathToTabIdSafe } from '$lib/nav/path-utils'
   import MenuIcon from '@lucide/svelte/icons/menu'
   import SearchIcon from '@lucide/svelte/icons/search'
@@ -17,11 +17,11 @@
 
   const navState = $derived(navStore.current)
 
-  // 当前 main 活动标题
+  // 当前 main 活动标题（从 AppManager 获取应用名称，不依赖已废弃的静态 nav-items）
   const activeTitle = $derived.by(() => {
     const tabId = pathToTabIdSafe(navState.mainLocation.pathname, navState.mainTabs)
     if (!tabId) return 'Gaubee'
-    return getNavItem(tabId)?.label ?? 'Gaubee'
+    return appManager.findByRoute(tabId)?.name ?? 'Gaubee'
   })
 
   let drawerOpen = $state(false)
@@ -42,14 +42,14 @@
 
   <button
     class="hover:bg-accent flex size-10 items-center justify-center rounded-md"
-    onclick={() => navController.activatePop('/search')}
+    onclick={() => navController.activatePop('/app/search')}
     aria-label="搜索"
   >
     <SearchIcon class="size-5" />
   </button>
   <button
     class="hover:bg-accent flex size-10 items-center justify-center rounded-md"
-    onclick={() => navController.activatePop('/notifications')}
+    onclick={() => navController.activatePop('/app/notifications')}
     aria-label="通知"
   >
     <BellIcon class="size-5" />

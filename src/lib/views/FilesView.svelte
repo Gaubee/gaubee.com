@@ -13,16 +13,17 @@
   import * as Card from '$lib/components/ui/card'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { gaubeeos } from '$lib/os/services'
+  import { ACCOUNT_UNAVAILABLE } from '$lib/apps/builtin/account/service'
+  import { notifySuccess } from '$lib/apps/builtin/notifications/service.svelte'
   import { serializeMarkdown } from '$lib/data/frontmatter'
   import FileTextIcon from '@lucide/svelte/icons/file-text'
   import FolderIcon from '@lucide/svelte/icons/folder'
   import PlusIcon from '@lucide/svelte/icons/plus'
   import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw'
-  import { toast } from 'svelte-sonner'
 
   // 通过账户服务获取登录态（不再直接 import authStore）
   const account = $derived(gaubeeos.getAppService('account'))
-  const accountState = $derived(account?.state ?? { loaded: true, authenticated: false, user: null, error: null })
+  const accountState = $derived(account?.state ?? ACCOUNT_UNAVAILABLE)
   const articles = $derived(vfsStore.filesInCollection('articles'))
   const events = $derived(vfsStore.filesInCollection('events'))
 
@@ -42,7 +43,7 @@
   function openFile(path: string) {
     const match = path.match(/^src\/content\/(articles|events)\/(.+)\.md$/)
     if (match) {
-      navController.navigateMain(`/editor/${match[1]}/${match[2]}`)
+      navController.navigateMain(`/app/editor/${match[1]}/${match[2]}`)
     }
   }
 
@@ -66,8 +67,8 @@
       '',
     )
     await vfsStore.write(path, content)
-    toast.success(`已新建 ${collection === 'articles' ? '文章' : '短评'} ${stem}`)
-    navController.navigateMain(`/editor/${collection}/${stem}`)
+    notifySuccess(`已新建 ${collection === 'articles' ? '文章' : '短评'} ${stem}`)
+    navController.navigateMain(`/app/editor/${collection}/${stem}`)
   }
 </script>
 

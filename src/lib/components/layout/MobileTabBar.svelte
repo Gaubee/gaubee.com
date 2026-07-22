@@ -6,7 +6,7 @@
 <script lang="ts">
   import { navStore } from '$lib/nav/nav.svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
-  import { getNavItem } from '$lib/nav/nav-items'
+  import { appManager } from '$lib/apps/AppManager.svelte'
   import { pathToTabIdSafe } from '$lib/nav/path-utils'
   import type { TabId } from '$lib/nav/controller'
 
@@ -15,6 +15,11 @@
 
   // 底栏最多 5 个，超出走抽屉
   const quickTabs = $derived(navState.mainTabs.slice(0, 5) as TabId[])
+
+  // 从 AppManager 获取应用元数据（图标/名称），不依赖已废弃的静态 nav-items
+  function getAppInfo(route: string) {
+    return appManager.findByRoute(route)
+  }
 </script>
 
 <nav
@@ -22,19 +27,20 @@
   aria-label="主导航"
 >
   {#each quickTabs as tabId (tabId)}
-    {@const item = getNavItem(tabId)}
+    {@const app = getAppInfo(tabId)}
     {@const isActive = tabId === activeTab}
-    {#if item}
+    {#if app}
       <button
         class="text-muted-foreground hover:bg-accent flex flex-1 flex-col items-center gap-0.5 rounded-md py-1.5 text-[10px] transition-colors {isActive
           ? 'text-foreground'
           : ''}"
         onclick={() => navController.navigateMain(tabId)}
-        aria-label={item.label}
+        aria-label={app.name}
         aria-current={isActive ? 'page' : undefined}
       >
-        <item.icon class="size-5" />
-        <span class="truncate">{item.label}</span>
+        <!-- svelte-ignore ownership_invalid_mutation -->
+        <app.icon class="size-5" />
+        <span class="truncate">{app.name}</span>
       </button>
     {/if}
   {/each}
