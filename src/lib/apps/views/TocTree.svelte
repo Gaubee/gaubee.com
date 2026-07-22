@@ -1,8 +1,9 @@
 <!--
 	正交意图：
 	1. 原始需求（2026-07-21）：长文章需要可用的桌面与移动 TOC。
-	2. 展示与正文 GFM heading id 完全一致的二、三级标题。
-	3. 在滚动中标记当前阅读位置，并提供可访问的移动 Sheet。
+	2. 原始需求（2026-07-22）：足够宽的桌面端将 TOC 放在正文右侧，并让其独立滚动、吸顶。
+	3. 展示与正文 GFM heading id 完全一致的二、三级标题。
+	4. 在滚动中标记当前阅读位置，并提供可访问的移动 Sheet。
 -->
 <script lang="ts">
   import { browser } from '$app/environment'
@@ -49,8 +50,11 @@
 </script>
 
 {#if toc.length > 0}
-  <nav class="hidden lg:block" aria-label="文章目录">
-    <div class="sticky top-8 max-h-[calc(100dvh-4rem)] overflow-y-auto pr-2 scrollbar-thin scrollbar-track-transparent">
+  <nav class="hidden xl:block" aria-label="文章目录">
+    <div
+      class="sticky top-8 max-h-[calc(100dvh-4rem)] overflow-y-auto pr-2 scrollbar-thin scrollbar-track-transparent"
+      data-toc-scroll-region
+    >
       <h2 class="mb-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
         <ListIcon class="size-4" />
         目录
@@ -69,7 +73,7 @@
     </div>
   </nav>
 
-  <div class="lg:hidden">
+  <div class="xl:hidden">
     <Sheet.Root bind:open={mobileOpen}>
       <Button
         variant="outline"

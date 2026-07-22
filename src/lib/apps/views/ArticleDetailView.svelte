@@ -1,7 +1,8 @@
 <!--
 	正交意图：
 	1. 原始需求（2026-07-21）：长文需要桌面和移动 TOC。
-	2. 从 ReadonlyVFS 阅读文章，并保持前后文章导航。
+	2. 原始需求（2026-07-22）：桌面 TOC 位于右侧，独立滚动并吸顶，避免与应用导航叠加在左侧。
+	3. 从 ReadonlyVFS 阅读文章，并保持前后文章导航。
 -->
 <script lang="ts">
   import { readonlyVfs, type ReadonlyPost } from '$lib/vfs/readonly'
@@ -75,7 +76,7 @@
   }
 </script>
 
-<div class="mx-auto max-w-5xl">
+<div class="mx-auto max-w-[78rem] px-4 py-6 sm:px-6 lg:px-8">
   {#if !target || !post}
     <div class="flex h-64 items-center justify-center">
       <p class="text-muted-foreground text-sm">文章未找到</p>
@@ -90,17 +91,12 @@
       <span>返回{post.collection === 'events' ? '说说' : '文章'}列表</span>
     </button>
 
-    <div class="flex gap-8">
-      <!-- 桌面端 TOC -->
-      <aside class="hidden lg:block lg:w-64 shrink-0">
-        <TocTree markdown={post.body} />
-      </aside>
-
-      <!-- 主内容区 -->
-      <div class="flex-1 min-w-0">
+    <div class="xl:grid xl:grid-cols-[minmax(0,72ch)_14rem] xl:justify-center xl:gap-x-10">
+      <!-- 主内容区：控制行宽，避免宽屏阅读时单行过长。 -->
+      <div class="min-w-0">
         <!-- 文章头部 -->
         <header class="mb-8">
-          <h1 class="mb-4 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
+          <h1 class="mb-4 text-balance text-3xl font-bold leading-tight sm:text-4xl">
             {post.metadata.title ?? post.id.slug ?? post.id.stem}
           </h1>
 
@@ -168,10 +164,15 @@
           {/if}
         </nav>
       </div>
+
+      <!-- 桌面端 TOC：全局应用导航在左，文章导航固定在右。 -->
+      <aside class="hidden xl:block xl:self-start">
+        <TocTree markdown={post.body} />
+      </aside>
     </div>
 
     <!-- 移动端 TOC（浮动按钮 + Sheet） -->
-    <div class="lg:hidden">
+    <div class="xl:hidden">
       <TocTree markdown={post.body} />
     </div>
   {/if}

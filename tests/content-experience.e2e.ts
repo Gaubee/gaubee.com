@@ -2,13 +2,14 @@
  * 正交意图：
  * 1. 原始需求（2026-07-21）：文章目录、短评 Markdown 与应用搜索必须可在真实浏览器使用。
  * 2. 锁定桌面/移动断点下的目录 Sheet、短评展开和 app: 筛选搜索契约。
+ * 3. 原始需求（2026-07-22）：宽桌面目录在正文右侧独立滚动，中等宽度收纳到 Sheet。
  */
 import { expect, test } from "@playwright/test";
 
 const ARTICLE_PATH = "/article/articles/0054.css-view-transitions-1";
 
 test.describe("内容阅读体验", () => {
-  test("桌面文章页显示唯一且完整的标题目录", async ({ page }) => {
+  test("宽桌面文章页在正文右侧显示独立滚动的标题目录", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto(ARTICLE_PATH);
 
@@ -18,6 +19,45 @@ test.describe("内容阅读体验", () => {
     await expect(
       toc.getByRole("button", { name: /一、告别刀耕火种/ }),
     ).toBeVisible();
+
+    const [tocBox, contentBox] = await Promise.all([
+      toc.boundingBox(),
+      page.locator("article.article-content").boundingBox(),
+    ]);
+    if (!tocBox || !contentBox) {
+      throw new Error("文章正文或目录未渲染");
+    }
+    expect(tocBox.x).toBeGreaterThan(contentBox.x + contentBox.width);
+
+    await expect(toc.locator("[data-toc-scroll-region]")).toHaveCSS(
+      "position",
+      "sticky",
+    );
+    await expect(toc.locator("[data-toc-scroll-region]")).toHaveCSS(
+      "overflow-y",
+      "auto",
+    );
+
+    await page
+      .locator(".main-content")
+      .evaluate((element) => element.scrollTo({ top: 600, behavior: "auto" }));
+    await expect
+      .poll(
+        async () => (await toc.boundingBox())?.y ?? Number.POSITIVE_INFINITY,
+      )
+      .toBeLessThanOrEqual(40);
+  });
+
+  test("中等宽度将文章目录收纳到 Sheet", async ({ page }) => {
+    await page.setViewportSize({ width: 1180, height: 800 });
+    await page.goto(ARTICLE_PATH);
+
+    await expect(
+      page.getByRole("button", { name: "打开文章目录" }),
+    ).toBeVisible();
+    await expect(
+      page.locator('nav[aria-label="文章目录"]:visible'),
+    ).toHaveCount(0);
   });
 
   test("移动端文章目录 Sheet 可定位到正文标题", async ({ page }) => {
