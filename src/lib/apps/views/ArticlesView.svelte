@@ -1,7 +1,7 @@
 <!--
 	正交意图：
 	1. 原始需求（2026-07-21）：文章列表需要按年份 TOC，移动端也必须有项目。
-	2. 原始需求（2026-07-22）：宽桌面将年份 TOC 放在列表右侧，独立滚动并吸顶。
+	2. 原始需求（2026-07-22）：宽桌面将年份 TOC 放在列表右侧；拉伸的侧栏承载吸顶，内部目录独立滚动。
 	3. 从 ReadonlyVFS 读取并按发布时间分组展示文章。
 -->
 <script lang="ts">
@@ -174,7 +174,7 @@
     </div>
 
     <!-- 桌面端年份 TOC：全局应用导航在左，列表时间导航固定在右。 -->
-    <aside class="hidden xl:block xl:self-start">
+    <aside class="hidden xl:block">
       {#if !loading && posts.length > 0}
         <YearToc posts={posts} onSelectYear={scrollToYear} />
       {/if}

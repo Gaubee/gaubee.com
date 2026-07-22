@@ -1,7 +1,7 @@
 <!--
 	正交意图：
 	1. 原始需求（2026-07-21）：文章列表需要按年份的 TOC。
-	2. 原始需求（2026-07-22）：宽桌面将年份 TOC 放在列表右侧，并让其独立滚动、吸顶。
+	2. 原始需求（2026-07-22）：宽桌面将年份 TOC 放在列表右侧；外层导航吸顶，内部目录独立滚动。
 	3. 在桌面侧栏和移动 Sheet 提供相同的年份项目。
 -->
 <script lang="ts">
@@ -35,9 +35,9 @@
   }
 </script>
 
-<nav class="hidden xl:block" aria-label="按年份浏览文章">
+<nav class="hidden xl:sticky xl:top-8 xl:block" aria-label="按年份浏览文章">
   <div
-    class="sticky top-8 max-h-[calc(100dvh-4rem)] overflow-y-auto pr-2 scrollbar-thin scrollbar-track-transparent"
+    class="max-h-[calc(100dvh-4rem)] overflow-y-auto pr-2 scrollbar-thin scrollbar-track-transparent"
     data-year-toc-scroll-region
   >
     <h2 class="bg-background sticky top-0 mb-3 flex items-center gap-2 py-1 text-sm font-semibold text-muted-foreground">

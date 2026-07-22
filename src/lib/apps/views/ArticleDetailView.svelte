@@ -1,7 +1,7 @@
 <!--
 	正交意图：
 	1. 原始需求（2026-07-21）：长文需要桌面和移动 TOC。
-	2. 原始需求（2026-07-22）：桌面 TOC 位于右侧，独立滚动并吸顶，避免与应用导航叠加在左侧。
+	2. 原始需求（2026-07-22）：桌面 TOC 位于右侧；拉伸的侧栏承载吸顶，内部目录独立滚动，避免与应用导航叠加在左侧。
 	3. 从 ReadonlyVFS 阅读文章，并保持前后文章导航。
 -->
 <script lang="ts">
@@ -166,7 +166,7 @@
       </div>
 
       <!-- 桌面端 TOC：全局应用导航在左，文章导航固定在右。 -->
-      <aside class="hidden xl:block xl:self-start">
+      <aside class="hidden xl:block">
         <TocTree markdown={post.body} />
       </aside>
     </div>

@@ -108,6 +108,7 @@ AppManifest.searchService ──► Search registry ──► SearchView
 
 - Markdown 目录与正文共用 `marked-gfm-heading-id` 结果；不得自行生成 slug。
 - 目录、年份入口和长短内容展开均须提供桌面与移动的可访问交互。
+- 宽桌面右侧目录由拉伸的 grid 侧栏承载：外层 `nav` 负责 `sticky top-8`，内层目录负责限高滚动；不得给侧栏使用 `self-start`，也不得将 sticky 放在内部滚动盒上。
 - 对内容的搜索结果按日期优先显示；首个非空批次立即渲染，后续结果以窗口合并降低列表抖动。
 
 ### 验证入口

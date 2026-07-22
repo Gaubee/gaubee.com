@@ -2,8 +2,8 @@
  * 正交意图：
  * 1. 原始需求（2026-07-21）：文章目录、短评 Markdown 与应用搜索必须可在真实浏览器使用。
  * 2. 锁定桌面/移动断点下的目录 Sheet、短评展开和 app: 筛选搜索契约。
- * 3. 原始需求（2026-07-22）：宽桌面目录在正文右侧独立滚动，中等宽度收纳到 Sheet。
- * 4. 原始需求（2026-07-22）：文章列表年份 TOC 也须在右侧独立滚动、吸顶。
+ * 3. 原始需求（2026-07-22）：宽桌面目录在正文右侧独立滚动，外层导航吸顶，中等宽度收纳到 Sheet。
+ * 4. 原始需求（2026-07-22）：文章列表年份 TOC 也须在右侧独立滚动，外层导航吸顶。
  */
 import { expect, test } from "@playwright/test";
 
@@ -30,10 +30,7 @@ test.describe("内容阅读体验", () => {
     }
     expect(tocBox.x).toBeGreaterThan(contentBox.x + contentBox.width);
 
-    await expect(toc.locator("[data-toc-scroll-region]")).toHaveCSS(
-      "position",
-      "sticky",
-    );
+    await expect(toc).toHaveCSS("position", "sticky");
     await expect(toc.locator("[data-toc-scroll-region]")).toHaveCSS(
       "overflow-y",
       "auto",
@@ -42,6 +39,11 @@ test.describe("内容阅读体验", () => {
     await page
       .locator(".main-content")
       .evaluate((element) => element.scrollTo({ top: 600, behavior: "auto" }));
+    await expect
+      .poll(
+        async () => (await toc.boundingBox())?.y ?? Number.NEGATIVE_INFINITY,
+      )
+      .toBeGreaterThanOrEqual(24);
     await expect
       .poll(
         async () => (await toc.boundingBox())?.y ?? Number.POSITIVE_INFINITY,
@@ -80,12 +82,17 @@ test.describe("内容阅读体验", () => {
     expect(tocBox.x).toBeGreaterThan(contentBox.x + contentBox.width);
 
     const scrollRegion = toc.locator("[data-year-toc-scroll-region]");
-    await expect(scrollRegion).toHaveCSS("position", "sticky");
+    await expect(toc).toHaveCSS("position", "sticky");
     await expect(scrollRegion).toHaveCSS("overflow-y", "auto");
 
     await page
       .locator(".main-content")
       .evaluate((element) => element.scrollTo({ top: 600, behavior: "auto" }));
+    await expect
+      .poll(
+        async () => (await toc.boundingBox())?.y ?? Number.NEGATIVE_INFINITY,
+      )
+      .toBeGreaterThanOrEqual(24);
     await expect
       .poll(
         async () => (await toc.boundingBox())?.y ?? Number.POSITIVE_INFINITY,
