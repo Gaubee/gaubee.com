@@ -6,7 +6,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { contentStore } from '$lib/data/content.svelte'
-  import { authStore } from '$lib/auth/session.svelte'
+  import { gaubeeos } from '$lib/os/services'
   import { navController } from '$lib/nav/nav-controller-instance'
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
   import { Button } from '$lib/components/ui/button'
@@ -20,7 +20,9 @@
 
   const state = $derived(contentStore.state)
   const posts = $derived(contentStore.allPosts)
-  const authState = $derived(authStore.state)
+  // 通过账户服务获取登录态（不再直接 import authStore）
+  const account = $derived(gaubeeos.getAppService('account'))
+  const accountState = $derived(account?.state ?? { loaded: true, authenticated: false, user: null, error: null })
 
   // 首次进入且未加载时拉取
   onMount(() => {
@@ -64,12 +66,12 @@
       <Card.Content class="pt-6">
         <p class="text-destructive mb-2 font-medium">加载失败</p>
         <p class="text-muted-foreground text-sm">{state.error}</p>
-        {#if !authState.authenticated}
+        {#if !accountState.authenticated}
           <p class="text-muted-foreground mt-3 text-sm">
             GitHub API 需要认证。请先
             <button
               class="text-primary underline"
-              onclick={() => navController.navigateMain('/settings')}
+              onclick={() => navController.navigateMain('/app/account')}
             >
               登录
             </button>
@@ -82,8 +84,8 @@
     <Card.Root>
       <Card.Content class="flex flex-col items-center gap-3 pt-12 pb-12 text-center">
         <p class="text-muted-foreground">还没有内容</p>
-        {#if !authState.authenticated}
-          <Button size="sm" onclick={() => navController.navigateMain('/settings')}>
+        {#if !accountState.authenticated}
+          <Button size="sm" onclick={() => navController.navigateMain('/app/account')}>
             <LogInIcon data-icon="inline-start" />
             登录以加载内容
           </Button>

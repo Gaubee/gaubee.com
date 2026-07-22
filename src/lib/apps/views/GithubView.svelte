@@ -11,7 +11,7 @@
 -->
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { authStore } from '$lib/auth/session.svelte'
+  import { gaubeeos } from '$lib/os/services'
   import { gitStore, type RepoConfig } from '$lib/apps/GitStore.svelte'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
@@ -27,7 +27,9 @@
   let repo = $state('gaubee.com')
   let branch = $state('main')
 
-  const authState = $derived(authStore.state)
+  // 通过账户服务获取登录态（不再直接 import authStore）
+  const account = $derived(gaubeeos.getAppService('account'))
+  const accountState = $derived(account?.state ?? { loaded: true, authenticated: false, user: null, error: null })
   const repoState = $derived(gitStore.repo)
   const commits = $derived(gitStore.commits)
   const loading = $derived(gitStore.loading)
@@ -38,7 +40,7 @@
       owner: owner.trim(),
       repo: repo.trim(),
       branch: branch.trim(),
-      authenticated: authState.authenticated,
+      authenticated: accountState.authenticated,
     }
     try {
       await gitStore.clone(config)
@@ -62,11 +64,11 @@
     <h1 class="text-2xl font-semibold">Github</h1>
   </div>
 
-  {#if !authState.authenticated}
+  {#if !accountState.authenticated}
     <Card.Root class="mb-4">
       <Card.Content class="flex flex-col items-center gap-3 pt-8 pb-8 text-center">
         <p class="text-muted-foreground">登录后可以克隆私有仓库并推送变更</p>
-        <Button onclick={() => authStore.login()}>
+        <Button onclick={() => account?.login()}>
           <LogInIcon data-icon="inline-start" />
           用 GitHub 登录
         </Button>

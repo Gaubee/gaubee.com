@@ -72,7 +72,10 @@ class MemFS {
   statSync = (path: string): { isDirectory: () => boolean; size: number } => {
     const data = this._get(path);
     if (data !== undefined) {
-      return { isDirectory: () => false, size: typeof data === "string" ? data.length : data.byteLength };
+      return {
+        isDirectory: () => false,
+        size: typeof data === "string" ? data.length : data.byteLength,
+      };
     }
     // 检查是否是目录
     const prefix = path.endsWith("/") ? path : path + "/";
@@ -116,9 +119,13 @@ class MemFS {
       Promise.resolve(this.mkdirSync(path, opts)),
     readdir: (path: string): Promise<string[]> =>
       Promise.resolve(this.readdirSync(path)),
-    stat: (path: string): Promise<{ isDirectory: () => boolean; size: number }> =>
+    stat: (
+      path: string,
+    ): Promise<{ isDirectory: () => boolean; size: number }> =>
       Promise.resolve(this.statSync(path)),
-    lstat: (path: string): Promise<{ isDirectory: () => boolean; size: number }> =>
+    lstat: (
+      path: string,
+    ): Promise<{ isDirectory: () => boolean; size: number }> =>
       Promise.resolve(this.lstatSync(path)),
     unlink: (path: string): Promise<void> =>
       Promise.resolve(this.unlinkSync(path)),
@@ -234,7 +241,9 @@ class GitStore {
         ref: this.branch,
       });
       this.changedFiles = status
-        .filter(([, head, workdir, stage]) => head !== workdir || workdir !== stage)
+        .filter(
+          ([, head, workdir, stage]) => head !== workdir || workdir !== stage,
+        )
         .map(([filepath]) => filepath);
     } catch (e) {
       this.error = e instanceof Error ? e.message : String(e);
@@ -279,7 +288,9 @@ class GitStore {
         dir: "/",
         remote: "origin",
         ref: this.branch,
-        onAuth: token ? () => ({ username: "oauth2", password: token }) : undefined,
+        onAuth: token
+          ? () => ({ username: "oauth2", password: token })
+          : undefined,
         corsProxy: "https://cors.isomorphic-git.org",
       });
     } catch (e) {
@@ -292,13 +303,11 @@ class GitStore {
   // ---- 内部工具 ----
 
   private getToken(): string | null {
-    // 从 authStore 获取 token（延迟导入避免循环依赖）
-    try {
-      const { authStore } = require("$lib/auth/session.svelte");
-      return authStore.state.token ?? null;
-    } catch {
-      return null;
-    }
+    // 历史遗留：isomorphic-git 直接调用 GitHub API，需要明文 access token，
+    // 但本架构下 token 仅存在于 Worker 端 httpOnly cookie，前端永远拿不到。
+    // 因此 GitStore（GithubApp 的 clone/log/branch）只能匿名操作公开仓库。
+    // 需要认证的写操作（commit/发表）请走 GitService → VFS → Git Data API（Worker 代理注入 token）。
+    return null;
   }
 }
 

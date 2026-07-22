@@ -270,7 +270,7 @@ GaubeeOS/
 │   └── VFS 分层（只读层 + 可写层）
 │
 ├── 软装（应用系统）
-│   ├── 系统应用：文章、说说、搜索、设置、通知
+│   ├── 系统应用：文章、说说、搜索、设置、通知、账户
 │   ├── 默认安装：Github（isomorphic-git）、Terminal（PATH/bin）
 │   └── 可选安装：写作
 │
@@ -281,5 +281,35 @@ GaubeeOS/
 │
 └── 扩展点
     ├── CLI：PATH/bin 注册（gh、git、自定义命令）
-    └── VFS 授权：应用间路径权限共享
+    ├── VFS 授权：应用间路径权限共享
+    └── 应用服务总线：manifest.services → gaubeeos.getAppService
 ```
+
+#### 13. 账户系统应用 + 应用服务总线（2026-07-23）
+
+深度优化登录模块，参考 macOS/Windows 系统账号登录，建立 OS 级应用服务总线。
+
+- [x] **应用服务总线基础设施**（`src/lib/os/services/`）：
+  - `types.ts`：AppService 契约、ServiceDeclaration（manifest.services 声明项）。
+  - `registry.ts`：AppServiceRegistry 单例（serviceId → { appId, factory }），生命周期由 AppManager 驱动。
+  - `bus.ts`：`gaubeeos.getAppService(id)` / `requestAppService(id)` 全局入口，类型安全（ServiceTypeMap），按需启动应用。
+  - 自定义错误 `AppServiceNotInstalled`、`NotAuthenticatedError`。
+  - 这是现有 searchService 扩展点范式的自然泛化（单一能力 → 任意命名 service）。
+- [x] **AccountApp（账户系统应用）**：
+  - `builtin/account/`：manifest（system 应用，hiddenFromNav 深链接）、service（封装 authStore）、AccountView（参考 macOS 账户面板）。
+  - AccountService 暴露 state/login/logout/refresh/requireAuthenticated，其它应用经总线获取，不再直接 import authStore。
+  - 修复技术债：`vfs.ts` 读 httpOnly cookie 误判（恒 false）改用 accountService.isAuthenticated；GitStore 失效的 require() token 获取清理。
+- [x] **Settings 解耦**：
+  - `settings-sections.ts`：SettingsSectionRegistry，设置面板入口动态注册（link 跳转 / render 内联）。
+  - SettingsView 从硬编码账户卡片改为遍历 registry 动态渲染；AccountApp 自行注册「账户」入口。
+  - 谁提供能力谁注册入口；设置应用不反向依赖业务应用。
+- [x] **迁移 authStore 消费者**：StatusBar/WriterView/GithubView/FeedView/FilesView/+layout 全部改用 accountService，登录入口跳转 `/app/account`。
+- [x] **GitService（GitApp 服务化）**：
+  - `installable/github/service.ts`：GitService 接口（readFile/writeFile/dirtyFiles/commit/revert/sync），委托 VFS（认证有效路径）。
+  - commit 内部 require account 鉴权；统一收口写仓路径。
+- [x] **WriterApp 发表功能**：
+  - EditorView 工具栏新增「发表」按钮：保存 → 经 GitService commit → 错误处理（未登录引导 /app/account，未装 GitApp 提示安装）。
+  - WriterView 新增「批量发表」入口（VFS dirty 文件统一提交）。
+  - 三方松耦合：写作 → git service → account service，经总线通信。
+- [x] 验证：类型检查零新增错误（22 个预存错误不变）；142 个单元测试全过；Playwright 视觉验证设置页/账户页/编辑器发表按钮均正常。
+

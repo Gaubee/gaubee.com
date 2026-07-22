@@ -1,38 +1,34 @@
 <!--
 	SettingsView：设置页 + 应用管理。
-	- 账户 / GitHub 登录
-	- 已安装应用管理（安装/卸载）
-	- 关于
+
+	解耦设计：
+	- 不再硬编码「账户」等具体功能面板。功能面板通过 settingsSectionsRegistry 注册，
+	  SettingsView 遍历 registry.all() 动态渲染入口（点击跳转深链接，或内联 render 组件）。
+	  谁提供能力谁注册入口，设置应用不反向依赖具体业务应用。
+	- SettingsApp 自身职责：已安装应用管理（安装/卸载）保留为静态卡片。
 -->
 <script lang="ts">
-  import { authStore } from '$lib/auth/session.svelte'
   import { appManager } from '$lib/apps/AppManager.svelte'
+  import { settingsSectionsRegistry, type SettingsSection } from '$lib/apps/builtin/settings-sections'
+  import { navController } from '$lib/nav/nav-controller-instance'
   import { Button } from '$lib/components/ui/button'
   import * as Card from '$lib/components/ui/card'
-  import { Avatar, AvatarImage, AvatarFallback } from '$lib/components/ui/avatar'
-  import { Skeleton } from '$lib/components/ui/skeleton'
   import { Badge } from '$lib/components/ui/badge'
-  import LogInIcon from '@lucide/svelte/icons/log-in'
-  import LogOutIcon from '@lucide/svelte/icons/log-out'
-  import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw'
+  import ChevronRightIcon from '@lucide/svelte/icons/chevron-right'
   import DownloadIcon from '@lucide/svelte/icons/download'
   import TrashIcon from '@lucide/svelte/icons/trash'
   import { toast } from 'svelte-sonner'
 
-  const authState = $derived(authStore.state)
-  let loggingOut = $state(false)
+  // 已注册的设置面板入口（账户、关于等由各应用自行注册）
+  const sections = $derived(settingsSectionsRegistry.all())
 
   // 应用管理
   const installedApps = $derived(appManager.allInstalled)
   const availableApps = $derived(appManager.available)
 
-  async function handleLogout() {
-    loggingOut = true
-    try {
-      await authStore.logout()
-      toast.success('已登出')
-    } finally {
-      loggingOut = false
+  function handleSectionClick(section: SettingsSection) {
+    if (section.link) {
+      navController.navigateMain(section.link)
     }
   }
 
@@ -58,56 +54,49 @@
 <div class="mx-auto max-w-2xl p-6">
   <h1 class="mb-6 text-2xl font-semibold">设置</h1>
 
-  <!-- 账户 / GitHub 登录 -->
-  <Card.Root>
-    <Card.Header>
-      <Card.Title>账户</Card.Title>
-      <Card.Description>使用 GitHub 账户登录以编辑内容、提交变更。</Card.Description>
-    </Card.Header>
-    <Card.Content>
-      {#if !authState.loaded}
-        <div class="flex items-center gap-3">
-          <Skeleton class="size-10 rounded-full" />
-          <div class="flex flex-col gap-1.5">
-            <Skeleton class="h-4 w-24" />
-            <Skeleton class="h-3 w-32" />
-          </div>
-        </div>
-      {:else if authState.authenticated && authState.user}
-        <div class="flex items-center gap-3">
-          <Avatar class="size-10">
-            <AvatarImage src={authState.user.avatar_url} alt={authState.user.login} />
-            <AvatarFallback>{authState.user.login.slice(0, 2).toUpperCase()}</AvatarFallback>
-          </Avatar>
-          <div class="min-w-0 flex-1">
-            <div class="truncate font-medium">{authState.user.name ?? authState.user.login}</div>
-            <div class="text-muted-foreground truncate text-sm">@{authState.user.login}</div>
-          </div>
-          <Button variant="outline" size="sm" onclick={() => authStore.refresh()}>
-            <RefreshCwIcon data-icon="inline-start" />
-            刷新
-          </Button>
-          <Button variant="outline" size="sm" onclick={handleLogout} disabled={loggingOut}>
-            <LogOutIcon data-icon="inline-start" />
-            登出
-          </Button>
-        </div>
-      {:else}
-        <div class="flex flex-col items-start gap-3">
-          <p class="text-muted-foreground text-sm">
-            未登录。登录后可编辑文章、暂存变更并提交到 GitHub。
-          </p>
-          {#if authState.error}
-            <p class="text-destructive text-sm">{authState.error}</p>
+  <!-- 已注册的设置面板入口（账户、关于等） -->
+  {#if sections.length > 0}
+    <Card.Root>
+      <Card.Content class="flex flex-col gap-1 pt-2">
+        {#each sections as section (section.id)}
+          {#if section.render}
+            <!-- 内联渲染型面板 -->
+            <div class="border-b border-border py-3 last:border-b-0">
+              <div class="mb-2 flex items-center gap-2">
+                {#if section.icon}
+                  <!-- svelte-ignore ownership_invalid_mutation -->
+                  <section.icon class="text-muted-foreground size-4" />
+                {/if}
+                <span class="font-medium text-sm">{section.title}</span>
+              </div>
+              {#if section.description}
+                <p class="text-muted-foreground mb-2 text-xs">{section.description}</p>
+              {/if}
+              <section.render />
+            </div>
+          {:else}
+            <!-- 跳转型入口 -->
+            <button
+              class="hover:bg-accent flex items-center gap-3 rounded-md px-2 py-3 text-left transition-colors"
+              onclick={() => handleSectionClick(section)}
+            >
+              {#if section.icon}
+                <!-- svelte-ignore ownership_invalid_mutation -->
+                <section.icon class="text-muted-foreground size-4" />
+              {/if}
+              <div class="min-w-0 flex-1">
+                <div class="font-medium text-sm">{section.title}</div>
+                {#if section.description}
+                  <div class="text-muted-foreground truncate text-xs">{section.description}</div>
+                {/if}
+              </div>
+              <ChevronRightIcon class="text-muted-foreground size-4" />
+            </button>
           {/if}
-          <Button onclick={() => authStore.login()}>
-            <LogInIcon data-icon="inline-start" />
-            用 GitHub 登录
-          </Button>
-        </div>
-      {/if}
-    </Card.Content>
-  </Card.Root>
+        {/each}
+      </Card.Content>
+    </Card.Root>
+  {/if}
 
   <!-- 已安装应用 -->
   <Card.Root class="mt-4">
@@ -177,16 +166,4 @@
       </Card.Content>
     </Card.Root>
   {/if}
-
-  <!-- 关于 -->
-  <Card.Root class="mt-4">
-    <Card.Header>
-      <Card.Title>关于</Card.Title>
-    </Card.Header>
-    <Card.Content>
-      <p class="text-muted-foreground text-sm">
-        GaubeeOS · 基于虚拟文件系统的纯 Web 操作系统。
-      </p>
-    </Card.Content>
-  </Card.Root>
 </div>

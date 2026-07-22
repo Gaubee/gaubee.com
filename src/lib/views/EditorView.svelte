@@ -12,6 +12,9 @@
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
   import { vfsStore } from '$lib/vfs/vfs.svelte'
   import { navStore } from '$lib/nav/nav.svelte'
+  import { navController } from '$lib/nav/nav-controller-instance'
+  import { gaubeeos } from '$lib/os/services'
+  import { handlePublishError } from '$lib/os/services/publish-helper'
   import { parseMarkdown, serializeMarkdown, type ArticleMetadata } from '$lib/data/frontmatter'
   import { Button } from '$lib/components/ui/button'
   import * as Dialog from '$lib/components/ui/dialog'
@@ -22,6 +25,7 @@
   import PencilIcon from '@lucide/svelte/icons/pencil'
   import TagsIcon from '@lucide/svelte/icons/tags'
   import SaveIcon from '@lucide/svelte/icons/save'
+  import SendIcon from '@lucide/svelte/icons/send'
 
   type View = 'edit' | 'split' | 'preview'
 
@@ -41,6 +45,8 @@
   let loadSeq = 0
   /** 是否有未保存修改（用于提示）。 */
   let dirty = $state(false)
+  /** 是否正在发表（提交到 GitHub）。 */
+  let publishing = $state(false)
 
   // 从路径解析文章：/editor/articles/0057.tc39-signals
   const targetPost = $derived.by(() => {
@@ -116,6 +122,39 @@
     if (!currentPath) return
     scheduleSave()
   }
+
+  /**
+   * 发表：保存当前文章到 VFS，经 GitService 提交到 GitHub。
+   * - 未登录（NotAuthenticatedError）→ 引导到 /app/account 登录。
+   * - GitApp 未安装（AppServiceNotInstalled）→ 提示安装 Github 应用。
+   * - 成功 → toast 提示 commit sha 前 7 位。
+   */
+  async function handlePublish() {
+    if (!currentPath) return
+    publishing = true
+    try {
+      // 1. 先保存当前文章到 VFS（同步等待，不依赖 debounce）
+      if (saveTimer) {
+        clearTimeout(saveTimer)
+        saveTimer = null
+      }
+      const content = serializeMarkdown(metadata, body)
+      await vfsStore.write(currentPath, content)
+      dirty = false
+
+      // 2. 按需获取 Git 服务（会启动 GitApp）
+      const git = await gaubeeos.requestAppService('git')
+
+      // 3. 提交（内部 require account 鉴权）
+      const title = metadata.title ?? currentPath.split('/').pop() ?? '文章'
+      const sha = await git.commit(`发表：${title}`)
+      toast.success(`已发表（${sha.slice(0, 7)}）`)
+    } catch (e) {
+      handlePublishError(e, navController, toast)
+    } finally {
+      publishing = false
+    }
+  }
 </script>
 
 <div class="flex h-full flex-col">
@@ -149,6 +188,15 @@
       <Button size="sm" variant="default" onclick={handleSave} disabled={!currentPath}>
         <SaveIcon data-icon="inline-start" />
         <span class="hidden sm:inline">保存</span>
+      </Button>
+      <Button
+        size="sm"
+        variant="secondary"
+        onclick={handlePublish}
+        disabled={!currentPath || publishing}
+      >
+        <SendIcon data-icon="inline-start" />
+        <span class="hidden sm:inline">{publishing ? '发表中…' : '发表'}</span>
       </Button>
     </div>
   </div>

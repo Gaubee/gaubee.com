@@ -14,6 +14,7 @@ import { shoutApp } from "./builtin/shout";
 import { searchApp } from "./builtin/search";
 import { settingsApp } from "./builtin/settings";
 import { notificationsApp } from "./builtin/notifications";
+import { accountApp } from "./builtin/account";
 
 // 可安装应用（动态 import，按需加载）
 import { githubApp } from "./installable/github";
@@ -33,6 +34,7 @@ export function registerAllApps(): void {
   appManager.register(searchApp);
   appManager.register(settingsApp);
   appManager.register(notificationsApp);
+  appManager.register(accountApp);
 
   // 可安装应用（默认不安装，用户手动安装）
   appManager.register(githubApp);
@@ -44,7 +46,14 @@ export function registerAllApps(): void {
 }
 
 // 导出各应用 manifest 供外部使用
-export { articlesApp, shoutApp, searchApp, settingsApp, notificationsApp };
+export {
+  articlesApp,
+  shoutApp,
+  searchApp,
+  settingsApp,
+  notificationsApp,
+  accountApp,
+};
 export { githubApp, terminalApp, writerApp };
 
 /** 获取所有已注册应用。 */
@@ -55,6 +64,7 @@ export function getAllRegisteredApps(): AppEntry[] {
     searchApp,
     settingsApp,
     notificationsApp,
+    accountApp,
     githubApp,
     terminalApp,
     writerApp,

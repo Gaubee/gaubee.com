@@ -14,6 +14,7 @@ import { pathManager } from "./PathManager";
 import type { Command, CommandContext } from "../terminal/shell";
 import { registerPathCommand, unregisterPathCommand } from "../terminal/shell";
 import { searchServiceRegistry } from "$lib/search/registry";
+import { appServiceRegistry } from "$lib/os/services";
 
 // ---------------------------------------------------------------------------
 // 工具：将 CliCommand 转换为 shell Command
@@ -46,6 +47,7 @@ export const SYSTEM_APP_IDS = [
   "search",
   "settings",
   "notifications",
+  "account",
 ] as const;
 
 /** 默认安装的应用 ID（可卸载）。 */
@@ -86,19 +88,25 @@ class AppManager {
       .filter(Boolean) as InstalledApp[];
   }
 
-  /** main 区的应用。 */
+  /** main 区的应用（不含隐藏应用）。 */
   get mainApps(): InstalledApp[] {
-    return this.allInstalled.filter((app) => app.defaultArea === "main");
+    return this.allInstalled.filter(
+      (app) => app.defaultArea === "main" && !app.hiddenFromNav,
+    );
   }
 
-  /** bottom 区的应用。 */
+  /** bottom 区的应用（不含隐藏应用）。 */
   get bottomApps(): InstalledApp[] {
-    return this.allInstalled.filter((app) => app.defaultArea === "bottom");
+    return this.allInstalled.filter(
+      (app) => app.defaultArea === "bottom" && !app.hiddenFromNav,
+    );
   }
 
-  /** 所有已安装应用的 route（用于 NavController ALL_TABS）。 */
+  /** 所有已安装应用的 route（用于 NavController ALL_TABS，不含隐藏应用）。 */
   get allRoutes(): string[] {
-    return this.allInstalled.map((app) => app.route);
+    return this.allInstalled
+      .filter((app) => !app.hiddenFromNav)
+      .map((app) => app.route);
   }
 
   /** 可卸载的应用（非系统内置）。 */
@@ -187,6 +195,7 @@ class AppManager {
 
     this.installedIds = installed;
     this.syncSearchServices();
+    this.syncServices();
     this.initialized = true;
   }
 
@@ -208,6 +217,7 @@ class AppManager {
     this.installedIds = [...this.installedIds, id];
     this.writeStorage();
     this.registerSearchService(entry);
+    this.registerServices(entry);
 
     // 注册 CLI 命令到 PATH
     if (entry.manifest.cliCommands) {
@@ -239,6 +249,7 @@ class AppManager {
     // 从 PATH 注销 CLI 命令
     const entry = this.registry.get(id);
     searchServiceRegistry.unregister(id);
+    appServiceRegistry.unregisterApp(id);
     if (entry?.manifest.cliCommands) {
       for (const cli of entry.manifest.cliCommands) {
         pathManager.unregisterApp(id);
@@ -347,6 +358,20 @@ class AppManager {
   private registerSearchService(entry: AppEntry): void {
     const service = entry.manifest.searchService?.();
     if (service) searchServiceRegistry.register(service);
+  }
+
+  /** 将已安装应用声明的 services 投影到通用服务注册表。 */
+  private syncServices(): void {
+    for (const id of this.installedIds) {
+      const entry = this.registry.get(id);
+      if (entry) this.registerServices(entry);
+    }
+  }
+
+  private registerServices(entry: AppEntry): void {
+    if (entry.manifest.services) {
+      appServiceRegistry.register(entry.manifest.id, entry.manifest.services);
+    }
   }
 
   // ---- 内部工具 ----

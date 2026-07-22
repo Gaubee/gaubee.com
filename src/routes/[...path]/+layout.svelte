@@ -18,7 +18,7 @@
   import '$lib/views/placeholders'
   import { initNavController } from '$lib/nav/nav-controller-instance'
   import { navStore } from '$lib/nav/nav.svelte'
-  import { authStore } from '$lib/auth/session.svelte'
+  import { gaubeeos } from '$lib/os/services'
   import AreaOutlet from '$lib/components/layout/AreaOutlet.svelte'
   import DesktopSidebar from '$lib/components/layout/DesktopSidebar.svelte'
   import MobileHeader from '$lib/components/layout/MobileHeader.svelte'
@@ -58,7 +58,8 @@
     const authError = params.get('auth_error')
     if (authStatus === 'success') {
       toast.success('登录成功')
-      authStore.refresh()
+      // 通过账户服务刷新登录态（account 是系统应用，此时已注册）
+      gaubeeos.getAppService('account')?.refresh()
     } else if (authError) {
       const messages: Record<string, string> = {
         invalid_state: '登录失败：状态校验错误，请重试',

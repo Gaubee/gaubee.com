@@ -12,7 +12,7 @@
   import { Button } from '$lib/components/ui/button'
   import * as Card from '$lib/components/ui/card'
   import { Skeleton } from '$lib/components/ui/skeleton'
-  import { authStore } from '$lib/auth/session.svelte'
+  import { gaubeeos } from '$lib/os/services'
   import { serializeMarkdown } from '$lib/data/frontmatter'
   import FileTextIcon from '@lucide/svelte/icons/file-text'
   import FolderIcon from '@lucide/svelte/icons/folder'
@@ -20,7 +20,9 @@
   import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw'
   import { toast } from 'svelte-sonner'
 
-  const authState = $derived(authStore.state)
+  // 通过账户服务获取登录态（不再直接 import authStore）
+  const account = $derived(gaubeeos.getAppService('account'))
+  const accountState = $derived(account?.state ?? { loaded: true, authenticated: false, user: null, error: null })
   const articles = $derived(vfsStore.filesInCollection('articles'))
   const events = $derived(vfsStore.filesInCollection('events'))
 
@@ -84,13 +86,13 @@
     </div>
   </div>
 
-  {#if !authState.authenticated}
+  {#if !accountState.authenticated}
     <Card.Root class="mb-4">
       <Card.Content class="text-muted-foreground pt-5 text-sm">
         GitHub API 需要认证才能浏览与编辑文件。请先
         <button
           class="text-primary underline"
-          onclick={() => navController.navigateMain('/settings')}
+          onclick={() => navController.navigateMain('/app/account')}
         >
           登录
         </button>

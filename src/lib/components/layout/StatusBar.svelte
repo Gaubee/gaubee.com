@@ -4,7 +4,7 @@
 -->
 <script lang="ts">
   import { navStore } from '$lib/nav/nav.svelte'
-  import { authStore } from '$lib/auth/session.svelte'
+  import { gaubeeos } from '$lib/os/services'
   import { navController } from '$lib/nav/nav-controller-instance'
   import { getNavItem } from '$lib/nav/nav-items'
   import { pathToTabIdSafe } from '$lib/nav/path-utils'
@@ -16,27 +16,29 @@
   import MoonIcon from '@lucide/svelte/icons/moon'
 
   const navState = $derived(navStore.current)
-  const authState = $derived(authStore.state)
+  // 通过账户服务获取登录态（不再直接 import authStore）
+  const account = $derived(gaubeeos.getAppService('account'))
+  const accountState = $derived(account?.state ?? { loaded: true, authenticated: false, user: null, error: null })
   const activeMain = $derived(pathToTabIdSafe(navState.mainLocation.pathname, navState.mainTabs))
   const mainLabel = $derived((activeMain && getNavItem(activeMain)?.label) ?? '未知')
 
-  function gotoSettings() {
-    navController.navigateMain('/settings')
+  function gotoAccount() {
+    navController.navigateMain('/app/account')
   }
 </script>
 
 <footer
   class="desktop-status items-center gap-3 border-t border-border bg-background px-3 py-1 text-muted-foreground text-xs"
 >
-  <!-- 登录态（点击进设置） -->
+  <!-- 登录态（点击进账户） -->
   <button
     class="hover:text-foreground flex cursor-pointer items-center gap-1.5 transition-colors"
-    onclick={gotoSettings}
+    onclick={gotoAccount}
   >
-    {#if authState.loaded && authState.authenticated && authState.user}
-      <img src={authState.user.avatar_url} alt="" class="size-3.5 rounded-full" />
-      <span>@{authState.user.login}</span>
-    {:else if authState.loaded}
+    {#if accountState.loaded && accountState.authenticated && accountState.user}
+      <img src={accountState.user.avatar_url} alt="" class="size-3.5 rounded-full" />
+      <span>@{accountState.user.login}</span>
+    {:else if accountState.loaded}
       <UserIcon class="size-3.5" />
       <span>未登录</span>
     {:else}

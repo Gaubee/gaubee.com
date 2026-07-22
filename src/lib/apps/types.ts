@@ -7,6 +7,7 @@
  */
 import type { Component } from "svelte";
 import type { SearchServiceFactory } from "$lib/search/types";
+import type { ServiceDeclaration } from "$lib/os/services";
 
 // ---------------------------------------------------------------------------
 // 应用分类
@@ -69,6 +70,11 @@ export interface AppManifest {
   route: string;
   /** 是否支持深链接（如 '/app/articles/article/xxx'）。 */
   supportsDeepLink?: boolean;
+  /**
+   * 是否从主导航隐藏（不占 tab，但仍作为应用安装、提供 service）。
+   * 用于只通过深链接进入的应用（如账户应用），避免污染导航栏。
+   */
+  hiddenFromNav?: boolean;
   /** CLI 命令列表（安装时注册到 PATH）。 */
   cliCommands?: CliCommand[];
   /** VFS 路径所有权（该应用"拥有"哪些路径）。 */
@@ -77,6 +83,12 @@ export interface AppManifest {
   vfsPermissions?: { path: string; mode: "read" | "write" }[];
   /** 可选搜索适配闭包；搜索应用仅通过此协议发现能力。 */
   searchService?: SearchServiceFactory;
+  /**
+   * 该应用向 GaubeeOS 暴露的命名服务（service id → 工厂闭包）。
+   * 其它应用通过 gaubeeos.getAppService / requestAppService 获取，
+   * 由 AppManager 在安装/初始化时投影到 appServiceRegistry。
+   */
+  services?: ServiceDeclaration;
 }
 
 /** 已安装应用实例（含运行时状态）。 */

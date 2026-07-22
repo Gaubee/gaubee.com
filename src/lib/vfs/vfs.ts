@@ -10,6 +10,7 @@
  * 不依赖 Svelte runes，纯 TS 类，可被任何代码调用（视图、测试、未来 bash）。
  */
 import { browser } from "$app/environment";
+import { accountService } from "$lib/apps/builtin/account/service";
 import {
   vfsAll,
   vfsClear,
@@ -220,8 +221,8 @@ export class Vfs {
     }
 
     // 2. 并发拉取内容（已登录 5000/h，并发 6 安全；未登录 60/h，并发 2）
-    const authed =
-      typeof document !== "undefined" && document.cookie.includes("gh_token");
+    // 通过账户服务判断登录态（httpOnly cookie 前端读不到，旧代码读 document.cookie 恒为 false）
+    const authed = accountService.isAuthenticated;
     const limit = authed ? 6 : 2;
     await pool(toFetch, limit, async (entry) => {
       try {

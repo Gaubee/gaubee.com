@@ -14,6 +14,7 @@ import SearchView from "./SearchView.svelte";
 import SettingsView from "./SettingsView.svelte";
 import TagsView from "./TagsView.svelte";
 import TerminalView from "./TerminalView.svelte";
+import AccountView from "$lib/apps/views/AccountView.svelte";
 import ArticlesView from "$lib/apps/views/ArticlesView.svelte";
 import ShoutView from "$lib/apps/views/ShoutView.svelte";
 import WriterView from "$lib/apps/views/WriterView.svelte";
@@ -50,6 +51,7 @@ export function ensureViewsRegistered(): void {
   // ===== 深链接 views（main 区非 tab 路径）=====
   registerDeepLinkView("/article", ArticleView);
   registerDeepLinkView("/tags", TagsView);
+  registerDeepLinkView("/app/account", AccountView);
 
   // ===== pop views =====
   registerPopView("/app/search", SearchView);

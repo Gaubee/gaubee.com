@@ -10,7 +10,8 @@
 -->
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { authStore } from '$lib/auth/session.svelte'
+  import { gaubeeos } from '$lib/os/services'
+  import { handlePublishError } from '$lib/os/services/publish-helper'
   import { vfsStore } from '$lib/vfs/vfs.svelte'
   import { contentStore } from '$lib/data/content.svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
@@ -19,11 +20,19 @@
   import * as Card from '$lib/components/ui/card'
   import FileTextIcon from '@lucide/svelte/icons/file-text'
   import LogInIcon from '@lucide/svelte/icons/log-in'
+  import SendIcon from '@lucide/svelte/icons/send'
+  import GitCommitHorizontalIcon from '@lucide/svelte/icons/git-commit-horizontal'
+  import { toast } from 'svelte-sonner'
 
   let files = $state<string[]>([])
   let loading = $state(true)
+  let publishing = $state(false)
 
-  const authState = $derived(authStore.state)
+  // 通过账户服务获取登录态（不再直接 import authStore）
+  const account = $derived(gaubeeos.getAppService('account'))
+  const accountState = $derived(account?.state ?? { loaded: true, authenticated: false, user: null, error: null })
+  // VFS dirty 文件数（待发表的本地变更）
+  const dirtyCount = $derived(vfsStore.dirtyCount)
 
   onMount(async () => {
     // 从 VFS 获取文件列表（包含只读层 + 可写层）
@@ -43,23 +52,41 @@
       navController.navigateMain(`/editor/${collection}/${stem}`)
     }
   }
+
+  /**
+   * 批量发表：把所有 VFS dirty 文件经 GitService 提交到 GitHub。
+   * 错误处理与 EditorView.handlePublish 一致。
+   */
+  async function handlePublishAll() {
+    publishing = true
+    try {
+      const git = await gaubeeos.requestAppService('git')
+      const sha = await git.commit(`发表 ${dirtyCount} 个变更`)
+      toast.success(`已发表 ${dirtyCount} 个变更（${sha.slice(0, 7)}）`)
+      await contentStore.refresh()
+    } catch (e) {
+      handlePublishError(e, navController, toast)
+    } finally {
+      publishing = false
+    }
+  }
 </script>
 
 <div class="mx-auto max-w-3xl p-4 sm:p-6">
   <div class="mb-4 flex items-center justify-between">
     <h1 class="text-2xl font-semibold">写作</h1>
-    {#if authState.authenticated}
+    {#if accountState.authenticated}
       <Button size="sm" variant="outline" onclick={() => contentStore.refresh()}>
         刷新
       </Button>
     {/if}
   </div>
 
-  {#if !authState.authenticated}
+  {#if !accountState.authenticated}
     <Card.Root class="mb-4">
       <Card.Content class="flex flex-col items-center gap-3 pt-8 pb-8 text-center">
         <p class="text-muted-foreground">登录后可以编辑文章并提交到 GitHub</p>
-        <Button onclick={() => authStore.login()}>
+        <Button onclick={() => account?.login()}>
           <LogInIcon data-icon="inline-start" />
           用 GitHub 登录
         </Button>
@@ -97,5 +124,22 @@
         </button>
       {/each}
     </div>
+
+    <!-- 待发表变更（VFS dirty 文件）批量提交入口 -->
+    {#if dirtyCount > 0}
+      <Card.Root class="mt-4">
+        <Card.Content class="flex items-center gap-3 pt-5">
+          <GitCommitHorizontalIcon class="text-muted-foreground size-5" />
+          <div class="flex-1">
+            <div class="text-sm font-medium">{dirtyCount} 个待发表变更</div>
+            <div class="text-muted-foreground text-xs">编辑后自动暂存的本地修改，可一并提交到 GitHub。</div>
+          </div>
+          <Button size="sm" onclick={handlePublishAll} disabled={publishing}>
+            <SendIcon data-icon="inline-start" />
+            {publishing ? '发表中…' : '批量发表'}
+          </Button>
+        </Card.Content>
+      </Card.Root>
+    {/if}
   {/if}
 </div>
