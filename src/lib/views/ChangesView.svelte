@@ -20,6 +20,10 @@
   import GitCommitHorizontalIcon from '@lucide/svelte/icons/git-commit-horizontal'
   import Undo2Icon from '@lucide/svelte/icons/undo-2'
   import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw'
+  import FilePlusIcon from '@lucide/svelte/icons/file-plus'
+  import FileMinusIcon from '@lucide/svelte/icons/file-minus'
+  import FilePenIcon from '@lucide/svelte/icons/file-pen'
+  import { diffLines, type DiffLine } from '$lib/utils/diff'
   import { toast } from 'svelte-sonner'
 
   let changes = $state<VfsNode[]>([])
@@ -64,6 +68,20 @@
     await load()
     toast.success('已撤销修改')
   }
+
+  /** 判断变更类型：新建/删除/修改。 */
+  function changeKind(change: VfsNode): 'add' | 'del' | 'mod' {
+    if (change.origin === 'local') return 'add'
+    if (change.content === null) return 'del'
+    return 'mod'
+  }
+
+  /** 生成 diff 行（基于 baseContent 与 content）。 */
+  function changeDiff(change: VfsNode): DiffLine[] {
+    if (changeKind(change) === 'add') return diffLines(null, change.content)
+    if (changeKind(change) === 'del') return diffLines(change.baseContent, null)
+    return diffLines(change.baseContent, change.content)
+  }
 </script>
 
 <div class="mx-auto max-w-3xl p-4 sm:p-6">
@@ -88,10 +106,27 @@
   {:else}
     <!-- 变更列表 -->
     {#each changes as change (change.path)}
+      {@const kind = changeKind(change)}
+      {@const diff = changeDiff(change)}
+      {@const adds = diff.filter((d) => d.type === 'add').length}
+      {@const dels = diff.filter((d) => d.type === 'del').length}
       <Card.Root class="mb-3">
         <Card.Content class="pt-5">
           <div class="mb-2 flex items-center gap-2">
+            {#if kind === 'add'}
+              <FilePlusIcon class="size-4 text-emerald-500" />
+            {:else if kind === 'del'}
+              <FileMinusIcon class="size-4 text-destructive" />
+            {:else}
+              <FilePenIcon class="size-4 text-amber-500" />
+            {/if}
             <code class="bg-muted rounded px-1.5 py-0.5 text-xs">{change.path}</code>
+            <span class="text-muted-foreground text-xs">
+              {kind === 'add' ? '新建' : kind === 'del' ? '删除' : '修改'}
+              {#if kind === 'mod'}
+                · <span class="text-emerald-500">+{adds}</span> <span class="text-destructive">-{dels}</span>
+              {/if}
+            </span>
             <span class="text-muted-foreground text-xs">
               {new Date(change.mtime).toLocaleString('zh-CN')}
             </span>
@@ -105,11 +140,23 @@
               <Undo2Icon />
             </Button>
           </div>
-          {#if change.content !== null}
-            <pre class="bg-muted max-h-24 overflow-auto rounded p-2 text-xs">{change.content.slice(0, 300)}{change.content.length > 300 ? '…' : ''}</pre>
-          {:else}
-            <span class="text-destructive text-sm">（删除）</span>
-          {/if}
+          <!-- 行级 diff 预览 -->
+          <div class="bg-muted/50 max-h-48 overflow-auto rounded border border-border text-xs">
+            {#each diff.slice(0, 100) as line, i (i)}
+              <div
+                class="px-2 py-0.5 font-mono {line.type === 'add'
+                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                  : line.type === 'del'
+                    ? 'bg-destructive/10 text-destructive'
+                    : ''}"
+              >
+                <span class="text-muted-foreground mr-1 select-none">{line.type === 'add' ? '+' : line.type === 'del' ? '-' : ' '}</span>{line.text}
+              </div>
+            {/each}
+            {#if diff.length > 100}
+              <div class="text-muted-foreground px-2 py-1">… 还有 {diff.length - 100} 行</div>
+            {/if}
+          </div>
         </Card.Content>
       </Card.Root>
     {/each}

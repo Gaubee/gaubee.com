@@ -22,29 +22,30 @@
    - **明确计划**: 在开始任何实质性的编码工作之前，AI 需要提供一份清晰、分步的执行计划。计划需要获得我的批准后才能开始执行。
    - **任务追踪**: 使用根目录下的 `TODO.md` 文件来追踪项目的宏观任务和未来规划。
 2. 开发技术栈：
-   1. react
+   1. sveltekit
+   1. svelte 5（runes 响应式）
    1. vite
-   1. vitest
+   1. vitest（双 project：server=node 纯逻辑，client=浏览器组件/runes）
+   1. playwright
    1. tailwindcss v4
-   1. shadcn/ui
-   1. magic/ui
-   1. astro v4
-   1. lucide-react
+   1. shadcn-svelte（shadcn/ui 的 svelte 版）
+   1. @lucide/svelte（注意：lucide 因商标移除了 brand 图标如 github）
+   1. adapter-static（SSG + SPA 混合）
 3. 开发流程
    - **Commit Message 规范**: 所有的 Git 提交信息（Commit Message）都必须使用中文书写，清晰地描述本次提交的内容。
    - **提交前检查**: 在执行 `submit` 操作之前，必须完成以下检查：
-     1. **运行类型检查**: 执行 `pnpm ts` 来确保没有 TypeScript 类型错误。
+     1. **运行类型检查**: 执行 `pnpm -w run check` 来确保没有 TypeScript 类型错误。
      2. **运行测试**: 如果项目中有自动化测试，必须全部运行并通过。
      3. **代码审查**: 调用 `request_code_review()` 工具来获取代码变更的反馈。
    - **前端验证**: 如果进行了任何前端 UI 相关的更改，必须在提交前执行 `frontend_verification_instructions` 并遵循其指示完成验证。
    - **测试环境**: 我们的开发环境中已经安装了 `npm:playwright`、`npm:vitest` 的相关依赖了。方便 AI 使用 vitest/playwright 来编写测试代码。
-     1. 使用 `pnpm test` 来执行 playwright 测试脚本。
+     1. 使用 `pnpm -w run test:e2e` 来执行 playwright 测试脚本。
         1. 使用之前请仔细阅读 `playwright.config.ts` 文件。
            > 比如你可以通过环境变量`PLAYWRIGHT_BASE_URL`来自定义`page.goto('/')`的baseUrl
-        2. 或者自己执行 `pnpm playwright` 去做更加仔细更加可控的的测试运行
-     2. 使用 `pnpm vitest --run` 来执行 vitest 测试脚本
-   - **单元测试**: 在`tests`文件夹下开发 vitest 测试代码来验证基础功能。也可以开发 Playwright 脚本，用来做组件可用性可靠性验证。
-     > 为此可能需要提供一些特殊的页面来为组件的测试提供访问路径。可以使用 `/_test/*` 这样的路径
+        2. 或者自己执行 `pnpm -w run playwright` 去做更加仔细更加可控的的测试运行
+     2. 使用 `pnpm -w run test:unit --run` 来执行 vitest 测试脚本
+        > server project（node）测纯逻辑用 `*.test.ts`；client project（浏览器）测含 runes/组件用 `*.svelte.test.ts`
+   - **单元测试**: 在`src/lib`下与源码同目录开发 vitest 测试代码来验证基础功能（参照 `*.test.ts` / `*.svelte.test.ts`）。也可以开发 Playwright 脚本，用来做组件可用性可靠性验证。
    - **技术验证**: 在`tests/jules-scratch`文件夹下，使用 Playwright 脚本 + 截图的方式进行验证。这套流程（启动服务 -> 编写/运行脚本 -> 生成截图 -> 分析截图 -> 修复 -> 再次验证）被证明是定位和解决布局等视觉问题的有效方法。
 4. 分支与提交
    - **分支命名**: 功能开发分支应使用 `feat/` 前缀，例如 `feat/redesign-ui`。修复 bug 的分支应使用 `fix/` 前缀。
@@ -52,8 +53,33 @@
 
 ## 快速开始
 
-- 使用 `pnpm dev` 可以启动http服务
-- 使用 `pnpm ts` 来获取ts类型检查，使用`pnpm ts --watch`可以实时监控
+- 使用 `pnpm -w run dev` 可以启动http服务
+- 使用 `pnpm -w run check` 来获取ts类型检查，使用`pnpm -w run check:watch`可以实时监控
+
+## 应用服务总线架构（2026-07-23）
+
+### 核心机制
+应用通过 `manifest.services` 声明能力（命名 service），其它应用经 `gaubeeos.getAppService(id)` 获取。这是 `searchService` 扩展点范式的泛化。
+
+```
+gaubeeos.getAppService('account')     → AccountService   （AccountApp，系统应用）
+gaubeeos.getAppService('git')         → GitService       （GithubApp，默认安装）
+gaubeeos.requestAppService('git')     → 异步按需启动 + 返回
+gaubeeos.getAppService('notification')→ NotificationService（通知应用，系统应用）
+```
+
+### 声明一个新 service（三步）
+1. **类型注册**：在 `src/lib/os/services/bus.ts` 的 `ServiceTypeMap` 加一行 `yourId: YourService`。
+2. **manifest 声明**：在应用的 manifest 加 `services: { yourId: () => yourServiceSingleton }`。
+3. **单例实现**：新建 service 文件实现 `AppService` 接口，导出单例。AppManager 在 init/install 时自动投影到 registry。
+
+### 依赖方向约定
+- service 实现内部依赖其它 service 时，**直接 import 单例**（如 `gitService` import `accountService`），不经过 `gaubeeos`/bus，避免循环依赖（bus → appManager → registry → 应用 → bus）。
+- `bus.ts` 用 `import type` 引用各 service 接口（类型擦除，无运行时循环）。
+- 网络层错误映射：`client.ts` 的 `assertOk` 把 401/403 转成 `NotAuthenticatedError`，让 `handlePublishError` 的鉴权引导分支生效。
+
+### contentStore 例外
+`contentStore`（`src/lib/data/content.svelte.ts`）是纯派生只读视图层（无鉴权、无写操作），允许视图直接 import，未 service 化。
 
 ## 提交规范
 

@@ -20,6 +20,11 @@ export interface VfsRecord {
   dirty: boolean;
   /** 修改时间戳。 */
   mtime: number;
+  /**
+   * 修改前的原始内容快照（首次 dirty 时保存，commit/revert 后清除）。用于 diff。
+   * 旧记录无此字段，读出为 undefined，调用方应 `?? null`。
+   */
+  baseContent?: string | null;
 }
 
 interface GaubeeDB extends DBSchema {

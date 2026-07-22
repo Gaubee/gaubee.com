@@ -14,6 +14,7 @@
   import { gaubeeos } from '$lib/os/services'
   import { ACCOUNT_UNAVAILABLE } from '$lib/apps/builtin/account/service'
   import { gitStore, type RepoConfig } from '$lib/apps/GitStore.svelte'
+  import { navController } from '$lib/nav/nav-controller-instance'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import { Skeleton } from '$lib/components/ui/skeleton'
@@ -65,10 +66,21 @@
     <h1 class="text-2xl font-semibold">Github</h1>
   </div>
 
+  <!-- 只读说明 -->
+  <Card.Root class="mb-4">
+    <Card.Content class="text-muted-foreground pt-4 text-sm">
+      此为公开仓库只读浏览器（基于 isomorphic-git 匿名 clone）。编辑与发表请用
+      <button class="text-primary underline" onclick={() => navController.navigateMain('/app/writer')}>写作</button>
+      或
+      <button class="text-primary underline" onclick={() => navController.navigateMain('/app/changes')}>变更</button>
+      应用。
+    </Card.Content>
+  </Card.Root>
+
   {#if !accountState.authenticated}
     <Card.Root class="mb-4">
       <Card.Content class="flex flex-col items-center gap-3 pt-8 pb-8 text-center">
-        <p class="text-muted-foreground">登录后可以克隆私有仓库并推送变更</p>
+        <p class="text-muted-foreground">登录后可访问更多仓库</p>
         <Button onclick={() => account?.login()}>
           <LogInIcon data-icon="inline-start" />
           用 GitHub 登录

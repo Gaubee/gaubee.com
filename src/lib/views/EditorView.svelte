@@ -58,6 +58,8 @@
   })
 
   async function loadPost() {
+    // 切换文章前，先把上一篇未保存的 debounce 内容落盘（避免丢用户输入/写错路径）
+    await flushSave()
     if (!targetPost) {
       currentPath = null
       body = ''
@@ -107,21 +109,31 @@
   function scheduleSave() {
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(async () => {
-      if (!currentPath) return
-      const content = serializeMarkdown(metadata, body)
-      await vfsStore.write(currentPath, content)
-      dirty = false
-      toast.success('已暂存', { duration: 1500 })
+      saveTimer = null
+      await flushSave()
     }, 1000)
   }
 
-  function handleSave() {
+  /**
+   * 立即将当前内容写入 VFS（如有 currentPath）。
+   * handleSave/handlePublish/切文章前调用，确保内容不丢。
+   * 取消 pending debounce timer，避免重复/错位写入。
+   */
+  async function flushSave(): Promise<void> {
     if (saveTimer) {
       clearTimeout(saveTimer)
       saveTimer = null
     }
     if (!currentPath) return
-    scheduleSave()
+    const content = serializeMarkdown(metadata, body)
+    await vfsStore.write(currentPath, content)
+    dirty = false
+  }
+
+  /** 保存按钮：立即落盘（不再走 1s debounce）。 */
+  async function handleSave() {
+    await flushSave()
+    toast.success('已保存', { duration: 1500 })
   }
 
   /**
@@ -134,14 +146,8 @@
     if (!currentPath) return
     publishing = true
     try {
-      // 1. 先保存当前文章到 VFS（同步等待，不依赖 debounce）
-      if (saveTimer) {
-        clearTimeout(saveTimer)
-        saveTimer = null
-      }
-      const content = serializeMarkdown(metadata, body)
-      await vfsStore.write(currentPath, content)
-      dirty = false
+      // 1. 立即保存当前文章到 VFS（flush debounce，确保最新内容落盘）
+      await flushSave()
 
       // 2. 按需获取 Git 服务（会启动 GitApp）
       const git = await gaubeeos.requestAppService('git')

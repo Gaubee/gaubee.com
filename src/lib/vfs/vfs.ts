@@ -39,6 +39,8 @@ export interface VfsNode {
   origin: "remote" | "local";
   dirty: boolean;
   mtime: number;
+  /** 修改前的原始内容快照（首次 dirty 时保存，用于 diff）。非 dirty 或无快照时为 null。 */
+  baseContent: string | null;
 }
 
 function toNode(rec: VfsRecord): VfsNode {
@@ -49,6 +51,7 @@ function toNode(rec: VfsRecord): VfsNode {
     origin: rec.origin,
     dirty: rec.dirty,
     mtime: rec.mtime,
+    baseContent: rec.baseContent ?? null,
   };
 }
 
@@ -110,6 +113,12 @@ export class Vfs {
   async writeFile(path: string, content: string): Promise<void> {
     const p = normalizePath(path);
     const existing = await vfsGet(p);
+    // 首次 dirty（existing 非 dirty）→ 保存原始内容作为 base 快照（供 diff）。
+    // 后续 dirty 不覆盖 base（保留最初原始态）；commit/revert 清除 base。
+    const isFirstDirty = !existing || !existing.dirty;
+    const baseContent = isFirstDirty
+      ? (existing?.content ?? null)
+      : (existing?.baseContent ?? null);
     await vfsPut({
       path: p,
       content,
@@ -117,6 +126,7 @@ export class Vfs {
       origin: existing?.origin ?? "local",
       dirty: true,
       mtime: Date.now(),
+      baseContent,
     });
   }
 
@@ -154,6 +164,7 @@ export class Vfs {
       origin: "remote",
       dirty: false,
       mtime: Date.now(),
+      baseContent: null,
     });
   }
 
@@ -273,7 +284,7 @@ export class Vfs {
 
     const sha = await commitChanges(message, changes, BRANCH);
 
-    // commit 成功：清除 dirty 状态
+    // commit 成功：清除 dirty 状态与 base 快照
     for (const node of dirty) {
       const rec = await vfsGet(node.path);
       if (!rec) continue;
@@ -281,7 +292,12 @@ export class Vfs {
         // 删除的文件：从 VFS 移除
         await vfsDelete(node.path);
       } else {
-        await vfsPut({ ...rec, dirty: false, mtime: Date.now() });
+        await vfsPut({
+          ...rec,
+          dirty: false,
+          mtime: Date.now(),
+          baseContent: null,
+        });
       }
     }
     return sha;

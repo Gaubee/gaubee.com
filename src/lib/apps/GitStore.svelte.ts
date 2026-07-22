@@ -1,11 +1,14 @@
 /**
- * GitStore：基于 isomorphic-git 的 Git 操作封装。
+ * GitStore：基于 isomorphic-git 的公开仓库只读浏览器（GithubApp 私有实现）。
  *
- * 设计目标：
- * - 绑定任意 GitHub 仓库（不只是 gaubee/gaubee.com）
- * - 纯前端运行（使用 CORS 代理处理 GitHub 请求）
- * - 提供完整的 git 能力：clone, log, diff, branch, add, commit, push
- * - Svelte 5 runes 响应式
+ * 定位：
+ * - 绑定任意公开 GitHub 仓库，匿名 clone/log（token 在 Worker httpOnly cookie，
+ *   isomorphic-git 拿不到，故只能匿名操作公开仓库）。
+ * - 与 GitService（走 VFS + Git Data API，认证有效）是两条独立路径：
+ *   本 store 仅用于 GithubView 的「浏览公开仓库提交历史」，不参与编辑/发表。
+ * - 编辑/发表/提交请走 GitService（gaubeeos.getAppService('git')）。
+ *
+ * Svelte 5 runes 响应式。
  */
 import * as git from "isomorphic-git";
 import http from "isomorphic-git/http/web";
@@ -147,38 +150,26 @@ class GitStore {
   branch = $state("main");
   /** 提交历史。 */
   commits = $state<GitCommit[]>([]);
-  /** 当前工作区变更的文件。 */
-  changedFiles = $state<string[]>([]);
   /** 是否正在加载。 */
   loading = $state(false);
   /** 错误信息。 */
   error = $state<string | null>(null);
 
-  /** 是否已经绑定仓库。 */
-  get hasRepo(): boolean {
-    return this.repo !== null;
-  }
-
   // ---- 核心 Git 操作 ----
 
-  /** 克隆仓库。 */
+  /** 克隆仓库（匿名，仅公开仓库；token 在 Worker 端，isomorphic-git 拿不到）。 */
   async clone(config: RepoConfig): Promise<void> {
     this.loading = true;
     this.error = null;
     try {
       const url = `https://github.com/${config.owner}/${config.repo}`;
-      const token = this.getToken();
-      const onAuth = token
-        ? () => ({ username: "oauth2", password: token })
-        : undefined;
 
       await git.clone({
         fs: this.fs as unknown as git.PromiseFsClient,
         http,
         dir: "/",
         url,
-        defaultBranch: config.branch,
-        ...(onAuth ? { onAuth } : {}),
+        ref: config.branch,
         corsProxy: "https://cors.isomorphic-git.org",
       });
 
@@ -233,81 +224,11 @@ class GitStore {
         author: c.commit.author,
         parent: c.commit.parent,
       }));
-
-      // 获取变更文件
-      const status = await git.statusMatrix({
-        fs: this.fs as unknown as git.PromiseFsClient,
-        dir: "/",
-        ref: this.branch,
-      });
-      this.changedFiles = status
-        .filter(
-          ([, head, workdir, stage]) => head !== workdir || workdir !== stage,
-        )
-        .map(([filepath]) => filepath);
     } catch (e) {
       this.error = e instanceof Error ? e.message : String(e);
     } finally {
       this.loading = false;
     }
-  }
-
-  /** 添加文件到暂存区。 */
-  async add(filepath: string): Promise<void> {
-    await git.add({
-      fs: this.fs as unknown as git.PromiseFsClient,
-      dir: "/",
-      filepath,
-    });
-    await this.refresh();
-  }
-
-  /** 提交变更。 */
-  async commit(message: string): Promise<string> {
-    if (!this.repo) throw new Error("未绑定仓库");
-    const sha = await git.commit({
-      fs: this.fs as unknown as git.PromiseFsClient,
-      dir: "/",
-      message,
-      author: { name: "GaubeeOS", email: "os@gaubee.com" },
-    });
-    await this.refresh();
-    return sha;
-  }
-
-  /** 推送到远程。 */
-  async push(): Promise<void> {
-    if (!this.repo) return;
-    this.loading = true;
-    this.error = null;
-    try {
-      const token = this.getToken();
-      await git.push({
-        fs: this.fs as unknown as git.PromiseFsClient,
-        http,
-        dir: "/",
-        remote: "origin",
-        ref: this.branch,
-        onAuth: token
-          ? () => ({ username: "oauth2", password: token })
-          : undefined,
-        corsProxy: "https://cors.isomorphic-git.org",
-      });
-    } catch (e) {
-      this.error = e instanceof Error ? e.message : String(e);
-    } finally {
-      this.loading = false;
-    }
-  }
-
-  // ---- 内部工具 ----
-
-  private getToken(): string | null {
-    // 历史遗留：isomorphic-git 直接调用 GitHub API，需要明文 access token，
-    // 但本架构下 token 仅存在于 Worker 端 httpOnly cookie，前端永远拿不到。
-    // 因此 GitStore（GithubApp 的 clone/log/branch）只能匿名操作公开仓库。
-    // 需要认证的写操作（commit/发表）请走 GitService → VFS → Git Data API（Worker 代理注入 token）。
-    return null;
   }
 }
 

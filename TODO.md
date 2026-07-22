@@ -362,5 +362,29 @@ GaubeeOS/
 - [x] **代码卫生**：writer manifest 删除「提供 CLI 命令：write」的矛盾注释（cliCommands 实为空）。
 - [x] 验证：类型检查零新增错误（20 个预存不变）；142 个单元测试全过（含 mock gaubeeos 的 shell git 测试）；Playwright 验证终端 git status 正常、git commit 未登录提示登录。
 
+#### 16. 核心测试补齐 + 401鉴权映射 + GitStore清理 + 编辑器修复 + diff预览（2026-07-23）
+
+审视后合并 P0（测试/401/文档）与 P1（GitStore清理/编辑器修复/diff），补齐核心架构的测试保障并修复多个真实 bug。
+
+- [x] **核心单元测试补齐**（新增 51 用例，142→193）：
+  - `os/services/registry.test.ts`（10）：同步/异步工厂、懒构造缓存、register/unregisterApp、覆盖。
+  - `os/services/bus.test.ts`（4）：getAppService/hasService/requestAppService 委托与 AppServiceNotInstalled。
+  - `os/services/publish-helper.test.ts`（5）：四个 instanceof 错误分支契约。
+  - `github/client.test.ts`（6）：401/403→NotAuthenticatedError 映射、各阶段失败。
+  - `builtin/settings-sections.test.ts`（4）：order 排序稳定性。
+  - `builtin/account/service.test.ts`（7）：requireAuthenticated 守卫、state 委托、ACCOUNT_UNAVAILABLE。
+  - `installable/github/service.test.ts`（8）：commit 鉴权+空dirty守卫、读写委托。
+  - `vfs/vfs.svelte.test.ts`（3，client 浏览器）：commitInFlight 互斥、sync inFlight 合并。
+- [x] **401→NotAuthenticatedError 映射**：client.ts 加 assertOk 辅助函数，401/403 转成 NotAuthenticatedError。会话过期时 handlePublishError 的鉴权引导分支终于命中（之前显示通用「失败:401」，现在引导重新登录）。
+- [x] **GitStore 死代码清理**：删 add/commit/push/changedFiles/hasRepo（无消费方且 push 因无 token 不可用）；clone 简化为匿名；GithubView 加只读说明（指向写作/变更应用）；顺带修预存 defaultBranch 类型错误。
+- [x] **EditorView 保存逻辑修复**：提取 flushSave() 共享函数；handleSave 改为立即落盘（之前只是重启 1s debounce）；loadPost 切文章前 flushSave（避免丢未保存内容/写错路径）。
+- [x] **ChangesView diff 预览**（VFS base 快照方案）：
+  - VfsRecord 加 baseContent 字段（首次 dirty 时保存原始内容，commit/revert 清除）。
+  - 新建 `utils/diff.ts`（LCS 行级 diff，大文件截断）。
+  - ChangesView 改为 diff 渲染：新建/删除/修改三种类型标签 + 行级彩色 diff（绿增红删）+ 增删行数统计。
+- [x] **AGENTS.md 更新**：修正技术栈（react→svelte）、类型检查命令（pnpm ts→pnpm -w run check）、补应用服务总线架构说明（声明三步流程、依赖方向、contentStore 例外）。
+- [x] 验证：类型检查零新增错误（19 个预存）；193 个单元测试全过；Playwright 验证编辑器保存、GithubView 只读说明正常。
+
+
 
 
