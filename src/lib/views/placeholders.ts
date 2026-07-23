@@ -5,6 +5,7 @@
  * 旧路径（/feed, /editor 等）已废弃，不再注册。
  */
 import type { Component } from "svelte";
+import DesktopView from "$lib/apps/views/DesktopView.svelte";
 import ArticleView from "$lib/apps/views/ArticleDetailView.svelte";
 import ChangesView from "./ChangesView.svelte";
 import EditorView from "./EditorView.svelte";
@@ -33,6 +34,8 @@ export function ensureViewsRegistered(): void {
   registered = true;
 
   // ===== 系统应用（不可卸载）=====
+  // 桌面应用（默认首页，首位）
+  registerTabView("/desktop", DesktopView);
   registerTabView("/app/articles", ArticlesView);
   registerTabView("/app/shout", ShoutView);
   registerTabView("/app/search", SearchView);

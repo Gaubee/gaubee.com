@@ -13,6 +13,8 @@ import Newspaper from "@lucide/svelte/icons/newspaper";
 import { createFileSearchService } from "$lib/search/file-service";
 import { asView } from "../types";
 import { defineApp } from "$lib/app-scaffold/define-app";
+import RecentArticlesWidget from "../widget/RecentArticlesWidget.svelte";
+import TagsWidget from "../widget/TagsWidget.svelte";
 
 export const articlesApp = defineApp({
   id: "articles",
@@ -39,4 +41,21 @@ export const articlesApp = defineApp({
   vfsOwnership: ["src/content/articles/"],
   searchService: () =>
     createFileSearchService({ appId: "articles", appName: "文章" }),
+  // 桌面小组件：最近文章 + 标签云（文章应用拥有这些内容）
+  widgets: [
+    {
+      id: "recent-articles",
+      title: "最近文章",
+      render: RecentArticlesWidget,
+      size: "medium",
+      order: 0,
+    },
+    {
+      id: "tags-cloud",
+      title: "标签",
+      render: TagsWidget,
+      size: "medium",
+      order: 2,
+    },
+  ],
 });

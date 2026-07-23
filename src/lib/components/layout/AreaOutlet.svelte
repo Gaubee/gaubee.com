@@ -52,6 +52,13 @@
 
   const tabEntries = $derived(allTabViews as ReadonlyArray<{ tabId: TabId; component: Component }>)
 
+  // 桌面 tabId（系统级桌面应用，常驻底层背景层）
+  const DESKTOP_TAB_ID = '/desktop'
+  // 当前是否有非桌面的激活应用（决定桌面层是否被覆盖）
+  const activeNonDesktopTab = $derived(
+    isActive && activeTabId !== null && activeTabId !== DESKTOP_TAB_ID,
+  )
+
   // 按 entry route（tabId）查 manifest，供 AppShell 隔离包裹。
   function manifestForTab(tabId: TabId): AppManifest | undefined {
     return appManager.findByRoute(tabId)
@@ -82,27 +89,60 @@
     </div>
   {/if}
 {:else}
-  <div class="h-full">
+  <div class="main-area-root">
     {#each tabEntries as { tabId, component } (tabId)}
       {@const inThisArea = tabIdsInArea.includes(tabId)}
       {@const isThisActive = inThisArea && isActive && activeTabId === tabId}
       {@const View = component}
       {@const manifest = manifestForTab(tabId)}
-      <div class="h-full" class:hidden={!isThisActive}>
-        {#if manifest}
-          <AppShell app={manifest} pathname={location.pathname}>
-            <View {area} {tabId} isActive={isThisActive} />
-          </AppShell>
-        {:else}
+      {@const isDesktop = tabId === DESKTOP_TAB_ID}
+      {@const showAsLayer = isDesktop ? true : isThisActive}
+      {#if isDesktop}
+        <!-- 桌面：常驻底层背景层（始终可见，被激活应用浮层覆盖） -->
+        <div class="desktop-layer" class:desktop-layer-top={!activeNonDesktopTab}>
           <View {area} {tabId} isActive={isThisActive} />
+        </div>
+      {:else}
+        <!-- 应用浮层：激活时覆盖桌面，z-index 高于桌面层 -->
+        {#if showAsLayer}
+          <div class="app-overlay-layer">
+            {#if manifest}
+              <AppShell app={manifest} pathname={location.pathname}>
+                <View {area} {tabId} isActive={isThisActive} />
+              </AppShell>
+            {:else}
+              <View {area} {tabId} isActive={isThisActive} />
+            {/if}
+          </div>
         {/if}
-      </div>
+      {/if}
     {/each}
   </div>
 {/if}
 
 <style>
-  .hidden {
-    display: none;
+  /* main 区根：桌面底层 + 应用浮层的堆叠上下文 */
+  .main-area-root {
+    position: relative;
+    height: 100%;
+    isolation: isolate;
+  }
+  /* 桌面层：常驻底层背景。被激活应用覆盖时降级（不可交互但仍可见作背景） */
+  .desktop-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    overflow: auto;
+  }
+  .desktop-layer-top {
+    /* 桌面为顶层时可交互 */
+    z-index: 2;
+  }
+  /* 应用浮层：激活时覆盖桌面，z-index 高于桌面层 */
+  .app-overlay-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    background: var(--background);
   }
 </style>

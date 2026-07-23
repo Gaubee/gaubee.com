@@ -16,6 +16,7 @@ import { registerPathCommand, unregisterPathCommand } from "../terminal/shell";
 import { searchServiceRegistry } from "$lib/search/registry";
 import { appServiceRegistry } from "$lib/os/services";
 import { settingsSectionsRegistry } from "./builtin/settings-sections";
+import { widgetRegistry } from "./widget/registry";
 import { routeDomainRegistry } from "./route-domain";
 
 // ---------------------------------------------------------------------------
@@ -42,8 +43,9 @@ function cliToShellCommand(cli: CliCommand): Command {
 
 const STORAGE_KEY = "gaubee:os:apps";
 
-/** 系统内置应用 ID（不可卸载）。 */
+/** 系统内置应用 ID（不可卸载）。desktop 是系统级桌面应用（默认首页）。 */
 export const SYSTEM_APP_IDS = [
+  "desktop",
   "articles",
   "shout",
   "search",
@@ -192,6 +194,7 @@ class AppManager {
     this.syncSearchServices();
     this.syncServices();
     this.syncSettingsSections();
+    this.syncWidgets();
     this.initialized = true;
   }
 
@@ -215,6 +218,7 @@ class AppManager {
     this.registerSearchService(entry);
     this.registerServices(entry);
     this.registerSettingsSections(entry.manifest);
+    this.registerWidgets(entry.manifest);
 
     // 注册 CLI 命令到 PATH
     if (entry.manifest.cliCommands) {
@@ -242,6 +246,7 @@ class AppManager {
     searchServiceRegistry.unregister(id);
     appServiceRegistry.unregisterApp(id);
     this.unregisterSettingsSections(id);
+    this.unregisterWidgets(id);
     if (entry?.manifest.cliCommands) {
       for (const cli of entry.manifest.cliCommands) {
         pathManager.unregisterApp(id);
@@ -340,6 +345,29 @@ class AppManager {
     if (!manifest?.settingsSections) return;
     for (const section of manifest.settingsSections) {
       settingsSectionsRegistry.unregister(section.id);
+    }
+  }
+
+  /** 将已安装应用的声明式 widget 投影到 widget 注册表。 */
+  private syncWidgets(): void {
+    for (const id of this.installedIds) {
+      const entry = this.registry.get(id);
+      if (entry) this.registerWidgets(entry.manifest);
+    }
+  }
+
+  private registerWidgets(manifest: AppManifest): void {
+    if (!manifest.widgets) return;
+    for (const widget of manifest.widgets) {
+      widgetRegistry.register(widget);
+    }
+  }
+
+  private unregisterWidgets(appId: string): void {
+    const manifest = this.findById(appId);
+    if (!manifest?.widgets) return;
+    for (const widget of manifest.widgets) {
+      widgetRegistry.unregister(widget.id);
     }
   }
 

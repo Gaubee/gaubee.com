@@ -956,7 +956,7 @@ export class NavController {
     });
     this.state = normalizeState(this.state);
 
-    // 3.5 根路径 / 重定向到默认主页（mainTabs[0]），避免空白首屏。
+    // 3.5 根路径 / 重定向到默认首页（mainTabs[0] = /desktop 桌面），避免空白首屏。
     // 仅当 URL 完全是 /（无 query/hash/bottom/pop）时触发。
     if (
       window.location.pathname === "/" &&

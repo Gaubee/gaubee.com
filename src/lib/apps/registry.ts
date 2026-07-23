@@ -9,6 +9,7 @@ import type { AppEntry } from "./types";
 import { appManager } from "./AppManager.svelte";
 
 // 系统应用（直接静态 import，打包进主代码）
+import { desktopApp } from "./builtin/desktop";
 import { articlesApp } from "./builtin/articles";
 import { shoutApp } from "./builtin/shout";
 import { searchApp } from "./builtin/search";
@@ -29,7 +30,8 @@ export function registerAllApps(): void {
   if (registered) return;
   registered = true;
 
-  // 系统应用（内置，不可卸载）
+  // 系统应用（内置，不可卸载）。desktop 首位（默认首页 mainTabs[0]）。
+  appManager.register(desktopApp);
   appManager.register(articlesApp);
   appManager.register(shoutApp);
   appManager.register(searchApp);
@@ -49,6 +51,7 @@ export function registerAllApps(): void {
 
 // 导出各应用 manifest 供外部使用
 export {
+  desktopApp,
   articlesApp,
   shoutApp,
   searchApp,
@@ -61,6 +64,7 @@ export { githubApp, terminalApp, filesApp, writerApp };
 /** 获取所有已注册应用。 */
 export function getAllRegisteredApps(): AppEntry[] {
   return [
+    desktopApp,
     articlesApp,
     shoutApp,
     searchApp,

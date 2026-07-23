@@ -10,6 +10,7 @@
 import MessageSquare from "@lucide/svelte/icons/message-square";
 import { createFileSearchService } from "$lib/search/file-service";
 import type { AppEntry } from "../types";
+import RecentShoutsWidget from "../widget/RecentShoutsWidget.svelte";
 
 export const shoutApp: AppEntry = {
   manifest: {
@@ -28,5 +29,15 @@ export const shoutApp: AppEntry = {
     vfsOwnership: ["src/content/events/"],
     searchService: () =>
       createFileSearchService({ appId: "shout", appName: "说说" }),
+    // 桌面小组件：最近说说
+    widgets: [
+      {
+        id: "recent-shouts",
+        title: "最近说说",
+        render: RecentShoutsWidget,
+        size: "medium",
+        order: 1,
+      },
+    ],
   },
 };

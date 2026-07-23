@@ -471,3 +471,30 @@ GaubeeOS/
 **settings 收编**：从模块副作用注册改为 `manifest.settingsSections` 声明式，AppManager install/uninstall 联动（修复卸载残留 bug）。account/appearance/about 迁入各自 manifest。
 
 **验证**：类型检查 0 错误；224 单元测试全过（含新增 FOCUS_APP + per-app 记忆测试）；Playwright 走查 3 项全过——①详情页 Dock「文章」高亮 ②切设置再切回恢复详情URL ③app-portal-root 存在。
+
+#### 20. 引入 DesktopApp —— 系统级桌面 + 浮动应用模型（2026-07-23）
+
+**理念**：桌面是常驻背景层，应用浮于其上（为未来 View Transitions 动画铺路）。
+
+**路由**：`/desktop` 成为系统级默认首页（根路径 `/` 重定向目标，取代原 `/app/articles`）。DesktopApp 是系统应用（SYSTEM_APP_IDS 首位，mainTabs[0]）。
+
+**渲染模型改造**（AreaOutlet main 分支重构）：
+- 桌面（/desktop）常驻底层背景层（desktop-layer，z:1），始终可见。
+- 激活的非桌面应用以浮层（app-overlay-layer，z:10，背景色覆盖）形式叠加在桌面之上。
+- 切回桌面 = 无应用浮层时桌面成为顶层（desktop-layer-top）。
+
+**Widget 声明式扩展点**（仿 settingsSections 范式）：
+- `src/lib/apps/widget/`：WidgetDeclaration 类型 + widgetRegistry 单例。
+- AppManifest 增 `widgets?: WidgetDeclaration[]`，AppManager install/init/uninstall 联动投影。
+- 三个 widget：最近文章（articles 声明，readonlyVfs 数据）、最近说说（shout 声明）、标签云（articles 声明）。
+
+**DesktopView**：应用图标网格（启动器，容器查询自适应列数）+ Widget 瀑布流（容器查询自适应）。数据源 appManager.allInstalled + widgetRegistry.all()。
+
+**任务栏**：保持 shell 级（DesktopSidebar/MobileTabBar 始终可见），桌面作 main 区背景层。打开应用时任务栏始终可见、布局协调（移动端 sticky 底栏 + padding 天然成立）。
+
+**验证**：类型检查 0 错误；224 单测全过；agent-browser 双端走查——
+- 根路径 → /desktop，9 图标 + 3 widget
+- 点应用 → 浮层覆盖桌面，任务栏可见，应用视图渲染
+- 切回桌面 → 浮层消失，图标网格恢复
+- 移动端：4 列图标网格、widget 单列自适应、header/tabbar 固定中间滚动
+- widget 数据正确（最近文章5条/最近说说5条/标签20个）

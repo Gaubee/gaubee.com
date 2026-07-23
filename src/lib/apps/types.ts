@@ -18,6 +18,7 @@ import type { Component } from "svelte";
 import type { SearchServiceFactory } from "$lib/search/types";
 import type { ServiceDeclaration } from "$lib/os/services";
 import type { SettingsSection } from "./builtin/settings-sections";
+import type { WidgetDeclaration } from "./widget/types";
 
 // ---------------------------------------------------------------------------
 // 应用分类
@@ -147,6 +148,8 @@ export interface AppManifest {
   services?: ServiceDeclaration;
   /** ★ 声明式设置面板（AppManager 投影到 settingsSectionsRegistry，卸载联动）。 */
   settingsSections?: SettingsSection[];
+  /** ★ 声明式桌面小组件（AppManager 投影到 widgetRegistry，DesktopView 渲染）。 */
+  widgets?: WidgetDeclaration[];
 }
 
 /** 已安装应用实例（含运行时状态）。 */
