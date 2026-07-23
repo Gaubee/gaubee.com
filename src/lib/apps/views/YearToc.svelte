@@ -63,7 +63,7 @@
     <Button
       variant="outline"
       size="icon"
-      class="absolute right-4 bottom-20 z-[var(--z-app-overlay)] rounded-lg shadow-sm"
+      class="fixed right-4 bottom-20 z-[var(--z-app-overlay)] rounded-lg shadow-sm"
       aria-label="按年份浏览文章"
       onclick={() => (mobileOpen = true)}
     >
