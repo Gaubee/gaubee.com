@@ -149,6 +149,32 @@
     outline-offset: 2px;
     border-radius: var(--radius-sm);
   }
+  /* 全局默认滚动条（thin + 透明 track + 半透明 thumb，符合用户偏好）。
+   * Firefox 用 scrollbar-width/scrollbar-color；Webkit 用 ::-webkit-scrollbar。 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, currentColor 40%, transparent) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, currentColor 40%, transparent);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, currentColor 60%, transparent);
+  }
+  @supports (corner-shape: squircle) {
+    * {
+      --radius: 1rem;
+      corner-shape: squircle;
+    }
+  }
 }
 
 /* ---------------------------------------------------------------------------

@@ -11,6 +11,7 @@
   import { draggedTabId, setDraggedTab } from '$lib/nav/drag-state.svelte'
   import { appManager } from '$lib/apps/AppManager.svelte'
   import { matchesRoutePrefix, routeDomainRegistry } from '$lib/apps/route-domain'
+  import TabContextMenu from './TabContextMenu.svelte'
   import type { Area, TabId } from '$lib/nav/controller'
   import XIcon from '@lucide/svelte/icons/x'
 
@@ -24,6 +25,7 @@
 
   const navState = $derived(navStore.current)
   const tabs = $derived(area === 'main' ? navState.mainTabs : navState.bottomTabs)
+  const isPinned = (tabId: TabId) => navState.pinnedTabs.includes(tabId)
 
   // 当前激活的 tab id：优先查路由域表（识别应用子场景，详情页也能高亮入口 tab），
   // fallback 到 entry route 前缀匹配。
@@ -151,7 +153,8 @@
 
   function handleClose(e: MouseEvent, tabId: TabId) {
     e.stopPropagation()
-    navController.closeTab(tabId)
+    // 新任务栏模型：X 按钮 = 退出应用（移除+销毁）；pinned 时无效（需先取消保留）
+    navController.quitApp(tabId)
   }
 </script>
 
@@ -181,25 +184,27 @@
           <div class="bg-primary absolute -top-0.5 left-1 right-1 h-0.5 rounded-full"></div>
         {/if}
 
-        <button
-          class="hover:bg-accent flex flex-1 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors {isActive
-            ? 'bg-accent text-accent-foreground font-medium'
-            : 'text-muted-foreground'}"
-          onclick={() => handleClick(tabId, isActive)}
-          title={collapsed ? app.name : undefined}
-        >
-          <!-- svelte-ignore ownership_invalid_mutation -->
-          <app.icon class="size-4 shrink-0" />
-          {#if !collapsed}
-            <span class="truncate">{app.name}</span>
-          {/if}
-        </button>
+        <TabContextMenu {tabId} pinned={isPinned(tabId)}>
+          <button
+            class="hover:bg-accent flex flex-1 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors {isActive
+              ? 'bg-accent text-accent-foreground font-medium'
+              : 'text-muted-foreground'}"
+            onclick={() => handleClick(tabId, isActive)}
+            title={collapsed ? app.name : undefined}
+          >
+            <!-- svelte-ignore ownership_invalid_mutation -->
+            <app.icon class="size-4 shrink-0" />
+            {#if !collapsed}
+              <span class="truncate">{app.name}</span>
+            {/if}
+          </button>
+        </TabContextMenu>
 
         {#if !collapsed}
           <button
             class="hover:bg-accent absolute -right-1 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
             onclick={(e) => handleClose(e, tabId)}
-            aria-label="关闭标签页"
+            aria-label="退出应用"
           >
             <XIcon class="size-3" />
           </button>

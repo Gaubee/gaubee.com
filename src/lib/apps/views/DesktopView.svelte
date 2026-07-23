@@ -15,111 +15,85 @@
   import { navController } from '$lib/nav/nav-controller-instance'
   import { navStore } from '$lib/nav/nav.svelte'
   import { widgetRegistry } from '$lib/apps/widget/registry'
+  import { routeDomainRegistry } from '$lib/apps/route-domain'
+  import { motionFade } from '$lib/utils/motion'
+  import { flip } from 'svelte/animate'
 
   const navState = $derived(navStore.current)
-  // 桌面图标网格：已安装、非隐藏应用，排除 desktop 自身（避免自引用）
+  // 桌面图标网格（启动器）：所有已安装应用，排除 desktop（避免自引用）。
+  // 含 hiddenFromNav 的应用（search/notifications/account）——它们在桌面作为快捷入口。
   const launcherApps = $derived(
-    appManager.allInstalled.filter(
-      (app) => !app.hiddenFromNav && app.id !== 'desktop',
-    ),
-  )
-  // pop 区应用（搜索/通知）单独作为工具入口
-  const popApps = $derived(
-    appManager.allInstalled.filter((app) => app.defaultArea === 'pop'),
+    appManager.allInstalled.filter((app) => app.id !== 'desktop'),
   )
   const widgets = $derived(widgetRegistry.all())
 
-  // 判断应用是否已打开（高亮图标）
+  // 判断应用是否在任务栏（已打开或 pinned）→ 图标红点标记
   function isOpen(route: string): boolean {
     return (
       navState.mainTabs.includes(route) ||
       navState.bottomTabs.includes(route)
     )
   }
-  // 当前激活的应用（用于高亮）
-  const activeMainTab = $derived(
-    (() => {
-      const path = navState.mainLocation.pathname
-      const tabs = navState.mainTabs
-      // 桌面自身激活时不算"应用打开"
-      for (const t of tabs) {
-        if (t !== '/desktop' && (path === t || path.startsWith(t + '/'))) return t
-      }
-      return null
-    })(),
+  // 当前激活的应用 entry route（用于高亮图标，识别子场景如 /article/...）
+  const activeRoute = $derived(
+    routeDomainRegistry.entryRouteForPath(navState.mainLocation.pathname) ??
+    routeDomainRegistry.entryRouteForPath(navState.bottomLocation.pathname),
   )
 
   function launch(route: string, area: string) {
-    if (area === 'bottom') {
-      navController.activateBottom(route)
-    } else if (area === 'pop') {
+    if (area === 'pop') {
       navController.activatePop(route)
     } else {
-      navController.focusApp(route)
+      // main/bottom 应用：openApp（加入任务栏 + 聚焦）
+      navController.openApp(route)
     }
   }
 </script>
 
 <div class="desktop-scroll-area scrollbar-thin scrollbar-track-transparent scrollbar-thumb-[color-mix(in_srgb,currentColor,transparent)]">
   <div class="desktop-container">
-    <!-- 应用图标网格（启动器） -->
-    <section class="desktop-section">
-      <h2 class="desktop-section-title">应用</h2>
-      <div class="app-grid">
-        {#each launcherApps as app (app.id)}
-          {@const active = app.route === activeMainTab}
-          <button
-            class="app-icon-button {active ? 'app-icon-active' : ''}"
-            onclick={() => launch(app.route, app.defaultArea)}
-            aria-label={app.name}
+    <!-- 应用图标网格（启动器）：无分组标题，图标自由组合 -->
+    <div class="app-grid">
+      {#each launcherApps as app, i (app.id)}
+        {@const active = app.route === activeRoute}
+        <button
+          class="app-icon-button {active ? 'app-icon-active' : ''}"
+          onclick={() => launch(app.route, app.defaultArea)}
+          aria-label={app.name}
+          in:motionFade={{ delay: i * 30, duration: 200 }}
+          animate:flip={{ duration: 200 }}
+        >
+          <span class="app-icon-box">
+            <!-- svelte-ignore ownership_invalid_mutation -->
+            <app.icon class="size-6" />
+            {#if isOpen(app.route) && !active}
+              <span class="app-icon-dot"></span>
+            {/if}
+          </span>
+          <span class="app-icon-label">{app.name}</span>
+        </button>
+      {/each}
+    </div>
+
+    <!-- Widget 瀑布流：无分组标题，卡片自由组合 -->
+    {#if widgets.length > 0}
+      <div class="widget-grid">
+        {#each widgets as widget (widget.id)}
+          {@const Widget = widget.render}
+          <article
+            class="widget-card widget-size-{widget.size ?? 'small'}"
+            in:motionFade={{ duration: 240 }}
+            animate:flip={{ duration: 200 }}
           >
-            <span class="app-icon-box">
-              <!-- svelte-ignore ownership_invalid_mutation -->
-              <app.icon class="size-6" />
-              {#if isOpen(app.route) && !active}
-                <span class="app-icon-dot"></span>
-              {/if}
-            </span>
-            <span class="app-icon-label">{app.name}</span>
-          </button>
-        {/each}
-        <!-- pop 应用（搜索/通知）归入网格 -->
-        {#each popApps as app (app.id)}
-          <button
-            class="app-icon-button"
-            onclick={() => launch(app.route, 'pop')}
-            aria-label={app.name}
-          >
-            <span class="app-icon-box">
-              <!-- svelte-ignore ownership_invalid_mutation -->
-              <app.icon class="size-6" />
-            </span>
-            <span class="app-icon-label">{app.name}</span>
-          </button>
+            <header class="widget-header">
+              <h3 class="widget-title">{widget.title}</h3>
+            </header>
+            <div class="widget-body">
+              <Widget />
+            </div>
+          </article>
         {/each}
       </div>
-    </section>
-
-    <!-- Widget 瀑布流 -->
-    {#if widgets.length > 0}
-      <section class="desktop-section">
-        <h2 class="desktop-section-title">小组件</h2>
-        <div class="widget-grid">
-          {#each widgets as widget (widget.id)}
-            {@const Widget = widget.render}
-            <article
-              class="widget-card widget-size-{widget.size ?? 'small'}"
-            >
-              <header class="widget-header">
-                <h3 class="widget-title">{widget.title}</h3>
-              </header>
-              <div class="widget-body">
-                <Widget />
-              </div>
-            </article>
-          {/each}
-        </div>
-      </section>
     {/if}
   </div>
 </div>
@@ -136,15 +110,6 @@
     display: flex;
     flex-direction: column;
     gap: 2rem;
-  }
-  .desktop-section-title {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--muted-foreground);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.75rem;
-    padding-left: 0.25rem;
   }
 
   /* 应用图标网格：容器查询自适应列数 */

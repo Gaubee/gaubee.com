@@ -35,6 +35,7 @@ function makeInitialState(): KernelState {
   return {
     mainTabs: [...DEFAULT_MAIN_TABS],
     bottomTabs: [...DEFAULT_BOTTOM_TABS],
+    pinnedTabs: [],
     updatedAt: 0,
     mainLocation: parseHref("/app/articles"),
     bottomLocation: parseHref("/"),
@@ -80,6 +81,7 @@ describe("areaForPath", () => {
   const layout = {
     mainTabs: [...DEFAULT_MAIN_TABS],
     bottomTabs: [...DEFAULT_BOTTOM_TABS],
+    pinnedTabs: [],
   };
 
   it("pop 路径优先", () => {
@@ -498,6 +500,7 @@ describe("URL 序列化往返", () => {
     const layout = {
       mainTabs: [...DEFAULT_MAIN_TABS],
       bottomTabs: [...DEFAULT_BOTTOM_TABS],
+      pinnedTabs: [],
     };
     const parsed = parseBrowserLocation(window.location, layout);
     expect(parsed.main.pathname).toBe("/app/articles");
@@ -510,6 +513,7 @@ describe("URL 序列化往返", () => {
     const layout = {
       mainTabs: [...DEFAULT_MAIN_TABS],
       bottomTabs: [...DEFAULT_BOTTOM_TABS],
+      pinnedTabs: [],
     };
     const parsed = parseBrowserLocation(window.location, layout);
     expect(parsed.main.pathname).toBe("/app/articles");
@@ -522,6 +526,7 @@ describe("URL 序列化往返", () => {
     const layout = {
       mainTabs: [...DEFAULT_MAIN_TABS],
       bottomTabs: [...DEFAULT_BOTTOM_TABS],
+      pinnedTabs: [],
     };
     const parsed = parseBrowserLocation(window.location, layout);
     expect(parsed.main.pathname).toBe("/app/articles");
@@ -533,6 +538,7 @@ describe("URL 序列化往返", () => {
     const layout = {
       mainTabs: [...DEFAULT_MAIN_TABS],
       bottomTabs: [...DEFAULT_BOTTOM_TABS],
+      pinnedTabs: [],
     };
     const parsed = parseBrowserLocation(window.location, layout);
     // /app/github 被识别为 bottom，main 回 /
@@ -545,6 +551,7 @@ describe("URL 序列化往返", () => {
     const layout = {
       mainTabs: [...DEFAULT_MAIN_TABS],
       bottomTabs: [...DEFAULT_BOTTOM_TABS],
+      pinnedTabs: [],
     };
     const parsed = parseBrowserLocation(window.location, layout);
     expect(parsed.pop.pathname).toBe("/app/search");
@@ -556,6 +563,7 @@ describe("URL 序列化往返", () => {
     const state: KernelState = {
       mainTabs: [...DEFAULT_MAIN_TABS],
       bottomTabs: [...DEFAULT_BOTTOM_TABS],
+      pinnedTabs: [],
       updatedAt: 0,
       mainLocation: makeLocation("/article/0001"),
       bottomLocation: makeLocation("/app/github"),
@@ -578,6 +586,7 @@ describe("URL 序列化往返", () => {
     const state: KernelState = {
       mainTabs: [...DEFAULT_MAIN_TABS],
       bottomTabs: [...DEFAULT_BOTTOM_TABS],
+      pinnedTabs: [],
       updatedAt: 0,
       mainLocation: makeLocation("/app/articles"),
       bottomLocation: makeLocation("/"),
@@ -596,12 +605,8 @@ describe("URL 序列化往返", () => {
 // ---------------------------------------------------------------------------
 
 describe("默认布局不变量", () => {
-  it("ALL_TABS 覆盖 main + bottom", () => {
-    const allInDefaults = [...DEFAULT_MAIN_TABS, ...DEFAULT_BOTTOM_TABS];
-    for (const tab of ALL_TABS) {
-      expect(allInDefaults).toContain(tab);
-    }
-  });
+  // 任务栏模型（2026-07-23 重构）：mainTabs/bottomTabs 默认空，不再强制 ALL_TABS 全覆盖。
+  // mergeLayout 只去重 + 互斥，不补全。
 
   it("main 与 bottom 默认不重叠", () => {
     const intersection = DEFAULT_MAIN_TABS.filter((t) =>
@@ -624,7 +629,7 @@ describe("默认布局不变量", () => {
 describe("NavController 实例", () => {
   // 实例的 dispatch 会 syncToUrl（访问 window），需要 stub window + history。
   beforeEach(() => {
-    const url = new URL("http://localhost/app/articles");
+    const url = new URL("http://localhost/");
     const historyState: { state: unknown } = { state: null };
     vi.stubGlobal("window", {
       location: url,
@@ -644,12 +649,17 @@ describe("NavController 实例", () => {
     vi.unstubAllGlobals();
   });
 
-  it("navigate 到非 tab 深链接（/article/0001）保留在 main，不被插件重置", () => {
+  it("初始状态：任务栏默认空，location=/（桌面）", () => {
     const controller = new NavController();
-    // 初始 mainLocation 是 /feed（DEFAULT_MAIN_TABS[0]）
-    expect(controller.getSnapshot().mainLocation.pathname).toBe(
-      "/app/articles",
-    );
+    const snap = controller.getSnapshot();
+    expect(snap.mainTabs).toEqual([]);
+    expect(snap.bottomTabs).toEqual([]);
+    expect(snap.pinnedTabs).toEqual([]);
+    expect(snap.mainLocation.pathname).toBe("/");
+  });
+
+  it("navigate 到深链接（/article/0001）：location 更新（深链接不依赖 tab 归属）", () => {
+    const controller = new NavController();
     controller.navigateMain("/article/0001");
     const snap = controller.getSnapshot();
     expect(snap.mainLocation.pathname).toBe("/article/0001");
@@ -662,11 +672,12 @@ describe("NavController 实例", () => {
       callCount++;
     });
     const snap1 = controller.getSnapshot();
-    controller.navigateMain("/app/settings");
+    // navigate 到深链接（非 tab 路径），空任务栏下仍保留
+    controller.navigateMain("/article/0002");
     expect(callCount).toBe(1);
     const snap2 = controller.getSnapshot();
-    expect(snap2).not.toBe(snap1); // 引用变化
-    expect(snap2.mainLocation.pathname).toBe("/app/settings");
+    expect(snap2).not.toBe(snap1);
+    expect(snap2.mainLocation.pathname).toBe("/article/0002");
   });
 
   it("未变化的 dispatch 不触发 listener", () => {
@@ -679,23 +690,141 @@ describe("NavController 实例", () => {
     controller.deactivateBottom();
     expect(callCount).toBe(0);
   });
+});
 
-  it("moveTab 后 mainTabs/bottomTabs 更新，snapshot 反映", () => {
-    const controller = new NavController();
-    controller.moveTab("/app/github", "main");
-    const snap = controller.getSnapshot();
-    expect(snap.mainTabs).toContain("/app/github");
-    expect(snap.bottomTabs).not.toContain("/app/github");
+// ---------------------------------------------------------------------------
+// 任务栏模型：OPEN_APP / QUIT_APP / PIN_TAB / UNPIN_TAB（2026-07-23）
+// ---------------------------------------------------------------------------
+
+describe("任务栏模型: OPEN_APP", () => {
+  it("openApp：加入任务栏 + 聚焦", () => {
+    const state: KernelState = {
+      mainTabs: [],
+      bottomTabs: [],
+      pinnedTabs: [],
+      updatedAt: 0,
+      mainLocation: makeLocation("/"),
+      bottomLocation: makeLocation("/"),
+      popLocation: makeLocation("/"),
+      appScenes: {},
+    };
+    const result = reduceKernel(state, { type: "OPEN_APP", tabId: "/app/articles" });
+    expect(result.nextState.mainTabs).toContain("/app/articles");
+    expect(result.nextState.mainLocation.pathname).toBe("/app/articles");
+    expect(result.persist).toBe("local");
   });
 
-  it("getSnapshot 返回的 mainTabs/bottomTabs 是副本（外部修改不影响内部）", () => {
-    const controller = new NavController();
-    const snap = controller.getSnapshot();
-    const original = [...snap.mainTabs];
-    snap.mainTabs.push("/app/github"); // 外部破坏性修改
-    // 再次获取 snapshot（缓存被清空后重新派生），应恢复
-    controller.navigateMain("/app/articles"); // 触发 notify 清缓存
-    const snap2 = controller.getSnapshot();
-    expect(snap2.mainTabs).toEqual(original);
+  it("openApp bottom 应用：加入 bottomTabs + 激活", () => {
+    const state: KernelState = {
+      mainTabs: [],
+      bottomTabs: [],
+      pinnedTabs: [],
+      updatedAt: 0,
+      mainLocation: makeLocation("/"),
+      bottomLocation: makeLocation("/"),
+      popLocation: makeLocation("/"),
+      appScenes: {},
+    };
+    const result = reduceKernel(state, { type: "OPEN_APP", tabId: "/app/github" });
+    expect(result.nextState.bottomTabs).toContain("/app/github");
+    expect(result.nextState.bottomLocation.pathname).toBe("/app/github");
+  });
+
+  it("openApp 已在任务栏：不重复加入，仅聚焦", () => {
+    const state: KernelState = {
+      mainTabs: ["/app/articles"],
+      bottomTabs: [],
+      pinnedTabs: [],
+      updatedAt: 0,
+      mainLocation: makeLocation("/"),
+      bottomLocation: makeLocation("/"),
+      popLocation: makeLocation("/"),
+      appScenes: {},
+    };
+    const result = reduceKernel(state, { type: "OPEN_APP", tabId: "/app/articles" });
+    expect(result.nextState.mainTabs).toEqual(["/app/articles"]); // 不重复
+    expect(result.nextState.mainLocation.pathname).toBe("/app/articles");
+  });
+});
+
+describe("任务栏模型: QUIT_APP", () => {
+  it("quitApp：从 mainTabs 移除", () => {
+    const state: KernelState = {
+      mainTabs: ["/app/articles", "/app/settings"],
+      bottomTabs: [],
+      pinnedTabs: [],
+      updatedAt: 0,
+      mainLocation: makeLocation("/app/articles"),
+      bottomLocation: makeLocation("/"),
+      popLocation: makeLocation("/"),
+      appScenes: {},
+    };
+    const result = reduceKernel(state, { type: "QUIT_APP", tabId: "/app/articles" });
+    expect(result.nextState.mainTabs).toEqual(["/app/settings"]);
+    // 当前激活的应用退出，location 回 /（桌面显现）
+    expect(result.nextState.mainLocation.pathname).toBe("/");
+    expect(result.persist).toBe("local");
+  });
+
+  it("quitApp pinned 应用：拒绝退出", () => {
+    const state: KernelState = {
+      mainTabs: ["/app/articles"],
+      bottomTabs: [],
+      pinnedTabs: ["/app/articles"],
+      updatedAt: 0,
+      mainLocation: makeLocation("/app/articles"),
+      bottomLocation: makeLocation("/"),
+      popLocation: makeLocation("/"),
+      appScenes: {},
+    };
+    const result = reduceKernel(state, { type: "QUIT_APP", tabId: "/app/articles" });
+    expect(result.changed).toBe(false);
+    expect(result.nextState.mainTabs).toContain("/app/articles");
+  });
+
+  it("quitApp 不在任务栏：无变化", () => {
+    const state: KernelState = {
+      mainTabs: [],
+      bottomTabs: [],
+      pinnedTabs: [],
+      updatedAt: 0,
+      mainLocation: makeLocation("/"),
+      bottomLocation: makeLocation("/"),
+      popLocation: makeLocation("/"),
+      appScenes: {},
+    };
+    const result = reduceKernel(state, { type: "QUIT_APP", tabId: "/app/articles" });
+    expect(result.changed).toBe(false);
+  });
+});
+
+describe("任务栏模型: PIN_TAB / UNPIN_TAB", () => {
+  const baseState: KernelState = {
+    mainTabs: ["/app/articles"],
+    bottomTabs: [],
+    pinnedTabs: [],
+    updatedAt: 0,
+    mainLocation: makeLocation("/app/articles"),
+    bottomLocation: makeLocation("/"),
+    popLocation: makeLocation("/"),
+    appScenes: {},
+  };
+
+  it("pinTab：加入 pinnedTabs", () => {
+    const result = reduceKernel(baseState, { type: "PIN_TAB", tabId: "/app/articles" });
+    expect(result.nextState.pinnedTabs).toContain("/app/articles");
+    expect(result.persist).toBe("local");
+  });
+
+  it("pinTab 已 pinned：无变化", () => {
+    const pinned: KernelState = { ...baseState, pinnedTabs: ["/app/articles"] };
+    const result = reduceKernel(pinned, { type: "PIN_TAB", tabId: "/app/articles" });
+    expect(result.changed).toBe(false);
+  });
+
+  it("unpinTab：从 pinnedTabs 移除", () => {
+    const pinned: KernelState = { ...baseState, pinnedTabs: ["/app/articles"] };
+    const result = reduceKernel(pinned, { type: "UNPIN_TAB", tabId: "/app/articles" });
+    expect(result.nextState.pinnedTabs).toEqual([]);
   });
 });

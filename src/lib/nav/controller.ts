@@ -48,6 +48,8 @@ export type PopRoute = (typeof POP_ROUTES)[number];
 export interface NavLayout {
   mainTabs: TabId[];
   bottomTabs: TabId[];
+  /** 固定在任务栏的应用（entry route）。pinned 应用不受 QUIT_APP 移除，刷新后保留。 */
+  pinnedTabs: TabId[];
 }
 
 interface PersistedNavLayout extends NavLayout {
@@ -118,12 +120,26 @@ type KernelEvent =
   | { type: "REORDER"; area: "main" | "bottom"; tabIds: TabId[] }
   | { type: "CLOSE_TAB"; tabId: TabId }
   | {
-      /** 聚焦某应用（Dock 图标点击）。
+      /** 聚焦某应用（任务栏图标点击）。
        * 语义（iPadOS Dock）：恢复该应用最后场景，不重置到入口；
        * 切焦点用 REPLACE 不入历史栈。仅在 main 区内聚焦。 */
       type: "FOCUS_APP";
       tabId: TabId;
     }
+  | {
+      /** 打开应用（桌面图标点击）：若不在任务栏则加入（按 appDefaultArea 决定 main/bottom），
+       *  再聚焦。与 FOCUS_APP 区别：会确保 tab 存在。 */
+      type: "OPEN_APP";
+      tabId: TabId;
+    }
+  | {
+      /** 退出应用：从任务栏移除（非 pinned）。若是当前激活，location 回 /（桌面显现）。
+       *  pinned 应用拒绝退出（UI 层应灰显）。 */
+      type: "QUIT_APP";
+      tabId: TabId;
+    }
+  | { type: "PIN_TAB"; tabId: TabId }
+  | { type: "UNPIN_TAB"; tabId: TabId }
   | { type: "ACTIVATE_BOTTOM"; location: HistoryLocation }
   | { type: "DEACTIVATE_BOTTOM" }
   | { type: "ACTIVATE_POP"; location: HistoryLocation }
@@ -218,6 +234,10 @@ function parsePersistedLayout(value: unknown): PersistedNavLayout | null {
   return {
     mainTabs: normalizeTabList(record.mainTabs),
     bottomTabs: normalizeTabList(record.bottomTabs),
+    // 兼容老数据（无 pinnedTabs 字段 → 默认空）
+    pinnedTabs: Array.isArray(record.pinnedTabs)
+      ? normalizeTabList(record.pinnedTabs)
+      : [],
     updatedAt: typeof record.updatedAt === "number" ? record.updatedAt : 0,
   };
 }
@@ -286,10 +306,10 @@ export function areaForPath(layout: NavLayout, path: string): Area {
   return "main";
 }
 
-/** 合并 layout：去重 + 保证 ALL_TABS 全覆盖 + mainTabs/bottomTabs 互斥。 */
+/** 合并 layout：去重 + mainTabs/bottomTabs 互斥（不再强制 ALL_TABS 全覆盖）。
+ * 任务栏模型（2026-07-23 重构）：任务栏默认空，只有 OPEN_APP 打开或 PIN 的应用才出现。
+ * 废除原"强制把所有已安装应用补进任务栏"的不变量。 */
 function mergeLayout(layout: NavLayout): NavLayout {
-  const allTabs = tabRegistry.allTabs;
-  const defaultBottom = tabRegistry.defaultBottomTabs;
   const placed = new Set<TabId>();
   const mainTabs: TabId[] = [];
   const bottomTabs: TabId[] = [];
@@ -306,23 +326,25 @@ function mergeLayout(layout: NavLayout): NavLayout {
       placed.add(tab);
     }
   }
-  for (const tab of allTabs) {
-    if (!placed.has(tab)) {
-      if (defaultBottom.includes(tab)) {
-        bottomTabs.push(tab);
-      } else {
-        mainTabs.push(tab);
-      }
+  // pinnedTabs 去重（不改变 main/bottom 归属，仅清理重复）
+  const pinnedTabs: TabId[] = [];
+  const pinnedSeen = new Set<TabId>();
+  for (const tab of layout.pinnedTabs ?? []) {
+    if (!pinnedSeen.has(tab)) {
+      pinnedTabs.push(tab);
+      pinnedSeen.add(tab);
     }
   }
-  return { mainTabs, bottomTabs };
+  return { mainTabs, bottomTabs, pinnedTabs };
 }
 
 function sanitizeMainLocation(
   location: HistoryLocation,
   mainTabs: readonly TabId[],
 ): HistoryLocation {
-  if (mainTabs.length === 0) return parseHref("/");
+  // location=/（桌面）或深链接（/article，pathToTabId 返回 null）时保留。
+  // 仅当 location 指向某应用 entry route（pathToTabId 非 null）但该应用不在 mainTabs 时清空。
+  if (location.pathname === "/") return location;
   const tabId = pathToTabId(location.pathname);
   if (tabId && !mainTabs.includes(tabId)) {
     return parseHref("/");
@@ -353,11 +375,13 @@ function normalizeState(state: KernelState): KernelState {
   const merged = mergeLayout({
     mainTabs: state.mainTabs,
     bottomTabs: state.bottomTabs,
+    pinnedTabs: state.pinnedTabs,
   });
   return {
     ...state,
     mainTabs: merged.mainTabs,
     bottomTabs: merged.bottomTabs,
+    pinnedTabs: merged.pinnedTabs,
     mainLocation: sanitizeMainLocation(state.mainLocation, merged.mainTabs),
     bottomLocation: sanitizeBottomLocation(
       state.bottomLocation,
@@ -485,19 +509,14 @@ const carryActiveOnMovePlugin: KernelBehaviorPlugin = ({
 };
 
 /**
- * main 区有 tab 但 location 是 '/'（未激活）时，跳到第一个 tab。
- * 注意：不强制要求 location 指向某个 tab——main 区允许非 tab 的深链接
- * （如 /article/0001、/tags/javascript），这些深链接也是合法的 main location。
+ * 任务栏模型（2026-07-23 重构）：location '/' = 桌面（合法态），不再强制跳 mainTabs[0]。
+ * 原 ensureMainHasActivePlugin（main 有 tab 就强制激活首个）已废弃——新模型桌面是 '/'，
+ * 空闲态显示桌面背景层，打开应用才进任务栏。
+ * 保留此空插件占位（BUILTIN_BEHAVIOR_PLUGINS 数组结构不变），未来如需引导逻辑可在此扩展。
  */
-const ensureMainHasActivePlugin: KernelBehaviorPlugin = ({ nextState }) => {
-  if (nextState.mainTabs.length === 0) return nextState;
-  if (nextState.mainLocation.pathname !== "/") return nextState;
-  return { ...nextState, mainLocation: parseHref(nextState.mainTabs[0]) };
-};
 
 const BUILTIN_BEHAVIOR_PLUGINS: readonly KernelBehaviorPlugin[] = [
   carryActiveOnMovePlugin,
-  ensureMainHasActivePlugin,
 ];
 
 function applyBehaviorPlugins(
@@ -618,6 +637,134 @@ export function reduceKernel(
         urlAction: "REPLACE",
         notify: [{ area: "main", type: "REPLACE" }],
         persist: "none",
+      };
+    }
+
+    case "OPEN_APP": {
+      // 打开应用：若不在任务栏则加入（按 defaultArea 决定 main/bottom），再聚焦。
+      const tabId = event.tabId;
+      const targetArea: "main" | "bottom" = tabRegistry.defaultBottomTabs.includes(
+        tabId,
+      )
+        ? "bottom"
+        : "main";
+      const tabs = targetArea === "main" ? state.mainTabs : state.bottomTabs;
+      let nextState = state;
+      if (!tabs.includes(tabId)) {
+        nextState =
+          targetArea === "main"
+            ? { ...state, mainTabs: [...state.mainTabs, tabId] }
+            : { ...state, bottomTabs: [...state.bottomTabs, tabId] };
+      }
+      // 聚焦：恢复场景（无记忆则 entry route）。main 区 REPLACE；bottom 区激活展开。
+      const remembered = state.appScenes[tabId];
+      const targetLocation = remembered ?? parseHref(tabId);
+      if (targetArea === "main") {
+        nextState = { ...nextState, mainLocation: targetLocation };
+        return {
+          nextState,
+          changed: true,
+          urlAction: "REPLACE",
+          notify: [{ area: "main", type: "REPLACE" }],
+          persist: "local",
+        };
+      }
+      // bottom 应用：激活（展开底栏）
+      nextState = { ...nextState, bottomLocation: targetLocation };
+      return {
+        nextState,
+        changed: true,
+        urlAction: "PUSH",
+        notify: [{ area: "bottom", type: "PUSH" }],
+        persist: "local",
+      };
+    }
+
+    case "QUIT_APP": {
+      // 退出应用：从任务栏移除（pinned 拒绝）。若是当前激活，location 回 /（桌面显现）。
+      const tabId = event.tabId;
+      if (state.pinnedTabs.includes(tabId)) {
+        // pinned 应用不可退出
+        return {
+          nextState: state,
+          changed: false,
+          notify: [],
+          persist: "none",
+        };
+      }
+      const inMain = state.mainTabs.includes(tabId);
+      const inBottom = state.bottomTabs.includes(tabId);
+      if (!inMain && !inBottom) {
+        return {
+          nextState: state,
+          changed: false,
+          notify: [],
+          persist: "none",
+        };
+      }
+      let nextState = state;
+      let notify: Array<{ area: Area; type: RouterAction }> = [];
+      if (inMain) {
+        const mainTabs = state.mainTabs.filter((t) => t !== tabId);
+        nextState = { ...nextState, mainTabs };
+        // 若是当前激活的 main tab，location 回 /（桌面显现）
+        if (pathToTabId(state.mainLocation.pathname) === tabId) {
+          nextState = { ...nextState, mainLocation: parseHref("/") };
+          notify = [{ area: "main", type: "REPLACE" }];
+        }
+      }
+      if (inBottom) {
+        const bottomTabs = state.bottomTabs.filter((t) => t !== tabId);
+        nextState = { ...nextState, bottomTabs };
+        if (pathToTabId(state.bottomLocation.pathname) === tabId) {
+          nextState = { ...nextState, bottomLocation: parseHref("/") };
+        }
+      }
+      return {
+        nextState,
+        changed: true,
+        urlAction: "REPLACE",
+        notify,
+        persist: "local",
+      };
+    }
+
+    case "PIN_TAB": {
+      const tabId = event.tabId;
+      if (state.pinnedTabs.includes(tabId)) {
+        return {
+          nextState: state,
+          changed: false,
+          notify: [],
+          persist: "none",
+        };
+      }
+      return {
+        nextState: { ...state, pinnedTabs: [...state.pinnedTabs, tabId] },
+        changed: true,
+        notify: [],
+        persist: "local",
+      };
+    }
+
+    case "UNPIN_TAB": {
+      const tabId = event.tabId;
+      if (!state.pinnedTabs.includes(tabId)) {
+        return {
+          nextState: state,
+          changed: false,
+          notify: [],
+          persist: "none",
+        };
+      }
+      return {
+        nextState: {
+          ...state,
+          pinnedTabs: state.pinnedTabs.filter((t) => t !== tabId),
+        },
+        changed: true,
+        notify: [],
+        persist: "local",
       };
     }
 
@@ -839,7 +986,8 @@ export function reduceKernel(
       const changed =
         event.layout.updatedAt !== state.updatedAt ||
         !areTabsEqual(state.mainTabs, merged.mainTabs) ||
-        !areTabsEqual(state.bottomTabs, merged.bottomTabs);
+        !areTabsEqual(state.bottomTabs, merged.bottomTabs) ||
+        !areTabsEqual(state.pinnedTabs, merged.pinnedTabs);
       if (
         !changed ||
         (!event.force && event.layout.updatedAt <= state.updatedAt)
@@ -856,6 +1004,7 @@ export function reduceKernel(
           ...state,
           mainTabs: merged.mainTabs,
           bottomTabs: merged.bottomTabs,
+          pinnedTabs: merged.pinnedTabs,
           updatedAt: event.layout.updatedAt,
         },
         changed: true,
@@ -878,10 +1027,13 @@ export type NavListener = () => void;
 
 function createInitialState(): KernelState {
   return {
-    mainTabs: [...tabRegistry.defaultMainTabs],
-    bottomTabs: [...tabRegistry.defaultBottomTabs],
+    // 任务栏模型：默认空，只有 OPEN_APP 打开或 PIN 的应用才出现
+    mainTabs: [],
+    bottomTabs: [],
+    pinnedTabs: [],
     updatedAt: 0,
-    mainLocation: parseHref(tabRegistry.defaultMainTabs[0] ?? "/"),
+    // 默认 location 为 /（桌面背景层显现）
+    mainLocation: parseHref("/"),
     bottomLocation: parseHref("/"),
     popLocation: parseHref("/"),
     appScenes: {},
@@ -909,22 +1061,17 @@ export class NavController {
     // 0. 重新创建初始状态（setTabRegistry 之后）
     this.state = createInitialState();
 
-    // 1. 从 localStorage 恢复 layout（tabs），location 留给 URL 决定。
+    // 1. 从 localStorage 恢复 layout（任务栏 tabs + pinned），location 留给 URL 决定。
     const persisted = readLocalStorage();
     if (persisted) {
       // 过滤掉不再 tabRegistry.allTabs 中的旧 tab（路径变更后兼容）
-      const validMainTabs = persisted.mainTabs.filter((t) =>
-        tabRegistry.allTabs.includes(t),
-      );
-      const validBottomTabs = persisted.bottomTabs.filter((t) =>
-        tabRegistry.allTabs.includes(t),
-      );
+      const valid = (list: readonly TabId[]) =>
+        list.filter((t) => tabRegistry.allTabs.includes(t));
       this.state = {
         ...this.state,
-        mainTabs:
-          validMainTabs.length > 0 ? validMainTabs : this.state.mainTabs,
-        bottomTabs:
-          validBottomTabs.length > 0 ? validBottomTabs : this.state.bottomTabs,
+        mainTabs: valid(persisted.mainTabs),
+        bottomTabs: valid(persisted.bottomTabs),
+        pinnedTabs: valid(persisted.pinnedTabs),
         updatedAt: persisted.updatedAt,
       };
     }
@@ -956,20 +1103,8 @@ export class NavController {
     });
     this.state = normalizeState(this.state);
 
-    // 3.5 根路径 / 重定向到默认首页（mainTabs[0] = /desktop 桌面），避免空白首屏。
-    // 仅当 URL 完全是 /（无 query/hash/bottom/pop）时触发。
-    if (
-      window.location.pathname === "/" &&
-      !window.location.search &&
-      !window.location.hash &&
-      this.state.mainTabs.length > 0 &&
-      this.state.mainLocation.pathname === "/"
-    ) {
-      this.state = {
-        ...this.state,
-        mainLocation: parseHref(this.state.mainTabs[0]),
-      };
-    }
+    // 3.5 根路径 / = 桌面背景层（新任务栏模型：桌面是 /，不再强制跳 mainTabs[0]）。
+    // 空任务栏时 mainLocation 保持 / ，桌面自然显现。
 
     // 4. 把 URL 规范化为 canonical 形式（深链接推断结果写回 URL）。
     const canonical = buildCanonicalUrl(this.state);
@@ -1019,6 +1154,7 @@ export class NavController {
     return {
       mainTabs: [...s.mainTabs],
       bottomTabs: [...s.bottomTabs],
+      pinnedTabs: [...s.pinnedTabs],
       mainLocation: s.mainLocation,
       bottomLocation: s.bottomLocation,
       popLocation: s.popLocation,
@@ -1106,6 +1242,7 @@ export class NavController {
       writeLocalStorage({
         mainTabs: this.state.mainTabs,
         bottomTabs: this.state.bottomTabs,
+        pinnedTabs: this.state.pinnedTabs,
         updatedAt: Date.now(),
       });
     }, PERSIST_DEBOUNCE_MS);
@@ -1137,6 +1274,32 @@ export class NavController {
    *  tabId = 应用 entry route（Dock 身份）。 */
   focusApp(tabId: TabId): void {
     this.dispatch({ type: "FOCUS_APP", tabId });
+  }
+
+  /** 打开应用（桌面图标点击）：确保进任务栏 + 聚焦。
+   *  与 focusApp 区别：会加入任务栏（若不在）。桌面启动器点击应走此 API。 */
+  openApp(tabId: TabId): void {
+    this.dispatch({ type: "OPEN_APP", tabId });
+  }
+
+  /** 退出应用：从任务栏移除（pinned 拒绝）+ view 销毁。 */
+  quitApp(tabId: TabId): void {
+    this.dispatch({ type: "QUIT_APP", tabId });
+  }
+
+  /** 固定应用到任务栏（pinned，退出时不移除，刷新后保留）。 */
+  pinTab(tabId: TabId): void {
+    this.dispatch({ type: "PIN_TAB", tabId });
+  }
+
+  /** 取消固定应用。 */
+  unpinTab(tabId: TabId): void {
+    this.dispatch({ type: "UNPIN_TAB", tabId });
+  }
+
+  /** 判断某应用是否 pinned。 */
+  isPinned(tabId: TabId): boolean {
+    return this.state.pinnedTabs.includes(tabId);
   }
 
   /** 激活 bottom 区（展开 + 导航到 location）。 */

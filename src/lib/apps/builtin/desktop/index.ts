@@ -26,7 +26,8 @@ export const desktopApp: AppEntry = {
         view: () => import("$lib/apps/views/DesktopView.svelte"),
       },
     ],
-    // 桌面作为默认首页，不可从导航关闭；不参与应用网格（避免自引用）。
-    hiddenFromNav: false,
+    // 桌面是 shell 级背景层（AreaOutlet 直接渲染，不经 tab 机制），
+    // 从主导航隐藏——不进 mainTabs/任务栏，由任务栏专属"桌面入口"提供回桌面。
+    hiddenFromNav: true,
   },
 };

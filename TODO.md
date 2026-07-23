@@ -498,3 +498,26 @@ GaubeeOS/
 - 切回桌面 → 浮层消失，图标网格恢复
 - 移动端：4 列图标网格、widget 单列自适应、header/tabbar 固定中间滚动
 - widget 数据正确（最近文章5条/最近说说5条/标签20个）
+
+#### 21. 任务栏模型重构 + 系统级动画 + 桌面清理（2026-07-23）
+
+**任务栏模型重构**（从"所有已安装应用"→"打开+固定应用"）：
+- controller：废 mergeLayout 全覆盖不变量；mainTabs/bottomTabs 默认空；新增 OPEN_APP（打开=进任务栏+聚焦）、QUIT_APP（退出=移除+销毁，pinned 拒绝）、PIN_TAB/UNPIN_TAB；pinnedTabs 状态 + 持久化（localStorage）；废 ensureMainHasActivePlugin（location / = 桌面合法态）。
+- desktop shell 化：hiddenFromNav:true，从 mainTabs 移出；AreaOutlet 桌面改为 shell 级直接渲染（不经 tab 机制），桌面背景层 + 应用浮层（visibility/opacity 过渡，保活）。
+
+**任务栏 UI**：
+- DesktopSidebar：顶部固定桌面入口（左栏时桌面在顶部）；任务栏=打开+固定应用（默认空，空态提示）。
+- MobileTabBar：中心固定桌面按钮（移动端桌面在中心），左右分布应用。
+- TabContextMenu：长按(pointerdown 500ms)/右键菜单，pin/unpin + quit（pinned 时退出禁用）。
+
+**前后台区分**：前台（main/bottom，有桌面 AppActivity，可进任务栏）vs 后台（pop 浮层服务 search/notifications，不进任务栏）。account 是 hiddenFromNav 前台深链接。
+
+**系统级动画**（纯 svelte 内置）：
+- src/lib/utils/motion.ts：reduced-motion 兜底 + fade/fly/scale/flip 工厂。
+- 应用浮层切换：visibility/opacity/transform CSS 过渡（保活前提下动画）。
+- 桌面图标 stagger（in:motionFade delay 递增）+ flip；widget flip。
+- 全局 scrollbar-thin（Firefox scrollbar-width + Webkit ::-webkit-scrollbar，透明 track + 半透明 thumb）。
+
+**桌面清理**：删除"应用"/"小组件"分组标题（图标/widget 自由组合）。
+
+验证：类型检查 0 错误；231 单测全过；agent-browser 双端走查——空任务栏、openApp 进任务栏、X 退出回桌面、右键 pin、刷新后 pinned 保留、移动端中心桌面按钮全部通过。

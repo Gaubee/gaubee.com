@@ -21,14 +21,16 @@
   const activeBottomRoute = $derived(routeDomainRegistry.entryRouteForPath(navState.bottomLocation.pathname))
 
   function goMain(route: string): void {
-    navController.focusApp(route)
+    // 抽屉是启动器：openApp（加入任务栏 + 聚焦）
+    navController.openApp(route)
     onnavigate?.()
   }
   function toggleBottom(route: string, isActive: boolean): void {
     if (isActive) {
       navController.deactivateBottom()
     } else {
-      navController.activateBottom(route)
+      // bottom 应用用 openApp（加入任务栏 + 激活）
+      navController.openApp(route)
     }
     onnavigate?.()
   }

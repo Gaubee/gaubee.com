@@ -18,6 +18,7 @@
   import { appManager } from '$lib/apps/AppManager.svelte'
   import { routeDomainRegistry } from '$lib/apps/route-domain'
   import AppShell from '$lib/app-scaffold/AppShell.svelte'
+  import DesktopView from '$lib/apps/views/DesktopView.svelte'
   import type { AppManifest } from '$lib/apps/types'
   import type { Area, TabId } from '$lib/nav/controller'
   import type { Component } from 'svelte'
@@ -54,11 +55,10 @@
 
   const tabEntries = $derived(allTabViews as ReadonlyArray<{ tabId: TabId; component: Component }>)
 
-  // 桌面 tabId（系统级桌面应用，常驻底层背景层）
-  const DESKTOP_TAB_ID = '/desktop'
-  // 当前是否有非桌面的激活应用（决定桌面层是否被覆盖）
-  const activeNonDesktopTab = $derived(
-    isActive && activeTabId !== null && activeTabId !== DESKTOP_TAB_ID,
+  // 桌面作为 shell 级背景层（main 区独有）：无应用浮层激活时显现。
+  // mainLocation 为 /（桌面）或无激活 tab 时，桌面是顶层。
+  const desktopVisible = $derived(
+    area === 'main' && (activeTabId === null) && !deepLinkView,
   )
 
   // 按 entry route（tabId）查 manifest，供 AppShell 隔离包裹。
@@ -92,30 +92,27 @@
   {/if}
 {:else}
   <div class="main-area-root">
+    {#if area === 'main'}
+      <!-- 桌面：shell 级背景层（始终常驻 DOM 保活，无应用浮层时显现） -->
+      <div class="desktop-layer" class:desktop-layer-hidden={!desktopVisible}>
+        <DesktopView />
+      </div>
+    {/if}
     {#each tabEntries as { tabId, component } (tabId)}
       {@const inThisArea = tabIdsInArea.includes(tabId)}
       {@const isThisActive = inThisArea && isActive && activeTabId === tabId}
       {@const View = component}
       {@const manifest = manifestForTab(tabId)}
-      {@const isDesktop = tabId === DESKTOP_TAB_ID}
-      {#if isDesktop}
-        <!-- 桌面：常驻底层背景层（始终渲染，被激活应用浮层遮挡时不可见但保活） -->
-        <div class="desktop-layer" class:desktop-layer-hidden={activeNonDesktopTab}>
-          <View {area} {tabId} isActive={isThisActive} />
-        </div>
-      {:else}
-        <!-- 应用浮层：常驻 DOM 保活（display 切换，避免销毁组件状态/编辑器/终端会话），
-             激活时覆盖桌面层，z-index 高于桌面。 -->
-        <div class="app-overlay-layer" class:app-overlay-hidden={!isThisActive}>
-          {#if manifest}
-            <AppShell app={manifest} pathname={location.pathname}>
-              <View {area} {tabId} isActive={isThisActive} />
-            </AppShell>
-          {:else}
+      <!-- 应用浮层：常驻 DOM 保活（display 切换），激活时覆盖桌面层。 -->
+      <div class="app-overlay-layer" class:app-overlay-hidden={!isThisActive}>
+        {#if manifest}
+          <AppShell app={manifest} pathname={location.pathname}>
             <View {area} {tabId} isActive={isThisActive} />
-          {/if}
-        </div>
-      {/if}
+          </AppShell>
+        {:else}
+          <View {area} {tabId} isActive={isThisActive} />
+        {/if}
+      </div>
     {/each}
   </div>
 {/if}
@@ -128,26 +125,44 @@
     height: 100%;
     isolation: isolate;
   }
-  /* 桌面层：常驻底层背景。无应用浮层时可见可交互；有浮层时隐藏（被遮挡，无需渲染） */
+  /* 桌面层：常驻底层背景。无应用浮层时可见可交互；有浮层时隐藏（被遮挡）。
+   * 用 visibility/opacity 过渡（display:none 无法 transition）。 */
   .desktop-layer {
     position: absolute;
     inset: 0;
     z-index: 1;
     overflow: auto;
+    visibility: visible;
+    opacity: 1;
+    transition:
+      opacity 0.18s ease,
+      visibility 0.18s ease;
   }
   .desktop-layer-hidden {
-    display: none;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
   }
-  /* 应用浮层：常驻 DOM 保活，激活时显示并覆盖桌面（z-index 高于桌面层）。
-   * 用 display:none 切换而非销毁，保留组件状态/滚动/编辑器/终端会话。 */
+  /* 应用浮层：常驻 DOM 保活（visibility/opacity 过渡而非 display:none/销毁），
+   * 保留组件状态/滚动/编辑器/终端会话。激活时显示并覆盖桌面。 */
   .app-overlay-layer {
     position: absolute;
     inset: 0;
     z-index: 10;
     background: var(--background);
     overflow: auto;
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+      opacity 0.2s ease,
+      transform 0.2s ease,
+      visibility 0.2s ease;
   }
   .app-overlay-hidden {
-    display: none;
+    visibility: hidden;
+    opacity: 0;
+    transform: translateY(6px);
+    pointer-events: none;
   }
 </style>
