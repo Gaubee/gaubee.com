@@ -6,14 +6,13 @@
   import { readonlyVfs, type ReadonlyPost } from '$lib/vfs/readonly'
   import { navController } from '$lib/nav/nav-controller-instance'
 
-  let posts = $state<ReadonlyPost[]>([])
-
-  $effect(() => {
-    posts = readonlyVfs
+  // readonlyVfs 是构建时静态数据（同步），用 $derived 派生最近 5 篇文章
+  const posts = $derived(
+    readonlyVfs
       .getPostsByCollection('articles')
       .sort((a, b) => b.metadata.date.getTime() - a.metadata.date.getTime())
-      .slice(0, 5)
-  })
+      .slice(0, 5),
+  )
 
   function titleOf(p: ReadonlyPost): string {
     return p.metadata.title ?? p.id.slug ?? p.id.stem

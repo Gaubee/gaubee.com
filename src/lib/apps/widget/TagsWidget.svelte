@@ -8,16 +8,14 @@
 
   type TagCount = { tag: string; count: number }
 
-  let tags = $state<TagCount[]>([])
-
-  $effect(() => {
+  const tags = $derived.by<TagCount[]>(() => {
     const counts = new Map<string, number>()
     for (const p of readonlyVfs.getPosts()) {
       for (const t of p.metadata.tags ?? []) {
         counts.set(t, (counts.get(t) ?? 0) + 1)
       }
     }
-    tags = [...counts.entries()]
+    return [...counts.entries()]
       .map(([tag, count]) => ({ tag, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 20)

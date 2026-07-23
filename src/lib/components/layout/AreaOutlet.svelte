@@ -1,8 +1,10 @@
 <!--
 	AreaOutlet：区域出口组件。
 	接收 area prop，渲染该 area 当前激活的 view。
-	- main/bottom：所有已注册的 tab view 常驻 DOM，用 CSS display 切换显示（组件保活）。
-	  当 activeTabId 为 null（非 tab 路径，如 /article/...）时，渲染深链接 view。
+	- main：桌面背景层 + 应用浮层模型（均常驻 DOM 保活，display 切换显隐）。
+	  桌面（/desktop）作底层；激活的非桌面应用以浮层覆盖。深链接（/article/...）
+	  在无 active tab 时渲染。保活确保切换应用不丢组件状态（编辑器/终端会话等）。
+	- bottom：所有已注册 tab view 常驻 DOM，display 切换（保活）。
 	- pop：不常驻，按需渲染（弹层打开时挂载）。
 -->
 <script lang="ts">
@@ -96,53 +98,56 @@
       {@const View = component}
       {@const manifest = manifestForTab(tabId)}
       {@const isDesktop = tabId === DESKTOP_TAB_ID}
-      {@const showAsLayer = isDesktop ? true : isThisActive}
       {#if isDesktop}
-        <!-- 桌面：常驻底层背景层（始终可见，被激活应用浮层覆盖） -->
-        <div class="desktop-layer" class:desktop-layer-top={!activeNonDesktopTab}>
+        <!-- 桌面：常驻底层背景层（始终渲染，被激活应用浮层遮挡时不可见但保活） -->
+        <div class="desktop-layer" class:desktop-layer-hidden={activeNonDesktopTab}>
           <View {area} {tabId} isActive={isThisActive} />
         </div>
       {:else}
-        <!-- 应用浮层：激活时覆盖桌面，z-index 高于桌面层 -->
-        {#if showAsLayer}
-          <div class="app-overlay-layer">
-            {#if manifest}
-              <AppShell app={manifest} pathname={location.pathname}>
-                <View {area} {tabId} isActive={isThisActive} />
-              </AppShell>
-            {:else}
+        <!-- 应用浮层：常驻 DOM 保活（display 切换，避免销毁组件状态/编辑器/终端会话），
+             激活时覆盖桌面层，z-index 高于桌面。 -->
+        <div class="app-overlay-layer" class:app-overlay-hidden={!isThisActive}>
+          {#if manifest}
+            <AppShell app={manifest} pathname={location.pathname}>
               <View {area} {tabId} isActive={isThisActive} />
-            {/if}
-          </div>
-        {/if}
+            </AppShell>
+          {:else}
+            <View {area} {tabId} isActive={isThisActive} />
+          {/if}
+        </div>
       {/if}
     {/each}
   </div>
 {/if}
 
 <style>
-  /* main 区根：桌面底层 + 应用浮层的堆叠上下文 */
+  /* main 区根：桌面底层 + 应用浮层的堆叠上下文。
+   * 桌面与应用都常驻 DOM（保活），靠 display + z-index 决定显隐层级。 */
   .main-area-root {
     position: relative;
     height: 100%;
     isolation: isolate;
   }
-  /* 桌面层：常驻底层背景。被激活应用覆盖时降级（不可交互但仍可见作背景） */
+  /* 桌面层：常驻底层背景。无应用浮层时可见可交互；有浮层时隐藏（被遮挡，无需渲染） */
   .desktop-layer {
     position: absolute;
     inset: 0;
     z-index: 1;
     overflow: auto;
   }
-  .desktop-layer-top {
-    /* 桌面为顶层时可交互 */
-    z-index: 2;
+  .desktop-layer-hidden {
+    display: none;
   }
-  /* 应用浮层：激活时覆盖桌面，z-index 高于桌面层 */
+  /* 应用浮层：常驻 DOM 保活，激活时显示并覆盖桌面（z-index 高于桌面层）。
+   * 用 display:none 切换而非销毁，保留组件状态/滚动/编辑器/终端会话。 */
   .app-overlay-layer {
     position: absolute;
     inset: 0;
     z-index: 10;
     background: var(--background);
+    overflow: auto;
+  }
+  .app-overlay-hidden {
+    display: none;
   }
 </style>

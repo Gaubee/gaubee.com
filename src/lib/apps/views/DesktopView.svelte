@@ -6,7 +6,9 @@
 	2. 应用图标网格（启动器）：已安装应用入口，点击聚焦应用（应用浮层覆盖桌面）。
 	3. Widget 瀑布流：各应用声明的内容小组件（最近文章/说说/标签云），容器查询自适应。
 
-	任务栏（Dock）在 S2 下沉到本视图作为常驻 UI（随桌面背景层常驻）。
+	注意：任务栏（Dock）是 shell 级组件（DesktopSidebar/MobileTabBar），不在本视图内。
+	本视图只负责桌面内容（图标网格 + widget）。桌面作为 main 区背景层常驻，
+	应用以浮层覆盖桌面，任务栏始终在 shell 层可见。
 -->
 <script lang="ts">
   import { appManager } from '$lib/apps/AppManager.svelte'

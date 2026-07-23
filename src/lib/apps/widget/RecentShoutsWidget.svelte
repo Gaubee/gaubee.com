@@ -6,14 +6,12 @@
   import { readonlyVfs, type ReadonlyPost } from '$lib/vfs/readonly'
   import { navController } from '$lib/nav/nav-controller-instance'
 
-  let shouts = $state<ReadonlyPost[]>([])
-
-  $effect(() => {
-    shouts = readonlyVfs
+  const shouts = $derived(
+    readonlyVfs
       .getPostsByCollection('events')
       .sort((a, b) => b.metadata.date.getTime() - a.metadata.date.getTime())
-      .slice(0, 5)
-  })
+      .slice(0, 5),
+  )
 
   function relTime(date: Date): string {
     const days = Math.floor((Date.now() - date.getTime()) / 86_400_000)
