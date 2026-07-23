@@ -17,6 +17,7 @@ import { searchServiceRegistry } from "$lib/search/registry";
 import { appServiceRegistry } from "$lib/os/services";
 import { settingsSectionsRegistry } from "./builtin/settings-sections";
 import { widgetRegistry } from "./widget/registry";
+import { appMenuRegistry } from "./menu/registry";
 import { routeDomainRegistry } from "./route-domain";
 
 // ---------------------------------------------------------------------------
@@ -195,6 +196,7 @@ class AppManager {
     this.syncServices();
     this.syncSettingsSections();
     this.syncWidgets();
+    this.syncAppMenus();
     this.initialized = true;
   }
 
@@ -219,6 +221,7 @@ class AppManager {
     this.registerServices(entry);
     this.registerSettingsSections(entry.manifest);
     this.registerWidgets(entry.manifest);
+    this.registerAppMenus(entry.manifest);
 
     // 注册 CLI 命令到 PATH
     if (entry.manifest.cliCommands) {
@@ -247,6 +250,7 @@ class AppManager {
     appServiceRegistry.unregisterApp(id);
     this.unregisterSettingsSections(id);
     this.unregisterWidgets(id);
+    this.unregisterAppMenus(id);
     if (entry?.manifest.cliCommands) {
       for (const cli of entry.manifest.cliCommands) {
         pathManager.unregisterApp(id);
@@ -368,6 +372,29 @@ class AppManager {
     if (!manifest?.widgets) return;
     for (const widget of manifest.widgets) {
       widgetRegistry.unregister(widget.id);
+    }
+  }
+
+  /** 将已安装应用的声明式状态栏菜单投影到菜单注册表。 */
+  private syncAppMenus(): void {
+    for (const id of this.installedIds) {
+      const entry = this.registry.get(id);
+      if (entry) this.registerAppMenus(entry.manifest);
+    }
+  }
+
+  private registerAppMenus(manifest: AppManifest): void {
+    if (!manifest.appMenus) return;
+    for (const menu of manifest.appMenus) {
+      appMenuRegistry.register(menu);
+    }
+  }
+
+  private unregisterAppMenus(appId: string): void {
+    const manifest = this.findById(appId);
+    if (!manifest?.appMenus) return;
+    for (const menu of manifest.appMenus) {
+      appMenuRegistry.unregister(menu.id);
     }
   }
 

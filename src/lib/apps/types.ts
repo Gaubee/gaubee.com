@@ -19,6 +19,7 @@ import type { SearchServiceFactory } from "$lib/search/types";
 import type { ServiceDeclaration } from "$lib/os/services";
 import type { SettingsSection } from "./builtin/settings-sections";
 import type { WidgetDeclaration } from "./widget/types";
+import type { AppMenuDeclaration } from "./menu/types";
 
 // ---------------------------------------------------------------------------
 // 应用分类
@@ -150,6 +151,9 @@ export interface AppManifest {
   settingsSections?: SettingsSection[];
   /** ★ 声明式桌面小组件（AppManager 投影到 widgetRegistry，DesktopView 渲染）。 */
   widgets?: WidgetDeclaration[];
+  /** ★ 声明式状态栏菜单（AppManager 投影到 appMenuRegistry，SystemStatusBar 渲染）。
+   *  三种位置：system（苹果菜单）/ app（当前应用菜单）/ tray（右上角快捷入口）。 */
+  appMenus?: AppMenuDeclaration[];
 }
 
 /** 已安装应用实例（含运行时状态）。 */

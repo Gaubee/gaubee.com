@@ -521,3 +521,29 @@ GaubeeOS/
 **桌面清理**：删除"应用"/"小组件"分组标题（图标/widget 自由组合）。
 
 验证：类型检查 0 错误；231 单测全过；agent-browser 双端走查——空任务栏、openApp 进任务栏、X 退出回桌面、右键 pin、刷新后 pinned 保留、移动端中心桌面按钮全部通过。
+
+#### 22. 顶部系统状态栏（macOS 风格）+ appMenus 扩展点（2026-07-23）
+
+引入 macOS 风格顶部系统状态栏，桌面/移动统一，当前应用信息和菜单挂载顶部左上角。
+
+## appMenus 声明式扩展点
+- `src/lib/apps/menu/`：AppMenuDeclaration（placement: system/app/tray）+ AppMenuItem（link/onClick/separator）+ appMenuRegistry（forPlacement 过滤）。
+- AppManifest 增 appMenus 字段，AppManager install/init/uninstall 投影（复刻 widgets 范式）。
+
+## SystemStatusBar 组件
+- 三段布局：左 LOGO 系统菜单（苹果菜单）/ 中 当前应用主菜单（含最小化+退出）/ 右 tray 快捷入口。
+- 取代 MobileHeader（移动端顶栏）+ 废除底部 StatusBar（功能上移顶部）。
+- 桌面/移动统一，容器查询自适应（移动端 LOGO 无文字、紧凑）。
+
+## 各应用注册菜单
+- settings：system 菜单（设置入口/主题切换/关于）
+- account：system 菜单（账户设置/登录/退出登录）
+- search/notifications：tray 菜单（右上角快捷入口，activatePop）
+- articles：app 菜单示范（文章列表/按标签浏览）
+
+## 布局重构
+- +layout：插入 SystemStatusBar 顶部，删 MobileHeader/StatusBar。
+- app.css：废弃 .mobile-header/.desktop-status 类，SystemStatusBar 始终显示。
+
+验证：类型检查 0 错误；231 单测全过；agent-browser 双端走查——
+LOGO 系统菜单（6项）、应用菜单（自注册+最小化/退出）、tray 搜索通知、最小化回桌面、移动端清爽布局 全部通过。

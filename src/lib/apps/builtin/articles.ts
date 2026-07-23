@@ -10,6 +10,8 @@
  * - /tags：标签聚合（/tags/{tag}）。
  */
 import Newspaper from "@lucide/svelte/icons/newspaper";
+import TagsIcon from "@lucide/svelte/icons/tags";
+import ListIcon from "@lucide/svelte/icons/list";
 import { createFileSearchService } from "$lib/search/file-service";
 import { asView } from "../types";
 import { defineApp } from "$lib/app-scaffold/define-app";
@@ -56,6 +58,20 @@ export const articlesApp = defineApp({
       render: TagsWidget,
       size: "medium",
       order: 2,
+    },
+  ],
+  // 应用主菜单（当前文章应用激活时显示）：文章列表 + 按标签浏览
+  appMenus: [
+    {
+      id: "articles:view",
+      title: "显示",
+      placement: "app",
+      appId: "articles",
+      order: 0,
+      items: [
+        { id: "article-list", title: "文章列表", icon: ListIcon, link: "/app/articles" },
+        { id: "browse-tags", title: "按标签浏览", icon: TagsIcon, link: "/tags" },
+      ],
     },
   ],
 });

@@ -10,6 +10,8 @@
  * appServiceRegistry；其它应用经 gaubeeos.getAppService('account') 获取。
  */
 import User from "@lucide/svelte/icons/user";
+import LogOutIcon from "@lucide/svelte/icons/log-out";
+import LogInIcon from "@lucide/svelte/icons/log-in";
 import type { AppEntry } from "../../types";
 import { accountService } from "./service";
 
@@ -43,6 +45,31 @@ export const accountApp: AppEntry = {
         icon: User,
         order: 0,
         link: "/app/account",
+      },
+    ],
+    // 系统菜单：登录/退出登录/账户设置
+    appMenus: [
+      {
+        id: "account:main",
+        title: "账户",
+        placement: "system",
+        order: 10,
+        items: [
+          { id: "account-settings", title: "账户设置…", icon: User, link: "/app/account" },
+          { id: "sep1", title: "-", separator: true },
+          {
+            id: "login",
+            title: "登录 GitHub",
+            icon: LogInIcon,
+            onClick: () => accountService.login(),
+          },
+          {
+            id: "logout",
+            title: "退出登录",
+            icon: LogOutIcon,
+            onClick: () => void accountService.logout(),
+          },
+        ],
       },
     ],
   },

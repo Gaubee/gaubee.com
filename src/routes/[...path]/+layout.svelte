@@ -21,11 +21,10 @@
   import { gaubeeos } from '$lib/os/services'
   import AreaOutlet from '$lib/components/layout/AreaOutlet.svelte'
   import DesktopSidebar from '$lib/components/layout/DesktopSidebar.svelte'
-  import MobileHeader from '$lib/components/layout/MobileHeader.svelte'
   import MobileTabBar from '$lib/components/layout/MobileTabBar.svelte'
   import BottomAreaRouter from '$lib/components/layout/BottomAreaRouter.svelte'
   import PopAreaRouter from '$lib/components/layout/PopAreaRouter.svelte'
-  import StatusBar from '$lib/components/layout/StatusBar.svelte'
+  import SystemStatusBar from '$lib/components/layout/SystemStatusBar.svelte'
   import { Toaster } from '$lib/components/ui/sonner'
   import { notifySuccess, notifyError } from '$lib/apps/builtin/notifications/service.svelte'
   import { ModeWatcher } from 'mode-watcher'
@@ -88,13 +87,13 @@
 
 <!-- @container/app：容器查询上下文 -->
 <div class="app-layout" style="container-name: app; container-type: inline-size">
-  <!-- 桌面侧栏（移动端 display:none） -->
+  <!-- 桌面侧栏 Dock（移动端 display:none） -->
   <DesktopSidebar />
 
   <!-- 主体 -->
   <div class="app-body">
-    <!-- 移动端顶栏（桌面 display:none） -->
-    <MobileHeader />
+    <!-- 顶部系统状态栏（桌面/移动统一，取代原 MobileHeader + 底部 StatusBar） -->
+    <SystemStatusBar />
 
     <!-- main + bottom 垂直堆叠 -->
     <div class="flex min-h-0 flex-1 flex-col">
@@ -105,10 +104,8 @@
       <BottomAreaRouter />
     </div>
 
-    <!-- 移动端底栏 tab（桌面 display:none） -->
+    <!-- 移动端底栏 Dock（桌面 display:none） -->
     <MobileTabBar />
-    <!-- 桌面底部状态栏（移动端 display:none） -->
-    <StatusBar />
   </div>
 </div>
 

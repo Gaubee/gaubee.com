@@ -34,5 +34,19 @@ export const notificationsApp: AppEntry = {
     services: {
       notification: () => notificationService,
     },
+    // tray 右上角快捷入口（点击打开通知中心浮层）
+    appMenus: [
+      {
+        id: "notifications:tray",
+        title: "通知",
+        icon: Bell,
+        placement: "tray",
+        order: 10,
+        onClick: () =>
+          import("$lib/nav/nav-controller-instance").then((m) =>
+            m.navController.activatePop("/app/notifications"),
+          ),
+      },
+    ],
   },
 };

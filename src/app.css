@@ -149,11 +149,9 @@
     outline-offset: 2px;
     border-radius: var(--radius-sm);
   }
-  /* 全局默认滚动条（thin + 透明 track + 半透明 thumb，符合用户偏好）。
-   * Firefox 用 scrollbar-width/scrollbar-color；Webkit 用 ::-webkit-scrollbar。 */
+  /* 全局默认滚动条 thin，符合用户偏好 */
   * {
     scrollbar-width: thin;
-    scrollbar-color: color-mix(in srgb, currentColor 40%, transparent) transparent;
   }
   ::-webkit-scrollbar {
     width: 8px;
@@ -222,13 +220,11 @@
 }
 
 /* 移动端默认显示的组件 */
-.mobile-header,
 .mobile-tabbar {
   display: flex;
 }
 /* 桌面端组件默认隐藏（容器查询切到桌面时再显示） */
-.desktop-sidebar,
-.desktop-status {
+.desktop-sidebar {
   display: none;
 }
 .desktop-sidebar {
@@ -288,11 +284,9 @@
   }
 }
 @container app (min-width: 768px) {
-  .desktop-sidebar,
-  .desktop-status {
+  .desktop-sidebar {
     display: flex;
   }
-  .mobile-header,
   .mobile-tabbar {
     display: none;
   }

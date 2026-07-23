@@ -23,5 +23,19 @@ export const searchApp: AppEntry = {
     // 浮层应用：不占 main/bottom tab，只通过 pop 入口进入
     hiddenFromNav: true,
     vfsOwnership: [],
+    // tray 右上角快捷入口（点击打开搜索浮层）
+    appMenus: [
+      {
+        id: "search:tray",
+        title: "搜索",
+        icon: Search,
+        placement: "tray",
+        order: 0,
+        onClick: () =>
+          import("$lib/nav/nav-controller-instance").then((m) =>
+            m.navController.activatePop("/app/search"),
+          ),
+      },
+    ],
   },
 };

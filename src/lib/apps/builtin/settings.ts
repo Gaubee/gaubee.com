@@ -8,7 +8,9 @@
 import Settings from "@lucide/svelte/icons/settings";
 import Info from "@lucide/svelte/icons/info";
 import PaletteIcon from "@lucide/svelte/icons/palette";
+import MoonIcon from "@lucide/svelte/icons/moon";
 import type { Component } from "svelte";
+import { toggleMode } from "mode-watcher";
 import AboutSection from "$lib/apps/views/AboutSection.svelte";
 import AppearanceSection from "./appearance/AppearanceSection.svelte";
 import type { AppEntry } from "../types";
@@ -45,6 +47,21 @@ export const settingsApp: AppEntry = {
         icon: Info,
         order: 100,
         render: AboutSection as unknown as Component,
+      },
+    ],
+    // 系统菜单（苹果菜单，LOGO 触发）：设置入口、主题切换、关于
+    appMenus: [
+      {
+        id: "settings:main",
+        title: "系统",
+        placement: "system",
+        order: 0,
+        items: [
+          { id: "settings-entry", title: "设置…", icon: Settings, link: "/app/settings" },
+          { id: "theme-toggle", title: "切换主题", icon: MoonIcon, onClick: toggleMode },
+          { id: "sep1", title: "-", separator: true },
+          { id: "about", title: "关于 GaubeeOS", icon: Info, link: "/app/settings" },
+        ],
       },
     ],
   },
