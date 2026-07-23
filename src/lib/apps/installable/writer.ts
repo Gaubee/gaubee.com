@@ -1,10 +1,13 @@
 /**
  * 写作应用（可选安装，手动安装）。
  *
- * 功能：Markdown 写作总览（文件清单、发表入口）。
+ * 完整「创作 → 发表」流水线，三场景共享 git.commit + handlePublishError + contentStore：
+ * - /app/writer（entry）：总览（文件清单 + 批量发表入口）。
+ * - /app/editor：编辑器（三视图 + 自动保存 + 单篇发表）。
+ * - /app/changes：变更（diff 预览 + 撤销 + 手动 commit，发表兜底）。
  *
- * 编辑闭环（editor/files/changes）已拆为独立的 workflow 应用，
- * writer 通过 deeplink 拉起 workflow 的场景。
+ * 文件实体的 CRUD/组织（新建/命名）归「文件管理」应用（拥有 content 目录）；
+ * 写作应用专注内容创作与发表。
  */
 import FileText from "@lucide/svelte/icons/file-text";
 import type { AppEntry } from "../types";
@@ -14,7 +17,8 @@ export const writerApp: AppEntry = {
     id: "writer",
     name: "写作",
     icon: FileText,
-    category: "installable",
+    // 编辑器/变更是文件管理高频跳转的协作场景，默认安装可用。
+    category: "default",
     defaultArea: "main",
     activities: [
       {
@@ -22,11 +26,14 @@ export const writerApp: AppEntry = {
         entry: true,
         view: () => import("$lib/apps/views/WriterView.svelte"),
       },
-    ],
-    vfsOwnership: [
-      "src/content/articles/",
-      "src/content/events/",
-      "src/content/draft/",
+      {
+        route: "/app/editor",
+        view: () => import("$lib/views/EditorView.svelte"),
+      },
+      {
+        route: "/app/changes",
+        view: () => import("$lib/views/ChangesView.svelte"),
+      },
     ],
     cliCommands: [],
   },

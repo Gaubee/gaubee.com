@@ -42,7 +42,7 @@ export function ensureViewsRegistered(): void {
   // ===== 可安装应用（默认安装）=====
   registerTabView("/app/github", GithubView);
   registerTabView("/app/terminal", TerminalView);
-  // workflow 入口是 /app/files（编辑闭环起点）
+  // 文件管理应用入口
   registerTabView("/app/files", FilesView);
 
   // ===== 可选安装 =====
@@ -56,7 +56,7 @@ export function ensureViewsRegistered(): void {
   registerDeepLinkView("/article", ArticleView as unknown as Component);
   registerDeepLinkView("/tags", TagsView);
   registerDeepLinkView("/app/account", AccountView);
-  // workflow 应用的非入口场景（编辑器、变更），入口 /app/files 已注册为 tab view。
+  // 写作应用场景（编辑器、变更），入口 /app/writer 已注册为 tab view。
   registerDeepLinkView("/app/editor", EditorView);
   registerDeepLinkView("/app/changes", ChangesView);
 

@@ -20,7 +20,7 @@ import { accountApp } from "./builtin/account";
 import { githubApp } from "./installable/github";
 import { terminalApp } from "./installable/terminal";
 import { writerApp } from "./installable/writer";
-import { workflowApp } from "./installable/workflow";
+import { filesApp } from "./installable/files";
 
 let registered = false;
 
@@ -40,7 +40,7 @@ export function registerAllApps(): void {
   // 可安装应用（默认不安装，用户手动安装）
   appManager.register(githubApp);
   appManager.register(terminalApp);
-  appManager.register(workflowApp);
+  appManager.register(filesApp);
   appManager.register(writerApp);
 
   // 初始化：恢复用户安装状态
@@ -56,7 +56,7 @@ export {
   notificationsApp,
   accountApp,
 };
-export { githubApp, terminalApp, workflowApp, writerApp };
+export { githubApp, terminalApp, filesApp, writerApp };
 
 /** 获取所有已注册应用。 */
 export function getAllRegisteredApps(): AppEntry[] {
@@ -69,7 +69,7 @@ export function getAllRegisteredApps(): AppEntry[] {
     accountApp,
     githubApp,
     terminalApp,
-    workflowApp,
+    filesApp,
     writerApp,
   ];
 }

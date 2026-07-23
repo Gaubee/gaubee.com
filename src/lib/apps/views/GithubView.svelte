@@ -71,10 +71,8 @@
     <Card.Content class="text-muted-foreground pt-4 text-sm">
       此为公开仓库只读浏览器（基于 isomorphic-git 匿名 clone）。编辑与发表请用
       <button class="text-primary underline" onclick={() => navController.navigateMain('/app/writer')}>写作</button>
-      或
-      <button class="text-primary underline" onclick={() => navController.navigateMain('/app/changes')}>变更</button>
-      应用；浏览与新建文件用
-      <button class="text-primary underline" onclick={() => navController.navigateMain('/app/files')}>文件</button>
+      应用（含编辑器与变更提交）；浏览与新建文件用
+      <button class="text-primary underline" onclick={() => navController.navigateMain('/app/files')}>文件管理</button>
       应用。
     </Card.Content>
   </Card.Root>
