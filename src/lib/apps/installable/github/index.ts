@@ -18,7 +18,13 @@ export const githubApp: AppEntry = {
     icon: GitBranch,
     category: "default",
     defaultArea: "bottom",
-    route: "/app/github",
+    activities: [
+      {
+        route: "/app/github",
+        entry: true,
+        view: () => import("$lib/apps/views/GithubView.svelte"),
+      },
+    ],
     vfsOwnership: [".git/"],
     // git 聚合命令（status/commit/pull），实现走 GitService（鉴权 + 类型化错误）。
     // 注意：git 是聚合命令，shell runLine 对 "git" 特判分发，不进 PathManager 扁平注册。
@@ -28,5 +34,4 @@ export const githubApp: AppEntry = {
       git: () => gitService,
     },
   },
-  view: () => import("$lib/apps/views/GithubView.svelte"),
 };

@@ -28,7 +28,7 @@
 </script>
 
 <header
-  class="mobile-header sticky top-0 z-30 items-center gap-1 border-b border-border bg-background/95 px-1 pb-1 pt-[calc(env(safe-area-inset-top)+0.25rem)] backdrop-blur supports-[backdrop-filter]:bg-background/80"
+  class="mobile-header sticky top-0 z-[var(--z-shell-base)] items-center gap-1 border-b border-border bg-background/95 px-1 pb-1 pt-[calc(env(safe-area-inset-top)+0.25rem)] backdrop-blur supports-[backdrop-filter]:bg-background/80"
 >
   <button
     class="hover:bg-accent flex size-10 items-center justify-center rounded-md"

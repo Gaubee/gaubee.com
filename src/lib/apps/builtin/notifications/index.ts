@@ -20,8 +20,14 @@ export const notificationsApp: AppEntry = {
     icon: Bell,
     category: "system",
     defaultArea: "pop",
-    route: "/app/notifications",
-    // 浮层应用：不占 main/bottom tab，只通过 pop 入口（侧栏浮层、移动端铃铛）进入
+    activities: [
+      {
+        route: "/app/notifications",
+        entry: true,
+        view: () => import("$lib/apps/views/NotificationsView.svelte"),
+      },
+    ],
+    // 浮层应用：不占 main/bottom tab，只通过 pop 入口进入
     hiddenFromNav: true,
     vfsOwnership: [],
     // 向 GaubeeOS 暴露 notification 服务
@@ -29,5 +35,4 @@ export const notificationsApp: AppEntry = {
       notification: () => notificationService,
     },
   },
-  view: () => import("$lib/apps/views/NotificationsView.svelte"),
 };

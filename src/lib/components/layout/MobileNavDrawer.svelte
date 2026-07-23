@@ -6,6 +6,7 @@
 -->
 <script lang="ts">
   import { appManager } from '$lib/apps/AppManager.svelte'
+  import { routeDomainRegistry } from '$lib/apps/route-domain'
   import { navStore } from '$lib/nav/nav.svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
   import Separator from '$lib/components/ui/separator/separator.svelte'
@@ -15,9 +16,12 @@
   const navState = $derived(navStore.current)
   const mainApps = $derived(appManager.mainApps)
   const bottomApps = $derived(appManager.bottomApps)
+  // 当前激活的 main/bottom 应用 entry route（查路由域，识别子场景）
+  const activeMainRoute = $derived(routeDomainRegistry.entryRouteForPath(navState.mainLocation.pathname))
+  const activeBottomRoute = $derived(routeDomainRegistry.entryRouteForPath(navState.bottomLocation.pathname))
 
   function goMain(route: string): void {
-    navController.navigateMain(route)
+    navController.focusApp(route)
     onnavigate?.()
   }
   function toggleBottom(route: string, isActive: boolean): void {
@@ -33,7 +37,7 @@
 <nav class="flex flex-col gap-1">
   <div class="text-muted-foreground px-3 py-1 text-[10px] tracking-wider uppercase">主区</div>
   {#each mainApps as app (app.id)}
-    {@const isActive = app.route === navState.mainLocation.pathname}
+    {@const isActive = app.route === activeMainRoute}
     <button
       class="hover:bg-accent flex items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-col {isActive
         ? 'bg-accent text-accent-foreground font-medium'
@@ -49,7 +53,7 @@
 
   <div class="text-muted-foreground px-3 py-1 text-[10px] tracking-wider uppercase">底栏</div>
   {#each bottomApps as app (app.id)}
-    {@const isActive = navState.bottomActive && app.route === navState.bottomLocation.pathname}
+    {@const isActive = navState.bottomActive && app.route === activeBottomRoute}
     <button
       class="hover:bg-accent flex items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors {isActive
         ? 'bg-accent text-accent-foreground font-medium'

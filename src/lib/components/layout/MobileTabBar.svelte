@@ -23,7 +23,7 @@
 </script>
 
 <nav
-  class="mobile-tabbar sticky bottom-0 z-30 items-center gap-1 border-t border-border bg-background/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+  class="mobile-tabbar sticky bottom-0 z-[var(--z-shell-base)] items-center gap-1 border-t border-border bg-background/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur supports-[backdrop-filter]:bg-background/80"
   aria-label="主导航"
 >
   {#each quickTabs as tabId (tabId)}
@@ -34,7 +34,7 @@
         class="text-muted-foreground hover:bg-accent flex flex-1 flex-col items-center gap-0.5 rounded-md py-1.5 text-[10px] transition-colors {isActive
           ? 'text-foreground'
           : ''}"
-        onclick={() => navController.navigateMain(tabId)}
+        onclick={() => navController.focusApp(tabId)}
         aria-label={app.name}
         aria-current={isActive ? 'page' : undefined}
       >

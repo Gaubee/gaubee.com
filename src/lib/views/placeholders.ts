@@ -42,6 +42,8 @@ export function ensureViewsRegistered(): void {
   // ===== 可安装应用（默认安装）=====
   registerTabView("/app/github", GithubView);
   registerTabView("/app/terminal", TerminalView);
+  // workflow 入口是 /app/files（编辑闭环起点）
+  registerTabView("/app/files", FilesView);
 
   // ===== 可选安装 =====
   registerTabView("/app/writer", WriterView);
@@ -54,11 +56,9 @@ export function ensureViewsRegistered(): void {
   registerDeepLinkView("/article", ArticleView as unknown as Component);
   registerDeepLinkView("/tags", TagsView);
   registerDeepLinkView("/app/account", AccountView);
+  // workflow 应用的非入口场景（编辑器、变更），入口 /app/files 已注册为 tab view。
   registerDeepLinkView("/app/editor", EditorView);
-  // 变更管理：GithubView 的「变更」入口、发表成功通知的跳转目标都指向 /app/changes。
   registerDeepLinkView("/app/changes", ChangesView);
-  // 文件管理：浏览/新建文章/短评/草稿。
-  registerDeepLinkView("/app/files", FilesView);
 
   // ===== pop views =====
   registerPopView("/app/search", SearchView);

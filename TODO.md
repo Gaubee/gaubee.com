@@ -445,3 +445,29 @@ GaubeeOS/
 
 
 
+
+#### 19. 应用脚手架 + iPadOS 模型路由改造（2026-07-23）
+
+**痛点**：应用只是「路由入口」而非「应用入口」——(1) 进文章详情时 Dock 高亮丢失（前缀匹配只认入口路由）；(2) 切换应用重置到入口（无 per-app 记忆）；(3) 布局零隔离（bits-ui Portal 默认挂 body，应用内 fixed 串区重叠，z-index 散乱无规范）。
+
+**核心抽象（iPadOS 模型）**：
+- App = 完整应用身份；Activity = 屏幕场景（路由域+视图）；DeepLink = 对外拉起契约；Dock = 任务栏（与场景形态正交）；area = Split View/Slide Over/模态。
+- `AppManifest` 破坏性重构：删 `route`/`supportsDeepLink`，新增 `activities`/`deepLinks`/`settingsSections`。入口路由 `getEntryRoute(manifest)` 派生自 entry activity。
+- 新建 `workflow` 应用：把 editor/files/changes 从 articles/writer 抽离成独立编辑闭环应用。
+
+**路由身份（解决聚焦激活 + 切换不重置）**：
+- `src/lib/apps/route-domain.ts`：路由域表，path → 归属应用 entry route（最长前缀匹配）。
+- NavController `FOCUS_APP` 事件 + `appScenes` per-app 场景记忆：切焦点用 REPLACE 不入栈，应用内导航才 PUSH。
+- 注入式 `appRouteResolver`：controller 纯逻辑不依赖 AppManager，由桥接层注入闭包。
+- AreaNav/MobileTabBar/MobileNavDrawer/path-utils 激活判定全部改查路由域。
+
+**布局隔离（AppShell）**：
+- `src/app.css` z-index token：shell-base(10)/app-content(20)/app-overlay(30)/shell-overlay(40)/global-toast(50)。
+- `src/lib/app-scaffold/AppShell.svelte`：`isolation:isolate` 建独立堆叠上下文，内嵌 `app-portal-root`。
+- `portal-context.svelte.ts`：svelte context 下发 portal 目标 getter；6 个 bits-ui portal 组件透传 `{to}`。
+- AreaOutlet 用 AppShell 包裹每个 main/bottom/deepLink 视图；FAB `fixed`→`absolute`。
+- `defineApp` 工厂 + `AppSurface` 语义布局 + `useApp` 上下文。
+
+**settings 收编**：从模块副作用注册改为 `manifest.settingsSections` 声明式，AppManager install/uninstall 联动（修复卸载残留 bug）。account/appearance/about 迁入各自 manifest。
+
+**验证**：类型检查 0 错误；224 单元测试全过（含新增 FOCUS_APP + per-app 记忆测试）；Playwright 走查 3 项全过——①详情页 Dock「文章」高亮 ②切设置再切回恢复详情URL ③app-portal-root 存在。

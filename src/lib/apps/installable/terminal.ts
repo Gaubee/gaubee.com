@@ -14,8 +14,13 @@ export const terminalApp: AppEntry = {
     icon: TerminalSquare,
     category: "default",
     defaultArea: "bottom",
-    route: "/app/terminal",
+    activities: [
+      {
+        route: "/app/terminal",
+        entry: true,
+        view: () => import("$lib/views/TerminalView.svelte"),
+      },
+    ],
     vfsOwnership: [],
   },
-  view: () => import("$lib/views/TerminalView.svelte"),
 };

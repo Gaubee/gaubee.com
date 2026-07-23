@@ -80,6 +80,13 @@ export interface KernelState extends PersistedNavLayout {
   mainLocation: HistoryLocation;
   bottomLocation: HistoryLocation;
   popLocation: HistoryLocation;
+  /**
+   * per-app 场景记忆（iPadOS 应用恢复语义）。
+   * key = 应用 entry route（Dock 身份），value = 该应用最后停留的 location。
+   * 切换应用（FOCUS_APP）时保存当前、恢复目标；应用内 NAVIGATE 时更新当前。
+   * 仅内存（不持久化），刷新丢失——同 iPadOS 后台杀进程。
+   */
+  appScenes: Record<string, HistoryLocation>;
 }
 
 /** reducer 输出：新状态 + 副作用预算（不执行副作用）。 */
@@ -110,6 +117,13 @@ type KernelEvent =
   | { type: "MOVE_TAB"; tabId: TabId; targetArea: "main" | "bottom" }
   | { type: "REORDER"; area: "main" | "bottom"; tabIds: TabId[] }
   | { type: "CLOSE_TAB"; tabId: TabId }
+  | {
+      /** 聚焦某应用（Dock 图标点击）。
+       * 语义（iPadOS Dock）：恢复该应用最后场景，不重置到入口；
+       * 切焦点用 REPLACE 不入历史栈。仅在 main 区内聚焦。 */
+      type: "FOCUS_APP";
+      tabId: TabId;
+    }
   | { type: "ACTIVATE_BOTTOM"; location: HistoryLocation }
   | { type: "DEACTIVATE_BOTTOM" }
   | { type: "ACTIVATE_POP"; location: HistoryLocation }
@@ -166,6 +180,21 @@ export function getTabRegistry(): TabRegistry {
   return tabRegistry;
 }
 
+/**
+ * 路由域解析器：给定任意 path，返回它归属应用的 entry route（Dock tabId）。
+ * 用于让 Dock 图标在应用的任意子场景下都正确高亮（聚焦激活）。
+ * 默认 null → 退化到 tabRegistry 前缀匹配（只认 entry route）。
+ * AppManager 初始化时注入一个查路由域表的实现（见 route-domain.ts）。
+ */
+let appRouteResolver: ((path: string) => TabId | null) | null = null;
+
+/** 注入路由域解析器（AppManager 初始化时调用）。 */
+export function setAppRouteResolver(
+  resolver: ((path: string) => TabId | null) | null,
+): void {
+  appRouteResolver = resolver;
+}
+
 // ---------------------------------------------------------------------------
 // 工具函数
 // ---------------------------------------------------------------------------
@@ -220,6 +249,12 @@ export function parseHref(href: string, state?: unknown): HistoryLocation {
 }
 
 function pathToTabId(path: string): TabId | null {
+  // 优先查路由域表（识别应用子场景，让 Dock 图标在任意子场景下高亮）
+  if (appRouteResolver) {
+    const resolved = appRouteResolver(path);
+    if (resolved) return resolved;
+  }
+  // fallback：entry route 前缀匹配（resolver 未注入时）
   for (const tab of tabRegistry.allTabs) {
     if (path === tab || path.startsWith(tab + "/")) {
       return tab;
@@ -533,12 +568,24 @@ export function reduceKernel(
         event.sourceArea === "pop"
           ? "pop"
           : areaForPath(state, event.location.pathname);
-      const nextState =
+      const baseState =
         targetArea === "main"
           ? { ...state, mainLocation: event.location }
           : targetArea === "bottom"
             ? { ...state, bottomLocation: event.location }
             : { ...state, popLocation: event.location };
+      // 应用内导航：更新该应用的场景记忆（用于 FOCUS_APP 恢复）
+      const appId = pathToTabId(event.location.pathname);
+      const nextState =
+        appId && targetArea !== "pop"
+          ? {
+              ...baseState,
+              appScenes: {
+                ...baseState.appScenes,
+                [appId]: event.location,
+              },
+            }
+          : baseState;
       return {
         nextState,
         changed: true,
@@ -551,13 +598,43 @@ export function reduceKernel(
       };
     }
 
+    case "FOCUS_APP": {
+      // Dock 图标点击：恢复该应用最后场景（无记忆则 entry route）。
+      // 切焦点用 REPLACE 不入历史栈（应用内导航才 PUSH）。
+      const tabId = event.tabId;
+      const remembered = state.appScenes[tabId];
+      const targetLocation = remembered ?? parseHref(tabId);
+      if (targetLocation.href === state.mainLocation.href) {
+        return {
+          nextState: state,
+          changed: false,
+          notify: [],
+          persist: "none",
+        };
+      }
+      return {
+        nextState: { ...state, mainLocation: targetLocation },
+        changed: true,
+        urlAction: "REPLACE",
+        notify: [{ area: "main", type: "REPLACE" }],
+        persist: "none",
+      };
+    }
+
     case "POPSTATE": {
+      // 后退：location 由浏览器历史决定，同步更新 appScenes 记忆
+      const appScenes = { ...state.appScenes };
+      const mainApp = pathToTabId(event.mainLocation.pathname);
+      if (mainApp) appScenes[mainApp] = event.mainLocation;
+      const bottomApp = pathToTabId(event.bottomLocation.pathname);
+      if (bottomApp) appScenes[bottomApp] = event.bottomLocation;
       return {
         nextState: {
           ...state,
           mainLocation: event.mainLocation,
           bottomLocation: event.bottomLocation,
           popLocation: event.popLocation,
+          appScenes,
         },
         changed: true,
         notify: [
@@ -807,6 +884,7 @@ function createInitialState(): KernelState {
     mainLocation: parseHref(tabRegistry.defaultMainTabs[0] ?? "/"),
     bottomLocation: parseHref("/"),
     popLocation: parseHref("/"),
+    appScenes: {},
   };
 }
 
@@ -859,6 +937,18 @@ export class NavController {
       bottomLocation: parsed.bottom,
       popLocation: parsed.pop,
     };
+
+    // 2.5 初始化 per-app 场景记忆：把首屏 main/bottom location 记入对应应用。
+    {
+      const scenes: Record<string, HistoryLocation> = {};
+      const mainApp = pathToTabId(parsed.main.pathname);
+      if (mainApp) scenes[mainApp] = parsed.main;
+      const bottomApp = pathToTabId(parsed.bottom.pathname);
+      if (bottomApp) scenes[bottomApp] = parsed.bottom;
+      if (Object.keys(scenes).length > 0) {
+        this.state = { ...this.state, appScenes: scenes };
+      }
+    }
 
     // 3. 行为插件（BOOTSTRAP）+ normalize。
     this.state = applyBehaviorPlugins(this.state, this.state, {
@@ -1040,6 +1130,13 @@ export class NavController {
   /** main 区导航（便捷方法）。 */
   navigateMain(path: string, action: BrowserAction = "PUSH"): void {
     this.navigate("main", path, action);
+  }
+
+  /** 聚焦某应用（Dock 图标点击）：恢复其最后场景，不重置到入口。
+   *  与 navigateMain 的区别：切焦点用 REPLACE 不入栈，且优先用 per-app 记忆。
+   *  tabId = 应用 entry route（Dock 身份）。 */
+  focusApp(tabId: TabId): void {
+    this.dispatch({ type: "FOCUS_APP", tabId });
   }
 
   /** 激活 bottom 区（展开 + 导航到 location）。 */

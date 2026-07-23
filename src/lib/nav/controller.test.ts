@@ -16,6 +16,7 @@ import {
   parseBrowserLocation,
   parseHref,
   reduceKernel,
+  setAppRouteResolver,
   NavController,
   type HistoryLocation,
   type KernelState,
@@ -38,6 +39,7 @@ function makeInitialState(): KernelState {
     mainLocation: parseHref("/app/articles"),
     bottomLocation: parseHref("/"),
     popLocation: parseHref("/"),
+    appScenes: {},
   };
 }
 
@@ -169,6 +171,72 @@ describe("reduceKernel: NAVIGATE", () => {
       location: makeLocation("/app/notifications"),
     });
     expect(result.nextState.popLocation.pathname).toBe("/app/notifications");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// reduceKernel —— FOCUS_APP（Dock 图标聚焦 + per-app 场景记忆）
+// ---------------------------------------------------------------------------
+
+describe("reduceKernel: FOCUS_APP", () => {
+  // 注入路由域解析器：模拟 articles 应用拥有 /article 子场景（详情页）。
+  // /article/0001 → 归属 articles → entry route /app/articles（Dock tabId）。
+  beforeEach(() => {
+    setAppRouteResolver((path) => {
+      if (path === "/article/0001" || path.startsWith("/article/")) {
+        return "/app/articles";
+      }
+      return null;
+    });
+  });
+  afterEach(() => {
+    setAppRouteResolver(null);
+  });
+
+  it("无记忆时聚焦：落到 entry route", () => {
+    const state = makeInitialState();
+    const result = reduceKernel(state, {
+      type: "FOCUS_APP",
+      tabId: "/app/settings",
+    });
+    expect(result.nextState.mainLocation.pathname).toBe("/app/settings");
+    expect(result.urlAction).toBe("REPLACE");
+  });
+
+  it("有记忆时聚焦：恢复最后场景，不重置到入口", () => {
+    // 先 NAVIGATE 到 articles 的子场景（详情），产生记忆
+    const state = makeInitialState();
+    const navigated = reduceKernel(state, {
+      type: "NAVIGATE",
+      sourceArea: "main",
+      action: "PUSH",
+      location: makeLocation("/article/0001"),
+    });
+    expect(navigated.nextState.appScenes["/app/articles"].pathname).toBe(
+      "/article/0001",
+    );
+    // 切到 settings（聚焦切换）
+    const focused = reduceKernel(navigated.nextState, {
+      type: "FOCUS_APP",
+      tabId: "/app/settings",
+    });
+    expect(focused.nextState.mainLocation.pathname).toBe("/app/settings");
+    // 再切回 articles：应恢复 /article/0001 而非 /app/articles
+    const back = reduceKernel(focused.nextState, {
+      type: "FOCUS_APP",
+      tabId: "/app/articles",
+    });
+    expect(back.nextState.mainLocation.pathname).toBe("/article/0001");
+  });
+
+  it("聚焦当前应用且无变化：changed=false", () => {
+    const state = makeInitialState();
+    // 当前 main 已是 /app/articles，聚焦它 → 无变化
+    const result = reduceKernel(state, {
+      type: "FOCUS_APP",
+      tabId: "/app/articles",
+    });
+    expect(result.changed).toBe(false);
   });
 });
 
@@ -492,6 +560,7 @@ describe("URL 序列化往返", () => {
       mainLocation: makeLocation("/article/0001"),
       bottomLocation: makeLocation("/app/github"),
       popLocation: makeLocation("/app/search"),
+      appScenes: {},
     };
     const url = buildCanonicalUrl(state);
     expect(url).toContain("/article/0001");
@@ -513,6 +582,7 @@ describe("URL 序列化往返", () => {
       mainLocation: makeLocation("/app/articles"),
       bottomLocation: makeLocation("/"),
       popLocation: makeLocation("/"),
+      appScenes: {},
     };
     const url = buildCanonicalUrl(state);
     expect(url).toBe("/app/articles");

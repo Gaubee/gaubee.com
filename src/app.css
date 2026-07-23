@@ -39,6 +39,20 @@
   --sidebar-accent-foreground: oklch(0.212 0.019 322.12);
   --sidebar-border: oklch(0.922 0.005 325.62);
   --sidebar-ring: oklch(0.711 0.019 323.02);
+
+  /* z-index 层级 token（堆叠上下文规范）。
+   * 数值递增 = 越靠近用户。AppShell 用 isolation:isolate 建独立堆叠上下文，
+   * 应用内 z 被封印在容器内，绝穿透 shell。
+   *   shell-base   10 : DesktopSidebar/MobileHeader/MobileTabBar/StatusBar
+   *   app-content  20 : 应用主内容
+   *   app-overlay  30 : 应用内浮层（Dialog/Sheet/Popover/Dropdown/应用内 FAB）
+   *   shell-overlay 40 : shell 级浮层（PopArea、shell 级 Sheet）
+   *   global-toast 50 : 全局 Toaster（sonner） */
+  --z-shell-base: 10;
+  --z-app-content: 20;
+  --z-app-overlay: 30;
+  --z-shell-overlay: 40;
+  --z-global-toast: 50;
 }
 
 .dark {

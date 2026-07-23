@@ -10,6 +10,7 @@
   import { navController } from '$lib/nav/nav-controller-instance'
   import { draggedTabId, setDraggedTab } from '$lib/nav/drag-state.svelte'
   import { appManager } from '$lib/apps/AppManager.svelte'
+  import { matchesRoutePrefix, routeDomainRegistry } from '$lib/apps/route-domain'
   import type { Area, TabId } from '$lib/nav/controller'
   import XIcon from '@lucide/svelte/icons/x'
 
@@ -24,11 +25,14 @@
   const navState = $derived(navStore.current)
   const tabs = $derived(area === 'main' ? navState.mainTabs : navState.bottomTabs)
 
-  // 当前激活的 tab id
+  // 当前激活的 tab id：优先查路由域表（识别应用子场景，详情页也能高亮入口 tab），
+  // fallback 到 entry route 前缀匹配。
   const activeTabId = $derived.by(() => {
     const loc = area === 'main' ? navState.mainLocation : navState.bottomLocation
+    const resolved = routeDomainRegistry.entryRouteForPath(loc.pathname)
+    if (resolved && tabs.includes(resolved)) return resolved
     for (const tabId of tabs) {
-      if (loc.pathname === tabId || loc.pathname.startsWith(tabId + '/')) {
+      if (matchesRoutePrefix(loc.pathname, tabId)) {
         return tabId
       }
     }
@@ -136,7 +140,8 @@
 
   function handleClick(tabId: TabId, isActive: boolean) {
     if (area === 'main') {
-      navController.navigateMain(tabId)
+      // Dock 图标聚焦：恢复该应用最后场景，不重置到入口（iPadOS Dock 语义）
+      navController.focusApp(tabId)
     } else {
       // bottom：toggle
       if (isActive) navController.deactivateBottom()

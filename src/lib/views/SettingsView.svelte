@@ -9,6 +9,7 @@
 -->
 <script lang="ts">
   import { appManager } from '$lib/apps/AppManager.svelte'
+  import { getEntryRoute } from '$lib/apps/types'
   import { settingsSectionsRegistry, type SettingsSection } from '$lib/apps/builtin/settings-sections'
   import { navController } from '$lib/nav/nav-controller-instance'
   import { Button } from '$lib/components/ui/button'
@@ -120,7 +121,7 @@
                     <Badge variant="secondary" class="text-xs">系统</Badge>
                   {/if}
                 </div>
-                <div class="text-muted-foreground text-xs">{app.route}</div>
+                <div class="text-muted-foreground text-xs">{getEntryRoute(app)}</div>
               </div>
               {#if !app.builtin}
                 <Button
@@ -154,7 +155,7 @@
               <app.icon class="text-muted-foreground size-5" />
               <div class="flex-1 min-w-0">
                 <span class="font-medium text-sm">{app.name}</span>
-                <div class="text-muted-foreground text-xs">{app.route}</div>
+                <div class="text-muted-foreground text-xs">{getEntryRoute(app)}</div>
               </div>
               <Button variant="outline" size="sm" onclick={() => handleInstall(app.id)}>
                 <DownloadIcon class="size-4" />

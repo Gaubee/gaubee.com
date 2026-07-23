@@ -8,13 +8,15 @@
  * 4. 提供应用元数据给 AreaNav / DesktopSidebar。
  * 5. 管理应用加载状态（视图组件按需加载）。
  */
-import type { Component } from "svelte";
 import type { AppEntry, AppManifest, CliCommand, InstalledApp } from "./types";
+import { getEntryRoute } from "./types";
 import { pathManager } from "./PathManager";
 import type { Command, CommandContext } from "../terminal/shell";
 import { registerPathCommand, unregisterPathCommand } from "../terminal/shell";
 import { searchServiceRegistry } from "$lib/search/registry";
 import { appServiceRegistry } from "$lib/os/services";
+import { settingsSectionsRegistry } from "./builtin/settings-sections";
+import { routeDomainRegistry } from "./route-domain";
 
 // ---------------------------------------------------------------------------
 // 工具：将 CliCommand 转换为 shell Command
@@ -51,7 +53,7 @@ export const SYSTEM_APP_IDS = [
 ] as const;
 
 /** 默认安装的应用 ID（可卸载）。 */
-export const DEFAULT_APP_IDS = ["github", "terminal"] as const;
+export const DEFAULT_APP_IDS = ["github", "terminal", "workflow"] as const;
 
 export type SystemAppId = (typeof SYSTEM_APP_IDS)[number];
 export type DefaultAppId = (typeof DEFAULT_APP_IDS)[number];
@@ -61,20 +63,11 @@ export type DefaultAppId = (typeof DEFAULT_APP_IDS)[number];
 // ---------------------------------------------------------------------------
 
 class AppManager {
-  /** 所有已注册的应用（静态 manifest + view loader）。 */
+  /** 所有已注册的应用（静态 manifest）。 */
   private registry = new Map<string, AppEntry>();
 
   /** 已安装的应用 ID 列表。 */
   installedIds = $state<string[]>([]);
-
-  /** 已加载的应用视图（id -> 组件类）。 */
-  private loadedViews = new Map<string, Component>();
-
-  /** 正在加载的应用视图。 */
-  private loadingPromises = new Map<string, Promise<Component | null>>();
-
-  /** 应用加载错误。 */
-  errors = $state<Map<string, string>>(new Map());
 
   /** 是否已初始化。 */
   initialized = $state(false);
@@ -102,11 +95,11 @@ class AppManager {
     );
   }
 
-  /** 所有已安装应用的 route（用于 NavController ALL_TABS，不含隐藏应用）。 */
+  /** 所有已安装应用的 entry route（用于 NavController ALL_TABS，不含隐藏应用）。 */
   get allRoutes(): string[] {
     return this.allInstalled
       .filter((app) => !app.hiddenFromNav)
-      .map((app) => app.route);
+      .map((app) => getEntryRoute(app));
   }
 
   /** 可卸载的应用（非系统内置）。 */
@@ -122,10 +115,10 @@ class AppManager {
       .map((entry) => entry.manifest);
   }
 
-  /** 根据 route 查找应用。 */
+  /** 根据 entry route 查找应用。 */
   findByRoute(route: string): AppManifest | undefined {
     for (const entry of this.registry.values()) {
-      if (entry.manifest.route === route) return entry.manifest;
+      if (getEntryRoute(entry.manifest) === route) return entry.manifest;
     }
     return undefined;
   }
@@ -135,28 +128,30 @@ class AppManager {
     return this.registry.get(id)?.manifest;
   }
 
-  /** 根据 route 查找应用 ID。 */
+  /** 根据 entry route 查找应用 ID。 */
   findIdByRoute(route: string): string | undefined {
     for (const [id, entry] of this.registry) {
-      if (entry.manifest.route === route) return id;
+      if (getEntryRoute(entry.manifest) === route) return id;
     }
     return undefined;
   }
 
-  /** 检查 route 是否属于某个应用。 */
+  /** 检查 entry route 是否属于某个应用。 */
   isAppRoute(route: string): boolean {
     return this.allRoutes.includes(route);
   }
 
   // ---- 注册 ----
 
-  /** 注册应用（模块加载时一次性调用）。 */
+  /** 注册应用（模块加载时一次性调用）。
+   *  同时投影路由域表（path → 应用归属，供聚焦激活判定）。 */
   register(entry: AppEntry): void {
     if (this.registry.has(entry.manifest.id)) {
       console.warn(`AppManager: 应用 ${entry.manifest.id} 已注册，忽略`);
       return;
     }
     this.registry.set(entry.manifest.id, entry);
+    this.projectRouteDomain(entry.manifest);
   }
 
   /** 批量注册。 */
@@ -196,6 +191,7 @@ class AppManager {
     this.installedIds = installed;
     this.syncSearchServices();
     this.syncServices();
+    this.syncSettingsSections();
     this.initialized = true;
   }
 
@@ -218,6 +214,7 @@ class AppManager {
     this.writeStorage();
     this.registerSearchService(entry);
     this.registerServices(entry);
+    this.registerSettingsSections(entry.manifest);
 
     // 注册 CLI 命令到 PATH
     if (entry.manifest.cliCommands) {
@@ -240,16 +237,11 @@ class AppManager {
     const idx = this.installedIds.indexOf(id);
     if (idx === -1) return false;
 
-    // 清理加载状态
-    this.loadedViews.delete(id);
-    this.loadingPromises.delete(id);
-    this.errors = new Map(this.errors);
-    this.errors.delete(id);
-
     // 从 PATH 注销 CLI 命令
     const entry = this.registry.get(id);
     searchServiceRegistry.unregister(id);
     appServiceRegistry.unregisterApp(id);
+    this.unregisterSettingsSections(id);
     if (entry?.manifest.cliCommands) {
       for (const cli of entry.manifest.cliCommands) {
         pathManager.unregisterApp(id);
@@ -272,52 +264,6 @@ class AppManager {
   /** 检查是否已安装。 */
   isInstalled(id: string): boolean {
     return this.installedIds.includes(id);
-  }
-
-  // ---- 视图加载 ----
-
-  /** 获取已加载的视图组件（同步）。 */
-  getView(id: string): Component | null {
-    return this.loadedViews.get(id) ?? null;
-  }
-
-  /** 异步加载应用视图。 */
-  async loadView(id: string): Promise<Component | null> {
-    if (this.loadedViews.has(id)) {
-      return this.loadedViews.get(id)!;
-    }
-
-    // 正在加载中，复用 promise
-    const existing = this.loadingPromises.get(id);
-    if (existing) return existing;
-
-    const entry = this.registry.get(id);
-    if (!entry) return null;
-
-    const promise = this.doLoadView(id, entry);
-    this.loadingPromises.set(id, promise);
-    return promise;
-  }
-
-  private async doLoadView(
-    id: string,
-    entry: AppEntry,
-  ): Promise<Component | null> {
-    try {
-      const mod = await entry.view();
-      this.loadedViews.set(id, mod.default);
-      this.errors = new Map(this.errors);
-      this.errors.delete(id);
-      return mod.default;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      this.errors = new Map(this.errors);
-      this.errors.set(id, msg);
-      console.error(`AppManager: 加载应用 ${id} 视图失败`, e);
-      return null;
-    } finally {
-      this.loadingPromises.delete(id);
-    }
   }
 
   // ---- 持久化 ----
@@ -374,6 +320,36 @@ class AppManager {
     }
   }
 
+  /** 将已安装应用的声明式 settings 面板投影到注册表。 */
+  private syncSettingsSections(): void {
+    for (const id of this.installedIds) {
+      const entry = this.registry.get(id);
+      if (entry) this.registerSettingsSections(entry.manifest);
+    }
+  }
+
+  private registerSettingsSections(manifest: AppManifest): void {
+    if (!manifest.settingsSections) return;
+    for (const section of manifest.settingsSections) {
+      settingsSectionsRegistry.register(section);
+    }
+  }
+
+  private unregisterSettingsSections(appId: string): void {
+    const manifest = this.findById(appId);
+    if (!manifest?.settingsSections) return;
+    for (const section of manifest.settingsSections) {
+      settingsSectionsRegistry.unregister(section.id);
+    }
+  }
+
+  // ---- 扩展点投影（路由域） ----
+
+  /** 投影应用路由域：把每个 activity 的 route 注册到路由域表。 */
+  private projectRouteDomain(manifest: AppManifest): void {
+    routeDomainRegistry.registerApp(manifest);
+  }
+
   // ---- 内部工具 ----
 
   private toInstalledApp(id: string): InstalledApp | null {
@@ -381,9 +357,12 @@ class AppManager {
     if (!entry) return null;
     return {
       ...entry.manifest,
+      route: getEntryRoute(entry.manifest),
       installedAt: 0,
       builtin: this.isSystemApp(id),
-      loaded: this.loadedViews.has(id),
+      // 当前视图由 placeholders.ts 静态注册（非懒加载），无加载状态可追踪。
+      // TODO: 切换到 activity.view 懒加载后，此处追踪加载状态。
+      loaded: false,
     };
   }
 }

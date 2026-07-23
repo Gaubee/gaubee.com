@@ -13,6 +13,10 @@
     getPopView,
     getDeepLinkView,
   } from '$lib/views/registry'
+  import { appManager } from '$lib/apps/AppManager.svelte'
+  import { routeDomainRegistry } from '$lib/apps/route-domain'
+  import AppShell from '$lib/app-scaffold/AppShell.svelte'
+  import type { AppManifest } from '$lib/apps/types'
   import type { Area, TabId } from '$lib/nav/controller'
   import type { Component } from 'svelte'
 
@@ -47,6 +51,16 @@
   )
 
   const tabEntries = $derived(allTabViews as ReadonlyArray<{ tabId: TabId; component: Component }>)
+
+  // 按 entry route（tabId）查 manifest，供 AppShell 隔离包裹。
+  function manifestForTab(tabId: TabId): AppManifest | undefined {
+    return appManager.findByRoute(tabId)
+  }
+  // 深链接按 path 查归属应用 id → manifest。
+  function manifestForPath(path: string): AppManifest | undefined {
+    const appId = routeDomainRegistry.appIdForPath(path)
+    return appId ? appManager.findById(appId) : undefined
+  }
 </script>
 
 {#if area === 'pop'}
@@ -56,17 +70,32 @@
   {/if}
 {:else if area === 'main' && !activeTabId && deepLinkView}
   {@const DeepView = deepLinkView}
-  <div class="h-full">
-    <DeepView pathname={location.pathname} />
-  </div>
+  {@const manifest = manifestForPath(location.pathname)}
+  {@const shellApp = manifest}
+  {#if shellApp}
+    <AppShell app={shellApp} pathname={location.pathname}>
+      <DeepView pathname={location.pathname} />
+    </AppShell>
+  {:else}
+    <div class="h-full">
+      <DeepView pathname={location.pathname} />
+    </div>
+  {/if}
 {:else}
   <div class="h-full">
     {#each tabEntries as { tabId, component } (tabId)}
       {@const inThisArea = tabIdsInArea.includes(tabId)}
       {@const isThisActive = inThisArea && isActive && activeTabId === tabId}
       {@const View = component}
+      {@const manifest = manifestForTab(tabId)}
       <div class="h-full" class:hidden={!isThisActive}>
-        <View {area} {tabId} isActive={isThisActive} />
+        {#if manifest}
+          <AppShell app={manifest} pathname={location.pathname}>
+            <View {area} {tabId} isActive={isThisActive} />
+          </AppShell>
+        {:else}
+          <View {area} {tabId} isActive={isThisActive} />
+        {/if}
       </div>
     {/each}
   </div>
