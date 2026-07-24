@@ -8,21 +8,23 @@
   import { navController } from '$lib/nav/nav-controller-instance'
   import AreaOutlet from './AreaOutlet.svelte'
   import * as Dialog from '$lib/components/ui/dialog'
+  import { Button } from '$lib/components/ui/button'
   import SearchIcon from '@lucide/svelte/icons/search'
   import BellIcon from '@lucide/svelte/icons/bell'
+  import XIcon from '@lucide/svelte/icons/x'
   import type { Component } from 'svelte'
 
   const navState = $derived(navStore.current)
 
-  // 根据当前 pop 路径决定标题与图标
+  // 根据当前 pop 路径决定标题与图标（pop 路径为 /app/search、/app/notifications）
   const title = $derived.by(() => {
     const path = navState.popLocation.pathname
-    if (path.startsWith('/search')) return '搜索'
-    if (path.startsWith('/notifications')) return '通知'
+    if (path.startsWith('/app/search')) return '搜索'
+    if (path.startsWith('/app/notifications')) return '通知'
     return '弹层'
   })
   const TitleIcon = $derived<Component>(
-    navState.popLocation.pathname.startsWith('/notifications') ? BellIcon : SearchIcon
+    navState.popLocation.pathname.startsWith('/app/notifications') ? BellIcon : SearchIcon
   )
 
   let open = $derived(navState.popActive)
@@ -36,11 +38,17 @@
 </script>
 
 <Dialog.Root open={open} onOpenChange={handleOpenChange}>
-  <Dialog.Content class="max-h-[85vh] max-w-2xl overflow-hidden p-0">
+  <Dialog.Content class="max-h-[85vh] max-w-2xl overflow-hidden p-0" showCloseButton={false}>
     <Dialog.Header class="flex-row items-center gap-2 border-b px-4 py-3">
       <TitleIcon class="size-4" />
       <Dialog.Title>{title}</Dialog.Title>
       <Dialog.Description class="sr-only">{title}</Dialog.Description>
+      <!-- 关闭按钮 inline-end：作为 Header flex 子元素，天然垂直居中 -->
+      <Dialog.Close class="ml-auto">
+        <Button variant="ghost" size="icon-sm" aria-label="关闭">
+          <XIcon class="size-4" />
+        </Button>
+      </Dialog.Close>
     </Dialog.Header>
     <div class="max-h-[70vh] overflow-auto p-4">
       <AreaOutlet area="pop" />

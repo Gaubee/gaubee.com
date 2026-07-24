@@ -15,9 +15,11 @@
   import { appManager } from '$lib/apps/AppManager.svelte'
   import { desktopLayout } from '$lib/apps/desktop-layout.svelte'
   import * as Dialog from '$lib/components/ui/dialog'
+  import { Button } from '$lib/components/ui/button'
   import { flip } from 'svelte/animate'
   import EyeIcon from '@lucide/svelte/icons/eye'
   import EyeOffIcon from '@lucide/svelte/icons/eye-off'
+  import XIcon from '@lucide/svelte/icons/x'
   import type { InstalledApp } from '$lib/apps/types'
 
   const visibleApps = $derived(desktopLayout.visibleApps(appManager.allInstalled))
@@ -106,10 +108,15 @@
   open={desktopLayout.launchpadOpen}
   onOpenChange={(v) => { if (!v) desktopLayout.closeLaunchpad() }}
 >
-  <Dialog.Content class="max-h-[85vh] max-w-2xl overflow-hidden p-0">
+  <Dialog.Content class="max-h-[85vh] max-w-2xl overflow-hidden p-0" showCloseButton={false}>
     <Dialog.Header class="flex-row items-center gap-2 border-b px-4 py-3">
       <Dialog.Title>管理桌面</Dialog.Title>
       <Dialog.Description class="sr-only">点击图标切换显隐，或拖拽排序。隐藏图标点击会追加到桌面显示末尾。</Dialog.Description>
+      <Dialog.Close class="ml-auto">
+        <Button variant="ghost" size="icon-sm" aria-label="关闭">
+          <XIcon class="size-4" />
+        </Button>
+      </Dialog.Close>
     </Dialog.Header>
 
     <div class="max-h-[70vh] space-y-4 overflow-auto p-4">

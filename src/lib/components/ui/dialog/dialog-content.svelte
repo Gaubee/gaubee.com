@@ -14,11 +14,15 @@
 		portalProps,
 		children,
 		showCloseButton = true,
+		closeButtonClass,
 		...restProps
 	}: WithoutChildrenOrChild<DialogPrimitive.ContentProps> & {
 		portalProps?: WithoutChildrenOrChild<ComponentProps<typeof DialogPortal>>;
 		children: Snippet;
 		showCloseButton?: boolean;
+		/** 关闭按钮自定义定位 class（默认 top-4 right-4，适配 p-6 内容区）。
+		 *  p-0 + 自定义 Header 的 Dialog 应传 top-3 right-3 与 Header py-3 对齐。 */
+		closeButtonClass?: string;
 	} = $props();
 </script>
 
@@ -37,7 +41,7 @@
 		{#if showCloseButton}
 			<DialogPrimitive.Close data-slot="dialog-close">
 				{#snippet child({ props })}
-					<Button variant="ghost" class="bg-secondary absolute top-4 right-4" size="icon-sm" {...props}>
+					<Button variant="ghost" class={cn("bg-secondary absolute top-4 right-4", closeButtonClass)} size="icon-sm" {...props}>
 						<XIcon  />
 						<span class="sr-only">Close</span>
 					</Button>

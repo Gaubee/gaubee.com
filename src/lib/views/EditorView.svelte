@@ -28,6 +28,7 @@
   import TagsIcon from '@lucide/svelte/icons/tags'
   import SaveIcon from '@lucide/svelte/icons/save'
   import SendIcon from '@lucide/svelte/icons/send'
+  import XIcon from '@lucide/svelte/icons/x'
 
   type View = 'edit' | 'split' | 'preview'
 
@@ -266,12 +267,17 @@
 
 <!-- 元数据编辑弹窗 -->
 <Dialog.Root bind:open={metadataOpen}>
-  <Dialog.Content class="max-h-[85vh] max-w-lg overflow-hidden p-0">
-    <Dialog.Header class="px-4 pt-4">
+  <Dialog.Content class="max-h-[85vh] max-w-lg overflow-hidden p-0" showCloseButton={false}>
+    <Dialog.Header class="flex-row items-center gap-2 px-4 pt-4">
       <Dialog.Title>元数据</Dialog.Title>
       <Dialog.Description class="sr-only">
         编辑文章的标题、日期、标签等元数据字段。
       </Dialog.Description>
+      <Dialog.Close class="ml-auto">
+        <Button variant="ghost" size="icon-sm" aria-label="关闭">
+          <XIcon class="size-4" />
+        </Button>
+      </Dialog.Close>
     </Dialog.Header>
     <div class="max-h-[70vh] overflow-hidden">
       <MetadataEditor bind:metadata oncommit={scheduleSave} />
