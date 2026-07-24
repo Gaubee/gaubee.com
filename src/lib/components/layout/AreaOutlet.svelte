@@ -81,43 +81,73 @@
   })
 
   // ---- deep link view 异步加载（非常驻）----
+  // 按路径缓存已加载组件（同一文章二次进入不重复 import）+ inFlight 守卫防 effect 重入死循环。
   const deepLinkLoader = $derived(
     area === 'main' && !activeTabId ? getDeepLinkLoader(location.pathname) : undefined,
   )
   let deepLinkView = $state<Component | undefined>(undefined)
+  const deepLinkCache = new Map<string, Component>()
+  const deepLinkInFlight = new Set<string>()
   $effect(() => {
     const loader = deepLinkLoader
+    const path = location.pathname
     if (!loader) {
       deepLinkView = undefined
       return
     }
-    const path = location.pathname
+    // 缓存命中：直接用已加载组件，不触发 store/loader
+    const cached = deepLinkCache.get(path)
+    if (cached) {
+      deepLinkView = cached
+      return
+    }
+    // inFlight 守卫：防止 effect 重入重复 start/loader（切断 start/done 死循环）
+    if (deepLinkInFlight.has(path)) return
+    deepLinkInFlight.add(path)
     appLoadStore.start(`deeplink:${path}`)
     loader()
       .then((m) => {
+        deepLinkCache.set(path, m.default)
         deepLinkView = m.default
       })
-      .finally(() => appLoadStore.done(`deeplink:${path}`))
+      .finally(() => {
+        deepLinkInFlight.delete(path)
+        appLoadStore.done(`deeplink:${path}`)
+      })
   })
 
   // ---- pop view 异步加载（非常驻）----
+  // 同 deep link：缓存 + inFlight 守卫。
   const popLoader = $derived(
     area === 'pop' && navState.popActive ? getPopLoader(location.pathname) : undefined,
   )
   let popView = $state<Component | undefined>(undefined)
+  const popCache = new Map<string, Component>()
+  const popInFlight = new Set<string>()
   $effect(() => {
     const loader = popLoader
+    const path = location.pathname
     if (!loader) {
       popView = undefined
       return
     }
-    const path = location.pathname
+    const cached = popCache.get(path)
+    if (cached) {
+      popView = cached
+      return
+    }
+    if (popInFlight.has(path)) return
+    popInFlight.add(path)
     appLoadStore.start(`pop:${path}`)
     loader()
       .then((m) => {
+        popCache.set(path, m.default)
         popView = m.default
       })
-      .finally(() => appLoadStore.done(`pop:${path}`))
+      .finally(() => {
+        popInFlight.delete(path)
+        appLoadStore.done(`pop:${path}`)
+      })
   })
 
   // 桌面作为 shell 级背景层（main 区独有）：无应用浮层激活时显现。
