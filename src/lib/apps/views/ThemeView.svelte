@@ -399,16 +399,27 @@
               />
               <Button onclick={commitImage} disabled={!imageUrl}>应用</Button>
             </div>
-            <!-- 外链推荐：svgbackgrounds.com（新窗口打开） -->
-            <a
-              href="https://www.svgbackgrounds.com/set/free-svg-backgrounds-and-patterns/"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-primary inline-flex items-center gap-1 text-xs hover:underline"
-            >
-              <ExternalLinkIcon class="size-3" />
-              推荐：SVG Backgrounds（免费 SVG 背景下载）
-            </a>
+            <!-- 外链推荐（新窗口打开） -->
+            <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              <a
+                href="https://unsplash.com/s/photos/free"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-primary inline-flex items-center gap-1 hover:underline"
+              >
+                <ExternalLinkIcon class="size-3" />
+                Unsplash（免费高清照片）
+              </a>
+              <a
+                href="https://www.svgbackgrounds.com/set/free-svg-backgrounds-and-patterns/"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-primary inline-flex items-center gap-1 hover:underline"
+              >
+                <ExternalLinkIcon class="size-3" />
+                SVG Backgrounds（免费 SVG 背景）
+              </a>
+            </div>
           </div>
 
           <!-- 提取主色：从图片提取候选主题色相 -->
