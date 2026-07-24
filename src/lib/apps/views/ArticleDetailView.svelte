@@ -10,6 +10,7 @@
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
   import TocTree from './TocTree.svelte'
   import { Badge } from '$lib/components/ui/badge'
+  import AIBadge from '$lib/components/ui/ai-badge/AIBadge.svelte'
   import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left'
   import ChevronRightIcon from '@lucide/svelte/icons/chevron-right'
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left'
@@ -120,6 +121,11 @@
               {#each post.metadata.tags as tag}
                 <Badge variant="secondary" class="text-xs">{tag}</Badge>
               {/each}
+            </div>
+          {/if}
+          {#if post.metadata.ai && post.metadata.ai.length > 0}
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+              <AIBadge ai={post.metadata.ai} />
             </div>
           {/if}
         </header>

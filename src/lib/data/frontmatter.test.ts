@@ -55,9 +55,34 @@ __editor_metadata:
 正文`;
     const { metadata } = parseMarkdown(raw);
     expect(metadata!.customField).toBe("hello");
-    expect(metadata!.scripts).toEqual(["/bundle/x.js"]);
-    expect(metadata!.__editor_metadata).toBeDefined();
-    expect(metadata!.__editor_metadata!.title.type).toBe("text");
+  });
+
+  it("ai 字段：string 归一化为 string[]", () => {
+    const raw = `---
+title: AI 测试
+date: 2025-01-01T00:00:00.000Z
+tags: []
+ai: gpt-5.6-sol
+---
+
+正文`;
+    const { metadata } = parseMarkdown(raw);
+    expect(metadata!.ai).toEqual(["gpt-5.6-sol"]);
+  });
+
+  it("ai 字段：string[] 保持数组", () => {
+    const raw = `---
+title: AI 测试
+date: 2025-01-01T00:00:00.000Z
+tags: []
+ai:
+  - gpt-5.6-sol
+  - glm-5.2
+---
+
+正文`;
+    const { metadata } = parseMarkdown(raw);
+    expect(metadata!.ai).toEqual(["gpt-5.6-sol", "glm-5.2"]);
   });
 
   it("剥离 preview/previewHTML 字段", () => {

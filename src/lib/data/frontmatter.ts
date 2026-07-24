@@ -35,6 +35,8 @@ export interface ArticleMetadata {
   date: Date;
   updated?: Date;
   tags: string[];
+  /** AI 协作信息（Agent/Model 标识，如 "gpt-5.6-sol" / "gemini-2.5-pro"）。 */
+  ai?: string[];
   /** customElements 脚本路径。 */
   scripts?: string[];
   /** 编辑器字段 schema（透传，阶段 5 编辑器用）。 */
@@ -123,6 +125,13 @@ export function normalizeMetadata(
     } else if (key === "tags") {
       if (Array.isArray(value)) {
         result.tags = value.filter((t): t is string => typeof t === "string");
+      }
+    } else if (key === "ai") {
+      // ai 支持 string（单个）或 string[]（多个），归一化为 string[]
+      if (typeof value === "string") {
+        result.ai = [value];
+      } else if (Array.isArray(value)) {
+        result.ai = value.filter((t): t is string => typeof t === "string");
       }
     } else if (key === "scripts") {
       if (Array.isArray(value)) {

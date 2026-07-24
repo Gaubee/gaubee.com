@@ -11,6 +11,7 @@
   import YearToc from './YearToc.svelte'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { Badge } from '$lib/components/ui/badge'
+  import AIBadge from '$lib/components/ui/ai-badge/AIBadge.svelte'
   import FileTextIcon from '@lucide/svelte/icons/file-text'
   import CalendarIcon from '@lucide/svelte/icons/calendar'
   import ArrowRightIcon from '@lucide/svelte/icons/arrow-right'
@@ -144,6 +145,11 @@
                                 {tag}
                               </Badge>
                             {/each}
+                          </div>
+                        {/if}
+                        {#if post.metadata.ai && post.metadata.ai.length > 0}
+                          <div class="flex flex-wrap gap-1">
+                            <AIBadge ai={post.metadata.ai} size="xs" />
                           </div>
                         {/if}
                       </div>
