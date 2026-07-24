@@ -81,15 +81,16 @@
   {@const DeepView = deepLinkView}
   {@const manifest = manifestForPath(location.pathname)}
   {@const shellApp = manifest}
-  {#if shellApp}
-    <AppShell app={shellApp} pathname={location.pathname}>
+  <!-- 深链接 view：h-full overflow-auto 提供滚动（main-content 是 overflow:hidden） -->
+  <div class="h-full overflow-auto">
+    {#if shellApp}
+      <AppShell app={shellApp} pathname={location.pathname}>
+        <DeepView pathname={location.pathname} />
+      </AppShell>
+    {:else}
       <DeepView pathname={location.pathname} />
-    </AppShell>
-  {:else}
-    <div class="h-full">
-      <DeepView pathname={location.pathname} />
-    </div>
-  {/if}
+    {/if}
+  </div>
 {:else}
   <div class="main-area-root">
     {#if area === 'main'}
