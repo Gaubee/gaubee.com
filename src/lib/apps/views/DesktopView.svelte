@@ -50,10 +50,8 @@
   })
   // 桌面网格最多显示的图标数（含末尾「全部」）：两行 × 列数 - 1
   const maxIcons = $derived(gridCols * 2 - 1)
-  // 截断后的展示图标（不含「全部」）
+  // 截断后的展示图标（不含「全部」）。「全部」始终占据最后一个位置（-1 的语义）。
   const displayApps = $derived(launcherApps.slice(0, maxIcons))
-  // 是否溢出（需要「全部」入口）
-  const hasOverflow = $derived(launcherApps.length > maxIcons)
 
   // 判断应用是否在任务栏（已打开或 pinned）→ 图标红点标记
   function isOpen(route: string): boolean {
@@ -110,20 +108,18 @@
           <span class="app-icon-label">{app.name}</span>
         </button>
       {/each}
-      {#if hasOverflow}
-        <!-- 「全部」入口：打开 BottomSheet 查看全部桌面应用 + 所有已安装应用 -->
-        <button
-          class="app-icon-button"
-          onclick={() => desktopLayout.openAllApps()}
-          aria-label="全部应用"
-          in:motionFade={{ delay: displayApps.length * 30, duration: 200 }}
-        >
-          <span class="app-icon-box">
-            <GridIcon class="size-6" />
-          </span>
-          <span class="app-icon-label">全部</span>
-        </button>
-      {/if}
+      <!-- 「全部」入口：始终占据最后一个位置（-1 的语义），打开 BottomSheet -->
+      <button
+        class="app-icon-button"
+        onclick={() => desktopLayout.openAllApps()}
+        aria-label="全部应用"
+        in:motionFade={{ delay: displayApps.length * 30, duration: 200 }}
+      >
+        <span class="app-icon-box">
+          <GridIcon class="size-6" />
+        </span>
+        <span class="app-icon-label">全部</span>
+      </button>
     </div>
 
     <!-- Widget 瀑布流：无分组标题，卡片自由组合 -->
