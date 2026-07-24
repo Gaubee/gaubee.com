@@ -12,8 +12,14 @@
   let { children } = $props()
 
   // 注册 service worker（仅 production + browser，dev 不注册避免破坏 HMR）
+  // 移除启动屏（SSG 和 SPA 路由都经过根 layout）
   onMount(() => {
     void registerSw()
+    const boot = document.getElementById('gaubee-boot')
+    if (boot) {
+      boot.classList.add('fade-out')
+      setTimeout(() => boot.remove(), 320)
+    }
   })
 </script>
 

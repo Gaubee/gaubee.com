@@ -72,6 +72,15 @@
       window.history.replaceState(window.history.state, '', newUrl)
     }
 
+    // 4. 移除启动屏（SPA 已就绪）
+    const boot = document.getElementById('gaubee-boot')
+    if (boot) {
+      boot.classList.add('fade-out')
+      setTimeout(() => boot.remove(), 320)
+    }
+
+    // 4. 启动屏移除由根 layout onMount 统一处理（SSG + SPA 都经过根 layout）
+
     return () => navStore.stop()
   })
 </script>
