@@ -119,11 +119,13 @@
 
 <style>
   /* main 区根：桌面底层 + 应用浮层的堆叠上下文。
-   * 桌面与应用都常驻 DOM（保活），靠 display + z-index 决定显隐层级。 */
+   * 桌面与应用都常驻 DOM（保活），靠 visibility/z-index 决定显隐层级。
+   * overflow:hidden 裁剪子层溢出，避免隐藏浮层的内容污染父级 scrollHeight（杜绝滚动嵌套）。 */
   .main-area-root {
     position: relative;
     height: 100%;
     isolation: isolate;
+    overflow: hidden;
   }
   /* 桌面层：常驻底层背景。无应用浮层时可见可交互；有浮层时隐藏（被遮挡）。
    * 用 visibility/opacity 过渡（display:none 无法 transition）。 */
@@ -142,9 +144,12 @@
     visibility: hidden;
     opacity: 0;
     pointer-events: none;
+    /* 隐藏时不滚动（避免贡献 scrollHeight，虽然被父级 overflow:hidden 裁剪已无害） */
+    overflow: hidden;
   }
   /* 应用浮层：常驻 DOM 保活（visibility/opacity 过渡而非 display:none/销毁），
-   * 保留组件状态/滚动/编辑器/终端会话。激活时显示并覆盖桌面。 */
+   * 保留组件状态/滚动/编辑器/终端会话。激活时显示并覆盖桌面。
+   * 隐藏态 overflow:hidden 避免内容参与父级尺寸计算（杜绝隐藏浮层撑高 scrollHeight）。 */
   .app-overlay-layer {
     position: absolute;
     inset: 0;
@@ -153,16 +158,14 @@
     overflow: auto;
     visibility: visible;
     opacity: 1;
-    transform: translateY(0);
     transition:
       opacity 0.2s ease,
-      transform 0.2s ease,
       visibility 0.2s ease;
   }
   .app-overlay-hidden {
     visibility: hidden;
     opacity: 0;
-    transform: translateY(6px);
     pointer-events: none;
+    overflow: hidden;
   }
 </style>

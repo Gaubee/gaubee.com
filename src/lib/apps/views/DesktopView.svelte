@@ -99,9 +99,9 @@
 </div>
 
 <style>
+  /* 桌面滚动容器：height:100% 填满 desktop-layer，不自己滚动（由 desktop-layer 统一滚动，避免嵌套） */
   .desktop-scroll-area {
-    height: 100%;
-    overflow-y: auto;
+    min-height: 100%;
   }
   .desktop-container {
     max-width: 80rem;

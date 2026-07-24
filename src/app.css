@@ -253,7 +253,9 @@
   flex: 1;
   min-height: 0;
   min-width: 0;
-  overflow: auto;
+  /* overflow:hidden：main 区不自己滚动，滚动交给内部桌面层/应用浮层（避免滚动嵌套） */
+  overflow: hidden;
+  position: relative;
 }
 .main-content:empty {
   display: none;
