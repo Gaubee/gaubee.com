@@ -329,11 +329,16 @@ function sanitizeMainLocation(
   location: HistoryLocation,
   mainTabs: readonly TabId[],
 ): HistoryLocation {
-  // location=/（桌面）或深链接（/article，pathToTabId 返回 null）时保留。
-  // 仅当 location 指向某应用 entry route（pathToTabId 非 null）但该应用不在 mainTabs 时清空。
+  // location=/（桌面）时保留。
   if (location.pathname === "/") return location;
-  const tabId = pathToTabId(location.pathname);
-  if (tabId && !mainTabs.includes(tabId)) {
+
+  // 区分「应用 entry route」与「deep link 子路径」：
+  // - entry route（如 /app/github）：该应用必须在 mainTabs 才合法，否则清洗。
+  // - deep link（如 /article/xxx、/tags/xxx）：归属某应用但非其 entry route，
+  //   AreaOutlet 会走 deep link 渲染分支（无需应用在任务栏），应保留。
+  //   仅当路径恰好等于某 tab 的 entry route 才视为"应用入口"，需要 mainTabs 校验。
+  const exactTab = tabRegistry.allTabs.find((tab) => location.pathname === tab);
+  if (exactTab && !mainTabs.includes(exactTab)) {
     return parseHref("/");
   }
   return location;
