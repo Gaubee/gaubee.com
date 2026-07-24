@@ -12,6 +12,7 @@
   import { themeService } from '$lib/apps/builtin/theme/service.svelte'
   import { desktopService } from '$lib/apps/builtin/desktop/service.svelte'
   import type { DesktopBackground } from '$lib/apps/builtin/desktop/service.svelte'
+  import { backgroundToCss } from '$lib/apps/builtin/desktop/background-render'
   import { SVG_TEMPLATES } from '$lib/apps/builtin/theme/svg-templates'
   import { DEFAULT_PRIMARY_HUE } from '$lib/apps/builtin/theme/service.svelte'
   import { extractHuesFromImage } from '$lib/color/extract'
@@ -21,11 +22,15 @@
   import { Input } from '$lib/components/ui/input'
   import { Label } from '$lib/components/ui/label'
   import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw'
+  import UploadIcon from '@lucide/svelte/icons/upload'
+  import ExternalLinkIcon from '@lucide/svelte/icons/external-link'
 
   // 主题色相（响应式订阅 themeService）
   const hue = $derived(themeService.hue)
   // 桌面背景（响应式订阅 desktopService）
   const background = $derived(desktopService.background)
+  // 桌面背景预览 CSS（实时派生，模拟桌面背景效果）
+  const backgroundPreviewCss = $derived(backgroundToCss(background))
 
   // 预设色相快捷（常见品牌色 hue）
   const PRESET_HUES = [
@@ -103,6 +108,47 @@
   }
   function commitImage() {
     if (imageUrl) desktopService.setBackground({ type: 'image', url: imageUrl })
+  }
+
+  // ---- 本地文件上传（input-file → data URL）----
+  let uploading = $state(false)
+  let uploadError = $state('')
+
+  async function onFileUpload(e: Event) {
+    const input = e.target as HTMLInputElement
+    const file = input.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      uploadError = '请选择图片文件'
+      return
+    }
+    // data URL 大小限制（约 2MB，避免 localStorage 爆容量）
+    if (file.size > 2 * 1024 * 1024) {
+      uploadError = '图片过大（限 2MB），建议使用外链或小图'
+      return
+    }
+    uploading = true
+    uploadError = ''
+    try {
+      const dataUrl = await readFileAsDataUrl(file)
+      imageUrl = dataUrl
+      desktopService.setBackground({ type: 'image', url: dataUrl })
+    } catch {
+      uploadError = '读取文件失败'
+    } finally {
+      uploading = false
+      // 重置 input 允许重复选同一文件
+      input.value = ''
+    }
+  }
+
+  function readFileAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => reject(new Error('read error'))
+      reader.readAsDataURL(file)
+    })
   }
 
   // ---- 图片主色提取（从背景图片提取候选主题色相供用户挑选）----
@@ -211,12 +257,47 @@
   <!-- 桌面背景 -->
   <Card.Root>
     <Card.Header>
-      <Card.Title>桌面背景</Card.Title>
+      <Card.Title class="flex items-center gap-2">桌面背景</Card.Title>
       <Card.Description>
         纯色/渐变/动态壁纸的色相受主题色约束（锁定亮度）；图片无限制。
       </Card.Description>
     </Card.Header>
-    <Card.Content>
+    <Card.Content class="space-y-4">
+      <!-- 桌面背景预览：模拟桌面背景效果（16:9 缩略图） -->
+      <div class="bg-muted/40 relative aspect-video w-full overflow-hidden rounded-lg border">
+        <div
+          class="absolute inset-0"
+          style={backgroundPreviewCss || 'background: var(--background)'}
+          aria-label="桌面背景预览"
+        ></div>
+        <!-- 预览层：模拟桌面内容（图标网格占位 + primary 色按钮） -->
+        <div class="absolute inset-0 flex flex-col gap-2 p-3 opacity-70">
+          <div class="flex gap-1.5">
+            <span
+              class="flex size-8 items-center justify-center rounded-lg border border-border bg-card"
+              style="color: var(--primary)"
+            >
+              <span class="size-4 rounded bg-primary/80"></span>
+            </span>
+            <span
+              class="flex size-8 items-center justify-center rounded-lg border border-border bg-card"
+              style="color: var(--primary)"
+            >
+              <span class="size-4 rounded bg-primary/60"></span>
+            </span>
+          </div>
+          <div class="mt-auto flex items-center gap-2">
+            <span
+              class="rounded-md px-2 py-1 text-xs font-medium text-primary-foreground"
+              style="background: var(--primary)"
+            >
+              按钮
+            </span>
+            <span class="text-xs text-muted-foreground">主题色 {hue.toFixed(0)}°</span>
+          </div>
+        </div>
+      </div>
+      <!-- 背景类型切换 + 配置 -->
       <Tabs.Root value={currentBgType} onValueChange={(v) => switchBgType(v as BgType)}>
         <Tabs.List class="grid w-full grid-cols-5">
           {#each bgTypes as t (t.value)}
@@ -283,19 +364,55 @@
 
         <!-- 图片 -->
         <Tabs.Content value="image" class="space-y-3 pt-4">
-          <Label>图片 URL</Label>
-          <div class="flex gap-2">
-            <Input
-              type="url"
-              placeholder="https://..."
-              bind:value={imageUrl}
-              onchange={commitImage}
-            />
-            <Button onclick={commitImage} disabled={!imageUrl}>应用</Button>
+          <!-- 本地上传 + 外链 URL 双通道 -->
+          <div class="space-y-2">
+            <Label>本地上传</Label>
+            <div class="flex gap-2">
+              <Button variant="outline" size="sm" disabled={uploading} class="relative">
+                <UploadIcon class="size-4" />
+                {uploading ? '上传中…' : '选择图片文件'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  class="absolute inset-0 cursor-pointer opacity-0"
+                  onchange={onFileUpload}
+                  aria-label="上传图片文件"
+                />
+              </Button>
+            </div>
+            {#if uploadError}
+              <p class="text-destructive text-xs">{uploadError}</p>
+            {/if}
+            <p class="text-muted-foreground text-xs">
+              限 2MB 以内（data URL 存储）。大图建议用下方外链。
+            </p>
+          </div>
+
+          <div class="space-y-2 border-t pt-3">
+            <Label>外链 URL</Label>
+            <div class="flex gap-2">
+              <Input
+                type="url"
+                placeholder="https://..."
+                bind:value={imageUrl}
+                onchange={commitImage}
+              />
+              <Button onclick={commitImage} disabled={!imageUrl}>应用</Button>
+            </div>
+            <!-- 外链推荐：svgbackgrounds.com（新窗口打开） -->
+            <a
+              href="https://www.svgbackgrounds.com/set/free-svg-backgrounds-and-patterns/"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-primary inline-flex items-center gap-1 text-xs hover:underline"
+            >
+              <ExternalLinkIcon class="size-3" />
+              推荐：SVG Backgrounds（免费 SVG 背景下载）
+            </a>
           </div>
 
           <!-- 提取主色：从图片提取候选主题色相 -->
-          <div class="space-y-2 pt-2">
+          <div class="space-y-2 border-t pt-3">
             <Button
               variant="outline"
               size="sm"
@@ -349,6 +466,15 @@
           <p class="text-muted-foreground text-xs">
             动态壁纸使用主题色相，支持 SVG 动画与滤镜。
           </p>
+          <a
+            href="https://www.svgbackgrounds.com/set/free-svg-backgrounds-and-patterns/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-primary inline-flex items-center gap-1 text-xs hover:underline"
+          >
+            <ExternalLinkIcon class="size-3" />
+            更多 SVG 背景：SVG Backgrounds（免费下载）
+          </a>
         </Tabs.Content>
       </Tabs.Root>
     </Card.Content>
