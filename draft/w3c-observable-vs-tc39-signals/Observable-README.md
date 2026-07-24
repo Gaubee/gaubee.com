@@ -235,9 +235,7 @@ const keys = document.when("keydown").map((e) => e.key);
 keys
   .flatMap((firstKey) => {
     if (firstKey === pattern[0]) {
-      return keys
-        .take(pattern.length - 1)
-        .every((k, i) => k === pattern[i + 1]);
+      return keys.take(pattern.length - 1).every((k, i) => k === pattern[i + 1]);
     }
   })
   .filter((matched) => matched)
@@ -622,8 +620,9 @@ Concretely, that means for `element.click()` in the above example, the following
    event was not canceled during or immediately after the callback. The event does whatever it would
    normally do (submit the form, `alert()` the user, etc.)
 1. Finally, the JavaScript containing `element.click()` is finished, and the final execution context
-is popped from the stack and the microtask queue is flushed. The user-supplied `.then()` handler
-is run, which attempts to cancel the event too late
+   is popped from the stack and the microtask queue is flushed. The user-supplied `.then()` handler
+   is run, which attempts to cancel the event too late
+
 </details>
 
 Two things mitigate this concern. First, there is a very simple workaround to _always_ avoid the

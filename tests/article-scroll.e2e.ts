@@ -17,7 +17,7 @@ test.describe("文章详情页滚动", () => {
 
     // 点第一篇文章进详情
     const firstArticle = page
-      .locator('[data-article-list-content] a, [data-article-list-content] button')
+      .locator("[data-article-list-content] a, [data-article-list-content] button")
       .first();
     await firstArticle.click();
     await page.waitForTimeout(1500);
@@ -28,12 +28,14 @@ test.describe("文章详情页滚动", () => {
     // 找到可滚动的容器（深链接 view 的包裹层或 AppShell）
     // 验证：页面中有 scrollHeight > clientHeight 且 overflow 允许滚动的元素
     const scrollInfo = await page.evaluate(() => {
-      const results: Array<{ cls: string; scrollH: number; clientH: number; canScroll: boolean }> = [];
+      const results: Array<{ cls: string; scrollH: number; clientH: number; canScroll: boolean }> =
+        [];
       for (const el of document.querySelectorAll<HTMLElement>("*")) {
         if (el.offsetWidth === 0 && el.offsetHeight === 0) continue;
         const s = getComputedStyle(el);
         if (s.visibility === "hidden") continue;
-        const canY = (s.overflowY === "auto" || s.overflowY === "scroll") && el.scrollHeight > el.clientHeight;
+        const canY =
+          (s.overflowY === "auto" || s.overflowY === "scroll") && el.scrollHeight > el.clientHeight;
         if (canY) {
           results.push({
             cls: (el.className || "").toString().slice(0, 50),
@@ -67,7 +69,7 @@ test.describe("文章详情页滚动", () => {
     await page.waitForTimeout(1000);
 
     const firstArticle = page
-      .locator('[data-article-list-content] a, [data-article-list-content] button')
+      .locator("[data-article-list-content] a, [data-article-list-content] button")
       .first();
     await firstArticle.click();
     await page.waitForTimeout(1500);
@@ -78,7 +80,8 @@ test.describe("文章详情页滚动", () => {
         if (el.offsetWidth === 0 && el.offsetHeight === 0) continue;
         const s = getComputedStyle(el);
         if (s.visibility === "hidden") continue;
-        const canY = (s.overflowY === "auto" || s.overflowY === "scroll") && el.scrollHeight > el.clientHeight;
+        const canY =
+          (s.overflowY === "auto" || s.overflowY === "scroll") && el.scrollHeight > el.clientHeight;
         if (canY && el.scrollHeight > el.clientHeight + 100) {
           el.scrollTop = 500;
           return { before: 0, after: el.scrollTop, scrollH: el.scrollHeight };

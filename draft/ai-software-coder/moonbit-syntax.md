@@ -369,7 +369,7 @@ test {
 
 A `Ref[T]` is a mutable reference containing a value `val` of type `T`.
 
-It can be constructed using `{ val : x }`, and can be accessed using `ref.val`. See [struct]() for detailed explanation.
+It can be constructed using `{ val : x }`, and can be accessed using `ref.val`. See [struct](<>) for detailed explanation.
 
 ```moonbit
 let a : Ref[Int] = { val : 100 }
@@ -389,7 +389,7 @@ test {
 - `Option[T]` represents a possibly missing value of type `T`. It can be abbreviated as `T?`.
 - `Result[T, E]` represents either a value of type `T` or an error of type `E`.
 
-See [enum]() for detailed explanation.
+See [enum](<>) for detailed explanation.
 
 ```moonbit
 test {
@@ -494,7 +494,7 @@ MoonBit provides a hash map data structure that preserves insertion order called
 let map : Map[String, Int] = { "x": 1, "y": 2, "z": 3 }
 ```
 
-Currently keys in map literal syntax must be constant. `Map`s can also be destructed elegantly with pattern matching, see [Map Pattern]().
+Currently keys in map literal syntax must be constant. `Map`s can also be destructed elegantly with pattern matching, see [Map Pattern](<>).
 
 ### Json literal
 
@@ -508,7 +508,7 @@ let moon_pkg_json_example : Json = {
 }
 ```
 
-Json values can be pattern matched too, see [Json Pattern]().
+Json values can be pattern matched too, see [Json Pattern](<>).
 
 ## Functions
 
@@ -544,7 +544,7 @@ test {
 }
 ```
 
-There’s also a form called **matrix function** that make use of [pattern matching]():
+There’s also a form called **matrix function** that make use of [pattern matching](<>):
 
 ```moonbit
 let extract : (Int?, Int) -> Int = fn {
@@ -777,7 +777,7 @@ The `else` clause can only be omitted if the return value has type `Unit`.
 
 ### Match Expression
 
-The `match` expression is similar to conditional expression, but it uses [pattern matching]() to decide which consequent to evaluate and extracting variables at the same time.
+The `match` expression is similar to conditional expression, but it uses [pattern matching](<>) to decide which consequent to evaluate and extracting variables at the same time.
 
 ```moonbit
 fn decide_sport(weather : String, humidity : Int) -> String {
@@ -815,7 +815,7 @@ test {
 
 #### Guarded Let
 
-The `let` statement can be used with [pattern matching](). However, `let` statement can only handle one case. And `guard let` can solve this issue.
+The `let` statement can be used with [pattern matching](<>). However, `let` statement can only handle one case. And `guard let` can solve this issue.
 
 In the following example, `getProcessedText` assumes that the input `path` points to resources that are all plain text,
 and it uses the `guard` statement to ensure this invariant. Compared to using
@@ -1032,7 +1032,7 @@ for x in [1, 2, 3] {
 ```
 
 `for .. in` loop is translated to the use of `Iter` in MoonBit’s standard library. Any type with a method `.iter() : Iter[T]` can be traversed using `for .. in`.
-For more information of the `Iter` type, see [Iterator]() below.
+For more information of the `Iter` type, see [Iterator](<>) below.
 
 `for .. in` loop also supports iterating through a sequence of integers, such as:
 
@@ -1663,7 +1663,7 @@ fn match_int(x : Int) -> Unit {
 }
 ```
 
-We can use `_` as wildcards for the values we don’t care about, and use `..` to ignore remaining fields of struct or enum, or array (see [array pattern]()).
+We can use `_` as wildcards for the values we don’t care about, and use `..` to ignore remaining fields of struct or enum, or array (see [array pattern](<>)).
 
 ```moonbit
 struct Point3D {
@@ -2036,25 +2036,25 @@ fn main {
 
 Currently, the following operators can be overloaded:
 
-| Operator Name         | Method Name  |
+| Operator Name | Method Name |
 | --------------------- | ------------ | ----- |
-| `+`                   | `op_add`     |
-| `-`                   | `op_sub`     |
-| `*`                   | `op_mul`     |
-| `/`                   | `op_div`     |
-| `%`                   | `op_mod`     |
-| `=`                   | `op_equal`   |
-| `<<`                  | `op_shl`     |
-| `>>`                  | `op_shr`     |
-| `-` (unary)           | `op_neg`     |
-| `_[_]` (get item)     | `op_get`     |
-| `_[_] = _` (set item) | `op_set`     |
-| `_[_:_]` (view)       | `op_as_view` |
-| `&`                   | `land`       |
-| `                     | `            | `lor` |
-| `^`                   | `lxor`       |
-| `<<`                  | `op_shl`     |
-| `>>`                  | `op_shr`     |
+| `+` | `op_add` |
+| `-` | `op_sub` |
+| `*` | `op_mul` |
+| `/` | `op_div` |
+| `%` | `op_mod` |
+| `=` | `op_equal` |
+| `<<` | `op_shl` |
+| `>>` | `op_shr` |
+| `-` (unary) | `op_neg` |
+| `_[_]` (get item) | `op_get` |
+| `_[_] = _` (set item) | `op_set` |
+| `_[_:_]` (view) | `op_as_view` |
+| `&` | `land` |
+| `                    |` | `lor` |
+| `^` | `lxor` |
+| `<<` | `op_shl` |
+| `>>` | `op_shr` |
 
 By implementing `op_as_view` method, you can create a view for a user-defined type. Here is an example:
 

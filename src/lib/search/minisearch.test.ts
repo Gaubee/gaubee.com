@@ -4,6 +4,7 @@
  * 2. 锁定中文语义词和单字回退 token 的召回契约。
  */
 import { describe, expect, it } from "vitest";
+
 import { tokenizeSearchText } from "./minisearch";
 
 describe("tokenizeSearchText", () => {

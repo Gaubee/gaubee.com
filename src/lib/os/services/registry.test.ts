@@ -4,6 +4,7 @@
  * 覆盖：同步/异步工厂、懒构造缓存、register/unregisterApp、has/appIdOf。
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { AppServiceNotInstalled, appServiceRegistry } from "./registry";
 import type { AppService } from "./types";
 

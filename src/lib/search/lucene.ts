@@ -4,17 +4,10 @@
  * 2. 支持 app、title、tags、content 字段，以及 AND/OR/NOT/括号/短语。
  */
 import MiniSearch, { type Query, type QueryCombination } from "minisearch";
+
 import type { SearchQuery } from "./types";
 
-type TokenKind =
-  | "word"
-  | "phrase"
-  | "and"
-  | "or"
-  | "not"
-  | "colon"
-  | "left-paren"
-  | "right-paren";
+type TokenKind = "word" | "phrase" | "and" | "or" | "not" | "colon" | "left-paren" | "right-paren";
 
 interface Token {
   kind: TokenKind;
@@ -71,14 +64,7 @@ function tokenize(source: string): Token[] {
     const value = match[0];
     const upper = value.toUpperCase();
     tokens.push({
-      kind:
-        upper === "AND"
-          ? "and"
-          : upper === "OR"
-            ? "or"
-            : upper === "NOT"
-              ? "not"
-              : "word",
+      kind: upper === "AND" ? "and" : upper === "OR" ? "or" : upper === "NOT" ? "not" : "word",
       value,
     });
     cursor += value.length;
@@ -95,8 +81,7 @@ class Parser {
   parse(): LuceneNode | null {
     if (this.tokens.length === 0) return null;
     const expression = this.parseOr();
-    if (this.peek())
-      throw new Error(`Lucene 查询在 “${this.peek()!.value}” 后缺少操作符`);
+    if (this.peek()) throw new Error(`Lucene 查询在 “${this.peek()!.value}” 后缺少操作符`);
     return expression;
   }
 
@@ -128,8 +113,7 @@ class Parser {
   private parsePrimary(): LuceneNode {
     if (this.consume("left-paren")) {
       const expression = this.parseOr();
-      if (!this.consume("right-paren"))
-        throw new Error("Lucene 分组缺少右括号");
+      if (!this.consume("right-paren")) throw new Error("Lucene 分组缺少右括号");
       return expression;
     }
 
@@ -170,8 +154,7 @@ class Parser {
 
 function withField(node: LuceneNode, field: string): LuceneNode {
   if (node.type === "term") return { ...node, field };
-  if (node.type === "not")
-    return { type: "not", child: withField(node.child, field) };
+  if (node.type === "not") return { type: "not", child: withField(node.child, field) };
   return {
     ...node,
     children: node.children.map((child) => withField(child, field)),
@@ -192,14 +175,10 @@ function collectAppFilters(
     collectAppFilters(node.child, !negated, include, exclude);
     return;
   }
-  for (const child of node.children)
-    collectAppFilters(child, negated, include, exclude);
+  for (const child of node.children) collectAppFilters(child, negated, include, exclude);
 }
 
-function join(
-  operator: QueryCombination["combineWith"],
-  queries: Query[],
-): Query | null {
+function join(operator: QueryCombination["combineWith"], queries: Query[]): Query | null {
   if (queries.length === 0) return null;
   if (queries.length === 1) return queries[0];
   return { combineWith: operator, queries };
@@ -228,9 +207,7 @@ function toPlan(node: LuceneNode): QueryPlan {
     return { positive: null, negative: [planToQuery(child)] };
   }
   if (node.type === "or") {
-    const alternatives = node.children.map((child) =>
-      planToQuery(toPlan(child)),
-    );
+    const alternatives = node.children.map((child) => planToQuery(toPlan(child)));
     return { positive: join("OR", alternatives), negative: [] };
   }
 

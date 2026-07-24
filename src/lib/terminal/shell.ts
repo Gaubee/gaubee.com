@@ -12,8 +12,8 @@
  * 参考思路：openspecui core/src/config.ts 的 tokenizeCliCommand。
  */
 
-import type { Vfs, VfsNode } from "$lib/vfs/vfs";
 import { gaubeeos } from "$lib/os/services";
+import type { Vfs, VfsNode } from "$lib/vfs/vfs";
 
 // ---------------------------------------------------------------------------
 // Tokenizer：空格分词 + 单/双引号
@@ -184,10 +184,7 @@ async function requireWriteAuth(ctx: CommandContext): Promise<boolean> {
   if (!account) return true;
   if (account.isAuthenticated) return true;
   // 明确未登录 → 拦截
-  ctx.write(
-    Term.err("需要先登录账户才能修改文件（登录后修改可提交到 GitHub）") +
-      Term.newline,
-  );
+  ctx.write(Term.err("需要先登录账户才能修改文件（登录后修改可提交到 GitHub）") + Term.newline);
   return false;
 }
 
@@ -336,8 +333,7 @@ const touchCommand: Command = {
 const writeCommand: Command = {
   name: "write",
   usage: "write <path> <content...>",
-  description:
-    "写入文件（自定义命令，等价于 echo > file，但本轮不支持重定向）。",
+  description: "写入文件（自定义命令，等价于 echo > file，但本轮不支持重定向）。",
   async run(ctx, args) {
     if (!args[1]) {
       ctx.write(Term.err("write: 用法: write <path> <content>") + Term.newline);
@@ -470,20 +466,12 @@ const helpCommand: Command = {
       return 1;
     }
     const lines: string[] = [`${ANSI.bold}可用命令：${ANSI.reset}`];
-    for (const cmd of [...registry.values()].sort((a, b) =>
-      a.name.localeCompare(b.name),
-    )) {
-      lines.push(
-        `  ${ANSI.cyan}${cmd.name.padEnd(10)}${ANSI.reset} ${cmd.usage}`,
-      );
+    for (const cmd of [...registry.values()].sort((a, b) => a.name.localeCompare(b.name))) {
+      lines.push(`  ${ANSI.cyan}${cmd.name.padEnd(10)}${ANSI.reset} ${cmd.usage}`);
     }
     // git 子命令单列（不在 registry，避免 Tab 补全污染）
-    lines.push(
-      `  ${ANSI.cyan}git       ${ANSI.reset}git status | commit | pull`,
-    );
-    lines.push(
-      `${ANSI.gray}提示：用 ↑↓ 切换历史，Tab 补全文件名/命令。${ANSI.reset}`,
-    );
+    lines.push(`  ${ANSI.cyan}git       ${ANSI.reset}git status | commit | pull`);
+    lines.push(`${ANSI.gray}提示：用 ↑↓ 切换历史，Tab 补全文件名/命令。${ANSI.reset}`);
     ctx.write(lines.join(Term.newline) + Term.newline);
     return 0;
   },
@@ -497,10 +485,7 @@ const helpCommand: Command = {
 type GitSubMap = Map<
   string,
   {
-    run: (
-      ctx: CommandContext,
-      args: string[],
-    ) => Promise<{ exit: number; newCwd: string | null }>;
+    run: (ctx: CommandContext, args: string[]) => Promise<{ exit: number; newCwd: string | null }>;
   }
 >;
 let _gitSubmapCache: GitSubMap | null = null;
@@ -573,10 +558,7 @@ export interface RunResult {
  * @param ctx 命令上下文（cwd 不会被修改，cd 的结果通过返回值 newCwd 传回）
  * @param line 用户输入的原始行
  */
-export async function runLine(
-  ctx: CommandContext,
-  line: string,
-): Promise<RunResult> {
+export async function runLine(ctx: CommandContext, line: string): Promise<RunResult> {
   const args = tokenize(line);
   if (args.length === 0) {
     return { exit: 0, newCwd: null };
@@ -591,8 +573,7 @@ export async function runLine(
     const target = submap.get(sub);
     if (!target) {
       ctx.write(
-        Term.err(`git: 不支持子命令 '${sub}'。可用：status / commit / pull`) +
-          Term.newline,
+        Term.err(`git: 不支持子命令 '${sub}'。可用：status / commit / pull`) + Term.newline,
       );
       return { exit: 1, newCwd: null };
     }
@@ -609,9 +590,7 @@ export async function runLine(
     // 验证目标是否是"目录"（VFS 没有显式目录，只要存在以此为前缀的文件就算目录）
     if (target) {
       const all = await ctx.vfs.readdir("", { recursive: true });
-      const isDir = all.some(
-        (n) => n.path === target || n.path.startsWith(target + "/"),
-      );
+      const isDir = all.some((n) => n.path === target || n.path.startsWith(target + "/"));
       const isFile = all.some((n) => n.path === target);
       if (!isDir || isFile) {
         ctx.write(Term.err(`cd: ${args[1]}: 不是目录`) + Term.newline);
@@ -623,9 +602,7 @@ export async function runLine(
 
   const cmd = getRegistry().get(name);
   if (!cmd) {
-    ctx.write(
-      Term.err(`${name}: 命令未找到。输入 help 查看可用命令。`) + Term.newline,
-    );
+    ctx.write(Term.err(`${name}: 命令未找到。输入 help 查看可用命令。`) + Term.newline);
     return { exit: 127, newCwd: null };
   }
 
@@ -638,10 +615,7 @@ export async function runLine(
  * - 命令名补全（行首）
  * - 路径补全（命令参数）
  */
-export async function tabComplete(
-  ctx: CommandContext,
-  line: string,
-): Promise<string[]> {
+export async function tabComplete(ctx: CommandContext, line: string): Promise<string[]> {
   // 简化：找到最后一个 token 的起点
   const match = line.match(/(\S*)$/);
   const current = match ? match[1] : "";

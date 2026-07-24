@@ -48,9 +48,7 @@ describe("AccountService", () => {
 
   describe("requireAuthenticated", () => {
     it("未认证 → 抛 NotAuthenticatedError", () => {
-      expect(() => accountService.requireAuthenticated()).toThrow(
-        NotAuthenticatedError,
-      );
+      expect(() => accountService.requireAuthenticated()).toThrow(NotAuthenticatedError);
     });
 
     it("已认证 → 不抛", () => {

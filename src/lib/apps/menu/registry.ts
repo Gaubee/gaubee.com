@@ -26,10 +26,7 @@ class AppMenuRegistry {
   /** 按位置过滤。
    *  - system/tray：返回该 placement 全部菜单。
    *  - app：仅返回 appId 匹配 activeAppId 的菜单（当前激活应用专属）。 */
-  forPlacement(
-    placement: MenuPlacement,
-    activeAppId?: string,
-  ): AppMenuDeclaration[] {
+  forPlacement(placement: MenuPlacement, activeAppId?: string): AppMenuDeclaration[] {
     return this.sortMenus(
       [...this.menus.values()].filter((m) => {
         if (m.placement !== placement) return false;

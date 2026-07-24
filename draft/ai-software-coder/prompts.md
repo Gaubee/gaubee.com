@@ -40,8 +40,7 @@ export class PromptLibrary {
     },
     optimized: {
       label: "Optimized Prompt (experimental)",
-      description:
-        "an Experimental version of the prompt for lower token usage",
+      description: "an Experimental version of the prompt for lower token usage",
       get: (options) => optimized(options),
     },
   };

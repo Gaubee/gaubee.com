@@ -89,7 +89,6 @@ flowchart LR
 >    - perform：执行一个异步 Future 并映射其输出，支持错误处理
 >    - run：执行一个 Stream 并映射每个输出项
 >    - sip：执行一个 Sipper 任务，支持进度反馈和最终输出的映射
->
 > 2. 任务组合类型
 >    - batch：将多个任务组合成一个并行执行的任务
 >    - map：映射任务的输出值，不改变任务执行流程
@@ -97,7 +96,6 @@ flowchart LR
 >    - chain：串联两个任务，第二个任务在第一个任务完全结束后执行
 >    - collect：收集任务产生的所有输出到一个 Vec 中
 >    - discard：丢弃任务的输出，只保留副作用
->
 > 3. 特殊任务类型
 >    - future：直接从 Future 创建任务
 >    - stream：直接从 Stream 创建任务

@@ -36,8 +36,7 @@ function readStorage(): PersistedDesktopLayout | null {
       desktopApps: (record.desktopApps as unknown[]).filter(
         (id): id is string => typeof id === "string",
       ),
-      updatedAt:
-        typeof record.updatedAt === "number" ? record.updatedAt : 0,
+      updatedAt: typeof record.updatedAt === "number" ? record.updatedAt : 0,
     };
   } catch {
     return null;
@@ -67,22 +66,15 @@ class DesktopLayoutStore {
     if (this.initialized) return;
     this.initialized = true;
 
-    const knownIds = new Set(
-      allInstalled.filter((a) => a.id !== "desktop").map((a) => a.id),
-    );
+    const knownIds = new Set(allInstalled.filter((a) => a.id !== "desktop").map((a) => a.id));
     const persisted = readStorage();
     if (persisted) {
       // 清洗：过滤已卸载的残留 id
-      this.desktopApps = persisted.desktopApps.filter((id) =>
-        knownIds.has(id),
-      );
+      this.desktopApps = persisted.desktopApps.filter((id) => knownIds.has(id));
     } else {
       // 首次访问：默认显示所有非隐藏应用（按 registry 顺序），隐藏 search/notifications/settings
       this.desktopApps = allInstalled
-        .filter(
-          (a) =>
-            a.id !== "desktop" && !DEFAULT_HIDDEN.includes(a.id),
-        )
+        .filter((a) => a.id !== "desktop" && !DEFAULT_HIDDEN.includes(a.id))
         .map((a) => a.id);
       this.schedulePersist();
     }
@@ -99,9 +91,7 @@ class DesktopLayoutStore {
   /** 隐藏的应用（已安装但不在 desktopApps，排除 desktop 自身）。 */
   hiddenApps(allInstalled: readonly InstalledApp[]): InstalledApp[] {
     const visible = new Set(this.desktopApps);
-    return allInstalled.filter(
-      (a) => a.id !== "desktop" && !visible.has(a.id),
-    );
+    return allInstalled.filter((a) => a.id !== "desktop" && !visible.has(a.id));
   }
 
   /** 组内排序：把 fromId 移到 toId 的位置。 */

@@ -12,11 +12,7 @@
  * 注意：registry 只保存「已安装应用」的 service。未安装应用的 service
  * 不在 registry 中，调用方会得到 null / AppServiceNotInstalled。
  */
-import type {
-  AppService,
-  AppServiceFactory,
-  ServiceDeclaration,
-} from "./types";
+import type { AppService, AppServiceFactory, ServiceDeclaration } from "./types";
 
 /** registry 内部条目。 */
 interface RegistryEntry {

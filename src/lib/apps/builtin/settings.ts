@@ -1,3 +1,7 @@
+import AboutSection from "$lib/apps/views/AboutSection.svelte";
+import Info from "@lucide/svelte/icons/info";
+import MoonIcon from "@lucide/svelte/icons/moon";
+import PaletteIcon from "@lucide/svelte/icons/palette";
 /**
  * 设置应用（系统内置，不可卸载）。
  *
@@ -6,14 +10,11 @@
  * 本应用自身注册「关于」面板；其它应用（如账户）各自声明自己的面板。
  */
 import Settings from "@lucide/svelte/icons/settings";
-import Info from "@lucide/svelte/icons/info";
-import PaletteIcon from "@lucide/svelte/icons/palette";
-import MoonIcon from "@lucide/svelte/icons/moon";
-import type { Component } from "svelte";
 import { toggleMode } from "mode-watcher";
-import AboutSection from "$lib/apps/views/AboutSection.svelte";
-import AppearanceSection from "./appearance/AppearanceSection.svelte";
+import type { Component } from "svelte";
+
 import type { AppEntry } from "../types";
+import AppearanceSection from "./appearance/AppearanceSection.svelte";
 
 export const settingsApp: AppEntry = {
   manifest: {

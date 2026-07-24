@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { render } from "vitest-browser-svelte";
+
 import MarkdownViewer from "./MarkdownViewer.svelte";
 
 describe("MarkdownViewer", () => {
@@ -15,8 +16,6 @@ describe("MarkdownViewer", () => {
     });
 
     expect(container.querySelector("strong")?.textContent).toBe("重点");
-    expect(container.querySelector("a")?.getAttribute("href")).toBe(
-      "https://example.com",
-    );
+    expect(container.querySelector("a")?.getAttribute("href")).toBe("https://example.com");
   });
 });

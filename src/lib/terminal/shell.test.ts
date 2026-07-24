@@ -1,3 +1,5 @@
+import { IDBFactory } from "fake-indexeddb";
+import "fake-indexeddb/auto";
 /**
  * bash 命令内核单元测试。
  *
@@ -5,9 +7,6 @@
  * ctx.write 用数组捕获输出，便于断言。
  */
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-
-import "fake-indexeddb/auto";
-import { IDBFactory } from "fake-indexeddb";
 
 const mockGetFileText = vi.fn<(p: string) => Promise<string>>();
 const mockFetchTree = vi.fn();
@@ -76,8 +75,7 @@ vi.mock("$lib/os/services", () => ({
 
 const { vfs } = await import("$lib/vfs/vfs");
 const { vfsClear } = await import("$lib/db");
-const { runLine, tokenize, resolvePath, prettyCwd, tabComplete } =
-  await import("./shell");
+const { runLine, tokenize, resolvePath, prettyCwd, tabComplete } = await import("./shell");
 import type { CommandContext } from "./shell";
 
 function freshIndexedDB() {
@@ -164,9 +162,7 @@ describe("tokenize", () => {
 
 describe("resolvePath", () => {
   it("相对路径基于 cwd", () => {
-    expect(resolvePath("src/content", "articles/0001.md")).toBe(
-      "src/content/articles/0001.md",
-    );
+    expect(resolvePath("src/content", "articles/0001.md")).toBe("src/content/articles/0001.md");
   });
 
   it(". 表示当前目录", () => {

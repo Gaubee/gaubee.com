@@ -4,16 +4,13 @@
  * 2. 验证协调器不会把应用结果耦合到任何业务数据模型。
  */
 import { describe, expect, it } from "vitest";
+
 import { searchRegisteredServices } from "./coordinator";
 import { parseLuceneQuery } from "./lucene";
 import { searchServiceRegistry } from "./registry";
 import type { SearchBatch, SearchService } from "./types";
 
-function service(
-  appId: string,
-  appName: string,
-  resultId: string,
-): SearchService {
+function service(appId: string, appName: string, resultId: string): SearchService {
   return {
     appId,
     appName,
@@ -66,9 +63,7 @@ describe("searchRegisteredServices", () => {
         progress.push(event);
       }
 
-      expect(progress.filter((event) => event.type === "batch")).toHaveLength(
-        1,
-      );
+      expect(progress.filter((event) => event.type === "batch")).toHaveLength(1);
       expect(progress.at(0)).toMatchObject({
         type: "batch",
         batch: { appId: "test-articles" },

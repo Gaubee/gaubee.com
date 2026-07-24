@@ -12,6 +12,7 @@
   import { navStore } from '$lib/nav/nav.svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
   import { appManager } from '$lib/apps/AppManager.svelte'
+  import { appLoadStore } from '$lib/apps/app-load.svelte'
   import { appMenuRegistry } from '$lib/apps/menu/registry'
   import { routeDomainRegistry } from '$lib/apps/route-domain'
   import type { AppMenuItem } from '$lib/apps/menu/types'
@@ -24,6 +25,7 @@
   const logoUrl = '/favicon-32.png'
 
   const navState = $derived(navStore.current)
+  const isLoading = $derived(appLoadStore.isLoading)
   const account = $derived(gaubeeos.getAppService('account'))
   const accountState = $derived(account?.state ?? ACCOUNT_UNAVAILABLE)
 
@@ -70,7 +72,7 @@
 </script>
 
 <header
-  class="system-statusbar sticky top-0 z-[var(--z-shell-base)] flex h-9 shrink-0 items-center gap-1 border-b border-border bg-background/95 px-2 text-xs backdrop-blur supports-[backdrop-filter]:bg-background/80"
+  class="system-statusbar sticky top-0 z-[var(--z-shell-base)] flex h-9 shrink-0 items-center gap-1 border-b border-border bg-background/95 px-2 text-xs backdrop-blur supports-[backdrop-filter]:bg-background/80 relative"
 >
   <!-- 左：GaubeeOS LOGO 系统菜单（苹果菜单） -->
   {#if systemMenus.length > 0}
@@ -198,4 +200,45 @@
       {/if}
     {/each}
   </div>
+
+  <!-- 应用启动进度条（indeterminate，absolute 不占布局高度，贴在 header 底边） -->
+  {#if isLoading}
+    <div class="app-loading-bar" aria-hidden="true"></div>
+  {/if}
 </header>
+
+<style>
+  /* 应用启动进度条：indeterminate 滑动细线，贴在 header 底边（border-b 之上）。
+   * absolute 定位脱离文档流，不影响 header 高度。颜色跟随 shadcn --primary 主题色。 */
+  .app-loading-bar {
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--primary) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: app-loading-slide 1.2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 1;
+  }
+  @keyframes app-loading-slide {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .app-loading-bar {
+      animation: none;
+      opacity: 0.6;
+    }
+  }
+</style>

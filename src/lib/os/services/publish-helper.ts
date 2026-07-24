@@ -1,3 +1,5 @@
+import { notifyError, notifyInfo } from "$lib/apps/builtin/notifications/service.svelte";
+
 /**
  * 发表流程共享错误处理。
  *
@@ -11,15 +13,7 @@
  * 通知走 NotificationService（notify* 便捷函数），自动写入通知历史。
  * 返回 true 表示错误已处理（调用方通常无需再做事）。
  */
-import {
-  AppServiceNotInstalled,
-  NotAuthenticatedError,
-  NoChangesError,
-} from "./bus";
-import {
-  notifyError,
-  notifyInfo,
-} from "$lib/apps/builtin/notifications/service.svelte";
+import { AppServiceNotInstalled, NotAuthenticatedError, NoChangesError } from "./bus";
 
 /** 发表流程依赖的最小导航接口（避免硬耦合具体 NavController 类型）。 */
 export interface PublishNavLike {

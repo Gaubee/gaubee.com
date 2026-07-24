@@ -183,8 +183,7 @@ let tabRegistry: TabRegistry = {
  */
 export const ALL_TABS: readonly TabId[] = tabRegistry.allTabs;
 export const DEFAULT_MAIN_TABS: readonly TabId[] = tabRegistry.defaultMainTabs;
-export const DEFAULT_BOTTOM_TABS: readonly TabId[] =
-  tabRegistry.defaultBottomTabs;
+export const DEFAULT_BOTTOM_TABS: readonly TabId[] = tabRegistry.defaultBottomTabs;
 
 /** 设置 TabRegistry（应用注册时调用）。 */
 export function setTabRegistry(registry: TabRegistry): void {
@@ -205,9 +204,7 @@ export function getTabRegistry(): TabRegistry {
 let appRouteResolver: ((path: string) => TabId | null) | null = null;
 
 /** 注入路由域解析器（AppManager 初始化时调用）。 */
-export function setAppRouteResolver(
-  resolver: ((path: string) => TabId | null) | null,
-): void {
+export function setAppRouteResolver(resolver: ((path: string) => TabId | null) | null): void {
   appRouteResolver = resolver;
 }
 
@@ -221,31 +218,23 @@ function isTabId(value: string): value is TabId {
 
 function normalizeTabList(value: unknown): TabId[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(
-    (item): item is TabId => typeof item === "string" && isTabId(item),
-  );
+  return value.filter((item): item is TabId => typeof item === "string" && isTabId(item));
 }
 
 function parsePersistedLayout(value: unknown): PersistedNavLayout | null {
   if (typeof value !== "object" || value == null) return null;
   const record = value as Record<string, unknown>;
-  if (!Array.isArray(record.mainTabs) || !Array.isArray(record.bottomTabs))
-    return null;
+  if (!Array.isArray(record.mainTabs) || !Array.isArray(record.bottomTabs)) return null;
   return {
     mainTabs: normalizeTabList(record.mainTabs),
     bottomTabs: normalizeTabList(record.bottomTabs),
     // 兼容老数据（无 pinnedTabs 字段 → 默认空）
-    pinnedTabs: Array.isArray(record.pinnedTabs)
-      ? normalizeTabList(record.pinnedTabs)
-      : [],
+    pinnedTabs: Array.isArray(record.pinnedTabs) ? normalizeTabList(record.pinnedTabs) : [],
     updatedAt: typeof record.updatedAt === "number" ? record.updatedAt : 0,
   };
 }
 
-function toHistoryLocationState(
-  state: unknown,
-  fallbackKey: string,
-): HistoryLocationState {
+function toHistoryLocationState(state: unknown, fallbackKey: string): HistoryLocationState {
   if (typeof state !== "object" || state == null) {
     return { key: fallbackKey };
   }
@@ -293,9 +282,7 @@ function activeTabForArea(state: KernelState, area: Area): TabId | null {
 }
 
 export function isPopPath(path: string): boolean {
-  return POP_ROUTES.some(
-    (route) => path === route || path.startsWith(route + "/"),
-  );
+  return POP_ROUTES.some((route) => path === route || path.startsWith(route + "/"));
 }
 
 /** 给定一个路径，判断它属于哪个 area（pop 优先，再看 bottom tab，否则 main）。 */
@@ -383,10 +370,7 @@ function normalizeState(state: KernelState): KernelState {
     bottomTabs: merged.bottomTabs,
     pinnedTabs: merged.pinnedTabs,
     mainLocation: sanitizeMainLocation(state.mainLocation, merged.mainTabs),
-    bottomLocation: sanitizeBottomLocation(
-      state.bottomLocation,
-      merged.bottomTabs,
-    ),
+    bottomLocation: sanitizeBottomLocation(state.bottomLocation, merged.bottomTabs),
     popLocation: sanitizePopLocation(state.popLocation),
   };
 }
@@ -417,10 +401,7 @@ export function parseBrowserLocation(
   url.searchParams.delete("_p");
 
   const historyState = window.history.state as UrlHistoryState | null;
-  let main = parseHref(
-    `${url.pathname}${url.search}${url.hash}`,
-    historyState?.main,
-  );
+  let main = parseHref(`${url.pathname}${url.search}${url.hash}`, historyState?.main);
   let bottom = parseHref(rawBottomHref ?? "/", historyState?.bottom);
   let pop = parseHref(rawPopHref ?? "/", historyState?.pop);
 
@@ -486,20 +467,13 @@ function writeLocalStorage(layout: PersistedNavLayout): void {
 // ---------------------------------------------------------------------------
 
 /** 拖动当前激活的 tab 到另一区域时，把它当前 location 一起带过去。 */
-const carryActiveOnMovePlugin: KernelBehaviorPlugin = ({
-  prevState,
-  nextState,
-  event,
-}) => {
+const carryActiveOnMovePlugin: KernelBehaviorPlugin = ({ prevState, nextState, event }) => {
   if (event.type !== "MOVE_TAB") return nextState;
-  const sourceArea: Area = prevState.bottomTabs.includes(event.tabId)
-    ? "bottom"
-    : "main";
+  const sourceArea: Area = prevState.bottomTabs.includes(event.tabId) ? "bottom" : "main";
   const sourceActiveTab = activeTabForArea(prevState, sourceArea);
   if (sourceActiveTab !== event.tabId) return nextState;
 
-  const sourceLocation =
-    sourceArea === "main" ? prevState.mainLocation : prevState.bottomLocation;
+  const sourceLocation = sourceArea === "main" ? prevState.mainLocation : prevState.bottomLocation;
   const carriedLocation = parseHref(sourceLocation.href, sourceLocation.state);
 
   if (event.targetArea === "main") {
@@ -515,9 +489,7 @@ const carryActiveOnMovePlugin: KernelBehaviorPlugin = ({
  * 保留此空插件占位（BUILTIN_BEHAVIOR_PLUGINS 数组结构不变），未来如需引导逻辑可在此扩展。
  */
 
-const BUILTIN_BEHAVIOR_PLUGINS: readonly KernelBehaviorPlugin[] = [
-  carryActiveOnMovePlugin,
-];
+const BUILTIN_BEHAVIOR_PLUGINS: readonly KernelBehaviorPlugin[] = [carryActiveOnMovePlugin];
 
 function applyBehaviorPlugins(
   prevState: KernelState,
@@ -540,11 +512,7 @@ function areTabsEqual(a: readonly TabId[], b: readonly TabId[]): boolean {
   return a.every((tab, index) => tab === b[index]);
 }
 
-function locationHrefChanged(
-  prev: KernelState,
-  next: KernelState,
-  area: Area,
-): boolean {
+function locationHrefChanged(prev: KernelState, next: KernelState, area: Area): boolean {
   const prevLoc =
     area === "main"
       ? prev.mainLocation
@@ -577,16 +545,11 @@ function appendLocationNotifications(
   return result;
 }
 
-export function reduceKernel(
-  state: KernelState,
-  event: KernelEvent,
-): KernelTransition {
+export function reduceKernel(state: KernelState, event: KernelEvent): KernelTransition {
   switch (event.type) {
     case "NAVIGATE": {
       const targetArea =
-        event.sourceArea === "pop"
-          ? "pop"
-          : areaForPath(state, event.location.pathname);
+        event.sourceArea === "pop" ? "pop" : areaForPath(state, event.location.pathname);
       const baseState =
         targetArea === "main"
           ? { ...state, mainLocation: event.location }
@@ -609,10 +572,7 @@ export function reduceKernel(
         nextState,
         changed: true,
         urlAction: event.action,
-        notify:
-          targetArea === event.sourceArea
-            ? []
-            : [{ area: targetArea, type: event.action }],
+        notify: targetArea === event.sourceArea ? [] : [{ area: targetArea, type: event.action }],
         persist: "none",
       };
     }
@@ -643,9 +603,7 @@ export function reduceKernel(
     case "OPEN_APP": {
       // 打开应用：若不在任务栏则加入（按 defaultArea 决定 main/bottom），再聚焦。
       const tabId = event.tabId;
-      const targetArea: "main" | "bottom" = tabRegistry.defaultBottomTabs.includes(
-        tabId,
-      )
+      const targetArea: "main" | "bottom" = tabRegistry.defaultBottomTabs.includes(tabId)
         ? "bottom"
         : "main";
       const tabs = targetArea === "main" ? state.mainTabs : state.bottomTabs;
@@ -794,9 +752,7 @@ export function reduceKernel(
     }
 
     case "MOVE_TAB": {
-      const sourceArea: Area = state.bottomTabs.includes(event.tabId)
-        ? "bottom"
-        : "main";
+      const sourceArea: Area = state.bottomTabs.includes(event.tabId) ? "bottom" : "main";
       if (sourceArea === event.targetArea) {
         return {
           nextState: state,
@@ -807,17 +763,13 @@ export function reduceKernel(
       }
       const mainTabs = state.mainTabs.filter((tab) => tab !== event.tabId);
       const bottomTabs = state.bottomTabs.filter((tab) => tab !== event.tabId);
-      const nextMainTabs =
-        event.targetArea === "main" ? [...mainTabs, event.tabId] : mainTabs;
+      const nextMainTabs = event.targetArea === "main" ? [...mainTabs, event.tabId] : mainTabs;
       const nextBottomTabs =
-        event.targetArea === "bottom"
-          ? [...bottomTabs, event.tabId]
-          : bottomTabs;
+        event.targetArea === "bottom" ? [...bottomTabs, event.tabId] : bottomTabs;
 
       let mainLocation = state.mainLocation;
       let bottomLocation = state.bottomLocation;
-      const sourceLocation =
-        sourceArea === "main" ? state.mainLocation : state.bottomLocation;
+      const sourceLocation = sourceArea === "main" ? state.mainLocation : state.bottomLocation;
       if (pathToTabId(sourceLocation.pathname) === event.tabId) {
         if (sourceArea === "main") mainLocation = parseHref("/");
         else bottomLocation = parseHref("/");
@@ -842,8 +794,7 @@ export function reduceKernel(
     }
 
     case "REORDER": {
-      const currentTabs =
-        event.area === "main" ? state.mainTabs : state.bottomTabs;
+      const currentTabs = event.area === "main" ? state.mainTabs : state.bottomTabs;
       const set = new Set(currentTabs);
       const ordered = event.tabIds.filter((tab) => set.has(tab));
       for (const tab of currentTabs) {
@@ -858,9 +809,7 @@ export function reduceKernel(
         };
       }
       const nextState =
-        event.area === "main"
-          ? { ...state, mainTabs: ordered }
-          : { ...state, bottomTabs: ordered };
+        event.area === "main" ? { ...state, mainTabs: ordered } : { ...state, bottomTabs: ordered };
       return { nextState, changed: true, notify: [], persist: "local" };
     }
 
@@ -988,10 +937,7 @@ export function reduceKernel(
         !areTabsEqual(state.mainTabs, merged.mainTabs) ||
         !areTabsEqual(state.bottomTabs, merged.bottomTabs) ||
         !areTabsEqual(state.pinnedTabs, merged.pinnedTabs);
-      if (
-        !changed ||
-        (!event.force && event.layout.updatedAt <= state.updatedAt)
-      ) {
+      if (!changed || (!event.force && event.layout.updatedAt <= state.updatedAt)) {
         return {
           nextState: state,
           changed: false,
@@ -1065,8 +1011,7 @@ export class NavController {
     const persisted = readLocalStorage();
     if (persisted) {
       // 过滤掉不再 tabRegistry.allTabs 中的旧 tab（路径变更后兼容）
-      const valid = (list: readonly TabId[]) =>
-        list.filter((t) => tabRegistry.allTabs.includes(t));
+      const valid = (list: readonly TabId[]) => list.filter((t) => tabRegistry.allTabs.includes(t));
       this.state = {
         ...this.state,
         mainTabs: valid(persisted.mainTabs),
@@ -1109,8 +1054,7 @@ export class NavController {
     // 4. 把 URL 规范化为 canonical 形式（深链接推断结果写回 URL）。
     const canonical = buildCanonicalUrl(this.state);
     if (
-      canonical !==
-      `${window.location.pathname}${window.location.search}${window.location.hash}`
+      canonical !== `${window.location.pathname}${window.location.search}${window.location.hash}`
     ) {
       window.history.replaceState(this.buildHistoryState(), "", canonical);
     }
@@ -1178,11 +1122,7 @@ export class NavController {
     if (!transition.changed) return;
 
     const prevState = this.state;
-    let nextState = applyBehaviorPlugins(
-      prevState,
-      transition.nextState,
-      event,
-    );
+    let nextState = applyBehaviorPlugins(prevState, transition.nextState, event);
     nextState = normalizeState(nextState);
     this.state = nextState;
 
@@ -1251,11 +1191,7 @@ export class NavController {
   // ---- 语义化 API（UI 调用） ----
 
   /** 导航到某个 location（来源 area 由路径推断）。 */
-  navigate(
-    sourceArea: Area,
-    path: string,
-    action: BrowserAction = "PUSH",
-  ): void {
+  navigate(sourceArea: Area, path: string, action: BrowserAction = "PUSH"): void {
     this.dispatch({
       type: "NAVIGATE",
       sourceArea,

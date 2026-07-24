@@ -1,3 +1,12 @@
+import { appServiceRegistry } from "$lib/os/services";
+import { searchServiceRegistry } from "$lib/search/registry";
+
+import type { Command, CommandContext } from "../terminal/shell";
+import { registerPathCommand, unregisterPathCommand } from "../terminal/shell";
+import { settingsSectionsRegistry } from "./builtin/settings-sections";
+import { appMenuRegistry } from "./menu/registry";
+import { pathManager } from "./PathManager";
+import { routeDomainRegistry } from "./route-domain";
 /**
  * GaubeeOS 应用管理器（Svelte 5 runes）。
  *
@@ -10,15 +19,7 @@
  */
 import type { AppEntry, AppManifest, CliCommand, InstalledApp } from "./types";
 import { getEntryRoute } from "./types";
-import { pathManager } from "./PathManager";
-import type { Command, CommandContext } from "../terminal/shell";
-import { registerPathCommand, unregisterPathCommand } from "../terminal/shell";
-import { searchServiceRegistry } from "$lib/search/registry";
-import { appServiceRegistry } from "$lib/os/services";
-import { settingsSectionsRegistry } from "./builtin/settings-sections";
 import { widgetRegistry } from "./widget/registry";
-import { appMenuRegistry } from "./menu/registry";
-import { routeDomainRegistry } from "./route-domain";
 
 // ---------------------------------------------------------------------------
 // 工具：将 CliCommand 转换为 shell Command
@@ -80,30 +81,22 @@ class AppManager {
 
   /** 所有已安装应用（含系统内置）。 */
   get allInstalled(): InstalledApp[] {
-    return this.installedIds
-      .map((id) => this.toInstalledApp(id))
-      .filter(Boolean) as InstalledApp[];
+    return this.installedIds.map((id) => this.toInstalledApp(id)).filter(Boolean) as InstalledApp[];
   }
 
   /** main 区的应用（不含隐藏应用）。 */
   get mainApps(): InstalledApp[] {
-    return this.allInstalled.filter(
-      (app) => app.defaultArea === "main" && !app.hiddenFromNav,
-    );
+    return this.allInstalled.filter((app) => app.defaultArea === "main" && !app.hiddenFromNav);
   }
 
   /** bottom 区的应用（不含隐藏应用）。 */
   get bottomApps(): InstalledApp[] {
-    return this.allInstalled.filter(
-      (app) => app.defaultArea === "bottom" && !app.hiddenFromNav,
-    );
+    return this.allInstalled.filter((app) => app.defaultArea === "bottom" && !app.hiddenFromNav);
   }
 
   /** 所有已安装应用的 entry route（用于 NavController ALL_TABS，不含隐藏应用）。 */
   get allRoutes(): string[] {
-    return this.allInstalled
-      .filter((app) => !app.hiddenFromNav)
-      .map((app) => getEntryRoute(app));
+    return this.allInstalled.filter((app) => !app.hiddenFromNav).map((app) => getEntryRoute(app));
   }
 
   /** 可卸载的应用（非系统内置）。 */

@@ -1,3 +1,6 @@
+import type { Vfs } from "$lib/vfs/vfs";
+import { vfs } from "$lib/vfs/vfs";
+import { FitAddon } from "@xterm/addon-fit";
 /**
  * xterm.js 终端控制器：管理 Terminal 实例 + readline 循环。
  *
@@ -11,16 +14,8 @@
  * 但极简化（单会话、无 WebSocket、无 PTY）。
  */
 import { Terminal } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
-import type { Vfs } from "$lib/vfs/vfs";
-import { vfs } from "$lib/vfs/vfs";
-import {
-  ANSI,
-  prettyCwd,
-  runLine,
-  tabComplete,
-  type CommandContext,
-} from "./shell";
+
+import { ANSI, prettyCwd, runLine, tabComplete, type CommandContext } from "./shell";
 
 const DEFAULT_CWD = "src/content";
 const HISTORY_KEY = "gaubee:terminal-history";
@@ -74,8 +69,7 @@ export class TerminalController {
       cols: 80,
       rows: 12,
       cursorBlink: true,
-      fontFamily:
-        '"IBM Plex Mono", "SF Mono", Menlo, Monaco, Consolas, monospace',
+      fontFamily: '"IBM Plex Mono", "SF Mono", Menlo, Monaco, Consolas, monospace',
       fontSize: 13,
       lineHeight: 1.3,
       allowTransparency: true,
@@ -154,12 +148,8 @@ export class TerminalController {
   }
 
   private writeWelcome(): void {
-    this.writeLine(
-      `${ANSI.cyan}${ANSI.bold}Gaubee 终端${ANSI.reset} — 纯前端 bash（基于 VFS）`,
-    );
-    this.writeLine(
-      `${ANSI.gray}输入 help 查看命令。↑↓ 切换历史，Tab 补全。${ANSI.reset}`,
-    );
+    this.writeLine(`${ANSI.cyan}${ANSI.bold}Gaubee 终端${ANSI.reset} — 纯前端 bash（基于 VFS）`);
+    this.writeLine(`${ANSI.gray}输入 help 查看命令。↑↓ 切换历史，Tab 补全。${ANSI.reset}`);
     this.writeLine("");
   }
 
@@ -300,8 +290,7 @@ export class TerminalController {
       case "\x1b[3~": // Delete
         if (this.cursorPos < this.currentLine.length) {
           this.currentLine =
-            this.currentLine.slice(0, this.cursorPos) +
-            this.currentLine.slice(this.cursorPos + 1);
+            this.currentLine.slice(0, this.cursorPos) + this.currentLine.slice(this.cursorPos + 1);
           this.redrawLine();
         }
         return;
@@ -313,9 +302,7 @@ export class TerminalController {
 
   private insertAtCursor(text: string): void {
     this.currentLine =
-      this.currentLine.slice(0, this.cursorPos) +
-      text +
-      this.currentLine.slice(this.cursorPos);
+      this.currentLine.slice(0, this.cursorPos) + text + this.currentLine.slice(this.cursorPos);
     this.cursorPos += text.length;
     // 重绘（处理多字符/中间插入）
     this.redrawLine();
@@ -324,8 +311,7 @@ export class TerminalController {
   private handleBackspace(): void {
     if (this.cursorPos === 0) return;
     this.currentLine =
-      this.currentLine.slice(0, this.cursorPos - 1) +
-      this.currentLine.slice(this.cursorPos);
+      this.currentLine.slice(0, this.cursorPos - 1) + this.currentLine.slice(this.cursorPos);
     this.cursorPos--;
     this.redrawLine();
   }
@@ -336,8 +322,7 @@ export class TerminalController {
     let i = this.cursorPos;
     while (i > 0 && this.currentLine[i - 1] === " ") i--;
     while (i > 0 && this.currentLine[i - 1] !== " ") i--;
-    this.currentLine =
-      this.currentLine.slice(0, i) + this.currentLine.slice(this.cursorPos);
+    this.currentLine = this.currentLine.slice(0, i) + this.currentLine.slice(this.cursorPos);
     this.cursorPos = i;
     this.redrawLine();
   }

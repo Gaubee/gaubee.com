@@ -5,13 +5,9 @@
  * 不触发 `$app/environment` 与 window 副作用）。
  */
 import { browser } from "$app/environment";
-import {
-  NavController,
-  setAppRouteResolver,
-  setTabRegistry,
-  type TabRegistry,
-} from "./controller";
 import { routeDomainRegistry } from "$lib/apps/route-domain";
+
+import { NavController, setAppRouteResolver, setTabRegistry, type TabRegistry } from "./controller";
 
 export const navController = new NavController();
 

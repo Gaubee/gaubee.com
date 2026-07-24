@@ -20,10 +20,7 @@ const MAX_LINES = 500;
  * @param base 原始内容（修改前）；null 表示全新文件（全部为 add）
  * @param current 当前内容（修改后）；null 表示删除（全部为 del，基于 base）
  */
-export function diffLines(
-  base: string | null,
-  current: string | null,
-): DiffLine[] {
+export function diffLines(base: string | null, current: string | null): DiffLine[] {
   // 全新文件：current 全部为 add
   if (base === null) {
     return (current ?? "")
@@ -46,9 +43,7 @@ export function diffLines(
   const m = a.length;
   const n = b.length;
   // dp[i][j] = a[0..i) 与 b[0..j) 的 LCS 长度
-  const dp: number[][] = Array.from({ length: m + 1 }, () =>
-    new Array(n + 1).fill(0),
-  );
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
       if (a[i - 1] === b[j - 1]) {

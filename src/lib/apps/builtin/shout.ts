@@ -1,3 +1,4 @@
+import { createFileSearchService } from "$lib/search/file-service";
 /**
  * 说说应用（系统内置，不可卸载）。
  *
@@ -8,7 +9,7 @@
  * 统一渲染（阅读器共享）。因此 shout 只声明列表入口场景。
  */
 import MessageSquare from "@lucide/svelte/icons/message-square";
-import { createFileSearchService } from "$lib/search/file-service";
+
 import type { AppEntry } from "../types";
 import RecentShoutsWidget from "../widget/RecentShoutsWidget.svelte";
 
@@ -27,8 +28,7 @@ export const shoutApp: AppEntry = {
       },
     ],
     vfsOwnership: ["src/content/events/"],
-    searchService: () =>
-      createFileSearchService({ appId: "shout", appName: "说说" }),
+    searchService: () => createFileSearchService({ appId: "shout", appName: "说说" }),
     // 桌面小组件：最近说说
     widgets: [
       {
@@ -40,7 +40,6 @@ export const shoutApp: AppEntry = {
       },
     ],
     description: "浏览短评与碎碎念",
-    longDescription:
-      "记录日常碎片想法，数据来自只读静态层。点击进入详情阅读完整内容。",
+    longDescription: "记录日常碎片想法，数据来自只读静态层。点击进入详情阅读完整内容。",
   },
 };

@@ -1,3 +1,6 @@
+import { defineApp } from "$lib/app-scaffold/define-app";
+import { createFileSearchService } from "$lib/search/file-service";
+import ListIcon from "@lucide/svelte/icons/list";
 /**
  * 文章应用（系统内置，不可卸载）。
  *
@@ -11,10 +14,8 @@
  */
 import Newspaper from "@lucide/svelte/icons/newspaper";
 import TagsIcon from "@lucide/svelte/icons/tags";
-import ListIcon from "@lucide/svelte/icons/list";
-import { createFileSearchService } from "$lib/search/file-service";
+
 import { asView } from "../types";
-import { defineApp } from "$lib/app-scaffold/define-app";
 import RecentArticlesWidget from "../widget/RecentArticlesWidget.svelte";
 import TagsWidget from "../widget/TagsWidget.svelte";
 
@@ -41,8 +42,7 @@ export const articlesApp = defineApp({
     },
   ],
   vfsOwnership: ["src/content/articles/"],
-  searchService: () =>
-    createFileSearchService({ appId: "articles", appName: "文章" }),
+  searchService: () => createFileSearchService({ appId: "articles", appName: "文章" }),
   // 桌面小组件：最近文章 + 标签云（文章应用拥有这些内容）
   widgets: [
     {

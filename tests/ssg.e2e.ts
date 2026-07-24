@@ -21,13 +21,9 @@ test.describe("SSG 阅读站", () => {
     });
     // title 与 h1
     await expect(page).toHaveTitle(/AI 生命体/);
-    await expect(page.getByRole("heading", { level: 1 })).toContainText(
-      "AI 生命体",
-    );
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("AI 生命体");
     // SEO meta
-    const desc = await page
-      .locator('meta[name="description"]')
-      .getAttribute("content");
+    const desc = await page.locator('meta[name="description"]').getAttribute("content");
     expect(desc?.length).toBeGreaterThan(50);
     // 正文段落（prose 区域）
     const prose = page.locator(".prose");
@@ -59,9 +55,7 @@ test.describe("SSG 阅读站", () => {
 
   test("标签页列出带该标签的文章", async ({ page }) => {
     await page.goto("/pages/tags/article", { waitUntil: "networkidle" });
-    await expect(
-      page.getByRole("heading", { name: /标签：article/ }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: /标签：article/ })).toBeVisible();
     // 应有文章链接
     const links = page.locator('a[href*="/pages/article/"]');
     expect(await links.count()).toBeGreaterThan(0);

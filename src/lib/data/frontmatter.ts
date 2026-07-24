@@ -15,15 +15,7 @@ import { dump as yamlDump, load as yamlLoad } from "js-yaml";
 
 /** frontmatter 中编辑器管理的字段 schema。透传存储。 */
 export interface MetadataFieldSchema {
-  type:
-    | "text"
-    | "date"
-    | "datetime"
-    | "number"
-    | "url"
-    | "tel"
-    | "color"
-    | "object";
+  type: "text" | "date" | "datetime" | "number" | "url" | "tel" | "color" | "object";
   isArray: boolean;
   order: number;
   description: string;
@@ -74,10 +66,7 @@ export function parseMarkdown(raw: string): ParsedMarkdown {
 }
 
 /** 把 frontmatter 对象 + body 序列化为完整 markdown 文本。 */
-export function serializeMarkdown(
-  metadata: ArticleMetadata,
-  body: string,
-): string {
+export function serializeMarkdown(metadata: ArticleMetadata, body: string): string {
   const fm = serializeFrontmatter(metadata);
   // frontmatter 结尾是 `---\n`，body 按原样拼接（parseMarkdown 已剥离前导空行）。
   // 保留 markdown 惯例：frontmatter 与 body 间一个空行。
@@ -106,9 +95,7 @@ export function serializeFrontmatter(metadata: ArticleMetadata): string {
  * 把原始 YAML 对象归一化为 ArticleMetadata（类型转换 + 默认值）。
  * 字段顺序完全跟随原文（JS 对象键按插入顺序保序），确保往返序列化不改变格式。
  */
-export function normalizeMetadata(
-  raw: Record<string, unknown>,
-): ArticleMetadata {
+export function normalizeMetadata(raw: Record<string, unknown>): ArticleMetadata {
   // 用 Record 构建（保证键顺序跟随 raw），最后断言为 ArticleMetadata
   const result: Record<string, unknown> = {};
 
@@ -135,9 +122,7 @@ export function normalizeMetadata(
       }
     } else if (key === "scripts") {
       if (Array.isArray(value)) {
-        result.scripts = value.filter(
-          (t): t is string => typeof t === "string",
-        );
+        result.scripts = value.filter((t): t is string => typeof t === "string");
       }
     } else if (key === "__editor_metadata") {
       if (value && typeof value === "object") {

@@ -24,18 +24,10 @@ test.describe("响应式布局切换", () => {
       const cs = getComputedStyle(document.querySelector(".app-layout")!);
       return {
         flexDirection: cs.flexDirection,
-        sidebarDisplay: getComputedStyle(
-          document.querySelector(".desktop-sidebar")!,
-        ).display,
-        mobileHeaderDisplay: getComputedStyle(
-          document.querySelector(".mobile-header")!,
-        ).display,
-        mobileTabbarDisplay: getComputedStyle(
-          document.querySelector(".mobile-tabbar")!,
-        ).display,
-        statusDisplay: getComputedStyle(
-          document.querySelector(".desktop-status")!,
-        ).display,
+        sidebarDisplay: getComputedStyle(document.querySelector(".desktop-sidebar")!).display,
+        mobileHeaderDisplay: getComputedStyle(document.querySelector(".mobile-header")!).display,
+        mobileTabbarDisplay: getComputedStyle(document.querySelector(".mobile-tabbar")!).display,
+        statusDisplay: getComputedStyle(document.querySelector(".desktop-status")!).display,
       };
     });
 
@@ -59,18 +51,10 @@ test.describe("响应式布局切换", () => {
       const cs = getComputedStyle(document.querySelector(".app-layout")!);
       return {
         flexDirection: cs.flexDirection,
-        sidebarDisplay: getComputedStyle(
-          document.querySelector(".desktop-sidebar")!,
-        ).display,
-        mobileHeaderDisplay: getComputedStyle(
-          document.querySelector(".mobile-header")!,
-        ).display,
-        mobileTabbarDisplay: getComputedStyle(
-          document.querySelector(".mobile-tabbar")!,
-        ).display,
-        statusDisplay: getComputedStyle(
-          document.querySelector(".desktop-status")!,
-        ).display,
+        sidebarDisplay: getComputedStyle(document.querySelector(".desktop-sidebar")!).display,
+        mobileHeaderDisplay: getComputedStyle(document.querySelector(".mobile-header")!).display,
+        mobileTabbarDisplay: getComputedStyle(document.querySelector(".mobile-tabbar")!).display,
+        statusDisplay: getComputedStyle(document.querySelector(".desktop-status")!).display,
       };
     });
 
@@ -113,17 +97,13 @@ test.describe("响应式布局切换", () => {
     expect(boxes).not.toBeNull();
     if (boxes) {
       // 横排：main 的 x 应在 sidebar 右侧（x >= sidebar.x + sidebar.w）
-      expect(boxes.main.x).toBeGreaterThanOrEqual(
-        boxes.sidebar.x + boxes.sidebar.w - 1,
-      );
+      expect(boxes.main.x).toBeGreaterThanOrEqual(boxes.sidebar.x + boxes.sidebar.w - 1);
       // sidebar 应在视口左侧（x 起点接近 0）
       expect(boxes.sidebar.x).toBeLessThan(50);
     }
   });
 
-  test("桌面视口：bottom 区展开后暗色按钮可点击（历史 bug 回归保护）", async ({
-    page,
-  }) => {
+  test("桌面视口：bottom 区展开后暗色按钮可点击（历史 bug 回归保护）", async ({ page }) => {
     // 历史 bug：bottom 区展开后 xterm 溢出覆盖 StatusBar，暗色按钮无法点击
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/");
@@ -148,14 +128,10 @@ test.describe("响应式布局切换", () => {
     await expect(toggle).toBeEnabled();
 
     // 点击应成功切换主题（验证没有被遮挡）
-    const classBefore = await page.evaluate(
-      () => document.documentElement.className,
-    );
+    const classBefore = await page.evaluate(() => document.documentElement.className);
     await toggle.click();
     await page.waitForTimeout(500);
-    const classAfter = await page.evaluate(
-      () => document.documentElement.className,
-    );
+    const classAfter = await page.evaluate(() => document.documentElement.className);
     expect(classAfter).not.toBe(classBefore);
   });
 });

@@ -1,3 +1,5 @@
+import type { ServiceDeclaration } from "$lib/os/services";
+import type { SearchServiceFactory } from "$lib/search/types";
 /**
  * GaubeeOS 应用系统类型定义。
  *
@@ -15,11 +17,10 @@
  * 它同时是 Dock 图标身份（tabId）。
  */
 import type { Component } from "svelte";
-import type { SearchServiceFactory } from "$lib/search/types";
-import type { ServiceDeclaration } from "$lib/os/services";
+
 import type { SettingsSection } from "./builtin/settings-sections";
-import type { WidgetDeclaration } from "./widget/types";
 import type { AppMenuDeclaration } from "./menu/types";
+import type { WidgetDeclaration } from "./widget/types";
 
 // ---------------------------------------------------------------------------
 // 应用分类
@@ -56,10 +57,7 @@ export interface CliCommand {
   usage: string;
   /** 执行命令。
    * @returns { newCwd: string | null } 如果命令改变了 cwd，返回新的 cwd */
-  run: (
-    ctx: CliCommandContext,
-    args: string[],
-  ) => Promise<{ exit: number; newCwd: string | null }>;
+  run: (ctx: CliCommandContext, args: string[]) => Promise<{ exit: number; newCwd: string | null }>;
 }
 
 // ---------------------------------------------------------------------------

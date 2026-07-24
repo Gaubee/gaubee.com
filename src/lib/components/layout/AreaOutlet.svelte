@@ -6,16 +6,22 @@
 	  在无 active tab 时渲染。保活确保切换应用不丢组件状态（编辑器/终端会话等）。
 	- bottom：所有已注册 tab view 常驻 DOM，display 切换（保活）。
 	- pop：不常驻，按需渲染（弹层打开时挂载）。
+
+	异步加载模型（2026-07-23）：
+	- tab view loader 首次触发时异步 import，期间渲染骨架 + 驱动 appLoadStore 进度条。
+	- 加载完成后缓存组件，常驻 DOM 保活（与改造前行为一致，只是首屏不预加载全部视图）。
+	- deep link / pop view 同样按需异步加载。
 -->
 <script lang="ts">
   import { navStore } from '$lib/nav/nav.svelte'
   import {
-    getAllTabViews,
+    getAllTabLoaders,
     activeTabIdForLocation,
-    getPopView,
-    getDeepLinkView,
+    getPopLoader,
+    getDeepLinkLoader,
   } from '$lib/views/registry'
   import { appManager } from '$lib/apps/AppManager.svelte'
+  import { appLoadStore } from '$lib/apps/app-load.svelte'
   import { routeDomainRegistry } from '$lib/apps/route-domain'
   import AppShell from '$lib/app-scaffold/AppShell.svelte'
   import DesktopView from '$lib/apps/views/DesktopView.svelte'
@@ -32,33 +38,92 @@
       ? navState.mainLocation
       : area === 'bottom'
         ? navState.bottomLocation
-        : navState.popLocation
+        : navState.popLocation,
   )
   const tabIdsInArea = $derived(
-    area === 'main' ? navState.mainTabs : area === 'bottom' ? navState.bottomTabs : []
+    area === 'main' ? navState.mainTabs : area === 'bottom' ? navState.bottomTabs : [],
   )
   const isActive = $derived(
-    area === 'main' || (area === 'bottom' ? navState.bottomActive : navState.popActive)
+    area === 'main' || (area === 'bottom' ? navState.bottomActive : navState.popActive),
   )
 
-  const allTabViews = $derived(getAllTabViews())
+  const allTabLoaders = $derived(getAllTabLoaders())
   const activeTabId = $derived(activeTabIdForLocation(location, area, tabIdsInArea))
 
-  // 深链接 view（activeTabId 为 null 时）
-  const deepLinkView = $derived(
-    area === 'main' && !activeTabId ? getDeepLinkView(location.pathname) : undefined
-  )
+  // ---- tab view 异步加载 + 缓存保活 ----
+  // 已加载组件数组（Svelte 5 deep reactivity：push/pop/splice 自动触发响应）。
+  const loadedSlots = $state<Array<{ tabId: TabId; component: Component }>>([])
+  // 加载中守卫（非响应式，纯逻辑去重，避免 effect 重入重复触发 loader）
+  const inFlightTabs = new Set<TabId>()
 
-  const popView = $derived(
-    area === 'pop' && navState.popActive ? getPopView(location.pathname) : undefined
-  )
+  function loadedComponentFor(tabId: TabId): Component | undefined {
+    return loadedSlots.find((s) => s.tabId === tabId)?.component
+  }
+  function setLoadedComponent(tabId: TabId, component: Component) {
+    if (loadedSlots.some((s) => s.tabId === tabId)) return
+    loadedSlots.push({ tabId, component })
+  }
 
-  const tabEntries = $derived(allTabViews as ReadonlyArray<{ tabId: TabId; component: Component }>)
+  // tab loader 变化时，为每个 loader 触发异步加载
+  // 幂等：inFlightTabs 守卫防重入，loadedSlots 缓存避免重复加载
+  $effect(() => {
+    for (const { tabId, loader } of allTabLoaders) {
+      if (loadedComponentFor(tabId) || inFlightTabs.has(tabId)) continue
+      inFlightTabs.add(tabId)
+      appLoadStore.start(tabId)
+      loader()
+        .then((m) => setLoadedComponent(tabId, m.default))
+        .finally(() => {
+          inFlightTabs.delete(tabId)
+          appLoadStore.done(tabId)
+        })
+    }
+  })
+
+  // ---- deep link view 异步加载（非常驻）----
+  const deepLinkLoader = $derived(
+    area === 'main' && !activeTabId ? getDeepLinkLoader(location.pathname) : undefined,
+  )
+  let deepLinkView = $state<Component | undefined>(undefined)
+  $effect(() => {
+    const loader = deepLinkLoader
+    if (!loader) {
+      deepLinkView = undefined
+      return
+    }
+    const path = location.pathname
+    appLoadStore.start(`deeplink:${path}`)
+    loader()
+      .then((m) => {
+        deepLinkView = m.default
+      })
+      .finally(() => appLoadStore.done(`deeplink:${path}`))
+  })
+
+  // ---- pop view 异步加载（非常驻）----
+  const popLoader = $derived(
+    area === 'pop' && navState.popActive ? getPopLoader(location.pathname) : undefined,
+  )
+  let popView = $state<Component | undefined>(undefined)
+  $effect(() => {
+    const loader = popLoader
+    if (!loader) {
+      popView = undefined
+      return
+    }
+    const path = location.pathname
+    appLoadStore.start(`pop:${path}`)
+    loader()
+      .then((m) => {
+        popView = m.default
+      })
+      .finally(() => appLoadStore.done(`pop:${path}`))
+  })
 
   // 桌面作为 shell 级背景层（main 区独有）：无应用浮层激活时显现。
   // mainLocation 为 /（桌面）或无激活 tab 时，桌面是顶层。
   const desktopVisible = $derived(
-    area === 'main' && (activeTabId === null) && !deepLinkView,
+    area === 'main' && (activeTabId === null) && !deepLinkLoader,
   )
 
   // 按 entry route（tabId）查 manifest，供 AppShell 隔离包裹。
@@ -76,19 +141,24 @@
   {#if navState.popActive && popView}
     {@const PopView = popView}
     <PopView />
+  {:else if navState.popActive && popLoader}
+    <div class="app-skeleton" aria-label="加载中"></div>
   {/if}
-{:else if area === 'main' && !activeTabId && deepLinkView}
-  {@const DeepView = deepLinkView}
+{:else if area === 'main' && !activeTabId && deepLinkLoader}
   {@const manifest = manifestForPath(location.pathname)}
   {@const shellApp = manifest}
-  <!-- 深链接 view：h-full overflow-auto 提供滚动（main-content 是 overflow:hidden） -->
   <div class="h-full overflow-auto">
-    {#if shellApp}
-      <AppShell app={shellApp} pathname={location.pathname}>
+    {#if deepLinkView}
+      {@const DeepView = deepLinkView}
+      {#if shellApp}
+        <AppShell app={shellApp} pathname={location.pathname}>
+          <DeepView pathname={location.pathname} />
+        </AppShell>
+      {:else}
         <DeepView pathname={location.pathname} />
-      </AppShell>
+      {/if}
     {:else}
-      <DeepView pathname={location.pathname} />
+      <div class="app-skeleton h-full" aria-label="加载中"></div>
     {/if}
   </div>
 {:else}
@@ -99,19 +169,24 @@
         <DesktopView />
       </div>
     {/if}
-    {#each tabEntries as { tabId, component } (tabId)}
+    {#each allTabLoaders as { tabId } (tabId)}
       {@const inThisArea = tabIdsInArea.includes(tabId)}
       {@const isThisActive = inThisArea && isActive && activeTabId === tabId}
-      {@const View = component}
+      {@const View = loadedComponentFor(tabId)}
       {@const manifest = manifestForTab(tabId)}
       <!-- 应用浮层：常驻 DOM 保活（display 切换），激活时覆盖桌面层。 -->
       <div class="app-overlay-layer" class:app-overlay-hidden={!isThisActive}>
-        {#if manifest}
-          <AppShell app={manifest} pathname={location.pathname}>
+        {#if View}
+          {#if manifest}
+            <AppShell app={manifest} pathname={location.pathname}>
+              <View {area} {tabId} isActive={isThisActive} />
+            </AppShell>
+          {:else}
             <View {area} {tabId} isActive={isThisActive} />
-          </AppShell>
-        {:else}
-          <View {area} {tabId} isActive={isThisActive} />
+          {/if}
+        {:else if isThisActive}
+          <!-- 仅激活态显示骨架（隐藏态保活层无需渲染骨架，节省资源） -->
+          <div class="app-skeleton h-full" aria-label="加载中"></div>
         {/if}
       </div>
     {/each}
@@ -168,5 +243,26 @@
     opacity: 0;
     pointer-events: none;
     overflow: hidden;
+  }
+  /* 加载骨架（shadcn skeleton 风格脉冲） */
+  .app-skeleton {
+    width: 100%;
+    min-height: 100%;
+    background: var(--muted);
+    animation: skeleton-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes skeleton-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .app-skeleton {
+      animation: none;
+    }
   }
 </style>

@@ -14,6 +14,7 @@
  */
 import { marked } from "marked";
 import { gfmHeadingId } from "marked-gfm-heading-id";
+
 import { highlightCode, primeHighlighter } from "./shiki-highlighter";
 
 let configured = false;

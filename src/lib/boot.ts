@@ -16,35 +16,35 @@
  * 2. animateAppIn：主体进场（用户需求 2026-07-23）
  */
 
-const DURATION = 400
-const EASE = 'cubic-bezier(0.22, 0.61, 0.36, 1)'
+const DURATION = 400;
+const EASE = "cubic-bezier(0.22, 0.61, 0.36, 1)";
 
 /**
  * 启动屏退场：blur 从 0 扩散到 24px，轻微放大，opacity 同步淡出。
  * 退场结束后移除 DOM。
  */
 export function dismissBoot(): void {
-  const boot = document.getElementById('gaubee-boot')
-  if (!boot) return
+  const boot = document.getElementById("gaubee-boot");
+  if (!boot) return;
 
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (reduceMotion) {
-    boot.remove()
-    return
+    boot.remove();
+    return;
   }
 
   // 停止 PureCSS 的呼吸动画，避免与退场动画冲突
-  const logo = boot.querySelector('.boot-logo') as HTMLElement | null
-  logo?.getAnimations().forEach(a => a.cancel())
+  const logo = boot.querySelector(".boot-logo") as HTMLElement | null;
+  logo?.getAnimations().forEach((a) => a.cancel());
 
   const anim = boot.animate(
     [
-      { filter: 'blur(0px)', transform: 'scale(1)', opacity: 1 },
-      { filter: 'blur(24px)', transform: 'scale(1.1)', opacity: 0 },
+      { filter: "blur(0px)", transform: "scale(1)", opacity: 1 },
+      { filter: "blur(24px)", transform: "scale(1.1)", opacity: 0 },
     ],
-    { duration: DURATION, easing: EASE, fill: 'forwards' },
-  )
-  anim.onfinish = () => boot.remove()
+    { duration: DURATION, easing: EASE, fill: "forwards" },
+  );
+  anim.onfinish = () => boot.remove();
 }
 
 /**
@@ -52,17 +52,17 @@ export function dismissBoot(): void {
  * 与 dismissBoot 并行，形成「主体从模糊中浮现」的过渡。
  */
 export function animateAppIn(): void {
-  const app = document.querySelector<HTMLElement>('.app-layout')
-  if (!app) return
+  const app = document.querySelector<HTMLElement>(".app-layout");
+  if (!app) return;
 
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  if (reduceMotion) return
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduceMotion) return;
 
   app.animate(
     [
-      { filter: 'blur(12px)', opacity: 0 },
-      { filter: 'blur(0px)', opacity: 1 },
+      { filter: "blur(12px)", opacity: 0 },
+      { filter: "blur(0px)", opacity: 1 },
     ],
-    { duration: DURATION, easing: EASE, fill: 'forwards' },
-  )
+    { duration: DURATION, easing: EASE, fill: "forwards" },
+  );
 }

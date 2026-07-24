@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { error } from "@sveltejs/kit";
+
 import { parseMarkdown, type Collection } from "$lib/data/frontmatter";
 import { ensureShikiLoaded, renderMarkdown } from "$lib/markdown/render";
+import { error } from "@sveltejs/kit";
 
 export const prerender = true;
 

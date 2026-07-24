@@ -1,3 +1,10 @@
+import {
+  gaubeeos,
+  AppServiceNotInstalled,
+  NotAuthenticatedError,
+  NoChangesError,
+} from "$lib/os/services";
+
 /**
  * Github 应用的 CLI 命令（git 聚合命令的子命令）。
  *
@@ -10,12 +17,6 @@
  * 导出的 gitSubcommandMap 查找子命令实现。
  */
 import type { CliCommand } from "../../types";
-import {
-  gaubeeos,
-  AppServiceNotInstalled,
-  NotAuthenticatedError,
-  NoChangesError,
-} from "$lib/os/services";
 
 // 终端输出格式化（自包含，避免从 shell.ts 导入造成循环依赖）。
 // 与 shell.ts 的 ANSI/Term 保持一致的转义码。
@@ -44,14 +45,10 @@ const gitStatusCommand: CliCommand = {
       const git = await getGit();
       const dirty = await git.dirtyFiles();
       if (dirty.length === 0) {
-        ctx.write(
-          `${ANSI.green}工作区干净，没有未提交的修改。${ANSI.reset}${newline}`,
-        );
+        ctx.write(`${ANSI.green}工作区干净，没有未提交的修改。${ANSI.reset}${newline}`);
         return { exit: 0, newCwd: null };
       }
-      ctx.write(
-        `${ANSI.bold}未提交的修改（${dirty.length}）：${ANSI.reset}${newline}`,
-      );
+      ctx.write(`${ANSI.bold}未提交的修改（${dirty.length}）：${ANSI.reset}${newline}`);
       for (const f of dirty.sort((a, b) => a.path.localeCompare(b.path))) {
         const tag =
           f.content === null
@@ -61,10 +58,7 @@ const gitStatusCommand: CliCommand = {
       }
       return { exit: 0, newCwd: null };
     } catch (e) {
-      ctx.write(
-        err(`git status: ${e instanceof Error ? e.message : "查询失败"}`) +
-          newline,
-      );
+      ctx.write(err(`git status: ${e instanceof Error ? e.message : "查询失败"}`) + newline);
       return { exit: 1, newCwd: null };
     }
   },
@@ -91,9 +85,7 @@ const gitCommitCommand: CliCommand = {
       const git = await getGit();
       ctx.write(`${ANSI.gray}正在提交…${ANSI.reset}${newline}`);
       const sha = await git.commit(message);
-      ctx.write(
-        `${ANSI.green}✓ 已提交${ANSI.reset} ${sha.slice(0, 7)}：${message}${newline}`,
-      );
+      ctx.write(`${ANSI.green}✓ 已提交${ANSI.reset} ${sha.slice(0, 7)}：${message}${newline}`);
       return { exit: 0, newCwd: null };
     } catch (e) {
       // GitService.commit 的鉴权与类型化错误在此统一处理
@@ -104,10 +96,7 @@ const gitCommitCommand: CliCommand = {
       } else if (e instanceof AppServiceNotInstalled) {
         ctx.write(err("git commit: Github 应用未安装，无法提交") + newline);
       } else {
-        ctx.write(
-          err(`git commit: ${e instanceof Error ? e.message : "提交失败"}`) +
-            newline,
-        );
+        ctx.write(err(`git commit: ${e instanceof Error ? e.message : "提交失败"}`) + newline);
       }
       return { exit: 1, newCwd: null };
     }
@@ -117,8 +106,7 @@ const gitCommitCommand: CliCommand = {
 const gitPullCommand: CliCommand = {
   name: "git pull",
   usage: "git pull",
-  description:
-    "从 GitHub 同步 src/content 内容子树到 VFS（不覆盖本地未提交修改）。",
+  description: "从 GitHub 同步 src/content 内容子树到 VFS（不覆盖本地未提交修改）。",
   async run(ctx) {
     try {
       const git = await getGit();
@@ -127,21 +115,14 @@ const gitPullCommand: CliCommand = {
       ctx.write(`${ANSI.green}✓ 已同步${ANSI.reset}${newline}`);
       return { exit: 0, newCwd: null };
     } catch (e) {
-      ctx.write(
-        err(`git pull: ${e instanceof Error ? e.message : "同步失败"}`) +
-          newline,
-      );
+      ctx.write(err(`git pull: ${e instanceof Error ? e.message : "同步失败"}`) + newline);
       return { exit: 1, newCwd: null };
     }
   },
 };
 
 /** git 子命令实现（供 shell runLine 的 git 聚合分发器查找）。 */
-export const gitCommands: CliCommand[] = [
-  gitStatusCommand,
-  gitCommitCommand,
-  gitPullCommand,
-];
+export const gitCommands: CliCommand[] = [gitStatusCommand, gitCommitCommand, gitPullCommand];
 
 /**
  * git 子命令分发表（子命令名 → CliCommand）。

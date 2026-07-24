@@ -47,10 +47,7 @@ function getDB(): Promise<IDBPDatabase<GaubeeDB>> {
         const rawDb = db as unknown as {
           objectStoreNames: DOMStringList;
           deleteObjectStore: (name: string) => void;
-          createObjectStore: (
-            name: string,
-            opts: { keyPath: string },
-          ) => unknown;
+          createObjectStore: (name: string, opts: { keyPath: string }) => unknown;
         };
         if (oldVersion < 2) {
           // 旧数据无 origin/dirty 字段，无法迁移到 vfs，直接丢弃旧 store

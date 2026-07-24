@@ -5,6 +5,7 @@
  */
 import MiniSearch from "minisearch";
 import { describe, expect, it } from "vitest";
+
 import { parseLuceneQuery } from "./lucene";
 import { createMiniSearchIndex, type SearchIndexDocument } from "./minisearch";
 
@@ -31,9 +32,7 @@ const documents: SearchIndexDocument[] = [
 
 describe("parseLuceneQuery", () => {
   it("分离 app 分组筛选，并保留标题短语搜索", () => {
-    const query = parseLuceneQuery(
-      'app:(articles OR shout) title:"Signals proposal"',
-    );
+    const query = parseLuceneQuery('app:(articles OR shout) title:"Signals proposal"');
 
     expect(query.includeAppIds).toEqual(["articles", "shout"]);
     expect(query.excludeAppIds).toEqual([]);

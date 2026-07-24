@@ -1,3 +1,18 @@
+import { appManager } from "./AppManager.svelte";
+import { accountApp } from "./builtin/account";
+import { appStoreApp } from "./builtin/app-store";
+import { articlesApp } from "./builtin/articles";
+// 系统应用（直接静态 import，打包进主代码）
+import { desktopApp } from "./builtin/desktop";
+import { notificationsApp } from "./builtin/notifications";
+import { searchApp } from "./builtin/search";
+import { settingsApp } from "./builtin/settings";
+import { shoutApp } from "./builtin/shout";
+import { filesApp } from "./installable/files";
+// 可安装应用（动态 import，按需加载）
+import { githubApp } from "./installable/github";
+import { terminalApp } from "./installable/terminal";
+import { writerApp } from "./installable/writer";
 /**
  * GaubeeOS 应用注册中心。
  *
@@ -6,23 +21,6 @@
  * 可安装应用（installable）通过动态 import 按需加载。
  */
 import type { AppEntry } from "./types";
-import { appManager } from "./AppManager.svelte";
-
-// 系统应用（直接静态 import，打包进主代码）
-import { desktopApp } from "./builtin/desktop";
-import { articlesApp } from "./builtin/articles";
-import { shoutApp } from "./builtin/shout";
-import { searchApp } from "./builtin/search";
-import { settingsApp } from "./builtin/settings";
-import { notificationsApp } from "./builtin/notifications";
-import { accountApp } from "./builtin/account";
-import { appStoreApp } from "./builtin/app-store";
-
-// 可安装应用（动态 import，按需加载）
-import { githubApp } from "./installable/github";
-import { terminalApp } from "./installable/terminal";
-import { writerApp } from "./installable/writer";
-import { filesApp } from "./installable/files";
 
 let registered = false;
 

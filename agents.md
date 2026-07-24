@@ -63,6 +63,7 @@
 ## 应用服务总线架构（2026-07-23）
 
 ### 核心机制
+
 应用通过 `manifest.services` 声明能力（命名 service），其它应用经 `gaubeeos.getAppService(id)` 获取。这是 `searchService` 扩展点范式的泛化。
 
 ```
@@ -73,16 +74,19 @@ gaubeeos.getAppService('notification')→ NotificationService（通知应用，�
 ```
 
 ### 声明一个新 service（三步）
+
 1. **类型注册**：在 `src/lib/os/services/bus.ts` 的 `ServiceTypeMap` 加一行 `yourId: YourService`。
 2. **manifest 声明**：在应用的 manifest 加 `services: { yourId: () => yourServiceSingleton }`。
 3. **单例实现**：新建 service 文件实现 `AppService` 接口，导出单例。AppManager 在 init/install 时自动投影到 registry。
 
 ### 依赖方向约定
+
 - service 实现内部依赖其它 service 时，**直接 import 单例**（如 `gitService` import `accountService`），不经过 `gaubeeos`/bus，避免循环依赖（bus → appManager → registry → 应用 → bus）。
 - `bus.ts` 用 `import type` 引用各 service 接口（类型擦除，无运行时循环）。
 - 网络层错误映射：`client.ts` 的 `assertOk` 把 401/403 转成 `NotAuthenticatedError`，让 `handlePublishError` 的鉴权引导分支生效。
 
 ### contentStore 例外
+
 `contentStore`（`src/lib/data/content.svelte.ts`）是纯派生只读视图层（无鉴权、无写操作），允许视图直接 import，未 service 化。
 
 ## 提交规范

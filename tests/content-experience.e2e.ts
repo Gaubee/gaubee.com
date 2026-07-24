@@ -17,9 +17,7 @@ test.describe("内容阅读体验", () => {
     const toc = page.locator('nav[aria-label="文章目录"]:visible');
     await expect(toc).toHaveCount(1);
     await expect(toc.getByRole("button")).toHaveCount(8);
-    await expect(
-      toc.getByRole("button", { name: /一、告别刀耕火种/ }),
-    ).toBeVisible();
+    await expect(toc.getByRole("button", { name: /一、告别刀耕火种/ })).toBeVisible();
 
     const [tocBox, contentBox] = await Promise.all([
       toc.boundingBox(),
@@ -31,23 +29,16 @@ test.describe("内容阅读体验", () => {
     expect(tocBox.x).toBeGreaterThan(contentBox.x + contentBox.width);
 
     await expect(toc).toHaveCSS("position", "sticky");
-    await expect(toc.locator("[data-toc-scroll-region]")).toHaveCSS(
-      "overflow-y",
-      "auto",
-    );
+    await expect(toc.locator("[data-toc-scroll-region]")).toHaveCSS("overflow-y", "auto");
 
     await page
       .locator(".main-content")
       .evaluate((element) => element.scrollTo({ top: 600, behavior: "auto" }));
     await expect
-      .poll(
-        async () => (await toc.boundingBox())?.y ?? Number.NEGATIVE_INFINITY,
-      )
+      .poll(async () => (await toc.boundingBox())?.y ?? Number.NEGATIVE_INFINITY)
       .toBeGreaterThanOrEqual(24);
     await expect
-      .poll(
-        async () => (await toc.boundingBox())?.y ?? Number.POSITIVE_INFINITY,
-      )
+      .poll(async () => (await toc.boundingBox())?.y ?? Number.POSITIVE_INFINITY)
       .toBeLessThanOrEqual(40);
   });
 
@@ -55,12 +46,8 @@ test.describe("内容阅读体验", () => {
     await page.setViewportSize({ width: 1180, height: 800 });
     await page.goto(ARTICLE_PATH);
 
-    await expect(
-      page.getByRole("button", { name: "打开文章目录" }),
-    ).toBeVisible();
-    await expect(
-      page.locator('nav[aria-label="文章目录"]:visible'),
-    ).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "打开文章目录" })).toBeVisible();
+    await expect(page.locator('nav[aria-label="文章目录"]:visible')).toHaveCount(0);
   });
 
   test("宽桌面文章列表在右侧显示独立滚动的年份目录", async ({ page }) => {
@@ -89,14 +76,10 @@ test.describe("内容阅读体验", () => {
       .locator(".main-content")
       .evaluate((element) => element.scrollTo({ top: 600, behavior: "auto" }));
     await expect
-      .poll(
-        async () => (await toc.boundingBox())?.y ?? Number.NEGATIVE_INFINITY,
-      )
+      .poll(async () => (await toc.boundingBox())?.y ?? Number.NEGATIVE_INFINITY)
       .toBeGreaterThanOrEqual(24);
     await expect
-      .poll(
-        async () => (await toc.boundingBox())?.y ?? Number.POSITIVE_INFINITY,
-      )
+      .poll(async () => (await toc.boundingBox())?.y ?? Number.POSITIVE_INFINITY)
       .toBeLessThanOrEqual(40);
   });
 
@@ -105,12 +88,8 @@ test.describe("内容阅读体验", () => {
     await page.goto("/app/articles");
     await expect(page.getByRole("heading", { name: "文章" })).toBeVisible();
 
-    await expect(
-      page.getByRole("button", { name: "按年份浏览文章" }),
-    ).toBeVisible();
-    await expect(
-      page.locator('nav[aria-label="按年份浏览文章"]:visible'),
-    ).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "按年份浏览文章" })).toBeVisible();
+    await expect(page.locator('nav[aria-label="按年份浏览文章"]:visible')).toHaveCount(0);
   });
 
   test("移动端文章目录 Sheet 可定位到正文标题", async ({ page }) => {
@@ -125,9 +104,7 @@ test.describe("内容阅读体验", () => {
     await sheet.getByRole("button", { name: /五、定制你的专属转场/ }).click();
     await expect(sheet).toBeHidden();
     await expect
-      .poll(() =>
-        page.locator(".main-content").evaluate((element) => element.scrollTop),
-      )
+      .poll(() => page.locator(".main-content").evaluate((element) => element.scrollTop))
       .toBeGreaterThan(500);
   });
 
@@ -145,9 +122,7 @@ test.describe("内容阅读体验", () => {
     await years.last().click();
     await expect(sheet).toBeHidden();
     await expect
-      .poll(() =>
-        page.locator(".main-content").evaluate((element) => element.scrollTop),
-      )
+      .poll(() => page.locator(".main-content").evaluate((element) => element.scrollTop))
       .toBeGreaterThan(100);
   });
 

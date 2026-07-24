@@ -5,6 +5,7 @@
  * vfsStore.current 是 reactive 快照，模板里直接用。
  */
 import { browser } from "$app/environment";
+
 import { vfs, type VfsNode } from "./vfs";
 
 // re-export 供视图使用
@@ -111,9 +112,7 @@ class VfsStore {
 
   /** 按 collection 筛选文件（articles/events 为正式内容，draft 为私有草稿）。 */
   filesInCollection(collection: "articles" | "events" | "draft"): VfsNode[] {
-    return this.files.filter((f) =>
-      f.path.startsWith(`src/content/${collection}/`),
-    );
+    return this.files.filter((f) => f.path.startsWith(`src/content/${collection}/`));
   }
 }
 

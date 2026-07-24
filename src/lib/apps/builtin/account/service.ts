@@ -1,3 +1,4 @@
+import { authStore, type GithubUser } from "$lib/auth/session.svelte";
 /**
  * AccountService：账户能力接口（GaubeeOS 应用服务总线的一部分）。
  *
@@ -11,7 +12,6 @@
  */
 import type { AppService } from "$lib/os/services";
 import { NotAuthenticatedError } from "$lib/os/services";
-import { authStore, type GithubUser } from "$lib/auth/session.svelte";
 
 /** 账户响应式快照（与 authStore.state 结构对齐，但对外屏蔽实现细节）。 */
 export interface AccountSnapshot {

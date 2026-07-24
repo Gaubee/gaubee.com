@@ -8,8 +8,8 @@
  * 内容路径：src/content/articles、src/content/events。
  */
 import { fetchGithub } from "$lib/auth/session.svelte";
-import { NotAuthenticatedError } from "$lib/os/services";
 import type { Collection } from "$lib/data/frontmatter";
+import { NotAuthenticatedError } from "$lib/os/services";
 
 export const OWNER = "gaubee";
 export const REPO = "gaubee.com";
@@ -34,9 +34,7 @@ async function assertOk(resp: Response, context: string): Promise<void> {
     // rate limit 的 403 不是鉴权问题，抛普通错误提示限速
     const body = await resp.text().catch(() => "");
     if (body.includes("rate limit")) {
-      throw new Error(
-        `${context} 失败：GitHub API 限速（匿名 60/h），请登录提升额度`,
-      );
+      throw new Error(`${context} 失败：GitHub API 限速（匿名 60/h），请登录提升额度`);
     }
     throw new NotAuthenticatedError(`${context}失败：无权限，可能需要登录`);
   }
@@ -72,9 +70,7 @@ function b64decode(b64: string): string {
 
 /** 列出目录内容。path 为仓库内相对路径（如 'src/content/articles'）。 */
 export async function listContents(path: string): Promise<GhContentEntry[]> {
-  const resp = await fetchGithub(
-    `repos/${OWNER}/${REPO}/contents/${path}?ref=${BRANCH}`,
-  );
+  const resp = await fetchGithub(`repos/${OWNER}/${REPO}/contents/${path}?ref=${BRANCH}`);
   if (!resp.ok) {
     if (resp.status === 404) return [];
     await assertOk(resp, `listContents(${path})`);
@@ -86,9 +82,7 @@ export async function listContents(path: string): Promise<GhContentEntry[]> {
 
 /** 读取文件文本内容。 */
 export async function getFileText(path: string): Promise<string> {
-  const resp = await fetchGithub(
-    `repos/${OWNER}/${REPO}/contents/${path}?ref=${BRANCH}`,
-  );
+  const resp = await fetchGithub(`repos/${OWNER}/${REPO}/contents/${path}?ref=${BRANCH}`);
   await assertOk(resp, `getFileText(${path})`);
   const data = (await resp.json()) as GhFileContent;
   if (data.type !== "file" || data.encoding !== "base64") {
@@ -98,18 +92,13 @@ export async function getFileText(path: string): Promise<string> {
 }
 
 /** 列出集合（articles/events）下所有 markdown 文件条目。 */
-export async function listCollectionFiles(
-  collection: Collection,
-): Promise<GhContentEntry[]> {
+export async function listCollectionFiles(collection: Collection): Promise<GhContentEntry[]> {
   const entries = await listContents(`src/content/${collection}`);
   return entries.filter((e) => e.type === "file" && e.name.endsWith(".md"));
 }
 
 /** 递归列出目录下所有文件（用于文件树浏览）。 */
-export async function listAllFiles(
-  path: string,
-  maxDepth = 4,
-): Promise<GhContentEntry[]> {
+export async function listAllFiles(path: string, maxDepth = 4): Promise<GhContentEntry[]> {
   const result: GhContentEntry[] = [];
   async function walk(dir: string, depth: number) {
     if (depth > maxDepth) return;
@@ -144,9 +133,7 @@ export async function fetchTree(
 ): Promise<{ tree: GhTreeEntry[]; sha: string; truncated: boolean }> {
   const subtreeParam = subtree ? `?recursive=1` : `?recursive=1`;
   void subtreeParam;
-  const resp = await fetchGithub(
-    `repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`,
-  );
+  const resp = await fetchGithub(`repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`);
   await assertOk(resp, "fetchTree");
   const data = (await resp.json()) as {
     tree: GhTreeEntry[];
@@ -155,9 +142,7 @@ export async function fetchTree(
   };
   if (subtree) {
     const prefix = subtree.endsWith("/") ? subtree : `${subtree}/`;
-    data.tree = data.tree.filter(
-      (e) => e.path === subtree || e.path.startsWith(prefix),
-    );
+    data.tree = data.tree.filter((e) => e.path === subtree || e.path.startsWith(prefix));
   }
   return data;
 }
@@ -187,16 +172,12 @@ export async function commitChanges(
   branch: string = BRANCH,
 ): Promise<string> {
   // 1. 获取分支最新 commit 与 tree
-  const refResp = await fetchGithub(
-    `repos/${OWNER}/${REPO}/git/refs/heads/${branch}`,
-  );
+  const refResp = await fetchGithub(`repos/${OWNER}/${REPO}/git/refs/heads/${branch}`);
   await assertOk(refResp, "获取 ref");
   const refData = (await refResp.json()) as { object: { sha: string } };
   const latestSha = refData.object.sha;
 
-  const commitResp = await fetchGithub(
-    `repos/${OWNER}/${REPO}/git/commits/${latestSha}`,
-  );
+  const commitResp = await fetchGithub(`repos/${OWNER}/${REPO}/git/commits/${latestSha}`);
   await assertOk(commitResp, "获取 commit");
   const commitData = (await commitResp.json()) as { tree: { sha: string } };
   const baseTreeSha = commitData.tree.sha;
@@ -242,30 +223,24 @@ export async function commitChanges(
   const treeData = (await treeResp.json()) as { sha: string };
 
   // 4. 创建 commit
-  const newCommitResp = await fetchGithub(
-    `repos/${OWNER}/${REPO}/git/commits`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message,
-        tree: treeData.sha,
-        parents: [latestSha],
-      }),
-    },
-  );
+  const newCommitResp = await fetchGithub(`repos/${OWNER}/${REPO}/git/commits`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message,
+      tree: treeData.sha,
+      parents: [latestSha],
+    }),
+  });
   await assertOk(newCommitResp, "创建 commit");
   const newCommitData = (await newCommitResp.json()) as { sha: string };
 
   // 5. 更新分支引用
-  const updateResp = await fetchGithub(
-    `repos/${OWNER}/${REPO}/git/refs/heads/${branch}`,
-    {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sha: newCommitData.sha }),
-    },
-  );
+  const updateResp = await fetchGithub(`repos/${OWNER}/${REPO}/git/refs/heads/${branch}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sha: newCommitData.sha }),
+  });
   await assertOk(updateResp, "更新 ref");
 
   return newCommitData.sha;

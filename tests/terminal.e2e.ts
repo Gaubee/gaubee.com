@@ -165,9 +165,7 @@ test.describe("桌面端终端", () => {
     expect(rows.join("\n")).toContain("hello");
   });
 
-  test("终端激活后 xterm 不溢出视口（约束在 bottom 区内）", async ({
-    page,
-  }) => {
+  test("终端激活后 xterm 不溢出视口（约束在 bottom 区内）", async ({ page }) => {
     await page.goto("/");
     await waitForSpa(page);
     await activateTerminal(page);
@@ -179,9 +177,7 @@ test.describe("桌面端终端", () => {
     expect(xtermBox).not.toBeNull();
     if (xtermBox && viewport) {
       // xterm 底部不应超过视口高度（允许 5px 容差）
-      expect(xtermBox.y + xtermBox.height).toBeLessThanOrEqual(
-        viewport.height + 5,
-      );
+      expect(xtermBox.y + xtermBox.height).toBeLessThanOrEqual(viewport.height + 5);
     }
   });
 });

@@ -9,6 +9,7 @@
  */
 
 import { parseMarkdown, parseArticleId, type ArticleMetadata } from "$lib/data/frontmatter";
+
 import { readonlyFiles } from "./readonly-data";
 
 // ---------------------------------------------------------------------------
@@ -76,10 +77,10 @@ function collectionFromPath(path: string): "articles" | "events" | null {
 function parseNode(path: string, content: string): ReadonlyPost | null {
   const collection = collectionFromPath(path);
   if (!collection) return null;
-  
+
   const filename = path.split("/").pop() ?? path;
   const { metadata, body } = parseMarkdown(content);
-  
+
   return {
     path,
     collection,
@@ -107,7 +108,7 @@ export class ReadonlyVfs {
     const map = initFileMap();
     const p = prefix.replace(/\/+$/, "");
     const prefixWithSlash = p ? `${p}/` : "";
-    
+
     const results: ReadonlyNode[] = [];
     for (const [path, content] of map) {
       if (p && !path.startsWith(prefixWithSlash)) continue;
@@ -117,7 +118,7 @@ export class ReadonlyVfs {
       }
       results.push({ path, content });
     }
-    
+
     return results.sort((a, b) => a.path.localeCompare(b.path));
   }
 
@@ -131,14 +132,14 @@ export class ReadonlyVfs {
   /** 获取所有解析后的 posts（缓存）。 */
   getPosts(): ReadonlyPost[] {
     if (postsCache) return postsCache;
-    
+
     const map = initFileMap();
     const posts: ReadonlyPost[] = [];
     for (const [path, content] of map) {
       const post = parseNode(path, content);
       if (post) posts.push(post);
     }
-    
+
     postsCache = posts;
     return postsCache;
   }

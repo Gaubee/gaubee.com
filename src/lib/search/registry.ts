@@ -19,10 +19,7 @@ class SearchServiceRegistry {
   servicesFor(query: SearchQuery): SearchService[] {
     return [...this.services.values()].filter((service) => {
       if (query.excludeAppIds.includes(service.appId)) return false;
-      return (
-        query.includeAppIds.length === 0 ||
-        query.includeAppIds.includes(service.appId)
-      );
+      return query.includeAppIds.length === 0 || query.includeAppIds.includes(service.appId);
     });
   }
 }

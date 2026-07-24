@@ -7,6 +7,7 @@
  * - 桌面主菜单（placement:desktop）：仅"管理桌面"入口。
  */
 import LayoutGrid from "@lucide/svelte/icons/layout-grid";
+
 import type { AppEntry } from "../../types";
 
 export const desktopApp: AppEntry = {
@@ -47,7 +48,6 @@ export const desktopApp: AppEntry = {
       },
     ],
     description: "系统桌面",
-    longDescription:
-      "GaubeeOS 的默认首页。应用图标网格启动器、桌面小组件和任务栏的背景层。",
+    longDescription: "GaubeeOS 的默认首页。应用图标网格启动器、桌面小组件和任务栏的背景层。",
   },
 };

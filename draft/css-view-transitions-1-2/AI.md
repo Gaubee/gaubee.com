@@ -165,9 +165,7 @@
     </section>
   </body>
   <script>
-    const allButtonGroup = [].slice.call(
-      document.querySelectorAll(".class-names button-group"),
-    );
+    const allButtonGroup = [].slice.call(document.querySelectorAll(".class-names button-group"));
     allButtonGroup.forEach((btnGroup) => {
       btnGroup.addEventListener("change", (e) => {
         canvas.classList.remove(...btnGroup.options);

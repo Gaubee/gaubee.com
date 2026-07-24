@@ -11,16 +11,7 @@
  */
 import { browser } from "$app/environment";
 import { accountService } from "$lib/apps/builtin/account/service";
-import { NoChangesError } from "$lib/os/services";
-import { readonlyVfs } from "./readonly";
-import {
-  vfsAll,
-  vfsClear,
-  vfsDelete,
-  vfsGet,
-  vfsPut,
-  type VfsRecord,
-} from "$lib/db";
+import { vfsAll, vfsClear, vfsDelete, vfsGet, vfsPut, type VfsRecord } from "$lib/db";
 import {
   BRANCH,
   OWNER,
@@ -30,6 +21,9 @@ import {
   getFileText,
   type GhTreeEntry,
 } from "$lib/github/client";
+import { NoChangesError } from "$lib/os/services";
+
+import { readonlyVfs } from "./readonly";
 
 /** VFS 暴露给视图/未来的 bash 的文件元数据快照。content=null 表示待删除。 */
 export interface VfsNode {
@@ -69,15 +63,12 @@ async function pool<T, R>(
 ): Promise<R[]> {
   const results: R[] = new Array(items.length);
   let cursor = 0;
-  const workers = Array.from(
-    { length: Math.min(limit, items.length) },
-    async () => {
-      while (cursor < items.length) {
-        const i = cursor++;
-        results[i] = await fn(items[i], i);
-      }
-    },
-  );
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const i = cursor++;
+      results[i] = await fn(items[i], i);
+    }
+  });
   await Promise.all(workers);
   return results;
 }
@@ -187,10 +178,7 @@ export class Vfs {
    * @param opts.recursive 递归列出子目录文件（默认 true）
    * 只返回 content !== null（即未删除）的文件。
    */
-  async readdir(
-    prefix = "",
-    opts: { recursive?: boolean } = {},
-  ): Promise<VfsNode[]> {
+  async readdir(prefix = "", opts: { recursive?: boolean } = {}): Promise<VfsNode[]> {
     const recursive = opts.recursive ?? true;
     const all = await vfsAll();
     const p = normalizePath(prefix);

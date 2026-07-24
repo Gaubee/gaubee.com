@@ -1,0 +1,10 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "sortImports": true,
+  "ignorePatterns": [
+    "build/",
+    ".svelte-kit/",
+    "src/lib/vfs/readonly-data.ts",
+    "static/search-index/"
+  ]
+}

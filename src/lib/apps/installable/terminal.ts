@@ -5,6 +5,7 @@
  * 自身提供基础命令：clear, help
  */
 import TerminalSquare from "@lucide/svelte/icons/terminal-square";
+
 import type { AppEntry } from "../types";
 
 export const terminalApp: AppEntry = {
@@ -23,8 +24,7 @@ export const terminalApp: AppEntry = {
     ],
     vfsOwnership: [],
     description: "终端命令行",
-    longDescription:
-      "内置 shell，暴露 PATH 中所有应用的 CLI 命令。支持文件操作、Git 命令等。",
+    longDescription: "内置 shell，暴露 PATH 中所有应用的 CLI 命令。支持文件操作、Git 命令等。",
     version: "1.0.0",
     author: "Gaubee",
   },

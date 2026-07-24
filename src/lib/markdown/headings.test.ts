@@ -4,6 +4,7 @@
  * 2. 锁定 Markdown 渲染和 TOC 共用的 GFM 标题 ID 契约。
  */
 import { describe, expect, it } from "vitest";
+
 import { extractMarkdownHeadings } from "./headings";
 
 describe("extractMarkdownHeadings", () => {

@@ -7,16 +7,14 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { parseArticleId, parseMarkdown } from "../src/lib/data/frontmatter";
-import {
-  createMiniSearchIndex,
-  type SearchIndexDocument,
-} from "../src/lib/search/minisearch";
 import type {
   SearchIndexApplication,
   SearchIndexManifest,
   SearchIndexShard,
 } from "../src/lib/search/index-format";
+import { createMiniSearchIndex, type SearchIndexDocument } from "../src/lib/search/minisearch";
 
 const directory = fileURLToPath(new URL(".", import.meta.url));
 const projectRoot = join(directory, "..");
@@ -56,9 +54,7 @@ function createExcerpt(markdown: string): string {
     .slice(0, 180);
 }
 
-async function loadDocuments(
-  source: ApplicationSource,
-): Promise<SearchIndexDocument[]> {
+async function loadDocuments(source: ApplicationSource): Promise<SearchIndexDocument[]> {
   const applicationDirectory = join(contentDirectory, source.directory);
   const files = await listMarkdownFiles(applicationDirectory);
   const documents = await Promise.all(
@@ -80,9 +76,7 @@ async function loadDocuments(
       } satisfies SearchIndexDocument;
     }),
   );
-  return documents.sort(
-    (left, right) => right.date - left.date || left.id.localeCompare(right.id),
-  );
+  return documents.sort((left, right) => right.date - left.date || left.id.localeCompare(right.id));
 }
 
 function serialize(documents: readonly SearchIndexDocument[]): string {
@@ -117,10 +111,7 @@ async function writeApplication(
 
   for (const document of documents) {
     const candidate = [...current, document];
-    if (
-      current.length > 0 &&
-      Buffer.byteLength(serialize(candidate)) > TARGET_SHARD_BYTES
-    ) {
+    if (current.length > 0 && Buffer.byteLength(serialize(candidate)) > TARGET_SHARD_BYTES) {
       await flush();
     }
     current.push(document);
@@ -135,9 +126,7 @@ async function main(): Promise<void> {
   await mkdir(outputDirectory, { recursive: true });
 
   const indexedApplications = await Promise.all(
-    applications.map(async (source) =>
-      writeApplication(source, await loadDocuments(source)),
-    ),
+    applications.map(async (source) => writeApplication(source, await loadDocuments(source))),
   );
   const manifest: SearchIndexManifest = {
     version: 1,

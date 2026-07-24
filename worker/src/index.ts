@@ -14,8 +14,8 @@
  * - CORS 仅允许 APP_ORIGIN。
  */
 import { Hono } from "hono";
-import { cors } from "hono/cors";
 import { setCookie, getCookie, deleteCookie } from "hono/cookie";
+import { cors } from "hono/cors";
 
 export interface Env {
   GITHUB_CLIENT_ID: string;
@@ -197,61 +197,58 @@ app.get("/auth/me", async (c) => {
 // - 只读（GET/HEAD）无 token 时回退匿名请求（公开仓库可读，受 60/h 限速）
 app.all("/api/proxy/*", async (c) => {
   // 解析目标路径：/api/proxy/repos/gaubee/.../contents → repos/gaubee/.../contents
-  const url = new URL(c.req.url)
+  const url = new URL(c.req.url);
   // 去掉 /api/proxy 前缀与前导斜杠，规范化
-  const ghPath = c.req.path.replace(/^\/api\/proxy\/?/, "")
+  const ghPath = c.req.path.replace(/^\/api\/proxy\/?/, "");
 
   // 路径白名单校验：必须以 ALLOWED_PROXY_PREFIX 开头（防 SSRF 到其他仓库）
   const isAllowed =
-    ghPath === ALLOWED_PROXY_PREFIX.slice(0, -1) || ghPath.startsWith(ALLOWED_PROXY_PREFIX)
+    ghPath === ALLOWED_PROXY_PREFIX.slice(0, -1) || ghPath.startsWith(ALLOWED_PROXY_PREFIX);
   if (!isAllowed) {
-    return c.json({ error: "forbidden: path not allowed" }, 403)
+    return c.json({ error: "forbidden: path not allowed" }, 403);
   }
 
-  const token = getCookie(c, COOKIE_NAME)
-  const method = c.req.method
-  const isWrite = method !== "GET" && method !== "HEAD"
+  const token = getCookie(c, COOKIE_NAME);
+  const method = c.req.method;
+  const isWrite = method !== "GET" && method !== "HEAD";
   // 写操作必须有 token（匿名不能写）
   if (isWrite && !token) {
-    return c.json({ error: "unauthorized: write requires login" }, 401)
+    return c.json({ error: "unauthorized: write requires login" }, 401);
   }
 
-  const targetUrl = `${GITHUB_API}/${ghPath}${url.search}`
+  const targetUrl = `${GITHUB_API}/${ghPath}${url.search}`;
 
   // 构造干净的请求头（白名单，删掉所有 proxy/client headers）
-  const headers = new Headers()
-  headers.set("Accept", "application/vnd.github+json")
-  headers.set("User-Agent", "gaubee-auth-worker")
+  const headers = new Headers();
+  headers.set("Accept", "application/vnd.github+json");
+  headers.set("User-Agent", "gaubee-auth-worker");
   if (token) {
-    headers.set("Authorization", `Bearer ${token}`)
+    headers.set("Authorization", `Bearer ${token}`);
   }
   if (isWrite) {
-    headers.set("Content-Type", "application/json")
+    headers.set("Content-Type", "application/json");
   }
 
   const resp = await fetch(targetUrl, {
     method,
     headers,
     body: isWrite ? await c.req.text() : undefined,
-  })
+  });
 
   // 透传响应
-  const respHeaders = new Headers()
-  respHeaders.set(
-    "Content-Type",
-    resp.headers.get("Content-Type") ?? "application/json",
-  )
-  respHeaders.set("Cache-Control", "no-store")
+  const respHeaders = new Headers();
+  respHeaders.set("Content-Type", resp.headers.get("Content-Type") ?? "application/json");
+  respHeaders.set("Cache-Control", "no-store");
   // 透传 GitHub 的 rate limit 头（前端可据此提示）
   for (const h of ["X-RateLimit-Limit", "X-RateLimit-Remaining", "ETag"]) {
-    const v = resp.headers.get(h)
-    if (v) respHeaders.set(h, v)
+    const v = resp.headers.get(h);
+    if (v) respHeaders.set(h, v);
   }
 
   return new Response(resp.body, {
     status: resp.status,
     headers: respHeaders,
-  })
-})
+  });
+});
 
 export default app;

@@ -1,3 +1,9 @@
+import { appManager } from "$lib/apps/AppManager.svelte";
+// ---- service 接口类型注册（import type：仅类型，不产生运行时依赖）----
+import type { AccountService } from "$lib/apps/builtin/account/service";
+import type { NotificationService } from "$lib/apps/builtin/notifications/service.svelte";
+import type { GitService } from "$lib/apps/installable/github/service";
+
 /**
  * GaubeeOS 前端 OS 入口：应用服务总线。
  *
@@ -18,13 +24,7 @@
  * - 各 service 实现内部不反向 import bus.ts（运行时）；需要类型时用 `import type`。
  */
 import { appServiceRegistry, AppServiceNotInstalled } from "./registry";
-import { appManager } from "$lib/apps/AppManager.svelte";
 import type { AppService } from "./types";
-
-// ---- service 接口类型注册（import type：仅类型，不产生运行时依赖）----
-import type { AccountService } from "$lib/apps/builtin/account/service";
-import type { GitService } from "$lib/apps/installable/github/service";
-import type { NotificationService } from "$lib/apps/builtin/notifications/service.svelte";
 
 /**
  * 全局 service id → 接口类型映射。
@@ -91,9 +91,7 @@ export const gaubeeos = {
    *
    * @throws AppServiceNotInstalled 提供该 service 的应用未安装。
    */
-  async requestAppService<K extends ServiceId>(
-    id: K,
-  ): Promise<ServiceTypeMap[K]> {
+  async requestAppService<K extends ServiceId>(id: K): Promise<ServiceTypeMap[K]> {
     const appId = appServiceRegistry.appIdOf(id);
     if (!appId) throw new AppServiceNotInstalled(id);
 

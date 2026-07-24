@@ -51,10 +51,7 @@ describe("VfsStore commit 互斥", () => {
     });
 
     // 并发发起两次 commit
-    const [sha1, sha2] = await Promise.all([
-      vfsStore.commit("msg1"),
-      vfsStore.commit("msg2"),
-    ]);
+    const [sha1, sha2] = await Promise.all([vfsStore.commit("msg1"), vfsStore.commit("msg2")]);
 
     // 两次都拿到同一个 sha（合并）
     expect(sha1).toBe("newsha1234567890");

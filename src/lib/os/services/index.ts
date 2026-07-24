@@ -13,9 +13,5 @@ export { NotAuthenticatedError, NoChangesError } from "./bus";
 export { appServiceRegistry } from "./registry";
 export { AppServiceNotInstalled } from "./registry";
 
-export type {
-  AppService,
-  AppServiceFactory,
-  ServiceDeclaration,
-} from "./types";
+export type { AppService, AppServiceFactory, ServiceDeclaration } from "./types";
 export type { ServiceId, ServiceTypeMap } from "./bus";

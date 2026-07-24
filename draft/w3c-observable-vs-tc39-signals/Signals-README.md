@@ -532,14 +532,15 @@ stateDiagram-v2
 ```
 
 The transitions are:
-| Number | From | To | Condition | Algorithm |
-| ------ | ---- | -- | --------- | --------- |
-| 1 | `~checked~` | `~dirty~` | An immediate source of this signal, which is a computed signal, has been evaluated, and its value has changed. | Algorithm: recalculate dirty computed Signal |
-| 2 | `~clean~` | `~dirty~` | An immediate source of this signal, which is a State, has been set, with a value which is not equal to its previous value. | Method: `Signal.State.prototype.set(newValue)` |
-| 3 | `~clean~` | `~checked~` | A recursive, but not immediate, source of this signal, which is a State, has been set, with a value which is not equal to its previous value. | Method: `Signal.State.prototype.set(newValue)` |
-| 4 | `~dirty~` | `~computing~` | We are about to execute the `callback`. | Algorithm: recalculate dirty computed Signal |
-| 5 | `~computing~` | `~clean~` | The `callback` has finished evaluating and either returned a value or thrown an exception. | Algorithm: recalculate dirty computed Signal |
-| 6 | `~checked~` | `~clean~` | All immediate sources of this signal have been evaluated, and all have been discovered unchanged, so we are now known not to be stale. | Algorithm: recalculate dirty computed Signal |
+
+| Number | From          | To            | Condition                                                                                                                                     | Algorithm                                      |
+| ------ | ------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| 1      | `~checked~`   | `~dirty~`     | An immediate source of this signal, which is a computed signal, has been evaluated, and its value has changed.                                | Algorithm: recalculate dirty computed Signal   |
+| 2      | `~clean~`     | `~dirty~`     | An immediate source of this signal, which is a State, has been set, with a value which is not equal to its previous value.                    | Method: `Signal.State.prototype.set(newValue)` |
+| 3      | `~clean~`     | `~checked~`   | A recursive, but not immediate, source of this signal, which is a State, has been set, with a value which is not equal to its previous value. | Method: `Signal.State.prototype.set(newValue)` |
+| 4      | `~dirty~`     | `~computing~` | We are about to execute the `callback`.                                                                                                       | Algorithm: recalculate dirty computed Signal   |
+| 5      | `~computing~` | `~clean~`     | The `callback` has finished evaluating and either returned a value or thrown an exception.                                                    | Algorithm: recalculate dirty computed Signal   |
+| 6      | `~checked~`   | `~clean~`     | All immediate sources of this signal have been evaluated, and all have been discovered unchanged, so we are now known not to be stale.        | Algorithm: recalculate dirty computed Signal   |
 
 #### `Signal.Computed` Internal slots
 
@@ -593,12 +594,13 @@ stateDiagram-v2
 ```
 
 The transitions are:
-| Number | From | To | Condition | Algorithm |
-| ------ | ---- | -- | --------- | --------- |
-| 1 | `~waiting~` | `~watching~` | The Watcher's `watch` method has been called. | Method: `Signal.subtle.Watcher.prototype.watch(...signals)` |
-| 2 | `~watching~` | `~waiting~` | The Watcher's `unwatch` method has been called, and the last watched signal has been removed. | Method: `Signal.subtle.Watcher.prototype.unwatch(...signals)` |
-| 3 | `~watching~` | `~pending~` | A watched signal may have changed value. | Method: `Signal.State.prototype.set(newValue)` |
-| 4 | `~pending~` | `~waiting~` | The `notify` callback has been run. | Method: `Signal.State.prototype.set(newValue)` |
+
+| Number | From         | To           | Condition                                                                                     | Algorithm                                                     |
+| ------ | ------------ | ------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| 1      | `~waiting~`  | `~watching~` | The Watcher's `watch` method has been called.                                                 | Method: `Signal.subtle.Watcher.prototype.watch(...signals)`   |
+| 2      | `~watching~` | `~waiting~`  | The Watcher's `unwatch` method has been called, and the last watched signal has been removed. | Method: `Signal.subtle.Watcher.prototype.unwatch(...signals)` |
+| 3      | `~watching~` | `~pending~`  | A watched signal may have changed value.                                                      | Method: `Signal.State.prototype.set(newValue)`                |
+| 4      | `~pending~`  | `~waiting~`  | The `notify` callback has been run.                                                           | Method: `Signal.State.prototype.set(newValue)`                |
 
 #### `Signal.subtle.Watcher` internal slots
 

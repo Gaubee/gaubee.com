@@ -36,11 +36,11 @@ export interface GitService extends AppService {
   sync(subtree?: string): Promise<void>;
 }
 
+import { accountService } from "$lib/apps/builtin/account/service";
 // 实现委托 VFS（Git Data API 路径，认证有效）。
 // 注意依赖方向：gitService → vfs + accountService（均纯单例，不经过 bus），
 // 避免经过 gaubeeos/bus 产生循环依赖（bus → appManager → registry → github → bus）。
 import { vfs, vfsStore } from "$lib/vfs/vfs.svelte";
-import { accountService } from "$lib/apps/builtin/account/service";
 
 /**
  * GitService 单例实现：委托 VFS（Git Data API 路径，认证有效）。

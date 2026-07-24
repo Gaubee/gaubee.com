@@ -4,20 +4,10 @@
  * 隐藏 Markdown 语法标记，显示富文本效果
  * 参考 codemirror-rich-markdoc 的实现方式
  */
-import {
-  HighlightStyle,
-  syntaxHighlighting,
-  syntaxTree,
-} from "@codemirror/language";
+import { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/language";
 import type { Extension } from "@codemirror/state";
 import type { DecorationSet } from "@codemirror/view";
-import {
-  Decoration,
-  EditorView,
-  ViewPlugin,
-  ViewUpdate,
-  WidgetType,
-} from "@codemirror/view";
+import { Decoration, EditorView, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
 import type { SyntaxNodeRef } from "@lezer/common";
 import { tags as t } from "@lezer/highlight";
 
@@ -108,8 +98,7 @@ function applyCodeBlockLines(
   const firstLine = view.state.doc.lineAt(node.from).number;
   const lastLine = view.state.doc.lineAt(node.to).number;
   const hasClosingFence =
-    node.to - node.from > 3 &&
-    view.state.doc.sliceString(node.to - 3, node.to) === "```";
+    node.to - node.from > 3 && view.state.doc.sliceString(node.to - 3, node.to) === "```";
 
   for (let lineNo = firstLine; lineNo <= lastLine; lineNo++) {
     const line = view.state.doc.line(lineNo);
@@ -155,15 +144,14 @@ class MarkdownPreviewPlugin {
   buildDecorations(view: EditorView): DecorationSet {
     const widgets: { from: number; to: number; decoration: Decoration }[] = [];
     const selectionRanges = view.state.selection.ranges;
-    const selectedLines: Array<{ from: number; to: number }> =
-      selectionRanges.map((r) => {
-        const lineFrom = view.state.doc.lineAt(r.from);
-        const lineTo = view.state.doc.lineAt(r.to);
-        return {
-          from: Math.min(lineFrom.from, lineTo.from),
-          to: Math.max(lineFrom.to, lineTo.to),
-        };
-      });
+    const selectedLines: Array<{ from: number; to: number }> = selectionRanges.map((r) => {
+      const lineFrom = view.state.doc.lineAt(r.from);
+      const lineTo = view.state.doc.lineAt(r.to);
+      return {
+        from: Math.min(lineFrom.from, lineTo.from),
+        to: Math.max(lineFrom.to, lineTo.to),
+      };
+    });
     const listStack: number[] = [];
 
     for (const { from, to } of view.visibleRanges) {
@@ -178,8 +166,7 @@ class MarkdownPreviewPlugin {
           const parentName = node.node.parent?.name ?? "";
           const grandName = node.node.parent?.parent?.name ?? "";
           const isOrderedList =
-            parentName.includes("OrderedList") ||
-            grandName.includes("OrderedList");
+            parentName.includes("OrderedList") || grandName.includes("OrderedList");
           const text = view.state.doc.sliceString(node.from, node.to);
 
           if (name === "OrderedList") {
@@ -285,9 +272,7 @@ class MarkdownPreviewPlugin {
 
           // 代码块 fence 与语言标记
           if (name === "CodeMark" || name === "CodeInfo") {
-            const decoration = isSelectedLine
-              ? fadedDecoration
-              : fenceDecoration;
+            const decoration = isSelectedLine ? fadedDecoration : fenceDecoration;
             widgets.push({
               from: node.from,
               to: node.to,
@@ -298,9 +283,7 @@ class MarkdownPreviewPlugin {
 
           // HeaderMark 需要包含后面的空格
           if (name === "HeaderMark") {
-            const decoration = isSelectedLine
-              ? fadedDecoration
-              : hiddenDecoration;
+            const decoration = isSelectedLine ? fadedDecoration : hiddenDecoration;
             widgets.push({
               from: node.from,
               to: node.to + 1, // +1 包含空格
@@ -524,9 +507,5 @@ const markdownPreviewTheme = EditorView.baseTheme({
 
 /** 导出 Markdown 实时预览扩展 */
 export function markdownPreview(): Extension {
-  return [
-    markdownPreviewPlugin,
-    syntaxHighlighting(markdownHighlightStyle),
-    markdownPreviewTheme,
-  ];
+  return [markdownPreviewPlugin, syntaxHighlighting(markdownHighlightStyle), markdownPreviewTheme];
 }

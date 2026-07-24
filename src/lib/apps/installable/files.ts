@@ -8,6 +8,7 @@
  * 点文件跳转 /app/editor 进入「写作」应用的编辑器（跨应用协作）。
  */
 import Folder from "@lucide/svelte/icons/folder";
+
 import type { AppEntry } from "../types";
 
 export const filesApp: AppEntry = {
@@ -24,14 +25,9 @@ export const filesApp: AppEntry = {
         view: () => import("$lib/views/FilesView.svelte"),
       },
     ],
-    vfsOwnership: [
-      "src/content/articles/",
-      "src/content/events/",
-      "src/content/draft/",
-    ],
+    vfsOwnership: ["src/content/articles/", "src/content/events/", "src/content/draft/"],
     description: "content 目录的文件管理",
-    longDescription:
-      "浏览、新建和管理文章、说说与草稿文件。点击文件进入写作应用编辑器。",
+    longDescription: "浏览、新建和管理文章、说说与草稿文件。点击文件进入写作应用编辑器。",
     version: "1.0.0",
     author: "Gaubee",
   },

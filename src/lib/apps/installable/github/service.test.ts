@@ -31,8 +31,7 @@ vi.mock("$lib/apps/builtin/account/service", () => ({
 }));
 
 const { gitService } = await import("./service");
-const { NotAuthenticatedError, NoChangesError } =
-  await import("$lib/os/services");
+const { NotAuthenticatedError, NoChangesError } = await import("$lib/os/services");
 
 describe("GitService", () => {
   beforeEach(() => {
@@ -44,9 +43,7 @@ describe("GitService", () => {
       mockAccountService.requireAuthenticated.mockImplementation(() => {
         throw new NotAuthenticatedError();
       });
-      await expect(gitService.commit("msg")).rejects.toThrow(
-        NotAuthenticatedError,
-      );
+      await expect(gitService.commit("msg")).rejects.toThrow(NotAuthenticatedError);
       expect(mockVfsStore.commit).not.toHaveBeenCalled();
     });
 

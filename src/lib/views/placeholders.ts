@@ -1,72 +1,63 @@
 /**
- * View 注册：所有 tab/pop 路由的视图组件。
+ * View 注册：所有 tab/pop 路由的视图懒加载器。
  *
  * GaubeeOS 应用系统：所有视图通过 `/app/*` 路径注册。
  * 旧路径（/feed, /editor 等）已废弃，不再注册。
+ *
+ * 加载模型（2026-07-23 改造）：
+ * - 全部改为动态 import 工厂（ViewLoader），视图按需加载，不进首屏主 bundle。
+ * - 与 manifest 的 activity.view 同源（同一目标文件），保持单一事实源。
+ * - AreaOutlet 维护已加载组件缓存，加载后常驻 DOM 保活（编辑器/终端会话不丢）。
+ * - 加载期间由 appLoadStore 驱动状态栏顶部进度条。
  */
-import type { Component } from "svelte";
-import ArticleView from "$lib/apps/views/ArticleDetailView.svelte";
-import ChangesView from "./ChangesView.svelte";
-import EditorView from "./EditorView.svelte";
-import FilesView from "./FilesView.svelte";
-import SearchView from "./SearchView.svelte";
-import SettingsView from "./SettingsView.svelte";
-import TagsView from "./TagsView.svelte";
-import TerminalView from "./TerminalView.svelte";
-import AccountView from "$lib/apps/views/AccountView.svelte";
-import ArticlesView from "$lib/apps/views/ArticlesView.svelte";
-import ShoutView from "$lib/apps/views/ShoutView.svelte";
-import WriterView from "$lib/apps/views/WriterView.svelte";
-import GithubView from "$lib/apps/views/GithubView.svelte";
-import NotificationsView from "$lib/apps/views/NotificationsView.svelte";
-import AppStoreView from "$lib/apps/views/AppStoreView.svelte";
-import {
-  registerDeepLinkView,
-  registerPopView,
-  registerTabView,
-} from "./registry";
+import { asView } from "$lib/apps/types";
+
+import { registerDeepLinkView, registerPopView, registerTabView } from "./registry";
 
 let registered = false;
 
-/** 注册所有 view（幂等，多次调用安全）。 */
+/** 注册所有 view loader（幂等，多次调用安全）。 */
 export function ensureViewsRegistered(): void {
   if (registered) return;
   registered = true;
 
   // ===== 系统应用（不可卸载）=====
   // 注意：桌面（/desktop）不经 tab 机制，由 AreaOutlet 作为 shell 级背景层直接渲染。
-  registerTabView("/app/articles", ArticlesView);
-  registerTabView("/app/shout", ShoutView);
-  registerTabView("/app/search", SearchView);
-  registerTabView("/app/settings", SettingsView);
-  registerTabView("/app/notifications", NotificationsView);
+  registerTabView("/app/articles", () => import("$lib/apps/views/ArticlesView.svelte"));
+  registerTabView("/app/shout", () => import("$lib/apps/views/ShoutView.svelte"));
+  registerTabView("/app/search", () => import("./SearchView.svelte"));
+  registerTabView("/app/settings", () => import("./SettingsView.svelte"));
+  registerTabView("/app/notifications", () => import("$lib/apps/views/NotificationsView.svelte"));
   // 应用市场（hiddenFromNav，通过设置页/桌面图标进入）
-  registerTabView("/app/store", AppStoreView);
+  registerTabView("/app/store", () => import("$lib/apps/views/AppStoreView.svelte"));
 
   // ===== 可安装应用（默认安装）=====
-  registerTabView("/app/github", GithubView);
-  registerTabView("/app/terminal", TerminalView);
+  registerTabView("/app/github", () => import("$lib/apps/views/GithubView.svelte"));
+  registerTabView("/app/terminal", () => import("./TerminalView.svelte"));
   // 文件管理应用入口
-  registerTabView("/app/files", FilesView);
+  registerTabView("/app/files", () => import("./FilesView.svelte"));
 
   // ===== 可选安装 =====
-  registerTabView("/app/writer", WriterView);
+  registerTabView("/app/writer", () => import("$lib/apps/views/WriterView.svelte"));
 
   // ===== 深链接 views（main 区非 tab 路径）=====
   // AreaOutlet 渲染深链接视图时统一传入 { pathname }（见 AreaOutlet.svelte）。
   // ArticleView 声明了 pathname props 并实际使用它；其余视图忽略该 prop。
-  // 受 Svelte Component 逆变特性限制，此处用 as Component 断言绕过类型不兼容
+  // 受 Svelte Component 逆变特性限制，此处用 asView 断言宽放
   // （运行时契约由 AreaOutlet 保证，所有深链接视图都会收到 pathname）。
-  registerDeepLinkView("/article", ArticleView as unknown as Component);
-  registerDeepLinkView("/tags", TagsView);
-  registerDeepLinkView("/app/account", AccountView);
+  registerDeepLinkView(
+    "/article",
+    asView(() => import("$lib/apps/views/ArticleDetailView.svelte")),
+  );
+  registerDeepLinkView("/tags", () => import("./TagsView.svelte"));
+  registerDeepLinkView("/app/account", () => import("$lib/apps/views/AccountView.svelte"));
   // 写作应用场景（编辑器、变更），入口 /app/writer 已注册为 tab view。
-  registerDeepLinkView("/app/editor", EditorView);
-  registerDeepLinkView("/app/changes", ChangesView);
+  registerDeepLinkView("/app/editor", () => import("./EditorView.svelte"));
+  registerDeepLinkView("/app/changes", () => import("./ChangesView.svelte"));
 
   // ===== pop views =====
-  registerPopView("/app/search", SearchView);
-  registerPopView("/app/notifications", NotificationsView);
+  registerPopView("/app/search", () => import("./SearchView.svelte"));
+  registerPopView("/app/notifications", () => import("$lib/apps/views/NotificationsView.svelte"));
 }
 
 // 模块加载时立即注册

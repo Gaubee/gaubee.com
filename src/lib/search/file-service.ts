@@ -5,17 +5,10 @@
  */
 import { base } from "$app/paths";
 import MiniSearch from "minisearch";
+
+import type { SearchIndexApplication, SearchIndexManifest } from "./index-format";
 import { miniSearchOptions, type SearchIndexDocument } from "./minisearch";
-import type {
-  SearchIndexApplication,
-  SearchIndexManifest,
-} from "./index-format";
-import type {
-  SearchBatch,
-  SearchResult,
-  SearchService,
-  SearchTask,
-} from "./types";
+import type { SearchBatch, SearchResult, SearchService, SearchTask } from "./types";
 
 interface FileSearchServiceOptions {
   appId: string;
@@ -23,10 +16,7 @@ interface FileSearchServiceOptions {
 }
 
 let manifestPromise: Promise<SearchIndexManifest> | null = null;
-const indexPromises = new Map<
-  string,
-  Promise<MiniSearch<SearchIndexDocument>>
->();
+const indexPromises = new Map<string, Promise<MiniSearch<SearchIndexDocument>>>();
 
 function searchAssetUrl(file: string): string {
   return `${base}/search-index/${file}`;
@@ -34,12 +24,10 @@ function searchAssetUrl(file: string): string {
 
 async function loadManifest(): Promise<SearchIndexManifest> {
   if (!manifestPromise) {
-    manifestPromise = fetch(searchAssetUrl("manifest.json")).then(
-      async (response) => {
-        if (!response.ok) throw new Error("搜索索引清单不可用");
-        return (await response.json()) as SearchIndexManifest;
-      },
-    );
+    manifestPromise = fetch(searchAssetUrl("manifest.json")).then(async (response) => {
+      if (!response.ok) throw new Error("搜索索引清单不可用");
+      return (await response.json()) as SearchIndexManifest;
+    });
   }
   return manifestPromise;
 }
@@ -53,10 +41,7 @@ function loadShard(file: string): Promise<MiniSearch<SearchIndexDocument>> {
         return response.text();
       })
       .then((serialized) =>
-        MiniSearch.loadJSONAsync<SearchIndexDocument>(
-          serialized,
-          miniSearchOptions,
-        ),
+        MiniSearch.loadJSONAsync<SearchIndexDocument>(serialized, miniSearchOptions),
       );
     indexPromises.set(file, indexPromise);
   }
@@ -67,9 +52,7 @@ function applicationIndex(
   manifest: SearchIndexManifest,
   appId: string,
 ): SearchIndexApplication | undefined {
-  return manifest.applications.find(
-    (application) => application.appId === appId,
-  );
+  return manifest.applications.find((application) => application.appId === appId);
 }
 
 function toSearchResult(
@@ -105,9 +88,7 @@ function toSearchResult(
 }
 
 /** 为拥有 VFS Markdown 的应用创建搜索服务闭包。 */
-export function createFileSearchService(
-  options: FileSearchServiceOptions,
-): SearchService {
+export function createFileSearchService(options: FileSearchServiceOptions): SearchService {
   return {
     appId: options.appId,
     appName: options.appName,
@@ -120,19 +101,14 @@ export function createFileSearchService(
         if (task.signal.aborted) return;
         const miniSearch = await loadShard(shard.file);
         if (task.signal.aborted) return;
-        const hits = miniSearch.search(
-          task.query.engineQuery ?? MiniSearch.wildcard,
-          {
-            prefix: true,
-            fuzzy: 0.2,
-          },
-        );
+        const hits = miniSearch.search(task.query.engineQuery ?? MiniSearch.wildcard, {
+          prefix: true,
+          fuzzy: 0.2,
+        });
         const results = hits
           .map((hit) => toSearchResult(options.appId, options.appName, hit))
           .filter((result): result is SearchResult => result !== null)
-          .sort(
-            (left, right) => right.date - left.date || right.score - left.score,
-          );
+          .sort((left, right) => right.date - left.date || right.score - left.score);
 
         yield {
           appId: options.appId,

@@ -7,9 +7,10 @@
  *   供写作发表等流程使用。
  */
 import GitHubMark from "$lib/components/icons/GitHubMark.svelte";
+
 import type { AppEntry } from "../../types";
-import { gitService } from "./service";
 import { gitCommands } from "./commands";
+import { gitService } from "./service";
 
 export const githubApp: AppEntry = {
   manifest: {

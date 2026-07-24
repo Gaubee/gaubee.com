@@ -1,12 +1,18 @@
 /**
- * View 注册表：把 TabId / pop 路由 / 深链接模式映射到对应的 Svelte 视图组件。
+ * View 注册表：把 TabId / pop 路由 / 深链接模式映射到对应的视图懒加载器。
  *
  * - tab view：main/bottom 区的 tab，常驻 DOM（CSS 切换显示，组件保活）。
+ *   组件首次加载是异步的（ViewLoader），AreaOutlet 维护已加载组件缓存以保留保活。
  * - pop view：模态弹层，按需挂载。
  * - deepLink view：main 区的非 tab 路径（如 /article/...、/tags/...），非常驻，
  *   activeTabId 为 null 时按路径匹配渲染。
+ *
+ * 正交意图：
+ * 1. ViewLoader 注册（按 TabId / pop route / deepLink pattern）。
+ * 2. 查询：getTabLoader / getPopLoader / getDeepLinkLoader / getAllTabLoaders。
+ * 3. 激活判定：activeTabIdForLocation（纯函数，不依赖加载状态）。
  */
-import type { Component } from "svelte";
+import type { ViewLoader } from "$lib/apps/types";
 import type { Area, HistoryLocation, TabId } from "$lib/nav/controller";
 
 /**
@@ -25,67 +31,58 @@ export interface DeepLinkViewProps {
   pathname: string;
 }
 
-export interface ViewEntry {
-  /** 匹配的 TabId（tab view）或 pop 路由前缀（pop view）。 */
-  id: string;
-  component: Component;
+/** tab view 注册表（按 TabId → 懒加载器）。 */
+const tabLoaders = new Map<TabId, ViewLoader>();
+
+/** pop view 注册表（按 POP_ROUTES 前缀 → 懒加载器）。 */
+const popLoaders = new Map<string, ViewLoader>();
+
+/** 深链接 view 注册表（按路径前缀 → 懒加载器，按注册顺序匹配）。 */
+const deepLinkLoaders: Array<{ pattern: string; loader: ViewLoader }> = [];
+
+export function registerTabView(tabId: TabId, loader: ViewLoader): void {
+  tabLoaders.set(tabId, loader);
 }
 
-/** tab view 注册表（按 TabId）。 */
-const tabViews = new Map<TabId, Component>();
-
-/** pop view 注册表（按 POP_ROUTES 前缀）。 */
-const popViews = new Map<string, Component>();
-
-/** 深链接 view 注册表（按路径前缀，按注册顺序匹配）。 */
-const deepLinkViews: Array<{ pattern: string; component: Component }> = [];
-
-export function registerTabView(tabId: TabId, component: Component): void {
-  tabViews.set(tabId, component);
-}
-
-export function registerPopView(route: string, component: Component): void {
-  popViews.set(route, component);
+export function registerPopView(route: string, loader: ViewLoader): void {
+  popLoaders.set(route, loader);
 }
 
 /** 注册深链接 view。pattern 是路径前缀（如 '/article'），匹配 pathname 以此开头。 */
-export function registerDeepLinkView(
-  pattern: string,
-  component: Component,
-): void {
-  deepLinkViews.push({ pattern, component });
+export function registerDeepLinkView(pattern: string, loader: ViewLoader): void {
+  deepLinkLoaders.push({ pattern, loader });
 }
 
-export function getTabView(tabId: TabId): Component | undefined {
-  return tabViews.get(tabId);
+export function getTabLoader(tabId: TabId): ViewLoader | undefined {
+  return tabLoaders.get(tabId);
 }
 
-export function getPopView(route: string): Component | undefined {
-  if (popViews.has(route)) return popViews.get(route);
-  for (const [prefix, component] of popViews) {
-    if (route.startsWith(prefix + "/") || route === prefix) return component;
+export function getPopLoader(route: string): ViewLoader | undefined {
+  if (popLoaders.has(route)) return popLoaders.get(route);
+  for (const [prefix, loader] of popLoaders) {
+    if (route.startsWith(prefix + "/") || route === prefix) return loader;
   }
   return undefined;
 }
 
-/** 按路径查找深链接 view（第一个匹配的 pattern）。 */
-export function getDeepLinkView(pathname: string): Component | undefined {
-  for (const { pattern, component } of deepLinkViews) {
+/** 按路径查找深链接 loader（第一个匹配的 pattern）。 */
+export function getDeepLinkLoader(pathname: string): ViewLoader | undefined {
+  for (const { pattern, loader } of deepLinkLoaders) {
     if (pathname === pattern || pathname.startsWith(pattern + "/")) {
-      return component;
+      return loader;
     }
   }
   return undefined;
 }
 
-/** 所有已注册的 tab view（供 area-outlet 常驻渲染）。 */
-export function getAllTabViews(): ReadonlyArray<{
+/** 所有已注册的 tab view loader（供 AreaOutlet 按需加载 + 缓存保活）。 */
+export function getAllTabLoaders(): ReadonlyArray<{
   tabId: TabId;
-  component: Component;
+  loader: ViewLoader;
 }> {
-  return Array.from(tabViews.entries()).map(([tabId, component]) => ({
+  return Array.from(tabLoaders.entries()).map(([tabId, loader]) => ({
     tabId,
-    component,
+    loader,
   }));
 }
 

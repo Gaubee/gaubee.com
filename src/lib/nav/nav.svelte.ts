@@ -1,3 +1,4 @@
+import type { NavState } from "./controller";
 /**
  * Svelte 5 runes adapter：把 NavController 的 subscribe/getSnapshot 桥接到 $state。
  *
@@ -13,7 +14,6 @@
  * Svelte 模板会自动重渲染。
  */
 import { navController } from "./nav-controller-instance";
-import type { NavState } from "./controller";
 
 class NavStore {
   /** 当前导航状态快照（reactive）。每次 NavController 变更都会替换为新引用。 */

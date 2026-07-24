@@ -1,3 +1,6 @@
+import { IDBFactory } from "fake-indexeddb";
+// fake-indexeddb/auto 自动注册所有 IndexedDB 全局符号到 globalThis
+import "fake-indexeddb/auto";
 /**
  * VFS 核心单元测试。
  *
@@ -5,10 +8,6 @@
  * 覆盖：读写删除、dirty 追踪、三层读取、readdir、commit。
  */
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-
-// fake-indexeddb/auto 自动注册所有 IndexedDB 全局符号到 globalThis
-import "fake-indexeddb/auto";
-import { IDBFactory } from "fake-indexeddb";
 
 // mock GitHub client（VFS 依赖 fetchGithub → fetch，这里全替换）
 const mockGetFileText = vi.fn<(p: string) => Promise<string>>();
@@ -161,9 +160,7 @@ describe("VFS readdir", () => {
   it("过滤掉删除的文件", async () => {
     await vfs.unlink("src/content/articles/0001.a.md");
     const all = await vfs.readdir("");
-    expect(
-      all.find((n) => n.path === "src/content/articles/0001.a.md"),
-    ).toBeUndefined();
+    expect(all.find((n) => n.path === "src/content/articles/0001.a.md")).toBeUndefined();
   });
 });
 

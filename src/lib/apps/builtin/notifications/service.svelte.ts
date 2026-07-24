@@ -1,3 +1,4 @@
+import { browser } from "$app/environment";
 /**
  * NotificationService：通知能力接口（GaubeeOS 应用服务总线的一部分）。
  *
@@ -11,7 +12,6 @@
  */
 import type { AppService } from "$lib/os/services";
 import { gaubeeos } from "$lib/os/services";
-import { browser } from "$app/environment";
 import { toast } from "svelte-sonner";
 
 /** 通知严重级别。 */
@@ -121,29 +121,17 @@ class NotificationServiceImpl implements NotificationService {
   private showToast(record: NotificationRecord): void {
     switch (record.severity) {
       case "success":
-        toast.success(
-          record.title,
-          record.message ? { description: record.message } : undefined,
-        );
+        toast.success(record.title, record.message ? { description: record.message } : undefined);
         break;
       case "error":
-        toast.error(
-          record.title,
-          record.message ? { description: record.message } : undefined,
-        );
+        toast.error(record.title, record.message ? { description: record.message } : undefined);
         break;
       case "warning":
-        toast.warning(
-          record.title,
-          record.message ? { description: record.message } : undefined,
-        );
+        toast.warning(record.title, record.message ? { description: record.message } : undefined);
         break;
       case "info":
       default:
-        toast.info(
-          record.title,
-          record.message ? { description: record.message } : undefined,
-        );
+        toast.info(record.title, record.message ? { description: record.message } : undefined);
         break;
     }
   }
@@ -178,52 +166,35 @@ class NotificationServiceImpl implements NotificationService {
 }
 
 /** 通知服务单例。 */
-export const notificationService: NotificationService =
-  new NotificationServiceImpl();
+export const notificationService: NotificationService = new NotificationServiceImpl();
 
 // ---------------------------------------------------------------------------
 // 便捷函数：消费方优先用这些，自动经 service（不可用时降级到直接 toast）
 // ---------------------------------------------------------------------------
 
 /** 推送成功通知。action 可选：提供后通知卡片可点击跳转。 */
-export function notifySuccess(
-  title: string,
-  message?: string,
-  action?: NotificationAction,
-): void {
+export function notifySuccess(title: string, message?: string, action?: NotificationAction): void {
   const svc = gaubeeos.getAppService("notification");
   if (svc) svc.push({ title, message, severity: "success", action });
   else toast.success(title, message ? { description: message } : undefined);
 }
 
 /** 推送错误通知。action 可选：提供后通知卡片可点击跳转。 */
-export function notifyError(
-  title: string,
-  message?: string,
-  action?: NotificationAction,
-): void {
+export function notifyError(title: string, message?: string, action?: NotificationAction): void {
   const svc = gaubeeos.getAppService("notification");
   if (svc) svc.push({ title, message, severity: "error", action });
   else toast.error(title, message ? { description: message } : undefined);
 }
 
 /** 推送信息通知。action 可选：提供后通知卡片可点击跳转。 */
-export function notifyInfo(
-  title: string,
-  message?: string,
-  action?: NotificationAction,
-): void {
+export function notifyInfo(title: string, message?: string, action?: NotificationAction): void {
   const svc = gaubeeos.getAppService("notification");
   if (svc) svc.push({ title, message, severity: "info", action });
   else toast.info(title, message ? { description: message } : undefined);
 }
 
 /** 推送警告通知。action 可选：提供后通知卡片可点击跳转。 */
-export function notifyWarning(
-  title: string,
-  message?: string,
-  action?: NotificationAction,
-): void {
+export function notifyWarning(title: string, message?: string, action?: NotificationAction): void {
   const svc = gaubeeos.getAppService("notification");
   if (svc) svc.push({ title, message, severity: "warning", action });
   else toast.warning(title, message ? { description: message } : undefined);

@@ -5,6 +5,7 @@
  * 注意：reducer 测试是纯函数；URL 序列化测试用 vi.stubGlobal 模拟 window。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   ALL_TABS,
   DEFAULT_BOTTOM_TABS,
@@ -214,9 +215,7 @@ describe("reduceKernel: FOCUS_APP", () => {
       action: "PUSH",
       location: makeLocation("/article/0001"),
     });
-    expect(navigated.nextState.appScenes["/app/articles"].pathname).toBe(
-      "/article/0001",
-    );
+    expect(navigated.nextState.appScenes["/app/articles"].pathname).toBe("/article/0001");
     // 切到 settings（聚焦切换）
     const focused = reduceKernel(navigated.nextState, {
       type: "FOCUS_APP",
@@ -290,20 +289,13 @@ describe("reduceKernel: MOVE_TAB", () => {
 describe("reduceKernel: REORDER", () => {
   it("重排 main tabs", () => {
     const state = makeInitialState();
-    const newOrder: TabId[] = [
-      "/app/shout",
-      "/app/articles",
-      ...state.mainTabs.slice(2),
-    ];
+    const newOrder: TabId[] = ["/app/shout", "/app/articles", ...state.mainTabs.slice(2)];
     const result = reduceKernel(state, {
       type: "REORDER",
       area: "main",
       tabIds: newOrder,
     });
-    expect(result.nextState.mainTabs.slice(0, 2)).toEqual([
-      "/app/shout",
-      "/app/articles",
-    ]);
+    expect(result.nextState.mainTabs.slice(0, 2)).toEqual(["/app/shout", "/app/articles"]);
     expect(result.persist).toBe("local");
   });
 
@@ -609,9 +601,7 @@ describe("默认布局不变量", () => {
   // mergeLayout 只去重 + 互斥，不补全。
 
   it("main 与 bottom 默认不重叠", () => {
-    const intersection = DEFAULT_MAIN_TABS.filter((t) =>
-      DEFAULT_BOTTOM_TABS.includes(t),
-    );
+    const intersection = DEFAULT_MAIN_TABS.filter((t) => DEFAULT_BOTTOM_TABS.includes(t));
     expect(intersection).toEqual([]);
   });
 

@@ -4,6 +4,7 @@
  * 覆盖：register/unregister/has/all 的 order 排序稳定性。
  */
 import { beforeEach, describe, expect, it } from "vitest";
+
 import { settingsSectionsRegistry } from "./settings-sections";
 
 describe("SettingsSectionRegistry", () => {

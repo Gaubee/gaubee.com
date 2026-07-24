@@ -9,8 +9,7 @@ import { browser } from "$app/environment";
 
 /** Worker 基础 URL。开发时本地 wrangler dev，生产环境变量配置。 */
 export const AUTH_BASE =
-  (import.meta.env.VITE_AUTH_BASE as string | undefined) ??
-  "http://localhost:8787";
+  (import.meta.env.VITE_AUTH_BASE as string | undefined) ?? "http://localhost:8787";
 
 export interface GithubUser {
   login: string;
@@ -121,10 +120,7 @@ if (browser) {
  * - POST/PUT/PATCH/DELETE：必须有 token（未登录返回 401）
  * - 路径限定 repos/gaubee/gaubee.com/（防 SSRF）
  */
-export async function fetchGithub(
-  path: string,
-  init?: RequestInit,
-): Promise<Response> {
+export async function fetchGithub(path: string, init?: RequestInit): Promise<Response> {
   const cleanPath = path.startsWith("/") ? path.slice(1) : path;
   return fetch(`${AUTH_BASE}/api/proxy/${cleanPath}`, {
     ...init,

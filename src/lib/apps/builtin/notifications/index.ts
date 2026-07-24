@@ -10,6 +10,7 @@
  * 或用便捷函数 notifySuccess/notifyError/notifyInfo/notifyWarning。
  */
 import Bell from "@lucide/svelte/icons/bell";
+
 import type { AppEntry } from "../../types";
 import { notificationService } from "./service.svelte";
 

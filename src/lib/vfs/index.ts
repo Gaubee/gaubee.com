@@ -9,8 +9,8 @@
  * 写入操作：仅作用于可写层（IndexedDB）。
  */
 
-import { vfs, type VfsNode } from "./vfs";
 import { readonlyVfs, type ReadonlyNode } from "./readonly";
+import { vfs, type VfsNode } from "./vfs";
 
 // ---------------------------------------------------------------------------
 // 类型定义
@@ -82,7 +82,7 @@ export class UnifiedVfs {
    */
   async readFile(path: string): Promise<string> {
     const p = normalizePath(path);
-    
+
     // 1. 先查可写层（本地修改优先）
     try {
       const writableContent = await this.writable.readFile(p);
@@ -90,11 +90,11 @@ export class UnifiedVfs {
     } catch {
       // 可写层无此文件，继续
     }
-    
+
     // 2. 再查只读层（构建时静态数据）
     const readonlyContent = this.readonly.readFile(p);
     if (readonlyContent !== null) return readonlyContent;
-    
+
     // 3. 最后在线拉取（GitHub API）
     return this.writable.readFile(p);
   }
@@ -102,45 +102,45 @@ export class UnifiedVfs {
   /** 列出某前缀下的所有文件（合并只读层 + 可写层）。 */
   async readdir(prefix = "", opts: { recursive?: boolean } = {}): Promise<UnifiedNode[]> {
     const p = normalizePath(prefix);
-    
+
     // 并行读取两层
     const [writableNodes, readonlyNodes] = await Promise.all([
       this.writable.readdir(p, opts),
       Promise.resolve().then(() => this.readonly.readdir(p, opts)),
     ]);
-    
+
     // 建立 path -> node 的映射（可写层优先）
     const map = new Map<string, UnifiedNode>();
-    
+
     // 先放只读层
     for (const node of readonlyNodes) {
       map.set(node.path, toUnifiedNode(node, "readonly"));
     }
-    
+
     // 再用可写层覆盖（本地修改优先）
     for (const node of writableNodes) {
       map.set(node.path, toUnifiedNode(node, node.origin === "local" ? "writable" : "remote"));
     }
-    
+
     return Array.from(map.values()).sort((a, b) => a.path.localeCompare(b.path));
   }
 
   /** 获取文件元数据（不触发拉取）。 */
   async stat(path: string): Promise<UnifiedNode | null> {
     const p = normalizePath(path);
-    
+
     // 先查可写层
     const writableNode = await this.writable.stat(p);
     if (writableNode) {
       return toUnifiedNode(writableNode, writableNode.origin === "local" ? "writable" : "remote");
     }
-    
+
     // 再查只读层
     const readonlyNode = this.readonly.stat(p);
     if (readonlyNode) {
       return toUnifiedNode(readonlyNode, "readonly");
     }
-    
+
     return null;
   }
 

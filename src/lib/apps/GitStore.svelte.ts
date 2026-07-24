@@ -120,20 +120,13 @@ class MemFS {
       Promise.resolve(this.writeFileSync(path, data)),
     mkdir: (path: string, opts?: { recursive?: boolean }): Promise<void> =>
       Promise.resolve(this.mkdirSync(path, opts)),
-    readdir: (path: string): Promise<string[]> =>
-      Promise.resolve(this.readdirSync(path)),
-    stat: (
-      path: string,
-    ): Promise<{ isDirectory: () => boolean; size: number }> =>
+    readdir: (path: string): Promise<string[]> => Promise.resolve(this.readdirSync(path)),
+    stat: (path: string): Promise<{ isDirectory: () => boolean; size: number }> =>
       Promise.resolve(this.statSync(path)),
-    lstat: (
-      path: string,
-    ): Promise<{ isDirectory: () => boolean; size: number }> =>
+    lstat: (path: string): Promise<{ isDirectory: () => boolean; size: number }> =>
       Promise.resolve(this.lstatSync(path)),
-    unlink: (path: string): Promise<void> =>
-      Promise.resolve(this.unlinkSync(path)),
-    rmdir: (path: string): Promise<void> =>
-      Promise.resolve(this.rmdirSync(path)),
+    unlink: (path: string): Promise<void> => Promise.resolve(this.unlinkSync(path)),
+    rmdir: (path: string): Promise<void> => Promise.resolve(this.rmdirSync(path)),
   };
 }
 

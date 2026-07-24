@@ -420,10 +420,7 @@
       btnTarget0.disabled = isPaused;
 
       // 更新按钮的 .active 类
-      btnTarget200.classList.toggle(
-        "active",
-        block.classList.contains("target-200"),
-      );
+      btnTarget200.classList.toggle("active", block.classList.contains("target-200"));
       btnTarget0.classList.toggle(
         "active",
         block.classList.contains("target-0") ||
@@ -431,14 +428,8 @@
             !block.classList.contains("target-0") &&
             block.style.translate === ""),
       ); // 如果显式设置或处于默认状态，则为活动状态
-      btnDuration.classList.toggle(
-        "active",
-        block.classList.contains("slow-duration"),
-      );
-      btnTiming.classList.toggle(
-        "active",
-        block.classList.contains("ease-timing"),
-      );
+      btnDuration.classList.toggle("active", block.classList.contains("slow-duration"));
+      btnTiming.classList.toggle("active", block.classList.contains("ease-timing"));
       btnPause.classList.toggle("active", isPaused); // 确保暂停按钮反映状态
 
       // 初始更新或在没有突变时调用

@@ -66,9 +66,9 @@ describe("gaubeeos 总线", () => {
     });
 
     it("service 未声明 → 抛 AppServiceNotInstalled", async () => {
-      await expect(
-        gaubeeos.requestAppService("nope" as "account"),
-      ).rejects.toThrow(AppServiceNotInstalled);
+      await expect(gaubeeos.requestAppService("nope" as "account")).rejects.toThrow(
+        AppServiceNotInstalled,
+      );
     });
 
     it("应用未安装 → 抛 AppServiceNotInstalled", async () => {
@@ -76,9 +76,7 @@ describe("gaubeeos 总线", () => {
         git: () => ({ id: "git", appId: "github" }),
       });
       mockAppManager.isInstalled.mockReturnValue(false);
-      await expect(gaubeeos.requestAppService("git")).rejects.toThrow(
-        AppServiceNotInstalled,
-      );
+      await expect(gaubeeos.requestAppService("git")).rejects.toThrow(AppServiceNotInstalled);
     });
   });
 });

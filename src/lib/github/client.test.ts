@@ -9,8 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 // mock fetchGithub（client.ts 的唯一外部网络依赖）
 const mockFetchGithub = vi.fn();
 vi.mock("$lib/auth/session.svelte", () => ({
-  fetchGithub: (path: string, init?: RequestInit) =>
-    mockFetchGithub(path, init),
+  fetchGithub: (path: string, init?: RequestInit) => mockFetchGithub(path, init),
 }));
 
 // mock $app/environment（os/services 间接依赖）
@@ -33,9 +32,7 @@ function makeResp(ok: boolean, status: number, body: unknown = {}): Response {
 describe("client assertOk — 401/403 映射", () => {
   it("getFileText 401 → NotAuthenticatedError", async () => {
     mockFetchGithub.mockResolvedValueOnce(makeResp(false, 401));
-    await expect(getFileText("src/content/articles/x.md")).rejects.toThrow(
-      NotAuthenticatedError,
-    );
+    await expect(getFileText("src/content/articles/x.md")).rejects.toThrow(NotAuthenticatedError);
   });
 
   it("getFileText 403 rate limit → 普通 Error（非鉴权，不引导登录）", async () => {
@@ -49,9 +46,7 @@ describe("client assertOk — 401/403 映射", () => {
 
   it("getFileText 403 权限不足 → NotAuthenticatedError", async () => {
     mockFetchGithub.mockResolvedValueOnce(makeResp(false, 403, "forbidden"));
-    await expect(getFileText("src/content/articles/x.md")).rejects.toThrow(
-      NotAuthenticatedError,
-    );
+    await expect(getFileText("src/content/articles/x.md")).rejects.toThrow(NotAuthenticatedError);
   });
 
   it("getFileText 500 → 普通 Error（非 NotAuthenticatedError）", async () => {
@@ -82,9 +77,9 @@ describe("commitChanges — 401 映射", () => {
   it("获取 ref 阶段 401 → NotAuthenticatedError", async () => {
     // commitChanges 第一步获取 ref，401 即抛
     mockFetchGithub.mockResolvedValueOnce(makeResp(false, 401));
-    await expect(
-      commitChanges("msg", [{ path: "a.md", content: "x" }]),
-    ).rejects.toThrow(NotAuthenticatedError);
+    await expect(commitChanges("msg", [{ path: "a.md", content: "x" }])).rejects.toThrow(
+      NotAuthenticatedError,
+    );
   });
 
   it("更新 ref 阶段 401 → NotAuthenticatedError（前几步成功）", async () => {
@@ -95,8 +90,8 @@ describe("commitChanges — 401 映射", () => {
       .mockResolvedValueOnce(makeResp(true, 200, { sha: "newtreesha" }))
       .mockResolvedValueOnce(makeResp(true, 200, { sha: "newcommitsha" }))
       .mockResolvedValueOnce(makeResp(false, 401)); // updateRef 401
-    await expect(
-      commitChanges("msg", [{ path: "a.md", content: "x" }]),
-    ).rejects.toThrow(NotAuthenticatedError);
+    await expect(commitChanges("msg", [{ path: "a.md", content: "x" }])).rejects.toThrow(
+      NotAuthenticatedError,
+    );
   });
 });

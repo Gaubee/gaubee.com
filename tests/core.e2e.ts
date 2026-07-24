@@ -44,9 +44,7 @@ test.describe("桌面端核心流程", () => {
       .getByRole("tab", { name: /搜索/ })
       .getByRole("button", { name: "搜索", exact: true })
       .click();
-    await expect(
-      page.getByRole("searchbox", { name: "搜索内容" }),
-    ).toBeVisible();
+    await expect(page.getByRole("searchbox", { name: "搜索内容" })).toBeVisible();
     expect(page.url()).toContain("/app/search");
   });
 
@@ -89,16 +87,12 @@ test.describe("桌面端核心流程", () => {
     await page.goto("/app/articles");
     await page.waitForLoadState("networkidle");
 
-    const htmlClassBefore = await page.evaluate(
-      () => document.documentElement.className,
-    );
+    const htmlClassBefore = await page.evaluate(() => document.documentElement.className);
     const toggle = page.getByRole("button", { name: /切换到/ });
     if (await toggle.isVisible().catch(() => false)) {
       await toggle.click();
       await page.waitForTimeout(500);
-      const htmlClassAfter = await page.evaluate(
-        () => document.documentElement.className,
-      );
+      const htmlClassAfter = await page.evaluate(() => document.documentElement.className);
       expect(htmlClassAfter).not.toBe(htmlClassBefore);
     }
   });

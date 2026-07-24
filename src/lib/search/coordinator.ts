@@ -4,13 +4,7 @@
  * 2. 将服务的 AsyncIterable 合并为一个可消费的进度流。
  */
 import { searchServiceRegistry } from "./registry";
-import type {
-  SearchBatch,
-  SearchProgress,
-  SearchQuery,
-  SearchService,
-  SearchTask,
-} from "./types";
+import type { SearchBatch, SearchProgress, SearchQuery, SearchService, SearchTask } from "./types";
 
 interface PendingNext {
   service: SearchService;
@@ -26,10 +20,7 @@ type NextOutcome =
     }
   | { type: "error"; service: SearchService; error: unknown };
 
-function readNext(
-  service: SearchService,
-  iterator: AsyncIterator<SearchBatch>,
-): PendingNext {
+function readNext(service: SearchService, iterator: AsyncIterator<SearchBatch>): PendingNext {
   return {
     service,
     iterator,
@@ -48,20 +39,14 @@ export async function* searchRegisteredServices(
   const services = searchServiceRegistry.servicesFor(query);
   const iterators = services.map((service) => ({
     service,
-    iterator: service
-      .search({ query, signal } satisfies SearchTask)
-      [Symbol.asyncIterator](),
+    iterator: service.search({ query, signal } satisfies SearchTask)[Symbol.asyncIterator](),
   }));
 
-  const pending = iterators.map(({ service, iterator }) =>
-    readNext(service, iterator),
-  );
+  const pending = iterators.map(({ service, iterator }) => readNext(service, iterator));
 
   while (pending.length > 0 && !signal.aborted) {
     const settled = await Promise.race(pending.map((entry) => entry.next));
-    const index = pending.findIndex(
-      (entry) => entry.service === settled.service,
-    );
+    const index = pending.findIndex((entry) => entry.service === settled.service);
     if (index === -1) continue;
     const [entry] = pending.splice(index, 1);
 
@@ -69,10 +54,7 @@ export async function* searchRegisteredServices(
       yield {
         type: "service-error",
         appId: entry.service.appId,
-        message:
-          settled.error instanceof Error
-            ? settled.error.message
-            : "搜索服务失败",
+        message: settled.error instanceof Error ? settled.error.message : "搜索服务失败",
       };
       continue;
     }

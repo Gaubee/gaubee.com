@@ -3,12 +3,8 @@
  * 覆盖：解析标准 frontmatter、序列化往返、id 解析、passthrough 透传。
  */
 import { describe, expect, it } from "vitest";
-import {
-  inferCollection,
-  parseArticleId,
-  parseMarkdown,
-  serializeMarkdown,
-} from "./frontmatter";
+
+import { inferCollection, parseArticleId, parseMarkdown, serializeMarkdown } from "./frontmatter";
 
 describe("parseMarkdown", () => {
   it("解析标准 frontmatter + body", () => {

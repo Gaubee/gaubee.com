@@ -23,8 +23,7 @@ export interface AppService {
  * manifest 声明的 service 工厂：应用按需启动时调用，返回 service 实例。
  * 工厂语义保证「懒构造」——只有真正被请求时才实例化 service。
  */
-export type AppServiceFactory<T extends AppService = AppService> = () =>
-  T | Promise<T>;
+export type AppServiceFactory<T extends AppService = AppService> = () => T | Promise<T>;
 
 /**
  * manifest.services 的声明项：service id → 工厂闭包。

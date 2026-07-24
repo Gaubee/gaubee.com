@@ -2,6 +2,7 @@
  * path-utils 单元测试：pathToTabIdSafe 路径匹配。
  */
 import { describe, expect, it } from "vitest";
+
 import { pathToTabIdSafe } from "./path-utils";
 
 describe("pathToTabIdSafe", () => {

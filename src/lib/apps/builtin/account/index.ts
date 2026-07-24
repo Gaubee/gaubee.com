@@ -1,3 +1,5 @@
+import LogInIcon from "@lucide/svelte/icons/log-in";
+import LogOutIcon from "@lucide/svelte/icons/log-out";
 /**
  * 账户应用（系统内置，不可卸载）。
  *
@@ -10,8 +12,7 @@
  * appServiceRegistry；其它应用经 gaubeeos.getAppService('account') 获取。
  */
 import User from "@lucide/svelte/icons/user";
-import LogOutIcon from "@lucide/svelte/icons/log-out";
-import LogInIcon from "@lucide/svelte/icons/log-in";
+
 import type { AppEntry } from "../../types";
 import { accountService } from "./service";
 
@@ -73,7 +74,6 @@ export const accountApp: AppEntry = {
       },
     ],
     description: "账户登录与会话管理",
-    longDescription:
-      "通过 GitHub OAuth 登录，管理账户会话。登录后可编辑内容并提交到 GitHub。",
+    longDescription: "通过 GitHub OAuth 登录，管理账户会话。登录后可编辑内容并提交到 GitHub。",
   },
 };

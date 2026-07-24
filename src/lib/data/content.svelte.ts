@@ -12,6 +12,7 @@
  */
 import { browser } from "$app/environment";
 import { vfsStore } from "$lib/vfs/vfs.svelte";
+
 import {
   parseArticleId,
   parseMarkdown,
@@ -158,9 +159,7 @@ class ContentStore {
 
   /** 根据 collection + stem 查找单篇。 */
   findPost(collection: Collection, stem: string): Post | undefined {
-    return this.state.posts.find(
-      (p) => p.collection === collection && p.id.stem === stem,
-    );
+    return this.state.posts.find((p) => p.collection === collection && p.id.stem === stem);
   }
 }
 

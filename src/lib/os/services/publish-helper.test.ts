@@ -15,8 +15,7 @@ vi.mock("$lib/apps/builtin/notifications/service.svelte", () => ({
 }));
 
 const { handlePublishError } = await import("./publish-helper");
-const { NotAuthenticatedError, AppServiceNotInstalled, NoChangesError } =
-  await import("./bus");
+const { NotAuthenticatedError, AppServiceNotInstalled, NoChangesError } = await import("./bus");
 
 /** 构造 fake nav。 */
 function makeNav() {
@@ -29,10 +28,7 @@ describe("handlePublishError", () => {
     const result = handlePublishError(new NotAuthenticatedError(), nav);
     expect(result).toBe(true);
     expect(nav.navigateMain).toHaveBeenCalledWith("/app/account");
-    expect(mockNotifyError).toHaveBeenCalledWith(
-      "请先登录账户",
-      "即将跳转到账户页面",
-    );
+    expect(mockNotifyError).toHaveBeenCalledWith("请先登录账户", "即将跳转到账户页面");
   });
 
   it("AppServiceNotInstalled → 跳 /app/settings + notifyError", () => {
@@ -48,10 +44,7 @@ describe("handlePublishError", () => {
     const result = handlePublishError(new NoChangesError(), nav);
     expect(result).toBe(true);
     expect(nav.navigateMain).not.toHaveBeenCalled();
-    expect(mockNotifyInfo).toHaveBeenCalledWith(
-      "没有待发表的变更",
-      "内容已是最新，无需重复发表",
-    );
+    expect(mockNotifyInfo).toHaveBeenCalledWith("没有待发表的变更", "内容已是最新，无需重复发表");
   });
 
   it("普通 Error → notifyError（通用失败）", () => {

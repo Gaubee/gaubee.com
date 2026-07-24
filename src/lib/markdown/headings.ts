@@ -4,11 +4,7 @@
  * 2. 以与 Markdown 渲染器完全相同的 GFM 规则产出标题 ID。
  */
 import { marked } from "marked";
-import {
-  getHeadingList,
-  gfmHeadingId,
-  type HeadingData,
-} from "marked-gfm-heading-id";
+import { getHeadingList, gfmHeadingId, type HeadingData } from "marked-gfm-heading-id";
 
 let headingIdsConfigured = false;
 

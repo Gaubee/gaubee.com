@@ -10,6 +10,7 @@
  * 写作应用专注内容创作与发表。
  */
 import FileText from "@lucide/svelte/icons/file-text";
+
 import type { AppEntry } from "../types";
 
 export const writerApp: AppEntry = {
