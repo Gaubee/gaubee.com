@@ -69,14 +69,15 @@
     {/if}
   </div>
 
-  <!-- main 区任务栏：打开 + 固定的应用（默认空） -->
-  <div class="flex-1 overflow-y-auto">
+  <!-- main 区任务栏：打开 + 固定的应用（默认空）。
+       flex-1 撑满剩余高度，让拖拽落区覆盖整个 main 区（拖入更宽松）。 -->
+  <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
     {#if !collapsed && navState.mainTabs.length === 0}
       <div class="text-muted-foreground px-2 py-4 text-center text-xs">
         打开应用后会出现在这里
       </div>
     {/if}
-    <AreaNav area="main" {collapsed} />
+    <AreaNav area="main" {collapsed} class="flex-1" />
   </div>
 
   <!-- bottom 区任务栏 -->

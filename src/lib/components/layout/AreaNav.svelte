@@ -18,9 +18,11 @@
   let {
     area,
     collapsed = false,
+    class: className = '',
   }: {
     area: 'main' | 'bottom'
     collapsed?: boolean
+    class?: string
   } = $props()
 
   const navState = $derived(navStore.current)
@@ -154,7 +156,7 @@
 </script>
 
 <ul
-  class="min-h-8 flex flex-col gap-0.5 {dragOverArea ? 'bg-accent/40 rounded-md' : ''}"
+  class="min-h-8 flex flex-col gap-0.5 {dragOverArea ? 'bg-accent/40 rounded-md' : ''} {className}"
   role="tablist"
   ondragover={handleAreaDragOver}
   ondragleave={handleAreaDragLeave}
