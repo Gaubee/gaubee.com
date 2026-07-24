@@ -19,7 +19,7 @@
   import { Input } from '$lib/components/ui/input'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import * as Card from '$lib/components/ui/card'
-  import GitBranchIcon from '@lucide/svelte/icons/git-branch'
+  import GitHubMark from '$lib/components/icons/GitHubMark.svelte'
   import GitCommitIcon from '@lucide/svelte/icons/git-commit'
   import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw'
   import LogInIcon from '@lucide/svelte/icons/log-in'
@@ -93,7 +93,7 @@
   <Card.Root class="mb-4">
     <Card.Header>
       <Card.Title class="flex items-center gap-2">
-        <GitBranchIcon class="size-4" />
+        <GitHubMark class="size-4" />
         绑定仓库
       </Card.Title>
     </Card.Header>

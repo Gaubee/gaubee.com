@@ -6,7 +6,7 @@
  * - 通过 GitService 向其它应用提供仓库操作能力（读取/暂存/提交），
  *   供写作发表等流程使用。
  */
-import GitBranch from "@lucide/svelte/icons/git-branch";
+import GitHubMark from "$lib/components/icons/GitHubMark.svelte";
 import type { AppEntry } from "../../types";
 import { gitService } from "./service";
 import { gitCommands } from "./commands";
@@ -15,7 +15,7 @@ export const githubApp: AppEntry = {
   manifest: {
     id: "github",
     name: "Github",
-    icon: GitBranch,
+    icon: GitHubMark,
     category: "default",
     defaultArea: "bottom",
     activities: [
