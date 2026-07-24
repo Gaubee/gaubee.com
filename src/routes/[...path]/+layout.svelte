@@ -76,7 +76,7 @@
 </script>
 
 <svelte:head>
-  <title>Gaubee 编辑器</title>
+  <title>GaubeeOS</title>
 </svelte:head>
 
 <!-- @container/app：容器查询上下文 -->
