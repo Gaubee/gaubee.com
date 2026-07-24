@@ -16,14 +16,14 @@
   import { navStore } from '$lib/nav/nav.svelte'
   import { widgetRegistry } from '$lib/apps/widget/registry'
   import { routeDomainRegistry } from '$lib/apps/route-domain'
+  import { desktopLayout } from '$lib/apps/desktop-layout.svelte'
   import { motionFade } from '$lib/utils/motion'
   import { flip } from 'svelte/animate'
 
   const navState = $derived(navStore.current)
-  // 桌面图标网格（启动器）：所有已安装应用，排除 desktop（避免自引用）。
-  // 含 hiddenFromNav 的应用（search/notifications/account）——它们在桌面作为快捷入口。
+  // 桌面图标网格：由 desktopLayout 决定显示哪些应用及顺序（用户可管理）。
   const launcherApps = $derived(
-    appManager.allInstalled.filter((app) => app.id !== 'desktop'),
+    desktopLayout.visibleApps(appManager.allInstalled),
   )
   const widgets = $derived(widgetRegistry.all())
 
@@ -48,6 +48,12 @@
       navController.openApp(route)
     }
   }
+
+  // 初始化桌面布局（首次访问按默认规则，否则从 localStorage 恢复 + id 清洗）。
+  // init 内部有 initialized 守卫，重复调用安全。
+  $effect(() => {
+    desktopLayout.init(appManager.allInstalled)
+  })
 </script>
 
 <div class="desktop-scroll-area scrollbar-thin scrollbar-track-transparent scrollbar-thumb-[color-mix(in_srgb,currentColor,transparent)]">

@@ -19,6 +19,7 @@ import ShoutView from "$lib/apps/views/ShoutView.svelte";
 import WriterView from "$lib/apps/views/WriterView.svelte";
 import GithubView from "$lib/apps/views/GithubView.svelte";
 import NotificationsView from "$lib/apps/views/NotificationsView.svelte";
+import AppStoreView from "$lib/apps/views/AppStoreView.svelte";
 import {
   registerDeepLinkView,
   registerPopView,
@@ -39,6 +40,8 @@ export function ensureViewsRegistered(): void {
   registerTabView("/app/search", SearchView);
   registerTabView("/app/settings", SettingsView);
   registerTabView("/app/notifications", NotificationsView);
+  // 应用市场（hiddenFromNav，通过设置页/桌面图标进入）
+  registerTabView("/app/store", AppStoreView);
 
   // ===== 可安装应用（默认安装）=====
   registerTabView("/app/github", GithubView);

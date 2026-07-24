@@ -5,6 +5,7 @@
  * - system（苹果菜单）：LOGO 触发，聚合系统级入口（设置/主题/登录/退出）。通常由 SettingsApp/AccountApp 注册。
  * - app（应用主菜单）：当前激活应用名触发，含标准项（最小化/退出）+ 应用自注册菜单（如 File/Edit/View）。
  * - tray（右上角）：常驻快捷入口（搜索/通知），图标按钮触发。
+ * - desktop（桌面菜单）：桌面态触发，仅桌面应用注册（如"管理桌面"）。
  *
  * 声明式扩展点：AppManifest.appMenus → AppManager 投影到 appMenuRegistry → SystemStatusBar 渲染。
  * 谁提供能力谁注册菜单，状态栏不反向依赖具体业务应用（与 settingsSections/widgets 同范式）。
@@ -12,7 +13,7 @@
 import type { Component } from "svelte";
 
 /** 菜单位置。 */
-export type MenuPlacement = "system" | "app" | "tray";
+export type MenuPlacement = "system" | "app" | "tray" | "desktop";
 
 /** 菜单项（下拉项）。 */
 export interface AppMenuItem {

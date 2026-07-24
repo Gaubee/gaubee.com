@@ -53,6 +53,7 @@ export const SYSTEM_APP_IDS = [
   "settings",
   "notifications",
   "account",
+  "app-store",
 ] as const;
 
 /** 默认安装的应用 ID（可卸载）。 */

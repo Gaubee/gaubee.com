@@ -40,6 +40,7 @@
   const systemMenus = $derived(appMenuRegistry.forPlacement('system'))
   const appMenus = $derived(appMenuRegistry.forPlacement('app', activeAppId ?? undefined))
   const trayMenus = $derived(appMenuRegistry.forPlacement('tray'))
+  const desktopMenus = $derived(appMenuRegistry.forPlacement('desktop'))
 
   // 执行菜单项动作
   function runItem(item: AppMenuItem) {
@@ -47,7 +48,14 @@
     if (item.onClick) {
       item.onClick()
     } else if (item.link) {
-      navController.navigateMain(item.link)
+      // 若 link 是某应用 entry route，用 openApp（加入任务栏 + 聚焦）；
+      // 否则 navigateMain（深链接，如 /article/xxx）。
+      const appId = appManager.findIdByRoute(item.link)
+      if (appId) {
+        navController.openApp(item.link)
+      } else {
+        navController.navigateMain(item.link)
+      }
     }
   }
 
@@ -135,6 +143,33 @@
           <XIcon class="size-4" />
           <span>退出{activeApp.name}</span>
         </DropdownMenu.Item>
+      </DropdownMenu.Content>
+    </DropdownMenu.Root>
+  {:else if desktopMenus.length > 0}
+    <!-- 桌面态：桌面主菜单（"管理桌面"等） -->
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger class="flex items-center rounded-md px-1.5 py-0.5 font-semibold transition-colors hover:bg-accent">
+        <span>桌面</span>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Content align="start">
+        {#each desktopMenus as menu, mi (menu.id)}
+          {#if mi > 0}<DropdownMenu.Separator />{/if}
+          {#if menu.items}
+            {#each menu.items as item (item.id)}
+              {#if item.separator}
+                <DropdownMenu.Separator />
+              {:else}
+                <DropdownMenu.Item onclick={() => runItem(item)} disabled={item.disabled}>
+                  {#if item.icon}
+                    {@const Icon = item.icon}
+                    <Icon class="size-4" />
+                  {/if}
+                  <span>{item.title}</span>
+                </DropdownMenu.Item>
+              {/if}
+            {/each}
+          {/if}
+        {/each}
       </DropdownMenu.Content>
     </DropdownMenu.Root>
   {:else}
