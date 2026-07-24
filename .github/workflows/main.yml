@@ -37,7 +37,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --config.dangerouslyAllowAllBuilds=true
 
       - name: Build static site
         # pnpm build = content:prepare（生成只读 VFS + 搜索索引）+ vite build（adapter-static 输出 build/）
