@@ -9,6 +9,7 @@
 import LayoutGrid from "@lucide/svelte/icons/layout-grid";
 
 import type { AppEntry } from "../../types";
+import { desktopService } from "./service.svelte";
 
 export const desktopApp: AppEntry = {
   manifest: {
@@ -24,6 +25,11 @@ export const desktopApp: AppEntry = {
         view: () => import("$lib/apps/views/DesktopView.svelte"),
       },
     ],
+    // 向 GaubeeOS 暴露桌面服务（gaubeeos.getAppService('desktop')），
+    // 供主题应用设置桌面背景。
+    services: {
+      desktop: () => desktopService,
+    },
     // 桌面是 shell 级背景层（AreaOutlet 直接渲染，不经 tab 机制），
     // 从主导航隐藏——不进 mainTabs/任务栏，由任务栏专属"桌面入口"提供回桌面。
     hiddenFromNav: true,

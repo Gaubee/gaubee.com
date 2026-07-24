@@ -1,0 +1,338 @@
+<!--
+	ThemeView：主题应用主界面（自定义 primary 色相 + 桌面背景）。
+
+	正交意图：
+	1. 主题色：色相滑块 + 预设色板，实时预览全 OS 换色（themeService.setHue 即时注入 --primary-h）。
+	2. 桌面背景：4 种类型切换（默认/纯色/渐变/图片/SVG 模板），通过 desktopService 设置。
+	   纯色/渐变/SVG 色相受限（L/C 锁定 = 可访问性保证）；纯图片无限制。
+
+	设计：二八法则——色相滑块是高频核心占主视觉；背景类型收纳在下方分区。
+-->
+<script lang="ts">
+  import { themeService } from '$lib/apps/builtin/theme/service.svelte'
+  import { desktopService } from '$lib/apps/builtin/desktop/service.svelte'
+  import type { DesktopBackground } from '$lib/apps/builtin/desktop/service.svelte'
+  import { SVG_TEMPLATES } from '$lib/apps/builtin/theme/svg-templates'
+  import { DEFAULT_PRIMARY_HUE } from '$lib/apps/builtin/theme/service.svelte'
+  import * as Card from '$lib/components/ui/card'
+  import * as Tabs from '$lib/components/ui/tabs'
+  import { Button } from '$lib/components/ui/button'
+  import { Input } from '$lib/components/ui/input'
+  import { Label } from '$lib/components/ui/label'
+  import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw'
+
+  // 主题色相（响应式订阅 themeService）
+  const hue = $derived(themeService.hue)
+  // 桌面背景（响应式订阅 desktopService）
+  const background = $derived(desktopService.background)
+
+  // 预设色相快捷（常见品牌色 hue）
+  const PRESET_HUES = [
+    { name: '橙红', hue: DEFAULT_PRIMARY_HUE },
+    { name: '红', hue: 25 },
+    { name: '品红', hue: 350 },
+    { name: '紫', hue: 300 },
+    { name: '蓝', hue: 250 },
+    { name: '青', hue: 200 },
+    { name: '绿', hue: 150 },
+    { name: '黄', hue: 90 },
+  ]
+
+  // 色相滑块实时更新（拖动即生效）
+  function onHueInput(e: Event) {
+    const value = Number((e.target as HTMLInputElement).value)
+    themeService.setHue(value)
+  }
+
+  // ---- 桌面背景类型切换 ----
+  type BgType = DesktopBackground['type']
+  const bgTypes: { value: BgType; label: string }[] = [
+    { value: 'default', label: '默认' },
+    { value: 'color', label: '纯色' },
+    { value: 'gradient', label: '渐变' },
+    { value: 'image', label: '图片' },
+    { value: 'svg', label: '动态' },
+  ]
+
+  // 当前背景类型（从 background 派生）
+  const currentBgType = $derived(background.type)
+
+  // 各类型局部编辑状态（输入过程中不立即写 service，避免抖动；失焦时提交）
+  let colorHue = $state(DEFAULT_PRIMARY_HUE)
+  let gradientFrom = $state(DEFAULT_PRIMARY_HUE)
+  let gradientTo = $state(DEFAULT_PRIMARY_HUE + 40)
+  let imageUrl = $state('')
+
+  // 切换类型时初始化局部状态
+  $effect(() => {
+    const bg = background
+    if (bg.type === 'color') colorHue = bg.hue
+    else if (bg.type === 'gradient') {
+      gradientFrom = bg.from
+      gradientTo = bg.to
+    } else if (bg.type === 'image') imageUrl = bg.url
+  })
+
+  function switchBgType(type: BgType) {
+    if (type === 'default') {
+      desktopService.setBackground({ type: 'default' })
+    } else if (type === 'color') {
+      desktopService.setBackground({ type: 'color', hue: colorHue })
+    } else if (type === 'gradient') {
+      desktopService.setBackground({ type: 'gradient', from: gradientFrom, to: gradientTo })
+    } else if (type === 'image') {
+      desktopService.setBackground({
+        type: 'image',
+        url: imageUrl || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920',
+      })
+    } else if (type === 'svg') {
+      desktopService.setBackground({
+        type: 'svg',
+        templateId: SVG_TEMPLATES[0].id,
+        hue,
+      })
+    }
+  }
+
+  function commitColor() {
+    desktopService.setBackground({ type: 'color', hue: colorHue })
+  }
+  function commitGradient() {
+    desktopService.setBackground({ type: 'gradient', from: gradientFrom, to: gradientTo })
+  }
+  function commitImage() {
+    if (imageUrl) desktopService.setBackground({ type: 'image', url: imageUrl })
+  }
+  function selectSvgTemplate(templateId: string) {
+    desktopService.setBackground({ type: 'svg', templateId, hue })
+  }
+</script>
+
+<div class="mx-auto max-w-2xl space-y-6 p-6">
+  <header class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-semibold">主题</h1>
+      <p class="text-muted-foreground mt-1 text-sm">调整主题色相与桌面背景</p>
+    </div>
+    <Button variant="outline" size="sm" onclick={() => themeService.reset()}>
+      <RotateCcwIcon class="size-4" />
+      重置色相
+    </Button>
+  </header>
+
+  <!-- 主题色相（核心高频区） -->
+  <Card.Root>
+    <Card.Header>
+      <Card.Title>主题色</Card.Title>
+      <Card.Description>
+        拖动滑块即时预览。亮度锁定（保证可访问性），仅旋转色相。
+      </Card.Description>
+    </Card.Header>
+    <Card.Content class="space-y-5">
+      <!-- 色相滑块 -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <Label>色相</Label>
+          <span class="text-muted-foreground font-mono text-xs">{hue.toFixed(1)}°</span>
+        </div>
+        <!--
+          色相滑块背景：conic 渐变呈现完整色环，thumb 位置即当前色相。
+          滑块本身用彩虹渐变让用户直观感知色相空间。
+        -->
+        <input
+          type="range"
+          min="0"
+          max="360"
+          step="0.5"
+          value={hue}
+          oninput={onHueInput}
+          class="hue-slider h-3 w-full cursor-pointer appearance-none rounded-full"
+          aria-label="主题色相"
+        />
+      </div>
+
+      <!-- 预设色板 -->
+      <div class="space-y-2">
+        <Label>预设</Label>
+        <div class="flex flex-wrap gap-2">
+          {#each PRESET_HUES as preset (preset.name)}
+            <button
+              class="flex flex-col items-center gap-1"
+              onclick={() => themeService.setHue(preset.hue)}
+              aria-label={preset.name}
+            >
+              <span
+                class="size-8 rounded-full transition-all hover:scale-110 {Math.abs(hue - preset.hue) < 2 ? 'ring-primary ring-2 ring-offset-2 ring-offset-background' : ''}"
+                style="background: oklch(0.514 0.222 {preset.hue})"
+              ></span>
+              <span class="text-muted-foreground text-xs">{preset.name}</span>
+            </button>
+          {/each}
+        </div>
+      </div>
+
+      <!-- 实时预览样本 -->
+      <div class="flex items-center gap-3 rounded-lg border p-3">
+        <span
+          class="size-12 rounded-lg shadow-sm"
+          style="background: oklch(0.514 0.222 {hue})"
+          aria-label="primary 色预览"
+        ></span>
+        <div class="text-sm">
+          <p class="font-medium">实时预览</p>
+          <p class="text-muted-foreground font-mono text-xs">
+            oklch(0.514 0.222 {hue.toFixed(3)})
+          </p>
+        </div>
+      </div>
+    </Card.Content>
+  </Card.Root>
+
+  <!-- 桌面背景 -->
+  <Card.Root>
+    <Card.Header>
+      <Card.Title>桌面背景</Card.Title>
+      <Card.Description>
+        纯色/渐变/动态壁纸的色相受主题色约束（锁定亮度）；图片无限制。
+      </Card.Description>
+    </Card.Header>
+    <Card.Content>
+      <Tabs.Root value={currentBgType} onValueChange={(v) => switchBgType(v as BgType)}>
+        <Tabs.List class="grid w-full grid-cols-5">
+          {#each bgTypes as t (t.value)}
+            <Tabs.Trigger value={t.value}>{t.label}</Tabs.Trigger>
+          {/each}
+        </Tabs.List>
+
+        <!-- 默认 -->
+        <Tabs.Content value="default" class="pt-4">
+          <p class="text-muted-foreground text-sm">
+            使用系统默认背景（透明，露出应用底层背景色）。
+          </p>
+        </Tabs.Content>
+
+        <!-- 纯色 -->
+        <Tabs.Content value="color" class="space-y-3 pt-4">
+          <div class="flex items-center justify-between">
+            <Label>纯色色相</Label>
+            <span class="text-muted-foreground font-mono text-xs">{colorHue.toFixed(1)}°</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="360"
+            step="0.5"
+            value={colorHue}
+            oninput={(e) => (colorHue = Number((e.target as HTMLInputElement).value))}
+            onchange={commitColor}
+            class="hue-slider h-3 w-full cursor-pointer appearance-none rounded-full"
+          />
+        </Tabs.Content>
+
+        <!-- 渐变 -->
+        <Tabs.Content value="gradient" class="space-y-3 pt-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <Label>起始色相</Label>
+              <input
+                type="range"
+                min="0"
+                max="360"
+                step="0.5"
+                value={gradientFrom}
+                oninput={(e) => (gradientFrom = Number((e.target as HTMLInputElement).value))}
+                onchange={commitGradient}
+                class="hue-slider h-3 w-full cursor-pointer appearance-none rounded-full"
+              />
+            </div>
+            <div class="space-y-2">
+              <Label>结束色相</Label>
+              <input
+                type="range"
+                min="0"
+                max="360"
+                step="0.5"
+                value={gradientTo}
+                oninput={(e) => (gradientTo = Number((e.target as HTMLInputElement).value))}
+                onchange={commitGradient}
+                class="hue-slider h-3 w-full cursor-pointer appearance-none rounded-full"
+              />
+            </div>
+          </div>
+        </Tabs.Content>
+
+        <!-- 图片 -->
+        <Tabs.Content value="image" class="space-y-3 pt-4">
+          <Label>图片 URL</Label>
+          <div class="flex gap-2">
+            <Input
+              type="url"
+              placeholder="https://..."
+              bind:value={imageUrl}
+              onchange={commitImage}
+            />
+            <Button onclick={commitImage} disabled={!imageUrl}>应用</Button>
+          </div>
+        </Tabs.Content>
+
+        <!-- SVG 动态壁纸 -->
+        <Tabs.Content value="svg" class="space-y-3 pt-4">
+          <Label>动态壁纸模板</Label>
+          <div class="grid grid-cols-3 gap-3">
+            {#each SVG_TEMPLATES as tpl (tpl.id)}
+              <button
+                class="flex flex-col items-center gap-2 rounded-lg border p-3 transition-colors hover:bg-accent"
+                class:border-primary={background.type === 'svg' && background.templateId === tpl.id}
+                onclick={() => selectSvgTemplate(tpl.id)}
+              >
+                <span
+                  class="bg-muted text-muted-foreground flex size-12 items-center justify-center rounded-md text-xs"
+                >
+                  {tpl.name}
+                </span>
+              </button>
+            {/each}
+          </div>
+          <p class="text-muted-foreground text-xs">
+            动态壁纸使用主题色相，支持 SVG 动画与滤镜。
+          </p>
+        </Tabs.Content>
+      </Tabs.Root>
+    </Card.Content>
+  </Card.Root>
+</div>
+
+<style>
+  /* 色相滑块：彩虹渐变背景，直观呈现色相空间。 */
+  .hue-slider {
+    background: linear-gradient(
+      to right,
+      oklch(0.514 0.222 0),
+      oklch(0.514 0.222 60),
+      oklch(0.514 0.222 120),
+      oklch(0.514 0.222 180),
+      oklch(0.514 0.222 240),
+      oklch(0.514 0.222 300),
+      oklch(0.514 0.222 360)
+    );
+  }
+  .hue-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid var(--primary);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+    cursor: pointer;
+  }
+  .hue-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid var(--primary);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+    cursor: pointer;
+  }
+</style>

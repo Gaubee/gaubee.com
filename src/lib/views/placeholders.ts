@@ -30,6 +30,8 @@ export function ensureViewsRegistered(): void {
   registerTabView("/app/notifications", () => import("$lib/apps/views/NotificationsView.svelte"));
   // 应用市场（hiddenFromNav，通过设置页/桌面图标进入）
   registerTabView("/app/store", () => import("$lib/apps/views/AppStoreView.svelte"));
+  // 主题应用（自定义 primary 色相 + 桌面背景）
+  registerTabView("/app/theme", () => import("$lib/apps/views/ThemeView.svelte"));
 
   // ===== 可安装应用（默认安装）=====
   registerTabView("/app/github", () => import("$lib/apps/views/GithubView.svelte"));

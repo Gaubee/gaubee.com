@@ -1,7 +1,9 @@
 import { appManager } from "$lib/apps/AppManager.svelte";
 // ---- service 接口类型注册（import type：仅类型，不产生运行时依赖）----
 import type { AccountService } from "$lib/apps/builtin/account/service";
+import type { DesktopService } from "$lib/apps/builtin/desktop/service.svelte";
 import type { NotificationService } from "$lib/apps/builtin/notifications/service.svelte";
+import type { ThemeService } from "$lib/apps/builtin/theme/service.svelte";
 import type { GitService } from "$lib/apps/installable/github/service";
 
 /**
@@ -32,8 +34,10 @@ import type { AppService } from "./types";
  */
 export interface ServiceTypeMap {
   account: AccountService;
+  desktop: DesktopService;
   git: GitService;
   notification: NotificationService;
+  theme: ThemeService;
 }
 
 /** 所有已注册的 service id。 */
