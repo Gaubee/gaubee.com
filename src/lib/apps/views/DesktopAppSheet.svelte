@@ -13,8 +13,10 @@
   import { navController } from '$lib/nav/nav-controller-instance'
   import { desktopLayout } from '$lib/apps/desktop-layout.svelte'
   import * as Sheet from '$lib/components/ui/sheet'
+  import { Button } from '$lib/components/ui/button'
   import { flip } from 'svelte/animate'
   import GridIcon from '@lucide/svelte/icons/layout-grid'
+  import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal'
 
   const visibleApps = $derived(desktopLayout.visibleApps(appManager.allInstalled))
   // 所有已安装应用（排除 desktop 自身），按 registry 默认顺序
@@ -28,6 +30,12 @@
     }
     desktopLayout.closeAllApps()
   }
+
+  // 从 BottomSheet 跳转到「管理桌面」Dialog：先关 BottomSheet 再开 Dialog
+  function openLaunchpad() {
+    desktopLayout.closeAllApps()
+    desktopLayout.openLaunchpad()
+  }
 </script>
 
 <Sheet.Root
@@ -35,12 +43,16 @@
   onOpenChange={(v) => { if (!v) desktopLayout.closeAllApps() }}
 >
   <Sheet.Content side="bottom" class="max-h-[80dvh] rounded-t-lg p-0" showCloseButton={false}>
-    <Sheet.Header class="border-b px-4 py-3">
+    <Sheet.Header class="flex-row items-center justify-between border-b px-4 py-3">
       <Sheet.Title class="flex items-center gap-2">
         <GridIcon class="size-4" />
         全部应用
       </Sheet.Title>
       <Sheet.Description class="sr-only">查看桌面应用与所有已安装应用</Sheet.Description>
+      <Button variant="ghost" size="sm" onclick={openLaunchpad} class="gap-1.5">
+        <SlidersHorizontalIcon class="size-4" />
+        管理
+      </Button>
     </Sheet.Header>
 
     <div class="max-h-[calc(80dvh-4rem)] space-y-4 overflow-y-auto p-4">
