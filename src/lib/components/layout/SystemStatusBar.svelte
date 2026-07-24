@@ -1,11 +1,10 @@
 <!--
-	SystemStatusBar：macOS 风格系统顶部状态栏（桌面/移动统一）。
+	SystemStatusBar：macOS 风格系统顶部状态栏（桌面/移动统一，全宽最高优先级）。
 
 	正交意图：
-	1. 原始需求（2026-07-23）：引入顶部状态栏，参考 macOS 把当前应用信息和菜单挂载顶部左上角。
-	2. 三段布局：左 LOGO 系统菜单（苹果菜单）/ 中 当前应用主菜单 / 右 tray 快捷入口。
+	1. 原始需求（2026-07-24）：顶部状态栏横跨全宽，高于左侧 Dock；左侧 GaubeeOS logo + 当前场景名。
+	2. 三段布局：左 LOGO 系统菜单（苹果菜单）+ 当前场景名（桌面/应用名→应用菜单）/ 右 tray 快捷入口。
 	3. appMenus 声明式扩展点消费：appMenuRegistry 按 placement 过滤渲染。
-	4. 容器查询自适应：桌面横排全部菜单；移动紧凑（应用名省略，tray 折叠"更多"）。
 
 	取代 MobileHeader（移动端顶栏）+ 废除底部 StatusBar（功能上移顶部）。
 -->
@@ -19,9 +18,9 @@
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import { gaubeeos } from '$lib/os/services'
   import { ACCOUNT_UNAVAILABLE } from '$lib/apps/builtin/account/service'
-  import NewspaperIcon from '@lucide/svelte/icons/newspaper'
   import MinusIcon from '@lucide/svelte/icons/minus'
   import XIcon from '@lucide/svelte/icons/x'
+  import logoUrl from '$lib/assets/favicon.svg'
 
   const navState = $derived(navStore.current)
   const account = $derived(gaubeeos.getAppService('account'))
@@ -62,14 +61,13 @@
 </script>
 
 <header
-  class="system-statusbar sticky top-0 z-[var(--z-shell-base)] flex items-center gap-1 border-b border-border bg-background/95 px-2 py-1 text-xs backdrop-blur supports-[backdrop-filter]:bg-background/80"
+  class="system-statusbar sticky top-0 z-[var(--z-shell-base)] flex h-9 shrink-0 items-center gap-1 border-b border-border bg-background/95 px-2 text-xs backdrop-blur supports-[backdrop-filter]:bg-background/80"
 >
-  <!-- 左：LOGO 系统菜单（苹果菜单） -->
+  <!-- 左：GaubeeOS LOGO 系统菜单（苹果菜单） -->
   {#if systemMenus.length > 0}
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger class="flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors hover:bg-accent">
-        <NewspaperIcon class="size-4 shrink-0" />
-        <span class="hidden font-semibold sm:inline">Gaubee</span>
+      <DropdownMenu.Trigger class="flex items-center rounded-md px-1 py-0.5 transition-colors hover:bg-accent">
+        <img src={logoUrl} alt="GaubeeOS" class="size-5 shrink-0 rounded-md" />
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="start">
         {#each systemMenus as menu, mi (menu.id)}
@@ -97,14 +95,10 @@
     </DropdownMenu.Root>
   {/if}
 
-  <!-- 中：当前应用主菜单 -->
+  <!-- 当前场景名（桌面态：纯文字；应用态：应用菜单 trigger） -->
   {#if activeApp && !onDesktop}
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger class="flex max-w-[12rem] items-center gap-1 rounded-md px-1.5 py-0.5 font-medium transition-colors hover:bg-accent">
-        {#if activeApp.icon}
-          <!-- svelte-ignore ownership_invalid_mutation -->
-          <activeApp.icon class="size-3.5 shrink-0" />
-        {/if}
+      <DropdownMenu.Trigger class="flex max-w-[12rem] items-center gap-1 rounded-md px-1.5 py-0.5 font-semibold transition-colors hover:bg-accent">
         <span class="truncate">{activeApp.name}</span>
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="start">
@@ -142,18 +136,18 @@
         </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Root>
-  {:else if onDesktop}
-    <span class="px-1.5 font-medium text-muted-foreground">桌面</span>
+  {:else}
+    <span class="px-1 font-semibold">桌面</span>
   {/if}
 
   <!-- 右：tray 快捷入口 -->
   <div class="ml-auto flex items-center gap-0.5">
-    <!-- 登录态指示（已登录显头像，未登录无） -->
+    <!-- 登录态指示（已登录显头像） -->
     {#if accountState.loaded && accountState.authenticated && accountState.user}
       <img src={accountState.user.avatar_url} alt="" class="size-5 rounded-full" />
     {/if}
 
-    <!-- tray 菜单（桌面直接展开图标，移动折叠到"更多"） -->
+    <!-- tray 菜单（搜索/通知等右上角快捷入口） -->
     {#each trayMenus as menu (menu.id)}
       {@const Icon = menu.icon}
       {#if Icon}

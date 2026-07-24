@@ -211,6 +211,15 @@
   height: 100dvh; /* dvh 处理移动端浏览器栏 */
   overflow: hidden;
 }
+/* 工作区：顶部状态栏之下，承载 Dock + 主体。
+ * 桌面（@media >=768px）横排（Dock 左 + 主体右）；移动仅主体（Dock 隐藏）。 */
+.app-workspace {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
 .app-body {
   display: flex;
   flex-direction: column;
@@ -274,12 +283,10 @@
   z-index: 50;
 }
 
-/* 桌面：容器宽 >= 768px 时切换为横排 */
-/* 注意：.app-layout 自身是容器（container-type: inline-size），不能用 @container
-   改变它自己的 flex-direction（浏览器为避免循环依赖会忽略该声明）。
-   因此 flex-direction 用 @media（视口级），display 切换仍用 @container（组件级）。 */
+/* 桌面：视口 >= 768px 时工作区横排（Dock 左 + 主体右）。
+ * 状态栏始终在顶部全宽（.app-layout column，状态栏 + workspace）。 */
 @media (min-width: 768px) {
-  .app-layout {
+  .app-workspace {
     flex-direction: row;
   }
 }

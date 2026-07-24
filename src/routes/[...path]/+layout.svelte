@@ -87,25 +87,28 @@
 
 <!-- @container/app：容器查询上下文 -->
 <div class="app-layout" style="container-name: app; container-type: inline-size">
-  <!-- 桌面侧栏 Dock（移动端 display:none） -->
-  <DesktopSidebar />
+  <!-- 顶部系统状态栏（全宽，最高优先级，高于左侧 Dock） -->
+  <SystemStatusBar />
 
-  <!-- 主体 -->
-  <div class="app-body">
-    <!-- 顶部系统状态栏（桌面/移动统一，取代原 MobileHeader + 底部 StatusBar） -->
-    <SystemStatusBar />
+  <!-- 工作区：左侧 Dock + 主体（桌面横排，移动仅主体） -->
+  <div class="app-workspace">
+    <!-- 桌面侧栏 Dock（移动端 display:none） -->
+    <DesktopSidebar />
 
-    <!-- main + bottom 垂直堆叠 -->
-    <div class="flex min-h-0 flex-1 flex-col">
-      <main class="main-content">
-        <AreaOutlet area="main" />
-      </main>
-      <!-- bottom 区（桌面展开时显示，移动端默认不显示） -->
-      <BottomAreaRouter />
+    <!-- 主体 -->
+    <div class="app-body">
+      <!-- main + bottom 垂直堆叠 -->
+      <div class="flex min-h-0 flex-1 flex-col">
+        <main class="main-content">
+          <AreaOutlet area="main" />
+        </main>
+        <!-- bottom 区（桌面展开时显示，移动端默认不显示） -->
+        <BottomAreaRouter />
+      </div>
+
+      <!-- 移动端底栏 Dock（桌面 display:none） -->
+      <MobileTabBar />
     </div>
-
-    <!-- 移动端底栏 Dock（桌面 display:none） -->
-    <MobileTabBar />
   </div>
 </div>
 
