@@ -1,8 +1,7 @@
 <!--
-	TabContextMenu：任务栏 tab 的长按/右键上下文菜单。
-	pin/unpin（保留在任务栏）+ quit（退出应用）。
-	桌面右键(oncontextmenu) + 移动端长按(pointerdown 500ms)触发。
-	包裹 tab 内容，透传 children snippet。
+	TabContextMenu：任务栏 tab 的上下文菜单。
+	触发方式：长按(pointerdown 500ms) / 右键 / 显式 trigger slot（hover 显示的 menu 图标按钮）。
+	菜单项：pin/unpin（保留在任务栏）+ quit（退出应用）。
 -->
 <script lang="ts">
   import { navController } from '$lib/nav/nav-controller-instance'
@@ -17,10 +16,13 @@
     tabId,
     pinned,
     children,
+    trigger,
   }: {
     tabId: TabId
     pinned: boolean
     children: Snippet
+    /** 显式菜单触发器（hover 显示的 menu 图标按钮）。点击打开菜单。可选。 */
+    trigger?: Snippet
   } = $props()
 
   let open = $state(false)
@@ -54,6 +56,7 @@
   }
 </script>
 
+<!-- 包裹层：长按 / 右键触发菜单 -->
 <div
   class="contents"
   role="presentation"
@@ -71,24 +74,37 @@
   {@render children()}
 </div>
 
-{#if open}
-  <DropdownMenu.Root bind:open>
-    <DropdownMenu.Trigger />
-    <DropdownMenu.Content>
-      <DropdownMenu.Item onclick={togglePin}>
-        {#if pinned}
-          <PinOffIcon class="size-4" />
-          <span>取消保留</span>
-        {:else}
-          <PinIcon class="size-4" />
-          <span>保留在任务栏</span>
-        {/if}
-      </DropdownMenu.Item>
-      <DropdownMenu.Separator />
-      <DropdownMenu.Item onclick={quit} disabled={pinned}>
-        <XIcon class="size-4" />
-        <span>退出应用{pinned ? '（需先取消保留）' : ''}</span>
-      </DropdownMenu.Item>
-    </DropdownMenu.Content>
-  </DropdownMenu.Root>
+<!-- 显式 trigger（hover 显示的 menu 图标按钮），点击打开菜单 -->
+{#if trigger}
+  <button
+    type="button"
+    class="hover:bg-accent absolute -right-1 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+    onclick={(e) => {
+      e.stopPropagation()
+      open = true
+    }}
+    aria-label="更多操作"
+  >
+    {@render trigger()}
+  </button>
 {/if}
+
+<DropdownMenu.Root bind:open>
+  <DropdownMenu.Trigger class="sr-only" />
+  <DropdownMenu.Content>
+    <DropdownMenu.Item onclick={togglePin}>
+      {#if pinned}
+        <PinOffIcon class="size-4" />
+        <span>取消保留</span>
+      {:else}
+        <PinIcon class="size-4" />
+        <span>保留在任务栏</span>
+      {/if}
+    </DropdownMenu.Item>
+    <DropdownMenu.Separator />
+    <DropdownMenu.Item onclick={quit} disabled={pinned}>
+      <XIcon class="size-4" />
+      <span>退出应用{pinned ? '（需先取消保留）' : ''}</span>
+    </DropdownMenu.Item>
+  </DropdownMenu.Content>
+</DropdownMenu.Root>

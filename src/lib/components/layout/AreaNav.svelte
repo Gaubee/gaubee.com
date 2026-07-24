@@ -13,7 +13,7 @@
   import { matchesRoutePrefix, routeDomainRegistry } from '$lib/apps/route-domain'
   import TabContextMenu from './TabContextMenu.svelte'
   import type { Area, TabId } from '$lib/nav/controller'
-  import XIcon from '@lucide/svelte/icons/x'
+  import EllipsisVerticalIcon from '@lucide/svelte/icons/ellipsis-vertical'
 
   let {
     area,
@@ -151,11 +151,6 @@
     }
   }
 
-  function handleClose(e: MouseEvent, tabId: TabId) {
-    e.stopPropagation()
-    // 新任务栏模型：X 按钮 = 退出应用（移除+销毁）；pinned 时无效（需先取消保留）
-    navController.quitApp(tabId)
-  }
 </script>
 
 <ul
@@ -188,27 +183,20 @@
           <button
             class="hover:bg-accent flex flex-1 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors {isActive
               ? 'bg-accent text-accent-foreground font-medium'
-              : 'text-muted-foreground'}"
+              : 'text-muted-foreground'} {collapsed ? 'justify-center' : ''}"
             onclick={() => handleClick(tabId, isActive)}
             title={collapsed ? app.name : undefined}
           >
             <!-- svelte-ignore ownership_invalid_mutation -->
-            <app.icon class="size-4 shrink-0" />
+            <app.icon class="{collapsed ? 'size-5' : 'size-4'} shrink-0" />
             {#if !collapsed}
               <span class="truncate">{app.name}</span>
             {/if}
           </button>
+          {#snippet trigger()}
+            <EllipsisVerticalIcon class="size-3" />
+          {/snippet}
         </TabContextMenu>
-
-        {#if !collapsed}
-          <button
-            class="hover:bg-accent absolute -right-1 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
-            onclick={(e) => handleClose(e, tabId)}
-            aria-label="退出应用"
-          >
-            <XIcon class="size-3" />
-          </button>
-        {/if}
 
         <!-- 落点指示线（后） -->
         {#if dropIndicator?.index === index && dropIndicator.position === 'after'}

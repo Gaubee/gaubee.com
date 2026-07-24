@@ -20,7 +20,8 @@
   import { ACCOUNT_UNAVAILABLE } from '$lib/apps/builtin/account/service'
   import MinusIcon from '@lucide/svelte/icons/minus'
   import XIcon from '@lucide/svelte/icons/x'
-  import logoUrl from '$lib/assets/favicon.svg'
+  // 用 favicon-32.png（用户提供的 logo 处理后的小尺寸版本），状态栏小尺寸清晰
+  const logoUrl = '/favicon-32.png'
 
   const navState = $derived(navStore.current)
   const account = $derived(gaubeeos.getAppService('account'))

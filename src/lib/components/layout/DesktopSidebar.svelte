@@ -10,7 +10,6 @@
 <script lang="ts">
   import { navController } from '$lib/nav/nav-controller-instance'
   import { navStore } from '$lib/nav/nav.svelte'
-  import { appManager } from '$lib/apps/AppManager.svelte'
   import AreaNav from './AreaNav.svelte'
   import PanelLeftIcon from '@lucide/svelte/icons/panel-left'
   import LayoutGridIcon from '@lucide/svelte/icons/layout-grid'
@@ -38,10 +37,6 @@
   const navState = $derived(navStore.current)
   // 是否在桌面（决定桌面入口高亮）
   const onDesktop = $derived(navState.mainLocation.pathname === '/')
-  // pop 区应用（搜索/通知）
-  const popApps = $derived(
-    appManager.allInstalled.filter((app) => app.defaultArea === 'pop'),
-  )
 </script>
 
 <aside class="desktop-sidebar p-2" data-collapsed={collapsed}>
@@ -49,12 +44,12 @@
   <div class="mb-3 flex items-center {collapsed ? 'justify-center' : 'justify-between'}">
     {#if collapsed}
       <button
-        class="hover:bg-accent flex size-8 items-center justify-center rounded-md {onDesktop ? 'bg-accent text-accent-foreground' : ''}"
+        class="hover:bg-accent flex size-9 items-center justify-center rounded-md {onDesktop ? 'bg-accent text-accent-foreground' : ''}"
         onclick={goDesktop}
         aria-label="桌面"
         title="桌面"
       >
-        <LayoutGridIcon class="size-4" />
+        <LayoutGridIcon class="size-5" />
       </button>
     {:else}
       <button
@@ -94,26 +89,5 @@
     <AreaNav area="bottom" {collapsed} />
   </div>
 
-  <!-- pop 入口（后台服务快捷入口） -->
-  {#if popApps.length > 0}
-    <div class="mt-2 border-t pt-2">
-      {#if !collapsed}
-        <div class="text-muted-foreground mb-1 px-2 text-[10px] tracking-wider uppercase">服务</div>
-      {/if}
-      <div class="flex flex-col gap-0.5">
-        {#each popApps as app (app.id)}
-          <button
-            class="hover:bg-accent flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground"
-            onclick={() => navController.activatePop(app.route)}
-            aria-haspopup="dialog"
-            title={collapsed ? app.name : undefined}
-          >
-            <!-- svelte-ignore ownership_invalid_mutation -->
-            <app.icon class="size-4 shrink-0" />
-            {#if !collapsed}<span class="truncate">{app.name}</span>{/if}
-          </button>
-        {/each}
-      </div>
-    </div>
-  {/if}
+  <!-- 注意：搜索/通知等 pop 入口已移至顶部状态栏 tray 区，Dock 底部不再显示 -->
 </aside>

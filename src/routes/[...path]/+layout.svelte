@@ -9,7 +9,6 @@
 -->
 <script lang="ts">
   import '../../app.css'
-  import favicon from '$lib/assets/favicon.svg'
   import { onMount } from 'svelte'
   import { appManager } from '$lib/apps/AppManager.svelte'
   // import registry 触发模块加载时的应用注册
@@ -81,7 +80,6 @@
 </script>
 
 <svelte:head>
-  <link rel="icon" href={favicon} />
   <title>Gaubee 编辑器</title>
 </svelte:head>
 
