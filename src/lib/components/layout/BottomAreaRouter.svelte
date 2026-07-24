@@ -88,7 +88,7 @@
       </button>
     </div>
 
-    <!-- bottom 内容。移动端 padding-bottom 让出 MobileTabBar 高度（sticky 会盖住 bottom 区底部） -->
+    <!-- bottom 内容 -->
     <div class="bottom-area-content min-h-0 flex-1 overflow-auto">
       <AreaOutlet area="bottom" />
     </div>

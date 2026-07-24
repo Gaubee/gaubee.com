@@ -19,7 +19,14 @@
   let collapsed = $state(false)
 
   if (typeof window !== 'undefined') {
-    collapsed = localStorage.getItem(COLLAPSED_KEY) === 'true'
+    // 移动端（窄视口）默认折叠节省空间；桌面端默认展开。
+    // 用户手动折叠/展开后优先 localStorage 记忆。
+    const stored = localStorage.getItem(COLLAPSED_KEY)
+    if (stored !== null) {
+      collapsed = stored === 'true'
+    } else {
+      collapsed = window.innerWidth < 768
+    }
   }
 
   function toggleCollapsed() {

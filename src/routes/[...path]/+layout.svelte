@@ -1,11 +1,8 @@
 <!--
-	根布局：挂载 NavController，用独立组件渲染四区骨架。
-	桌面（容器宽 >= 768px）：DesktopSidebar 左 + 主体右（main + bottom 堆叠）+ 底部 StatusBar
-	移动端：MobileHeader 顶 + main 中 + MobileTabBar 底（bottom 区默认不显示）
-	pop 区：PopAreaRouter 浮层（Dialog），任何视口都可用
-
-	响应式由 CSS 容器查询驱动（.app-layout 父容器带 container-name: app），
-	DesktopSidebar / MobileHeader / MobileTabBar / StatusBar 通过 display: none/flex 互斥切换。
+	根布局：挂载 NavController，渲染 OS 骨架。
+	- SystemStatusBar：顶部全宽系统状态栏（最高优先级）
+	- app-workspace：左侧 Dock（DesktopSidebar）+ 主体（main + bottom 堆叠），始终横排，移动/桌面统一
+	- PopAreaRouter：浮层（Dialog），任何视口都可用
 -->
 <script lang="ts">
   import '../../app.css'
@@ -20,7 +17,6 @@
   import { gaubeeos } from '$lib/os/services'
   import AreaOutlet from '$lib/components/layout/AreaOutlet.svelte'
   import DesktopSidebar from '$lib/components/layout/DesktopSidebar.svelte'
-  import MobileTabBar from '$lib/components/layout/MobileTabBar.svelte'
   import BottomAreaRouter from '$lib/components/layout/BottomAreaRouter.svelte'
   import PopAreaRouter from '$lib/components/layout/PopAreaRouter.svelte'
   import SystemStatusBar from '$lib/components/layout/SystemStatusBar.svelte'
@@ -88,9 +84,9 @@
   <!-- 顶部系统状态栏（全宽，最高优先级，高于左侧 Dock） -->
   <SystemStatusBar />
 
-  <!-- 工作区：左侧 Dock + 主体（桌面横排，移动仅主体） -->
+  <!-- 工作区：左侧 Dock + 主体（始终横排，移动/桌面统一） -->
   <div class="app-workspace">
-    <!-- 桌面侧栏 Dock（移动端 display:none） -->
+    <!-- 左侧 Dock 侧栏（始终显示，移动端默认折叠态） -->
     <DesktopSidebar />
 
     <!-- 主体 -->
@@ -100,12 +96,9 @@
         <main class="main-content">
           <AreaOutlet area="main" />
         </main>
-        <!-- bottom 区（桌面展开时显示，移动端默认不显示） -->
+        <!-- bottom 区 -->
         <BottomAreaRouter />
       </div>
-
-      <!-- 移动端底栏 Dock（桌面 display:none） -->
-      <MobileTabBar />
     </div>
   </div>
 </div>
