@@ -57,6 +57,7 @@ class ThemeServiceImpl implements ThemeService {
     this.hue = normalized;
     this.applyToDom(normalized);
     this.persist();
+    this.notifySw(normalized);
   }
 
   reset(): void {
@@ -67,6 +68,22 @@ class ThemeServiceImpl implements ThemeService {
   private applyToDom(hue: number): void {
     if (!browser) return;
     document.documentElement.style.setProperty("--primary-h", String(hue));
+  }
+
+  /**
+   * 通知 Service Worker 主题色变更（增强：SW 可在首屏 HTML 注入 --primary-h，杜绝刷新闪烁）。
+   * SW 不存在时无副作用（dev 模式不注册 SW）。
+   */
+  private notifySw(hue: number): void {
+    if (!browser) return;
+    try {
+      navigator.serviceWorker?.controller?.postMessage({
+        type: "THEME_HUE",
+        hue,
+      });
+    } catch {
+      // SW 不可用，忽略（增强特性，失败不影响核心功能）
+    }
   }
 
   private persist(): void {
@@ -91,6 +108,7 @@ class ThemeServiceImpl implements ThemeService {
         const hue = normalizeHue((parsed as { hue: number }).hue);
         this.hue = hue;
         this.applyToDom(hue);
+        this.notifySw(hue);
       }
     } catch {
       // 损坏数据，忽略

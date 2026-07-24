@@ -624,24 +624,30 @@ LOGO 系统菜单（6项）、应用菜单（自注册+最小化/退出）、tra
 引入「主题」系统应用，支持自定义主题色相（亮度锁定）和桌面背景（4 种类型）。
 
 ### app.css 重构（计算式）
+
 - 引入 `--primary-h` 唯一运行时旋钮，橙红系变量（primary/chart-*/sidebar-primary）改为基于它的 calc 计算式。
 - L/C 字面量固定（锁定亮度 = 可访问性保证），仅色相旋转。
 - calc 偏移保留 chart 间约 6° 色相微差（设计精度零误差还原）。
 
 ### 两个独立 service
+
 - themeService（`builtin/theme/service.svelte.ts`）：hue 状态 + setProperty('--primary-h') 注入 + gaubee:os:theme 持久化。
 - desktopService（`builtin/desktop/service.svelte.ts`）：background 状态 + gaubee:os:desktop 持久化，5 种背景类型（默认/纯色/渐变/图片/SVG 模板）。
 
 ### 主题应用（独立路由 /app/theme）
+
 - ThemeView：色相滑块（彩虹渐变直观呈现）+ 预设色板 + 桌面背景类型切换（Tabs）。
 - 实时预览：滑块拖动即时全 OS 换色。
 
 ### SVG 动态壁纸模板（`builtin/theme/svg-templates.ts`）
+
 - 3 个内置模板（极光/网格/波浪），通过 var(--primary-h) 引用主题色，支持 SVG animation（脉动/流动）。
 
 ### 桌面背景渲染（`builtin/desktop/background-render.ts`）
+
 - backgroundToCss：DesktopBackground → 内联 CSS。纯色/渐变用 oklch(L C hue)（L/C 锁定）；SVG 用 data URL 内联。
 
 ### 验证
+
 - check 0 错误、238 单测全过、build 成功。
 - Playwright：--primary-h 注入（16.935→250）+ chart calc 计算式 + 纯色桌面背景 oklch(0.514 0.222 200) + 持久化恢复 全部通过。

@@ -14,6 +14,7 @@
   import type { DesktopBackground } from '$lib/apps/builtin/desktop/service.svelte'
   import { SVG_TEMPLATES } from '$lib/apps/builtin/theme/svg-templates'
   import { DEFAULT_PRIMARY_HUE } from '$lib/apps/builtin/theme/service.svelte'
+  import { extractHuesFromImage } from '$lib/color/extract'
   import * as Card from '$lib/components/ui/card'
   import * as Tabs from '$lib/components/ui/tabs'
   import { Button } from '$lib/components/ui/button'
@@ -102,6 +103,25 @@
   }
   function commitImage() {
     if (imageUrl) desktopService.setBackground({ type: 'image', url: imageUrl })
+  }
+
+  // ---- 图片主色提取（从背景图片提取候选主题色相供用户挑选）----
+  let extractedHues = $state<number[]>([])
+  let extracting = $state(false)
+  let extractError = $state('')
+
+  async function extractColors() {
+    if (!imageUrl || extracting) return
+    extracting = true
+    extractError = ''
+    extractedHues = []
+    try {
+      extractedHues = await extractHuesFromImage(imageUrl, 5)
+    } catch (e) {
+      extractError = e instanceof Error ? e.message : '提取失败（图片可能跨域）'
+    } finally {
+      extracting = false
+    }
   }
   function selectSvgTemplate(templateId: string) {
     desktopService.setBackground({ type: 'svg', templateId, hue })
@@ -272,6 +292,39 @@
               onchange={commitImage}
             />
             <Button onclick={commitImage} disabled={!imageUrl}>应用</Button>
+          </div>
+
+          <!-- 提取主色：从图片提取候选主题色相 -->
+          <div class="space-y-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onclick={extractColors}
+              disabled={!imageUrl || extracting}
+            >
+              {extracting ? '提取中…' : '从图片提取主题色'}
+            </Button>
+
+            {#if extractError}
+              <p class="text-destructive text-xs">{extractError}</p>
+            {/if}
+
+            {#if extractedHues.length > 0}
+              <div class="space-y-1.5">
+                <p class="text-muted-foreground text-xs">点击候选色应用为主题色：</p>
+                <div class="flex flex-wrap gap-2">
+                  {#each extractedHues as h (h)}
+                    <button
+                      class="size-8 rounded-full transition-all hover:scale-110 {Math.abs(hue - h) < 2 ? 'ring-primary ring-2 ring-offset-2 ring-offset-background' : ''}"
+                      style="background: oklch(0.514 0.222 {h})"
+                      onclick={() => themeService.setHue(h)}
+                      aria-label={`应用色相 ${h.toFixed(0)}°`}
+                      title={`${h.toFixed(1)}°`}
+                    ></button>
+                  {/each}
+                </div>
+              </div>
+            {/if}
           </div>
         </Tabs.Content>
 
