@@ -15,8 +15,12 @@ import type { InstalledApp } from "./types";
 
 const STORAGE_KEY = "gaubee:os:desktop-layout";
 const PERSIST_DEBOUNCE_MS = 300;
-/** 默认隐藏的应用（系统服务类，桌面网格不显示）。 */
-const DEFAULT_HIDDEN = ["search", "notifications", "settings"];
+/**
+ * 默认隐藏的应用（桌面网格不显示）。
+ * - search/notifications/settings：系统服务类，通过状态栏 tray/菜单进入。
+ * - github/terminal：bottom 区应用（Dock 任务栏层），不属于桌面网格。
+ */
+const DEFAULT_HIDDEN = ["search", "notifications", "settings", "github", "terminal"];
 
 interface PersistedDesktopLayout {
   desktopApps: string[];
@@ -57,6 +61,8 @@ class DesktopLayoutStore {
   desktopApps = $state<string[]>([]);
   /** 管理桌面弹窗开关。 */
   launchpadOpen = $state(false);
+  /** 「全部应用」BottomSheet 开关（桌面图标溢出时入口）。 */
+  allAppsOpen = $state(false);
 
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
   private initialized = false;
@@ -106,6 +112,15 @@ class DesktopLayoutStore {
     this.schedulePersist();
   }
 
+  /**
+   * 应用新的完整排序（LaunchpadDialog 拖拽精确落点用）。
+   * 直接赋值 + 持久化，绕过 reorder 的简单两两交换逻辑。
+   */
+  applyOrder(apps: string[]): void {
+    this.desktopApps = apps;
+    this.schedulePersist();
+  }
+
   /** 从隐藏移到显示（追加到末尾）。 */
   moveToVisible(appId: string): void {
     if (this.desktopApps.includes(appId)) return;
@@ -125,6 +140,13 @@ class DesktopLayoutStore {
   }
   closeLaunchpad(): void {
     this.launchpadOpen = false;
+  }
+
+  openAllApps(): void {
+    this.allAppsOpen = true;
+  }
+  closeAllApps(): void {
+    this.allAppsOpen = false;
   }
 
   private schedulePersist(): void {

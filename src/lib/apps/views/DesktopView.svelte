@@ -21,6 +21,7 @@
   import { backgroundToCss } from '$lib/apps/builtin/desktop/background-render'
   import { motionFade } from '$lib/utils/motion'
   import { flip } from 'svelte/animate'
+  import GridIcon from '@lucide/svelte/icons/layout-grid'
 
   const navState = $derived(navStore.current)
   // 桌面背景：从 desktopService 派生 CSS（响应式，主题应用修改即时刷新）
@@ -30,6 +31,29 @@
     desktopLayout.visibleApps(appManager.allInstalled),
   )
   const widgets = $derived(widgetRegistry.all())
+
+  // ---- 桌面图标截断：最多显示「两行 × 每行列数 - 1」，余下进「全部」----
+  // app-grid 用 auto-fill minmax(5rem,1fr)，列数随容器宽度变化，需 ResizeObserver 实时测量。
+  let gridCols = $state(6)
+  let gridEl = $state<HTMLDivElement>()
+  $effect(() => {
+    const el = gridEl
+    if (!el) return
+    const COL_MIN = 5 * 16 // 5rem（minmax 第一参数）
+    const GAP = 0.75 * 16 // 0.75rem gap
+    const ro = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? el.clientWidth
+      gridCols = Math.max(1, Math.floor((width + GAP) / (COL_MIN + GAP)))
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  })
+  // 桌面网格最多显示的图标数（含末尾「全部」）：两行 × 列数 - 1
+  const maxIcons = $derived(gridCols * 2 - 1)
+  // 截断后的展示图标（不含「全部」）
+  const displayApps = $derived(launcherApps.slice(0, maxIcons))
+  // 是否溢出（需要「全部」入口）
+  const hasOverflow = $derived(launcherApps.length > maxIcons)
 
   // 判断应用是否在任务栏（已打开或 pinned）→ 图标红点标记
   function isOpen(route: string): boolean {
@@ -65,9 +89,9 @@
   style={desktopBg}
 >
   <div class="desktop-container">
-    <!-- 应用图标网格（启动器）：无分组标题，图标自由组合 -->
-    <div class="app-grid">
-      {#each launcherApps as app, i (app.id)}
+    <!-- 应用图标网格（启动器）：截断显示，溢出时末尾「全部」入口 -->
+    <div class="app-grid" bind:this={gridEl}>
+      {#each displayApps as app, i (app.id)}
         {@const active = app.route === activeRoute}
         <button
           class="app-icon-button {active ? 'app-icon-active' : ''}"
@@ -86,6 +110,20 @@
           <span class="app-icon-label">{app.name}</span>
         </button>
       {/each}
+      {#if hasOverflow}
+        <!-- 「全部」入口：打开 BottomSheet 查看全部桌面应用 + 所有已安装应用 -->
+        <button
+          class="app-icon-button"
+          onclick={() => desktopLayout.openAllApps()}
+          aria-label="全部应用"
+          in:motionFade={{ delay: displayApps.length * 30, duration: 200 }}
+        >
+          <span class="app-icon-box">
+            <GridIcon class="size-6" />
+          </span>
+          <span class="app-icon-label">全部</span>
+        </button>
+      {/if}
     </div>
 
     <!-- Widget 瀑布流：无分组标题，卡片自由组合 -->

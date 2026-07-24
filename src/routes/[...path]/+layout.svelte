@@ -20,6 +20,7 @@
   import BottomAreaRouter from '$lib/components/layout/BottomAreaRouter.svelte'
   import PopAreaRouter from '$lib/components/layout/PopAreaRouter.svelte'
   import LaunchpadDialog from '$lib/components/layout/LaunchpadDialog.svelte'
+  import DesktopAppSheet from '$lib/apps/views/DesktopAppSheet.svelte'
   import SystemStatusBar from '$lib/components/layout/SystemStatusBar.svelte'
   import { Toaster } from '$lib/components/ui/sonner'
   import { notifySuccess, notifyError } from '$lib/apps/builtin/notifications/service.svelte'
@@ -115,6 +116,9 @@
 
 <!-- 管理桌面浮层（应用显示/隐藏/排序） -->
 <LaunchpadDialog />
+
+<!-- 桌面「全部应用」BottomSheet（图标溢出时入口） -->
+<DesktopAppSheet />
 
 <!-- SvelteKit children（+page.svelte 输出空，隐藏不占空间；必须渲染否则路由报错） -->
 <div style="display: none">{@render children?.()}</div>

@@ -3,7 +3,13 @@
 	受 desktopLayout.launchpadOpen 控制。两组布局：
 	- 上组"桌面显示"：可拖拽排序（组内 reorder），可拖到下组隐藏。
 	- 下组"已隐藏"：可拖到上组显示。
-	HTML5 DnD + flip 动画。
+
+	交互（2026-07-24 改造）：
+	- 点击切换：点击任意图标切换显隐（移动端友好，无需拖拽）。
+	  · 点击「桌面显示」图标 → 移到「已隐藏」
+	  · 点击「已隐藏」图标 → 追加到「桌面显示」末尾
+	- 拖拽排序（桌面端增强）：HTML5 DnD + flip 动画，精确落点排序。
+	- 拖拽持久化：通过 desktopLayout.applyOrder 持久化（修复直接赋值绕过 schedulePersist 的 bug）。
 -->
 <script lang="ts">
   import { appManager } from '$lib/apps/AppManager.svelte'
@@ -21,6 +27,13 @@
   let draggedAppId = $state<string | null>(null)
   let draggedFrom = $state<'visible' | 'hidden' | null>(null)
   let dropTarget = $state<{ id: string; position: 'before' | 'after' } | null>(null)
+
+  // 点击切换显隐（移动端友好替代拖拽）。
+  // isVisible=true 表示当前在显示组 → 点击移到隐藏；反之追加到显示末尾。
+  function toggle(app: InstalledApp, isVisible: boolean) {
+    if (isVisible) desktopLayout.moveToHidden(app.id)
+    else desktopLayout.moveToVisible(app.id)
+  }
 
   function handleDragStart(e: DragEvent, app: InstalledApp, from: 'visible' | 'hidden') {
     draggedAppId = app.id
@@ -58,17 +71,15 @@
       // 跨组：隐藏→显示，先加入显示组，再排序到落点
       desktopLayout.moveToVisible(appId)
     }
-    // 组内排序到落点
+    // 组内排序到落点（通过 applyOrder 持久化，修复直接赋值绕过 schedulePersist 的 bug）
     if (appId !== targetApp.id) {
-      // 插入到 target 前/后
       const apps = [...desktopLayout.desktopApps]
       const idx = apps.indexOf(appId)
       if (idx !== -1) apps.splice(idx, 1)
       const targetIdx = apps.indexOf(targetApp.id)
       if (targetIdx !== -1) {
         apps.splice(dropTarget?.position === 'after' ? targetIdx + 1 : targetIdx, 0, appId)
-        // 直接重设 desktopApps（绕过 reorder 的简单逻辑，支持精确落点）
-        desktopLayout.desktopApps = apps
+        desktopLayout.applyOrder(apps)
       }
     }
     handleDragEnd()
@@ -89,12 +100,6 @@
     e.preventDefault()
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
   }
-
-  // 切换显隐（点击图标快捷操作）
-  function toggle(app: InstalledApp, isVisible: boolean) {
-    if (isVisible) desktopLayout.moveToHidden(app.id)
-    else desktopLayout.moveToVisible(app.id)
-  }
 </script>
 
 <Dialog.Root
@@ -104,7 +109,7 @@
   <Dialog.Content class="max-h-[85vh] max-w-2xl overflow-hidden p-0">
     <Dialog.Header class="flex-row items-center gap-2 border-b px-4 py-3">
       <Dialog.Title>管理桌面</Dialog.Title>
-      <Dialog.Description class="sr-only">管理桌面应用显示、隐藏与排序</Dialog.Description>
+      <Dialog.Description class="sr-only">点击图标切换显隐，或拖拽排序。隐藏图标点击会追加到桌面显示末尾。</Dialog.Description>
     </Dialog.Header>
 
     <div class="max-h-[70vh] space-y-4 overflow-auto p-4">
@@ -127,33 +132,24 @@
             }
           }}
         >
-          {#each visibleApps as app, i (app.id)}
+          {#each visibleApps as app (app.id)}
             <button
-              class="hover:bg-accent group relative flex flex-col items-center gap-1 rounded-lg border p-2 transition-colors {draggedAppId === app.id ? 'opacity-40' : ''} {dropTarget?.id === app.id ? 'ring-2 ring-primary' : ''}"
+              class="hover:bg-destructive/10 group relative flex flex-col items-center gap-1 rounded-lg border p-2 transition-colors {draggedAppId === app.id ? 'opacity-40' : ''} {dropTarget?.id === app.id ? 'ring-primary ring-2' : ''}"
               draggable="true"
+              onclick={() => toggle(app, true)}
               ondragstart={(e) => handleDragStart(e, app, 'visible')}
               ondragend={handleDragEnd}
               ondragover={(e) => handleVisibleDragOver(e, app)}
               ondrop={(e) => handleVisibleDrop(e, app)}
-
+              title="点击隐藏 · 拖拽排序"
               animate:flip={{ duration: 200 }}
             >
               <!-- svelte-ignore ownership_invalid_mutation -->
               <app.icon class="size-6" />
               <span class="w-full truncate text-center text-xs">{app.name}</span>
-              <span
-                class="text-muted-foreground absolute top-0.5 right-0.5 hidden size-5 items-center justify-center rounded-full bg-background group-hover:flex"
-                role="button"
-                tabindex="0"
-                onclick={(e) => { e.stopPropagation(); toggle(app, true) }}
-                onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); toggle(app, true) } }}
-                aria-label="从桌面隐藏"
-              >
-                <EyeOffIcon class="size-3" />
-              </span>
             </button>
           {:else}
-            <p class="text-muted-foreground col-span-full py-4 text-center text-xs">拖拽下方应用到这里显示</p>
+            <p class="text-muted-foreground col-span-full py-4 text-center text-xs">点击下方应用添加到桌面</p>
           {/each}
         </div>
       </section>
@@ -172,26 +168,17 @@
         >
           {#each hiddenApps as app (app.id)}
             <button
-              class="hover:bg-accent group relative flex flex-col items-center gap-1 rounded-lg border p-2 opacity-60 transition-opacity {draggedAppId === app.id ? 'opacity-40' : ''}"
+              class="hover:bg-primary/10 group relative flex flex-col items-center gap-1 rounded-lg border p-2 opacity-60 transition-opacity {draggedAppId === app.id ? 'opacity-40' : ''}"
               draggable="true"
+              onclick={() => toggle(app, false)}
               ondragstart={(e) => handleDragStart(e, app, 'hidden')}
               ondragend={handleDragEnd}
-
+              title="点击显示在桌面 · 拖拽到上方"
               animate:flip={{ duration: 200 }}
             >
               <!-- svelte-ignore ownership_invalid_mutation -->
               <app.icon class="size-6" />
               <span class="w-full truncate text-center text-xs">{app.name}</span>
-              <span
-                class="absolute top-0.5 right-0.5 hidden size-5 items-center justify-center rounded-full bg-background text-muted-foreground group-hover:flex"
-                role="button"
-                tabindex="0"
-                onclick={(e) => { e.stopPropagation(); toggle(app, false) }}
-                onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); toggle(app, false) } }}
-                aria-label="显示在桌面"
-              >
-                <EyeIcon class="size-3" />
-              </span>
             </button>
           {:else}
             <p class="text-muted-foreground col-span-full py-4 text-center text-xs">没有隐藏的应用</p>
