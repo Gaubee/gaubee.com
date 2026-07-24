@@ -48,5 +48,8 @@ export const notificationsApp: AppEntry = {
           ),
       },
     ],
+    description: "通知中心",
+    longDescription:
+      "聚合系统通知，提供即时 toast 推送和历史记录。其它应用通过 NotificationService 推送通知。",
   },
 };

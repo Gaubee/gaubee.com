@@ -74,4 +74,7 @@ export const articlesApp = defineApp({
       ],
     },
   ],
+  description: "浏览文章列表，阅读文章详情",
+  longDescription:
+    "从构建时静态数据读取文章内容，无需登录即可阅读。支持按年份浏览、标签聚合和全文搜索。",
 });

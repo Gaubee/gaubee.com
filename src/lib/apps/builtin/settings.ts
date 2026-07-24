@@ -64,5 +64,8 @@ export const settingsApp: AppEntry = {
         ],
       },
     ],
+    description: "系统设置与偏好",
+    longDescription:
+      "管理系统外观（明暗主题）、账户会话和系统信息。各应用通过声明式注册将自己的设置面板投影到这里。",
   },
 };

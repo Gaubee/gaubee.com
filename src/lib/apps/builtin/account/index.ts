@@ -72,5 +72,8 @@ export const accountApp: AppEntry = {
         ],
       },
     ],
+    description: "账户登录与会话管理",
+    longDescription:
+      "通过 GitHub OAuth 登录，管理账户会话。登录后可编辑内容并提交到 GitHub。",
   },
 };

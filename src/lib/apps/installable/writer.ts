@@ -36,5 +36,10 @@ export const writerApp: AppEntry = {
       },
     ],
     cliCommands: [],
+    description: "Markdown 写作与发表",
+    longDescription:
+      "完整的创作→发表流水线。编辑器支持三视图（编辑/分屏/预览）、自动保存和单篇/批量发表到 GitHub。",
+    version: "1.0.0",
+    author: "Gaubee",
   },
 };

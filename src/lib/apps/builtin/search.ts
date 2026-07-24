@@ -37,5 +37,8 @@ export const searchApp: AppEntry = {
           ),
       },
     ],
+    description: "全文搜索所有内容",
+    longDescription:
+      "搜索文章与说说，支持 Lucene 查询语法和按应用过滤。结果按发布时间优先显示。",
   },
 };

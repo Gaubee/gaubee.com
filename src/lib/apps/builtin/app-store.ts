@@ -22,5 +22,8 @@ export const appStoreApp: AppEntry = {
       },
     ],
     hiddenFromNav: true,
+    description: "安装与管理应用",
+    longDescription:
+      "浏览、安装和卸载应用。系统应用不可卸载，可安装应用可随时移除。",
   },
 };

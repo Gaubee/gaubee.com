@@ -39,5 +39,8 @@ export const shoutApp: AppEntry = {
         order: 1,
       },
     ],
+    description: "浏览短评与碎碎念",
+    longDescription:
+      "记录日常碎片想法，数据来自只读静态层。点击进入详情阅读完整内容。",
   },
 };

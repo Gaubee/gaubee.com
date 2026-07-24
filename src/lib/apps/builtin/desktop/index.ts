@@ -46,5 +46,8 @@ export const desktopApp: AppEntry = {
         ],
       },
     ],
+    description: "系统桌面",
+    longDescription:
+      "GaubeeOS 的默认首页。应用图标网格启动器、桌面小组件和任务栏的背景层。",
   },
 };

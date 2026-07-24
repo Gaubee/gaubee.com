@@ -33,5 +33,11 @@ export const githubApp: AppEntry = {
     services: {
       git: () => gitService,
     },
+    description: "Git 仓库管理",
+    longDescription:
+      "基于 isomorphic-git 的 Git 能力。提供仓库浏览、变更管理和向其它应用暴露的 GitService。",
+    version: "1.0.0",
+    author: "Gaubee",
+    homepage: "https://github.com/Gaubee/gaubee.com",
   },
 };

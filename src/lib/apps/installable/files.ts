@@ -29,5 +29,10 @@ export const filesApp: AppEntry = {
       "src/content/events/",
       "src/content/draft/",
     ],
+    description: "content 目录的文件管理",
+    longDescription:
+      "浏览、新建和管理文章、说说与草稿文件。点击文件进入写作应用编辑器。",
+    version: "1.0.0",
+    author: "Gaubee",
   },
 };

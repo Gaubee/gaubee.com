@@ -154,6 +154,19 @@ export interface AppManifest {
   /** ★ 声明式状态栏菜单（AppManager 投影到 appMenuRegistry，SystemStatusBar 渲染）。
    *  三种位置：system（苹果菜单）/ app（当前应用菜单）/ tray（右上角快捷入口）。 */
   appMenus?: AppMenuDeclaration[];
+
+  // ---- 面向用户的展示元数据（应用市场详情页） ----
+
+  /** 一句话简介（应用市场列表副文本）。 */
+  description?: string;
+  /** 详情页长描述（说明功能与适用场景）。 */
+  longDescription?: string;
+  /** 版本号（如 "1.0.0"）。 */
+  version?: string;
+  /** 作者或组织。 */
+  author?: string;
+  /** 项目主页 URL。 */
+  homepage?: string;
 }
 
 /** 已安装应用实例（含运行时状态）。 */
