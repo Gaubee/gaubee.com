@@ -10,9 +10,8 @@
 		<!-- 启动屏：pure CSS，零 JS 依赖，HTML 解析即见。SPA hydrate 后由 JS 移除。 -->
 		<div id="gaubee-boot">
 			<div class="boot-logo">
-				<img src="/favicon-32.png" alt="GaubeeOS" width="48" height="48" />
+				<img src="/pwa-192.png" alt="GaubeeOS" width="96" height="96" />
 			</div>
-			<div class="boot-spinner"></div>
 		</div>
 		<style>
 			#gaubee-boot {
@@ -20,10 +19,8 @@
 				inset: 0;
 				z-index: 9999;
 				display: flex;
-				flex-direction: column;
 				align-items: center;
 				justify-content: center;
-				gap: 1.25rem;
 				background: #fff;
 				transition: opacity 0.3s ease;
 			}
@@ -36,29 +33,54 @@
 				opacity: 0;
 				pointer-events: none;
 			}
+			/* Logo：圆角包裹 + blur 呼吸光影动画 */
 			.boot-logo {
-				animation: boot-pulse 1.6s ease-in-out infinite;
+				width: 96px;
+				height: 96px;
+				border-radius: 24px;
+				overflow: hidden;
+				position: relative;
+				animation: boot-breathe 2.4s ease-in-out infinite;
 			}
-			.boot-spinner {
-				width: 28px;
-				height: 28px;
-				border: 3px solid rgba(255, 90, 54, 0.2);
-				border-top-color: #ff5a36;
-				border-radius: 50%;
-				animation: boot-spin 0.7s linear infinite;
+			.boot-logo img {
+				width: 100%;
+				height: 100%;
+				object-fit: cover;
+				display: block;
 			}
-			@keyframes boot-spin {
-				to {
-					transform: rotate(360deg);
-				}
+			/* 光影层：用伪元素叠加 box-shadow 模拟呼吸光晕 */
+			.boot-logo::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				border-radius: inherit;
+				box-shadow: 0 0 0 0 rgba(255, 90, 54, 0);
+				animation: boot-glow 2.4s ease-in-out infinite;
 			}
-			@keyframes boot-pulse {
+			@keyframes boot-breathe {
 				0%,
 				100% {
-					opacity: 1;
+					filter: blur(0px);
+					transform: scale(1);
 				}
 				50% {
-					opacity: 0.5;
+					filter: blur(1.5px);
+					transform: scale(0.94);
+				}
+			}
+			@keyframes boot-glow {
+				0%,
+				100% {
+					box-shadow: 0 0 24px 2px rgba(255, 90, 54, 0.15);
+				}
+				50% {
+					box-shadow: 0 0 48px 8px rgba(255, 90, 54, 0.35);
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.boot-logo,
+				.boot-logo::after {
+					animation: none;
 				}
 			}
 		</style>
