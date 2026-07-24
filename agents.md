@@ -150,3 +150,36 @@ AppManifest.searchService ──► Search registry ──► SearchView
 - `pnpm content:prepare` 生成只读 VFS 与搜索索引。
 - `pnpm build` 是静态产物事实来源；SSG E2E 应在 production preview 中运行。
 - `PLAYWRIGHT_BASE_URL` 用于复用已有服务器；未设置时 Playwright 自行运行 `pnpm build && pnpm preview`。
+
+## 毛玻璃标准（backdrop-blur 固定搭配，2026-07-24）
+
+### 为什么要标准化
+
+`backdrop-blur` 模糊背后的内容后，前景文字/图标的可读性会受背景影响——亮图上白字看不清，暗图上黑字看不清。`backdrop-filter` 必须搭配固定的 `contrast`/`brightness` 滤镜来补偿，这是**固定搭配，不可拆分**。
+
+### 标准搭配
+
+```
+亮色模式：backdrop-filter: blur(12px) contrast(2) brightness(0.8)
+暗色模式：backdrop-filter: blur(12px) contrast(0.8) brightness(1.2)
+```
+
+- **亮色**：`contrast(2)` 增强边缘对比 + `brightness(0.8)` 压暗背景，保证深色前景文字在任意背景图上可读。
+- **暗色**：`contrast(0.8)` 柔化 + `brightness(1.2)` 提亮背景，保证浅色前景文字可读。
+
+### 使用方式
+
+在 CSS 中用 dark variant 分别声明（项目用 `@custom-variant dark (&:is(.dark *))`）：
+
+```css
+.glass-card {
+  background: color-mix(in oklch, var(--card) 70%, transparent);
+  backdrop-filter: blur(12px) contrast(2) brightness(0.8);
+}
+:global(.dark) .glass-card,
+.dark .glass-card {
+  backdrop-filter: blur(12px) contrast(0.8) brightness(1.2);
+}
+```
+
+**规则**：任何使用 `backdrop-blur` 的元素，都必须按此搭配写明 contrast/brightness，不允许裸用 `backdrop-filter: blur(...)`。`blur` 半径可调（8-16px），但 contrast/brightness 数值是固定的。

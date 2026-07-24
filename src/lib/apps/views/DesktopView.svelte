@@ -190,9 +190,14 @@
     width: 3.5rem;
     height: 3.5rem;
     border-radius: 1.25rem;
-    background: var(--card);
-    border: 1px solid var(--border);
+    /* 半透明 + backdrop-blur 毛玻璃，与桌面图片背景融合（遵循毛玻璃标准搭配） */
+    background: color-mix(in oklch, var(--card) 70%, transparent);
+    border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
     color: var(--foreground);
+    backdrop-filter: blur(12px) contrast(2) brightness(0.8);
+  }
+  :global(.dark) .app-icon-box {
+    backdrop-filter: blur(12px) contrast(0.8) brightness(1.2);
   }
   .app-icon-active .app-icon-box {
     background: var(--primary);
@@ -226,13 +231,18 @@
     align-items: start;
   }
   .widget-card {
-    background: var(--card);
-    border: 1px solid var(--border);
+    /* 半透明 + backdrop-blur 毛玻璃，与桌面图片背景融合（遵循毛玻璃标准搭配） */
+    background: color-mix(in oklch, var(--card) 70%, transparent);
+    border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
     border-radius: 1.25rem;
     padding: 1rem;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+    backdrop-filter: blur(12px) contrast(2) brightness(0.8);
+  }
+  :global(.dark) .widget-card {
+    backdrop-filter: blur(12px) contrast(0.8) brightness(1.2);
   }
   /* 尺寸档位：wide 跨整行 */
   .widget-size-wide {
