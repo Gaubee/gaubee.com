@@ -8,18 +8,16 @@
   import '../app.css'
   import { ModeWatcher } from 'mode-watcher'
   import { registerSw } from '$lib/sw/register'
+  import { dismissBoot } from '$lib/boot'
 
   let { children } = $props()
 
   // 注册 service worker（仅 production + browser，dev 不注册避免破坏 HMR）
-  // 移除启动屏（SSG 和 SPA 路由都经过根 layout）
   onMount(() => {
     void registerSw()
-    const boot = document.getElementById('gaubee-boot')
-    if (boot) {
-      boot.classList.add('fade-out')
-      setTimeout(() => boot.remove(), 320)
-    }
+    // 根 layout 是所有路由（SSG + SPA）的公共出口，兜底移除启动屏。
+    // 进场动画由 SPA layout 负责（SSG 页面是直出 HTML，无需 blurIn）。
+    dismissBoot()
   })
 </script>
 
