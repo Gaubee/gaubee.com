@@ -8,6 +8,7 @@
   import { navController } from '$lib/nav/nav-controller-instance'
   import * as Card from '$lib/components/ui/card'
   import { Badge } from '$lib/components/ui/badge'
+  import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left'
 
   const navState = $derived(navStore.current)
   const tag = $derived.by(() => {
@@ -22,9 +23,22 @@
   function formatDate(d: Date): string {
     return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
   }
+
+  function back() {
+    navController.navigateMain('/')
+  }
 </script>
 
 <div class="mx-auto max-w-3xl p-4 sm:p-6">
+  <!-- 返回按钮 -->
+  <button
+    class="text-muted-foreground hover:text-foreground mb-6 flex items-center gap-1.5 text-sm transition-colors"
+    onclick={back}
+  >
+    <ArrowLeftIcon class="size-4" />
+    <span>返回</span>
+  </button>
+
   <h1 class="mb-4 text-2xl font-semibold">
     标签：<Badge variant="secondary">{tag || '全部'}</Badge>
   </h1>
