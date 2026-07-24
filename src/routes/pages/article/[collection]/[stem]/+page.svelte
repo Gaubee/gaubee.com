@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { photoswipe } from "$lib/photoswipe/action";
+
   let { data } = $props();
   const article = $derived(data);
 
@@ -44,7 +46,7 @@
   </header>
 
   <!-- 正文（SSG 预渲染 HTML） -->
-  <div class="prose prose-sm dark:prose-invert max-w-none">
+  <div class="prose prose-sm dark:prose-invert max-w-none" use:photoswipe>
     {@html article.html}
   </div>
 

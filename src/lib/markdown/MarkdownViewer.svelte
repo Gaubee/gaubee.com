@@ -13,6 +13,7 @@
   import { onMount } from 'svelte'
   import { highlightCode, getHighlighter } from './shiki-highlighter'
   import { configureMarkdownHeadingIds } from './headings'
+  import { photoswipe } from '$lib/photoswipe/action'
 
   let {
     markdown = '',
@@ -93,10 +94,16 @@
 
 {#if inline}
   <!-- 内联模式：无 prose 包装 -->
-  {@html rendered}
+  <div use:photoswipe>
+    {@html rendered}
+  </div>
 {:else}
   <!-- 完整渲染：prose 排版 + 可选截断雾化 -->
-  <div class="prose prose-sm dark:prose-invert max-w-none" class:truncate-fade={truncated}>
+  <div
+    class="prose prose-sm dark:prose-invert max-w-none"
+    class:truncate-fade={truncated}
+    use:photoswipe
+  >
     {@html rendered}
   </div>
 {/if}
