@@ -17,15 +17,12 @@
   import { widgetRegistry } from '$lib/apps/widget/registry'
   import { routeDomainRegistry } from '$lib/apps/route-domain'
   import { desktopLayout } from '$lib/apps/desktop-layout.svelte'
-  import { desktopService } from '$lib/apps/builtin/desktop/service.svelte'
-  import { backgroundToCss } from '$lib/apps/builtin/desktop/background-render'
   import { motionFade } from '$lib/utils/motion'
   import { flip } from 'svelte/animate'
   import GridIcon from '@lucide/svelte/icons/layout-grid'
 
   const navState = $derived(navStore.current)
-  // 桌面背景：从 desktopService 派生 CSS（响应式，主题应用修改即时刷新）
-  const desktopBg = $derived(backgroundToCss(desktopService.background))
+  // 桌面背景已上移为系统级（.app-layout 提供，见 +layout.svelte），本视图不再渲染背景。
   // 桌面图标网格：由 desktopLayout 决定显示哪些应用及顺序（用户可管理）。
   const launcherApps = $derived(
     desktopLayout.visibleApps(appManager.allInstalled),
@@ -84,7 +81,6 @@
 
 <div
   class="desktop-scroll-area scrollbar-thin scrollbar-track-transparent scrollbar-thumb-[color-mix(in_srgb,currentColor,transparent)]"
-  style={desktopBg}
 >
   <div class="desktop-container">
     <!-- 应用图标网格（启动器）：截断显示，溢出时末尾「全部」入口 -->

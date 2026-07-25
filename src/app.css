@@ -7,6 +7,19 @@
 @plugin '@tailwindcss/typography';
 @plugin 'tailwind-scrollbar';
 
+/* ---------------------------------------------------------------------------
+ * 毛玻璃工具类（遵循毛玻璃标准搭配，见 AGENTS.md）。
+ * backdrop-blur 必须搭配固定 contrast/brightness，不可裸用。
+ * 用于状态栏、Dock 等需要透传系统背景的 shell 元素。
+ * ------------------------------------------------------------------------- */
+.glass-surface {
+  background: color-mix(in oklch, var(--background) 70%, transparent);
+  backdrop-filter: blur(12px) contrast(2) brightness(0.8);
+}
+.dark .glass-surface {
+  backdrop-filter: blur(12px) contrast(0.8) brightness(1.2);
+}
+
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0.008 326);
@@ -232,12 +245,12 @@
   min-width: 0;
 }
 
-/* Dock 侧栏：始终显示（移动/桌面统一），移动端默认折叠态节省空间 */
+/* Dock 侧栏：始终显示（移动/桌面统一），移动端默认折叠态节省空间。
+ * 背景由 .glass-surface 提供（透传系统背景），此处不再设 background。 */
 .desktop-sidebar {
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border);
-  background: var(--sidebar);
   overflow: hidden;
   transition:
     width 0.18s ease,

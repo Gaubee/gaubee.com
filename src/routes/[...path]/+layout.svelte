@@ -26,8 +26,14 @@
   import { notifySuccess, notifyError } from '$lib/apps/builtin/notifications/service.svelte'
   import { ModeWatcher } from 'mode-watcher'
   import { dismissBoot, animateAppIn } from '$lib/boot'
+  import { desktopService } from '$lib/apps/builtin/desktop/service.svelte'
+  import { backgroundToCss } from '$lib/apps/builtin/desktop/background-render'
 
   let { children } = $props()
+
+  // 系统背景：桌面背景上移为系统级（覆盖 .app-layout 全屏）。
+  // 状态栏/Dock 用 backdrop-blur 透传背景（遵循毛玻璃标准）。
+  const systemBackground = $derived(backgroundToCss(desktopService.background))
 
   onMount(() => {
     // 1. 从 AppManager 构建 TabRegistry 并初始化 NavController
@@ -87,8 +93,11 @@
   <title>GaubeeOS</title>
 </svelte:head>
 
-<!-- @container/app：容器查询上下文 -->
-<div class="app-layout" style="container-name: app; container-type: inline-size">
+<!-- @container/app：容器查询上下文。系统背景由 desktopService 提供（桌面背景上移为系统级）。 -->
+<div
+  class="app-layout"
+  style="container-name: app; container-type: inline-size; {systemBackground}"
+>
   <!-- 顶部系统状态栏（全宽，最高优先级，高于左侧 Dock） -->
   <SystemStatusBar />
 

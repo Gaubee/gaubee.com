@@ -72,7 +72,7 @@
 </script>
 
 <header
-  class="system-statusbar sticky top-0 z-[var(--z-shell-base)] flex h-9 shrink-0 items-center gap-1 border-b border-border bg-background/95 px-2 text-xs backdrop-blur supports-[backdrop-filter]:bg-background/80 relative"
+  class="system-statusbar glass-surface sticky top-0 z-[var(--z-shell-base)] flex h-9 shrink-0 items-center gap-1 border-b border-border px-2 text-xs relative"
 >
   <!-- 左：GaubeeOS LOGO 系统菜单（苹果菜单） -->
   {#if systemMenus.length > 0}

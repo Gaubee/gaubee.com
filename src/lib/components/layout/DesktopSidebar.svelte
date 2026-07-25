@@ -46,7 +46,7 @@
   const onDesktop = $derived(navState.mainLocation.pathname === '/')
 </script>
 
-<aside class="desktop-sidebar p-2" data-collapsed={collapsed}>
+<aside class="desktop-sidebar glass-surface p-2" data-collapsed={collapsed}>
   <!-- 顶部桌面入口 + 折叠按钮（左栏时桌面在顶部） -->
   <div class="mb-3 flex items-center {collapsed ? 'justify-center' : 'justify-between'}">
     {#if collapsed}
