@@ -26,6 +26,9 @@
 
   let { pathname }: Props = $props();
 
+  /** 正文容器（bind:this，传给 TocTree 作为 ScrollSpy 的 container）。 */
+  let articleContentEl: HTMLElement | undefined = $state();
+
   /** 解析路径参数。 */
   const target = $derived.by(() => {
     const match = pathname.match(/^\/article\/(articles|events)\/(.+)$/)
@@ -134,8 +137,8 @@
           {/if}
         </header>
 
-        <!-- 正文 -->
-        <article class="article-content prose dark:prose-invert prose-zinc max-w-none">
+        <!-- 正文：bind this 给 TocTree 用作 ScrollSpy 的 container -->
+        <article bind:this={articleContentEl} class="article-content prose dark:prose-invert prose-zinc max-w-none">
           <MarkdownViewer markdown={post.body} />
         </article>
 
@@ -177,13 +180,13 @@
 
       <!-- 桌面端 TOC：全局应用导航在左，文章导航固定在右。 -->
       <aside class="hidden xl:block">
-        <TocTree markdown={post.body} />
+        <TocTree markdown={post.body} contentEl={articleContentEl} />
       </aside>
     </div>
 
     <!-- 移动端 TOC（浮动按钮 + Sheet） -->
     <div class="xl:hidden">
-      <TocTree markdown={post.body} />
+      <TocTree markdown={post.body} contentEl={articleContentEl} />
     </div>
   {/if}
 </div>

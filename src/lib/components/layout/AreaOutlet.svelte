@@ -27,7 +27,6 @@
   import { blurTransition } from '$lib/utils/motion'
   import AppShell from '$lib/app-scaffold/AppShell.svelte'
   import DesktopView from '$lib/apps/views/DesktopView.svelte'
-  import { desktopService } from '$lib/apps/builtin/desktop/service.svelte'
   import type { AppManifest } from '$lib/apps/types'
   import type { Area, TabId } from '$lib/nav/controller'
   import type { Component } from 'svelte'
@@ -35,12 +34,6 @@
   let { area }: { area: Area } = $props()
 
   const navState = $derived(navStore.current)
-
-  // shell 容器底色：有壁纸时毛玻璃透出，default 时退化纯色底（可读性优先）。
-  // 单一真相源为 desktopService.isWallpaperActive，避免各处自行判断 default。
-  const surfaceClass = $derived(
-    desktopService.isWallpaperActive ? 'glass-surface' : 'app-surface-opaque',
-  )
 
   const location = $derived(
     area === 'main'
@@ -188,7 +181,7 @@
 {:else if area === 'main' && !activeTabId && deepLinkLoader}
   {@const manifest = manifestForPath(location.pathname)}
   {@const shellApp = manifest}
-  <div class="h-full overflow-auto {surfaceClass}">
+  <div class="h-full overflow-auto bg-background">
     {#if deepLinkView}
       {@const DeepView = deepLinkView}
       <div in:motionBlur>
@@ -223,7 +216,7 @@
       {@const manifest = manifestForTab(tabId)}
       <!-- 应用浮层：常驻 DOM 保活，激活时覆盖桌面层。显隐用 WAAPI blurIn/blurOut。 -->
       <div
-        class="app-overlay-layer {surfaceClass}"
+        class="app-overlay-layer"
         class:app-overlay-hidden={!isThisActive}
         use:blurTransition={{ hiddenClass: 'app-overlay-hidden' }}
       >
@@ -274,12 +267,14 @@
   /* 应用浮层：常驻 DOM 保活，激活时显示并覆盖桌面。
    * 显隐用 WAAPI blurIn/blurOut 动画（见 use:blurTransition action），visibility 锁交互。
    * 默认态 filter:none，隐藏态 overflow:hidden 避免内容参与父级尺寸计算。
-   * 背景不在此声明——由 shell 容器上的 .glass-surface / .app-surface-opaque 提供，
-   * 跟随 desktopService.isWallpaperActive 状态（全局系统底色一致性）。 */
+   * 背景保持非透明 var(--background)：App 区域承载 shadcn-ui 组件，
+   * 这些组件不是为毛玻璃透传设计的，强行半透明会引入海量样式回归。
+   * 透传定制（状态栏/Dock）由 .glass-surface 单独处理（见 app.css）。 */
   .app-overlay-layer {
     position: absolute;
     inset: 0;
     z-index: 10;
+    background: var(--background);
     overflow: auto;
   }
   .app-overlay-hidden {

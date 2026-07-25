@@ -12,6 +12,13 @@
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { Badge } from '$lib/components/ui/badge'
   import AIBadge from '$lib/components/ui/ai-badge/AIBadge.svelte'
+  import {
+    createPrefixedSectionDetector,
+    createScrollSpy,
+    findScrollParent,
+    type HighlightMap,
+  } from '$lib/components/toc/scroll-spy.dom'
+  import { browser } from '$app/environment'
   import FileTextIcon from '@lucide/svelte/icons/file-text'
   import CalendarIcon from '@lucide/svelte/icons/calendar'
   import ArrowRightIcon from '@lucide/svelte/icons/arrow-right'
@@ -25,6 +32,26 @@
   // 首帧骨架屏：管道尚未初始化时显示
   const loading = $derived(!contentQuery.initialized)
   let yearRefs = $state<Map<number, HTMLElement>>(new Map())
+
+  /** 年份分组容器（包裹所有 section），bind:this 给 ScrollSpy。 */
+  let yearListEl: HTMLElement | undefined = $state()
+  /** ScrollSpy 高亮映射（key=`year-{year}`）。 */
+  let yearHighlights = $state<HighlightMap>(new Map())
+
+  // 年份分组 ScrollSpy：container=yearListEl，detector 识别 section#year-*
+  $effect(() => {
+    if (!browser || !yearListEl) return
+    const viewport = findScrollParent(yearListEl)
+    if (!viewport) return
+    const handle = createScrollSpy({
+      container: yearListEl,
+      detector: createPrefixedSectionDetector('year-'),
+      viewport,
+      topOffset: 80,
+      onUpdate: (m) => (yearHighlights = m),
+    })
+    return () => handle.destroy()
+  })
 
   function formatDate(d: Date): string {
     return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -96,10 +123,10 @@
           <p class="text-muted-foreground text-sm">还没有发布任何文章</p>
         </div>
       {:else}
-        <!-- 按年份分组的文章列表 -->
-        <div class="space-y-12">
+        <!-- 按年份分组的文章列表：bind this 给 ScrollSpy 作 container -->
+        <div class="space-y-12" bind:this={yearListEl}>
           {#each [...grouped.entries()] as [year, yearPosts], yearIndex (year)}
-            <section use:yearAnchor={year} aria-labelledby={`year-${year}`}>
+            <section id="year-{year}" use:yearAnchor={year} aria-labelledby={`year-${year}`}>
               <!-- 年份标题 -->
               <div class="flex items-center gap-4 mb-6">
                 <h2 id={`year-${year}`} class="text-balance text-2xl font-bold">{year}</h2>
@@ -111,7 +138,7 @@
               <div class="space-y-4">
                 {#each yearPosts as post, postIndex (post.path)}
                   <article
-                    class="overflow-hidden rounded-2xl border bg-card transition-colors hover:border-primary/30 hover:bg-accent/20"
+                    class="overflow-hidden rounded-2xl border transition-colors hover:border-primary/40 hover:bg-accent"
                     style="animation: fadeInUp 0.5s ease-out {(yearIndex * 5 + postIndex) * 0.05}s both;"
                   >
                     <a
@@ -173,7 +200,7 @@
     <!-- 桌面端年份 TOC：全局应用导航在左，列表时间导航固定在右。 -->
     <aside class="hidden xl:block">
       {#if !loading && posts.length > 0}
-        <YearToc posts={posts} onSelectYear={scrollToYear} />
+        <YearToc posts={posts} onSelectYear={scrollToYear} highlights={yearHighlights} />
       {/if}
     </aside>
   </div>
