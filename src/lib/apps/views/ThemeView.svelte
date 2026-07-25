@@ -311,8 +311,8 @@
               style={backgroundPreviewCss || 'background: var(--background)'}
               aria-label="桌面背景预览"
             >
-              <!-- 亮模式预览（左半，默认） -->
-              <div class="preview-pane preview-light relative flex flex-col gap-2 p-2.5">
+              <!-- 亮模式预览（左半，.force-light 强制亮色变量，不受全局 .dark 影响） -->
+              <div class="preview-pane force-light relative flex flex-col gap-2 p-2.5">
                 <div class="flex gap-1.5">
                   <span class="preview-icon"><span class="preview-icon-dot"></span></span>
                   <span class="preview-icon"></span>

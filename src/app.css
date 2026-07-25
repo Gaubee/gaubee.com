@@ -20,7 +20,13 @@
   backdrop-filter: blur(12px) contrast(0.8) brightness(1.2);
 }
 
-:root {
+/*
+ * 亮色主题变量。
+ * :root 是全局亮色默认；.force-light 用于在暗色全局环境下强制亮色（如主题预览的亮色面板）。
+ * .force-light 容器重定义亮色变量，覆盖祖先 .dark 的继承。
+ */
+:root,
+.force-light {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0.008 var(--base-h));
   --card: oklch(1 0 0);
