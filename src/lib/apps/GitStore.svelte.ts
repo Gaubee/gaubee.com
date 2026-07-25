@@ -10,11 +10,12 @@ import { getFs, type ZenFs } from "$lib/fs/zenfs-instance";
  *   编辑/发表/提交请走 GitService（gaubeeos.getAppService('git')）。
  * - clone 结果持久化到 ZenFS（IndexedDB），刷新页面后历史仍在。
  *
- * Svelte 5 runes 响应式。
+ * 克隆策略：
+ * - 默认浅克隆（depth=1, singleBranch=true），快速获取最新提交 + 工作树。
+ * - 用户可手动「深克隆」（unshallow），获取完整历史。
+ * - shallow 状态通过读取 .git/shallow 文件判断（isomorphic-git 协议层支持）。
  *
- * 存储：使用 ZenFS 单例（@lib/fs/zenfs-instance），挂载点 /git。
- * isomorphic-git 的 PromiseFsClient 只要求 fs.promises.{readFile,...}，
- * ZenFS 原生提供该 promises 命名空间，直接作为 fs client 传入即可。
+ * Svelte 5 runes 响应式。
  */
 import * as git from "isomorphic-git";
 import http from "isomorphic-git/http/web";
@@ -29,6 +30,10 @@ export interface RepoConfig {
   branch: string;
   /** 是否使用 GitHub OAuth 认证（否则用 public access）。 */
   authenticated: boolean;
+  /** clone 目标路径（ZenFS 绝对路径，如 /git）。默认 /git。 */
+  dir?: string;
+  /** 是否浅克隆（depth=1）。默认 true。 */
+  shallow?: boolean;
 }
 
 export interface GitCommit {
@@ -52,8 +57,8 @@ export interface CloneProgress {
 // 状态（Svelte 5 runes）
 // ---------------------------------------------------------------------------
 
-/** isomorphic-git 的 clone 根目录（与主工作区 /workspace 分离）。 */
-const GIT_ROOT = "/git";
+/** isomorphic-git 的默认 clone 根目录（与主工作区 /workspace 分离）。 */
+const DEFAULT_GIT_ROOT = "/git";
 
 class GitStore {
   /** 当前绑定的仓库。 */
@@ -70,6 +75,8 @@ class GitStore {
   error = $state<string | null>(null);
   /** clone/pull 进度（null = 无操作/完成）。 */
   progress = $state<CloneProgress | null>(null);
+  /** 当前仓库是否为浅克隆（unshallow 后变 false）。 */
+  isShallow = $state(false);
 
   /** 获取（懒加载）已初始化的 ZenFS 实例。 */
   private async fs(): Promise<ZenFs> {
@@ -79,36 +86,53 @@ class GitStore {
     return this.fsInstance;
   }
 
-  /** clone 前清空 /git 目录，避免上次 clone 残留污染本次。 */
-  private async cleanGitRoot(): Promise<void> {
+  /** clone 前清空目标目录，避免上次 clone 残留污染本次。 */
+  private async cleanDir(dir: string): Promise<void> {
     const fs = await this.fs();
     try {
-      await fs.promises.rm(GIT_ROOT, { recursive: true, force: true });
+      await fs.promises.rm(dir, { recursive: true, force: true });
     } catch {
       // 不存在忽略
     }
-    await fs.promises.mkdir(GIT_ROOT, { recursive: true });
+    await fs.promises.mkdir(dir, { recursive: true });
+  }
+
+  /** 判断仓库是否为浅克隆（读取 .git/shallow 文件是否存在）。 */
+  private async checkShallow(dir: string): Promise<boolean> {
+    const fs = await this.fs();
+    try {
+      await fs.promises.readFile(`${dir}/.git/shallow`);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   // ---- 核心 Git 操作 ----
 
-  /** 克隆仓库（匿名，仅公开仓库；token 在 Worker 端，isomorphic-git 拿不到）。 */
+  /** 克隆仓库（匿名，仅公开仓库）。
+   *  默认浅克隆（depth=1, singleBranch=true），快速获取最新提交。 */
   async clone(config: RepoConfig): Promise<void> {
     this.loading = true;
     this.error = null;
     this.progress = { phase: "准备中", loaded: 0, total: 0 };
+    const dir = config.dir ?? DEFAULT_GIT_ROOT;
+    const shallow = config.shallow ?? true;
     try {
       const fs = await this.fs();
-      await this.cleanGitRoot();
+      await this.cleanDir(dir);
       const url = `https://github.com/${config.owner}/${config.repo}`;
 
       await git.clone({
         fs: fs as unknown as git.PromiseFsClient,
         http,
-        dir: GIT_ROOT,
+        dir,
         url,
         ref: config.branch,
         corsProxy: "https://cors.isomorphic-git.org",
+        // 浅克隆：只拉最新一层提交 + 单分支，大幅减少网络传输
+        depth: shallow ? 1 : undefined,
+        singleBranch: true,
         onProgress: (p: CloneProgress) => {
           this.progress = p;
         },
@@ -116,6 +140,7 @@ class GitStore {
 
       this.repo = config;
       this.branch = config.branch;
+      this.isShallow = await this.checkShallow(dir);
       await this.refresh();
     } catch (e) {
       this.error = e instanceof Error ? e.message : String(e);
@@ -132,19 +157,62 @@ class GitStore {
     this.loading = true;
     this.error = null;
     this.progress = { phase: "拉取中", loaded: 0, total: 0 };
+    const dir = this.repo.dir ?? DEFAULT_GIT_ROOT;
     try {
       const fs = await this.fs();
       await git.pull({
         fs: fs as unknown as git.PromiseFsClient,
         http,
-        dir: GIT_ROOT,
+        dir,
         ref: this.branch,
         author: { name: "GaubeeOS", email: "os@gaubee.com" },
         corsProxy: "https://cors.isomorphic-git.org",
+        singleBranch: true,
         onProgress: (p: CloneProgress) => {
           this.progress = p;
         },
       });
+      await this.refresh();
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : String(e);
+    } finally {
+      this.loading = false;
+      this.progress = null;
+    }
+  }
+
+  /** 深克隆（unshallow）：获取完整历史。
+   *  对应 git fetch --unshallow。isomorphic-git 用 fetch + 大 depth 实现。 */
+  async unshallow(): Promise<void> {
+    if (!this.repo || !this.isShallow) return;
+    this.loading = true;
+    this.error = null;
+    this.progress = { phase: "深克隆中", loaded: 0, total: 0 };
+    const dir = this.repo.dir ?? DEFAULT_GIT_ROOT;
+    try {
+      const fs = await this.fs();
+      // 删除 shallow 标记文件，让 fetch 不受 depth 限制
+      try {
+        await fs.promises.unlink(`${dir}/.git/shallow`);
+      } catch {
+        // 不存在忽略
+      }
+      // 用大 depth 的 fetch 拉完整历史（对应 git fetch --unshallow）
+      await git.fetch({
+        fs: fs as unknown as git.PromiseFsClient,
+        http,
+        dir,
+        ref: this.branch,
+        remote: "origin",
+        corsProxy: "https://cors.isomorphic-git.org",
+        singleBranch: true,
+        depth: 999999,
+        relative: true,
+        onProgress: (p: CloneProgress) => {
+          this.progress = p;
+        },
+      });
+      this.isShallow = false;
       await this.refresh();
     } catch (e) {
       this.error = e instanceof Error ? e.message : String(e);
@@ -159,11 +227,12 @@ class GitStore {
     if (!this.repo) return;
     this.loading = true;
     this.error = null;
+    const dir = this.repo.dir ?? DEFAULT_GIT_ROOT;
     try {
       const fs = await this.fs();
       const log = await git.log({
         fs: fs as unknown as git.PromiseFsClient,
-        dir: GIT_ROOT,
+        dir,
         ref: this.branch,
         depth: 50,
       });

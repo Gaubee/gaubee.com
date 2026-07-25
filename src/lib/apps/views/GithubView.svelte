@@ -17,6 +17,8 @@
   import { navController } from '$lib/nav/nav-controller-instance'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
+  import { Label } from '$lib/components/ui/label'
+  import { Switch } from '$lib/components/ui/switch'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import * as Card from '$lib/components/ui/card'
   import GitHubMark from '$lib/components/icons/GitHubMark.svelte'
@@ -24,10 +26,16 @@
   import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw'
   import LogInIcon from '@lucide/svelte/icons/log-in'
   import CodeXmlIcon from '@lucide/svelte/icons/code-xml'
+  import ChevronDownIcon from '@lucide/svelte/icons/chevron-down'
+  import ChevronUpIcon from '@lucide/svelte/icons/chevron-up'
+  import LayersIcon from '@lucide/svelte/icons/layers'
 
   let owner = $state('gaubee')
   let repo = $state('gaubee.com')
   let branch = $state('main')
+  let showAdvanced = $state(false)
+  let cloneDir = $state('/git')
+  let shallowClone = $state(true)
 
   // 通过账户服务获取登录态（不再直接 import authStore）
   const account = $derived(gaubeeos.getAppService('account'))
@@ -37,6 +45,7 @@
   const loading = $derived(gitStore.loading)
   const error = $derived(gitStore.error)
   const progress = $derived(gitStore.progress)
+  const isShallow = $derived(gitStore.isShallow)
 
   async function handleClone() {
     const config: RepoConfig = {
@@ -44,6 +53,8 @@
       repo: repo.trim(),
       branch: branch.trim(),
       authenticated: accountState.authenticated,
+      dir: cloneDir.trim() || '/git',
+      shallow: shallowClone,
     }
     try {
       await gitStore.clone(config)
@@ -54,6 +65,14 @@
 
   async function handlePull() {
     await gitStore.pull()
+  }
+
+  async function handleUnshallow() {
+    try {
+      await gitStore.unshallow()
+    } catch {
+      // 错误已在 store 中处理
+    }
   }
 
   function formatDate(ts: number): string {
@@ -148,6 +167,37 @@
       {#if error}
         <p class="text-destructive text-sm">{error}</p>
       {/if}
+
+      <!-- 高级选项（折叠）：目标路径 + 浅克隆开关 -->
+      <button
+        class="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors"
+        onclick={() => (showAdvanced = !showAdvanced)}
+      >
+        {#if showAdvanced}
+          <ChevronUpIcon class="size-3" />
+        {:else}
+          <ChevronDownIcon class="size-3" />
+        {/if}
+        高级选项
+      </button>
+      {#if showAdvanced}
+        <div class="space-y-3 rounded-lg border border-dashed p-3">
+          <div class="space-y-1.5">
+            <Label class="text-xs">目标路径</Label>
+            <Input placeholder="/git" bind:value={cloneDir} class="font-mono text-xs" />
+            <p class="text-muted-foreground text-[11px]">
+              仓库数据保存到浏览器 IndexedDB（ZenFS），刷新页面后保留。
+            </p>
+          </div>
+          <div class="flex items-center justify-between">
+            <div class="space-y-0.5">
+              <Label class="text-xs">浅克隆（depth=1）</Label>
+              <p class="text-muted-foreground text-[11px]">仅拉取最新提交，大幅减少下载量</p>
+            </div>
+            <Switch bind:checked={shallowClone} />
+          </div>
+        </div>
+      {/if}
     </Card.Content>
   </Card.Root>
 
@@ -161,6 +211,21 @@
           <span class="text-muted-foreground text-sm font-normal">
             {repoState.owner}/{repoState.repo}@{gitStore.branch}
           </span>
+          {#if isShallow}
+            <span class="bg-muted text-muted-foreground flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px]">
+              <LayersIcon class="size-3" />
+              浅克隆
+            </span>
+            <Button variant="outline" size="sm" onclick={handleUnshallow} disabled={loading} class="ml-auto h-7 gap-1 text-xs">
+              {#if loading}
+                <RefreshCwIcon class="size-3 animate-spin" />
+                深克隆中…
+              {:else}
+                <LayersIcon class="size-3" />
+                深克隆
+              {/if}
+            </Button>
+          {/if}
         </Card.Title>
       </Card.Header>
       <Card.Content>

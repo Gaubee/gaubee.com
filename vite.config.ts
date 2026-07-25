@@ -1,9 +1,18 @@
+import { Buffer } from "buffer";
+
 import adapter from "@sveltejs/adapter-static";
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { playwright } from "@vitest/browser-playwright";
 import { mdsvex } from "mdsvex";
 import { defineConfig } from "vitest/config";
+
+// isomorphic-git 内部大量使用 Node.js Buffer（Buffer.from/Buffer.alloc/Buffer.isBuffer）。
+// 浏览器无原生 Buffer，需全局 polyfill（isomorphic-git 不走 import 而是 JS 全局引用）。
+// ZenFS 内部自带 polyfill，但 isomorphic-git 是独立包，需在此全局注入。
+if (typeof globalThis.Buffer === "undefined") {
+  (globalThis as Record<string, unknown>).Buffer = Buffer;
+}
 
 export default defineConfig({
   plugins: [

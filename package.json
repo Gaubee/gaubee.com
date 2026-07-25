@@ -39,6 +39,7 @@
     "@xterm/xterm": "^6.0.0",
     "@zenfs/core": "^2.5.8",
     "@zenfs/dom": "^1.2.9",
+    "buffer": "^6.0.3",
     "codemirror": "^6.0.2",
     "idb": "^8.0.3",
     "isomorphic-git": "^1.38.9",
