@@ -21,9 +21,22 @@
 }
 
 /*
+ * 运行时色相旋钮（仅 :root 声明，不进 .force-light）。
+ * themeService 通过 documentElement.style.setProperty 注入到 <html>，
+ * .force-light 和 .dark 都继承 <html> 的运行时值，不在此重复声明（否则覆盖注入值）。
+ * - --primary-h：品牌强调色（primary / chart 系列 / sidebar-primary），橙红系。
+ * - --base-h：中性表面色（foreground / muted / border / ring / sidebar 系列等），mauve 系。
+ * L/C 保持字面量（锁定亮度 = 可访问性保证），仅色相旋转。
+ */
+:root {
+  --primary-h: 16.935;
+  --base-h: 326;
+}
+
+/*
  * 亮色主题变量。
  * :root 是全局亮色默认；.force-light 用于在暗色全局环境下强制亮色（如主题预览的亮色面板）。
- * .force-light 容器重定义亮色变量，覆盖祖先 .dark 的继承。
+ * 注意：--primary-h / --base-h 不在此声明（由上方独立 :root 提供，.force-light 继承 <html> 运行时注入值）。
  */
 :root,
 .force-light {
@@ -33,18 +46,6 @@
   --card-foreground: oklch(0.145 0.008 var(--base-h));
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0.008 var(--base-h));
-  /*
-   * 主题色相旋钮（2026-07-24）：运行时换肤双旋钮。
-   * - --primary-h：品牌强调色（primary / chart 系列 / sidebar-primary），橙红系。
-   * - --base-h：中性表面色（foreground / muted / border / ring / sidebar 系列等），mauve 系。
-   * themeService 通过 documentElement.style.setProperty 注入，L/C 保持字面量
-   * （锁定亮度 = 可访问性保证），仅色相旋转。
-   * 中性色规律（色彩学推导，参考 shadcn-svelte base color 体系）：
-   *   所有中性色的 H = base-h，C 极低（0.001-0.034），L 按表面层级固定。
-   *   亮模式 background 永远纯白（oklch(1 0 0)），不随 base 变。
-   */
-  --primary-h: 16.935;
-  --base-h: 326;
   --primary: oklch(0.514 0.222 var(--primary-h));
   --primary-foreground: oklch(0.969 0.015 calc(var(--primary-h) - 4.513));
   --secondary: oklch(0.967 0.001 var(--base-h));
