@@ -1,11 +1,13 @@
-import { IDBFactory } from "fake-indexeddb";
-import "fake-indexeddb/auto";
 /**
  * bash 命令内核单元测试。
  *
- * 复用 vfs.test.ts 的 mock 模式（fake-indexeddb + mock GitHub client）。
+ * 复用 vfs.test.ts 的 mock 模式（InMemory ZenFS + fake-indexeddb meta-store + mock GitHub client）。
  * ctx.write 用数组捕获输出，便于断言。
  */
+import { configureSingle, fs as zenfs } from "@zenfs/core";
+import "fake-indexeddb/auto";
+import { InMemory } from "@zenfs/core";
+import { IDBFactory } from "fake-indexeddb";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGetFileText = vi.fn<(p: string) => Promise<string>>();
@@ -22,6 +24,16 @@ vi.mock("$lib/github/client", () => ({
 }));
 
 vi.mock("$app/environment", () => ({ browser: true }));
+
+// mock ZenFS 单例：getFs 返回共享的 zenfs（用 InMemory 后端，每测试 fresh）。
+vi.mock("$lib/fs/zenfs-instance", () => ({
+  getFs: async () => {
+    await configureSingle({ backend: InMemory });
+    await zenfs.promises.mkdir("/workspace", { recursive: true });
+    return zenfs;
+  },
+  getCachedFs: () => zenfs,
+}));
 
 // mock 应用服务总线：git 命令走 gaubeeos.requestAppService('git')，
 // 返回一个委托真实 vfs 的 git service（鉴权守卫绕过：requireAuthenticated 不抛）。
@@ -74,7 +86,7 @@ vi.mock("$lib/os/services", () => ({
 }));
 
 const { vfs } = await import("$lib/vfs/vfs");
-const { vfsClear } = await import("$lib/db");
+const { metaClear, _resetMetaDbForTest } = await import("$lib/vfs/meta-store");
 const { runLine, tokenize, resolvePath, prettyCwd, tabComplete } = await import("./shell");
 import type { CommandContext } from "./shell";
 
@@ -88,7 +100,9 @@ beforeAll(() => {
 
 beforeEach(async () => {
   freshIndexedDB();
-  await vfsClear();
+  _resetMetaDbForTest();
+  vfs._resetFsForTest();
+  await metaClear();
   mockGetFileText.mockReset();
   mockFetchTree.mockReset();
   mockCommitChanges.mockReset();
