@@ -271,12 +271,7 @@
   flex: 1;
   min-height: 0;
   min-width: 0;
-  /* 统一边框：把原状态栏 border-b 与 Dock border-right 合并到这里。
-   * 视觉上 Dock 与主体之间、状态栏与主体之间共用同一条 L 形边线，更和谐。
-   * 边框色用 var(--border) 与原各处一致。 */
-  border-width: 1px 0 0 1px;
-  border-style: solid;
-  border-color: var(--border);
+  box-shadow: 2px 2px 5px -2px var(--border);
 }
 
 /* Dock 侧栏：始终显示（移动/桌面统一），移动端默认折叠态节省空间。

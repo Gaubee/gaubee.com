@@ -118,8 +118,12 @@
     <!-- 左侧 Dock 侧栏（始终显示，移动端默认折叠态） -->
     <DesktopSidebar />
 
-    <!-- 主体 -->
-    <div class="app-body">
+    <!-- 主体
+     统一边框：把原状态栏 border-b 与 Dock border-right 合并到这里。
+     视觉上 Dock 与主体之间、状态栏与主体之间共用同一条 L 形边线，更和谐。
+     边框色用 var(--border) 与原各处一致。
+     -->
+    <div class="app-body border-border/80 border border-r-0 border-b-0">
       <!-- main + bottom 垂直堆叠 -->
       <div class="flex min-h-0 flex-1 flex-col">
         <main class="main-content">
