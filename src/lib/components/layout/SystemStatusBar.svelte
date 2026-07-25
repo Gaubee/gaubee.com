@@ -50,10 +50,13 @@
     if (item.onClick) {
       item.onClick()
     } else if (item.link) {
-      // 若 link 是某应用 entry route，用 openApp（加入任务栏 + 聚焦）；
-      // 否则 navigateMain（深链接，如 /article/xxx）。
+      // 若 link 是某非隐藏应用的 entry route，用 openApp（加入任务栏 + 聚焦）；
+      // 否则 navigateMain（深链接，如 /article/xxx 或 hiddenFromNav 应用的 entry route）。
+      // hiddenFromNav 应用（如 account/app-store）的 entry route 走 deep link 渲染，
+      // 不应 openApp（会错误加入 mainTabs，但它没注册 tabView 导致空白）。
       const appId = appManager.findIdByRoute(item.link)
-      if (appId) {
+      const app = appId ? appManager.findById(appId) : undefined
+      if (appId && app && !app.hiddenFromNav) {
         navController.openApp(item.link)
       } else {
         navController.navigateMain(item.link)
