@@ -1,11 +1,15 @@
 /**
- * GitHub 客户端：封装对仓库文件的读写操作。
+ * GitHub 客户端：封装对仓库文件的读写操作 + 只读 REST API 浏览。
  *
  * 认证后通过 Worker 代理（fetchGithub，cookie httpOnce 注入 token）。
  * 所有 GitHub REST API 调用都走 /api/proxy/*，前端不接触 token。
  *
- * 仓库：gaubee/gaubee.com（OWNER/REPO 常量）。
+ * 仓库：gaubee/gaubee.com（OWNER/REPO 常量，写作/提交主路径）。
  * 内容路径：src/content/articles、src/content/events。
+ *
+ * 多仓库只读浏览：listContents / getFileText / fetchTree / listCommits 均接受
+ * 可选 { owner, repo } 参数（默认 OWNER/REPO，向后兼容），可浏览任意公开仓库的
+ * 历史/文件/目录（经 Worker，有 token 任意仓库可读，无 token 受 60/h 限速）。
  */
 import { fetchGithub } from "$lib/auth/session.svelte";
 import type { Collection } from "$lib/data/frontmatter";
@@ -50,6 +54,117 @@ export interface GhContentEntry {
   sha: string;
 }
 
+/** 仓库定位参数（默认指向 gaubee/gaubee.com，向后兼容）。 */
+export interface RepoRef {
+  owner?: string;
+  repo?: string;
+}
+
+function resolveRepo(ref?: RepoRef): { owner: string; repo: string } {
+  return { owner: ref?.owner ?? OWNER, repo: ref?.repo ?? REPO };
+}
+
+/** GitHub Commits API 返回的 commit 摘要（listCommits 用）。 */
+export interface CommitInfo {
+  sha: string;
+  /** commit message 第一行（标题）。 */
+  message: string;
+  /** 完整 commit message（含正文）。 */
+  body: string;
+  author: {
+    name: string;
+    email: string | null;
+    /** 提交时间（ISO 字符串，可能是 null）。 */
+    date: string | null;
+  } | null;
+  committer: {
+    name: string;
+    email: string | null;
+    date: string | null;
+  } | null;
+  /** 作者头像（取自 GitHub author，匿名提交可能缺失）。 */
+  avatarUrl: string | null;
+  /** 提交者 GitHub login（匿名可能缺失）。 */
+  login: string | null;
+  parents: string[];
+}
+
+interface GhCommitResponse {
+  sha: string;
+  commit: {
+    message: string;
+    author?: { name: string; email?: string | null; date?: string | null } | null;
+    committer?: { name: string; email?: string | null; date?: string | null } | null;
+  };
+  author?: { login: string; avatar_url: string } | null;
+  committer?: { login: string; avatar_url: string } | null;
+  parents?: { sha: string }[];
+}
+
+function toCommitInfo(c: GhCommitResponse): CommitInfo {
+  const msg = c.commit?.message ?? "";
+  const newlineIdx = msg.indexOf("\n");
+  return {
+    sha: c.sha,
+    message: newlineIdx === -1 ? msg : msg.slice(0, newlineIdx),
+    body: newlineIdx === -1 ? "" : msg.slice(newlineIdx + 1).trim(),
+    author: c.commit?.author
+      ? {
+          name: c.commit.author.name,
+          email: c.commit.author.email ?? null,
+          date: c.commit.author.date ?? null,
+        }
+      : null,
+    committer: c.commit?.committer
+      ? {
+          name: c.commit.committer.name,
+          email: c.commit.committer.email ?? null,
+          date: c.commit.committer.date ?? null,
+        }
+      : null,
+    avatarUrl: c.author?.avatar_url ?? c.committer?.avatar_url ?? null,
+    login: c.author?.login ?? c.committer?.login ?? null,
+    parents: (c.parents ?? []).map((p) => p.sha),
+  };
+}
+
+/**
+ * 列出仓库的提交历史（GitHub REST API: GET /repos/{owner}/{repo}/commits）。
+ *
+ * @param opts 可选：仓库定位（默认 gaubee/gaubee.com）、分支/ref、分页（perPage/page）、
+ *             路径前缀（只看某文件/目录的历史）、作者 login 过滤。
+ * @returns CommitInfo 数组（最新在前）。
+ */
+export async function listCommits(
+  opts: RepoRef & {
+    /** ref 或分支名，默认 BRANCH。 */
+    sha?: string;
+    /** 每页数量，默认 30，最大 100。 */
+    perPage?: number;
+    /** 页码，默认 1。 */
+    page?: number;
+    /** 仅列该路径的历史。 */
+    path?: string;
+    /** 按 GitHub login 过滤作者。 */
+    author?: string;
+  } = {},
+): Promise<CommitInfo[]> {
+  const { owner, repo } = resolveRepo(opts);
+  const params = new URLSearchParams();
+  params.set("sha", opts.sha ?? BRANCH);
+  params.set("per_page", String(opts.perPage ?? 30));
+  params.set("page", String(opts.page ?? 1));
+  if (opts.path) params.set("path", opts.path);
+  if (opts.author) params.set("author", opts.author);
+  const resp = await fetchGithub(`repos/${owner}/${repo}/commits?${params.toString()}`);
+  if (!resp.ok) {
+    if (resp.status === 404) return [];
+    await assertOk(resp, `listCommits(${owner}/${repo})`);
+  }
+  const data = (await resp.json()) as GhCommitResponse[];
+  return data.map(toCommitInfo);
+}
+
 /** GitHub Content API 返回的文件内容（base64）。 */
 export interface GhFileContent {
   type: "file";
@@ -68,9 +183,13 @@ function b64decode(b64: string): string {
   return new TextDecoder("utf-8").decode(bytes);
 }
 
-/** 列出目录内容。path 为仓库内相对路径（如 'src/content/articles'）。 */
-export async function listContents(path: string): Promise<GhContentEntry[]> {
-  const resp = await fetchGithub(`repos/${OWNER}/${REPO}/contents/${path}?ref=${BRANCH}`);
+/**
+ * 列出目录内容。path 为仓库内相对路径（如 'src/content/articles'）。
+ * @param ref 可选仓库定位（默认 gaubee/gaubee.com，向后兼容）。
+ */
+export async function listContents(path: string, ref?: RepoRef): Promise<GhContentEntry[]> {
+  const { owner, repo } = resolveRepo(ref);
+  const resp = await fetchGithub(`repos/${owner}/${repo}/contents/${path}?ref=${BRANCH}`);
   if (!resp.ok) {
     if (resp.status === 404) return [];
     await assertOk(resp, `listContents(${path})`);
@@ -80,9 +199,10 @@ export async function listContents(path: string): Promise<GhContentEntry[]> {
   return [];
 }
 
-/** 读取文件文本内容。 */
-export async function getFileText(path: string): Promise<string> {
-  const resp = await fetchGithub(`repos/${OWNER}/${REPO}/contents/${path}?ref=${BRANCH}`);
+/** 读取文件文本内容。@param ref 可选仓库定位（默认 gaubee/gaubee.com）。 */
+export async function getFileText(path: string, ref?: RepoRef): Promise<string> {
+  const { owner, repo } = resolveRepo(ref);
+  const resp = await fetchGithub(`repos/${owner}/${repo}/contents/${path}?ref=${BRANCH}`);
   await assertOk(resp, `getFileText(${path})`);
   const data = (await resp.json()) as GhFileContent;
   if (data.type !== "file" || data.encoding !== "base64") {
@@ -128,12 +248,17 @@ export interface GhTreeEntry {
   size?: number;
 }
 
+/**
+ * @param ref 可选仓库定位（默认 gaubee/gaubee.com）。
+ */
 export async function fetchTree(
   subtree?: string,
+  ref?: RepoRef,
 ): Promise<{ tree: GhTreeEntry[]; sha: string; truncated: boolean }> {
   const subtreeParam = subtree ? `?recursive=1` : `?recursive=1`;
   void subtreeParam;
-  const resp = await fetchGithub(`repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`);
+  const { owner, repo } = resolveRepo(ref);
+  const resp = await fetchGithub(`repos/${owner}/${repo}/git/trees/${BRANCH}?recursive=1`);
   await assertOk(resp, "fetchTree");
   const data = (await resp.json()) as {
     tree: GhTreeEntry[];

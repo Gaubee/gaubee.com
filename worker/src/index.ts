@@ -50,10 +50,18 @@ function isProd(env: Env): boolean {
   return env.ENVIRONMENT === "production";
 }
 
-/** 代理路径限定：只允许访问本仓库。防 SSRF 到其他仓库。 */
-const OWNER = "gaubee";
-const REPO = "gaubee.com";
-const ALLOWED_PROXY_PREFIX = `repos/${OWNER}/${REPO}/`;
+/**
+ * 代理路径限定：只允许 GitHub REST API 的 repos/* 路径。
+ *
+ * 设计权衡：GithubApp 重设计后需要浏览任意公开仓库的历史/文件树（只读）。
+ * 因此路径白名单从「仅本仓库」放宽为「任意 repos/{owner}/{repo}/...」：
+ * - 有 token：任意仓库可读写（权限由 token 的 scope 与目标仓库权限决定，GitHub 强制）。
+ * - 无 token：只读（GET/HEAD）公开仓库，写操作拒绝。
+ *
+ * 仍限定以 repos/ 开头，防止 SSRF 到 GitHub 其它 API（/user、/gists、/user/repos 等
+ * 会改写账户状态或泄露 token 持有者信息的端点）。
+ */
+const PROXY_PATH_PREFIX = "repos/";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -192,26 +200,26 @@ app.get("/auth/me", async (c) => {
 });
 
 // ---- 5. GitHub API 代理：前端所有 GitHub 调用走这里，token 从 cookie 取 ----
-// - 路径限定为 repos/gaubee/gaubee.com/（防 SSRF 到其他仓库）
-// - 写操作（POST/PUT/PATCH/DELETE）必须 token
-// - 只读（GET/HEAD）无 token 时回退匿名请求（公开仓库可读，受 60/h 限速）
+// - 路径限定为 repos/*（GitHub REST API 仓库端点，防 SSRF 到 /user、/gists 等）
+// - 有 token：任意仓库可读写（权限由 token scope 决定）
+// - 无 token：只读（GET/HEAD）公开仓库，写操作拒绝
+// - 只读无 token 时回退匿名请求（公开仓库可读，受 60/h 限速）
 app.all("/api/proxy/*", async (c) => {
-  // 解析目标路径：/api/proxy/repos/gaubee/.../contents → repos/gaubee/.../contents
+  // 解析目标路径：/api/proxy/repos/{owner}/{repo}/contents → repos/{owner}/{repo}/contents
   const url = new URL(c.req.url);
   // 去掉 /api/proxy 前缀与前导斜杠，规范化
   const ghPath = c.req.path.replace(/^\/api\/proxy\/?/, "");
 
-  // 路径白名单校验：必须以 ALLOWED_PROXY_PREFIX 开头（防 SSRF 到其他仓库）
-  const isAllowed =
-    ghPath === ALLOWED_PROXY_PREFIX.slice(0, -1) || ghPath.startsWith(ALLOWED_PROXY_PREFIX);
-  if (!isAllowed) {
-    return c.json({ error: "forbidden: path not allowed" }, 403);
+  // 路径白名单校验：只放行 GitHub REST API 的 repos/* 路径（防 SSRF 到
+  // /user、/gists 等会改写账户状态或泄露 token 持有者信息的端点）。
+  if (!ghPath.startsWith(PROXY_PATH_PREFIX)) {
+    return c.json({ error: "forbidden: path not allowed (only repos/ allowed)" }, 403);
   }
 
   const token = getCookie(c, COOKIE_NAME);
   const method = c.req.method;
   const isWrite = method !== "GET" && method !== "HEAD";
-  // 写操作必须有 token（匿名不能写）
+  // 写操作必须有 token（匿名不能写）；有 token 时任意仓库可写（权限由 token scope 决定）。
   if (isWrite && !token) {
     return c.json({ error: "unauthorized: write requires login" }, 401);
   }

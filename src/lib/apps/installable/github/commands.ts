@@ -121,8 +121,113 @@ const gitPullCommand: CliCommand = {
   },
 };
 
+/**
+ * git clone：基于 isomorphic-git 克隆仓库到 ZenFS（降级路径）。
+ *
+ * 用法：git clone <owner>/<repo> [branch]
+ *
+ * 注意：isomorphic-git 走公共 CORS proxy（https://cors.isomorphic-git.org），
+ * 大仓库可能受 proxy 限速或失败。日常浏览请用 GithubApp 的 UI（REST API 控制台），
+ * clone 仅用于需要本地完整 git 历史的离线场景。
+ */
+const gitCloneCommand: CliCommand = {
+  name: "git clone",
+  usage: "git clone <owner>/<repo> [branch]",
+  description: "克隆仓库到浏览器（isomorphic-git，需 CORS proxy，大仓库可能失败）。",
+  async run(ctx, args) {
+    // args 形如 [git, clone, owner/repo, branch?]
+    const target = args[2];
+    if (!target || !target.includes("/")) {
+      ctx.write(err("git clone: 用法 git clone <owner>/<repo> [branch]") + newline);
+      return { exit: 1, newCwd: null };
+    }
+    const [owner, repo] = target.split("/");
+    const branch = args[3]?.trim() || "main";
+    if (!owner || !repo) {
+      ctx.write(err("git clone: owner/repo 格式错误") + newline);
+      return { exit: 1, newCwd: null };
+    }
+    try {
+      // 懒加载 gitStore（isomorphic-git），避免 App UI 层硬依赖。
+      const { gitStore } = await import("$lib/apps/GitStore.svelte");
+      await gitStore.init();
+      ctx.write(
+        `${ANSI.gray}正在克隆 ${owner}/${repo}@${branch}（经 CORS proxy）…${ANSI.reset}${newline}`,
+      );
+      await gitStore.clone({ owner, repo, branch, shallow: true });
+      const dir = `/repos/${owner}/${repo}`;
+      ctx.write(
+        `${ANSI.green}✓ 已克隆${ANSI.reset} ${owner}/${repo} → ${ANSI.bold}${dir}${ANSI.reset}${newline}`,
+      );
+      return { exit: 0, newCwd: null };
+    } catch (e) {
+      ctx.write(err(`git clone: ${e instanceof Error ? e.message : "克隆失败"}`) + newline);
+      return { exit: 1, newCwd: null };
+    }
+  },
+};
+
+/**
+ * git log：显示 isomorphic-git 克隆仓库的提交历史（降级路径）。
+ *
+ * 用法：git log [owner/repo]
+ * 不带参数 → 当前激活的克隆仓库；带 owner/repo → 切换后再读历史。
+ *
+ * 注意：仅对已 `git clone` 的仓库有效。日常浏览主仓库历史用 GithubApp UI 的「历史」Tab。
+ */
+const gitLogCommand: CliCommand = {
+  name: "git log",
+  usage: "git log [owner/repo]",
+  description: "显示已克隆仓库的提交历史（isomorphic-git，需先 git clone）。",
+  async run(ctx, args) {
+    try {
+      const { gitStore } = await import("$lib/apps/GitStore.svelte");
+      await gitStore.init();
+      const target = args[2]?.trim();
+      if (target) {
+        if (!target.includes("/")) {
+          ctx.write(err("git log: owner/repo 格式错误") + newline);
+          return { exit: 1, newCwd: null };
+        }
+        await gitStore.switchRepo(target);
+      }
+      await gitStore.refresh();
+      const commits = gitStore.commits;
+      const repo = gitStore.activeRepo;
+      if (!repo) {
+        ctx.write(err("git log: 没有已克隆的仓库。先用 git clone <owner>/<repo> 克隆。") + newline);
+        return { exit: 1, newCwd: null };
+      }
+      if (commits.length === 0) {
+        ctx.write(`${ANSI.gray}（${repo.owner}/${repo.repo} 暂无提交历史）${ANSI.reset}${newline}`);
+        return { exit: 0, newCwd: null };
+      }
+      ctx.write(
+        `${ANSI.bold}${repo.owner}/${repo.repo}@${repo.branch}${ANSI.reset} ${ANSI.gray}(${commits.length})${ANSI.reset}${newline}`,
+      );
+      for (const c of commits) {
+        const date = new Date(c.author.timestamp * 1000).toLocaleDateString("zh-CN");
+        ctx.write(
+          `${ANSI.yellow}${c.oid.slice(0, 7)}${ANSI.reset} ${date} ${ANSI.bold}${c.author.name}${ANSI.reset}${newline}` +
+            `        ${c.message.split("\n")[0]}${newline}`,
+        );
+      }
+      return { exit: 0, newCwd: null };
+    } catch (e) {
+      ctx.write(err(`git log: ${e instanceof Error ? e.message : "查询失败"}`) + newline);
+      return { exit: 1, newCwd: null };
+    }
+  },
+};
+
 /** git 子命令实现（供 shell runLine 的 git 聚合分发器查找）。 */
-export const gitCommands: CliCommand[] = [gitStatusCommand, gitCommitCommand, gitPullCommand];
+export const gitCommands: CliCommand[] = [
+  gitStatusCommand,
+  gitCommitCommand,
+  gitPullCommand,
+  gitCloneCommand,
+  gitLogCommand,
+];
 
 /**
  * git 子命令分发表（子命令名 → CliCommand）。
@@ -133,4 +238,6 @@ export const gitSubcommandMap: Map<string, CliCommand> = new Map([
   ["commit", gitCommitCommand],
   ["pull", gitPullCommand],
   ["sync", gitPullCommand], // sync 作为 pull 的别名
+  ["clone", gitCloneCommand],
+  ["log", gitLogCommand],
 ]);

@@ -455,10 +455,12 @@ const helpCommand: Command = {
       // git 子命令
       if (args[1] === "git") {
         ctx.write(
-          `${ANSI.bold}git${ANSI.reset} — 子命令：status / commit / pull${Term.newline}` +
+          `${ANSI.bold}git${ANSI.reset} — 子命令：status / commit / pull / clone / log${Term.newline}` +
             `  git status    ${ANSI.gray}显示未提交修改${ANSI.reset}${Term.newline}` +
             `  git commit -m "msg"    ${ANSI.gray}提交到 GitHub${ANSI.reset}${Term.newline}` +
-            `  git pull    ${ANSI.gray}同步 src/content 子树${ANSI.reset}${Term.newline}`,
+            `  git pull    ${ANSI.gray}同步 src/content 子树${ANSI.reset}${Term.newline}` +
+            `  git clone <owner>/<repo>    ${ANSI.gray}克隆仓库（isomorphic-git/CORS proxy）${ANSI.reset}${Term.newline}` +
+            `  git log [owner/repo]    ${ANSI.gray}已克隆仓库的提交历史${ANSI.reset}${Term.newline}`,
         );
         return 0;
       }
@@ -470,7 +472,7 @@ const helpCommand: Command = {
       lines.push(`  ${ANSI.cyan}${cmd.name.padEnd(10)}${ANSI.reset} ${cmd.usage}`);
     }
     // git 子命令单列（不在 registry，避免 Tab 补全污染）
-    lines.push(`  ${ANSI.cyan}git       ${ANSI.reset}git status | commit | pull`);
+    lines.push(`  ${ANSI.cyan}git       ${ANSI.reset}git status | commit | pull | clone | log`);
     lines.push(`${ANSI.gray}提示：用 ↑↓ 切换历史，Tab 补全文件名/命令。${ANSI.reset}`);
     ctx.write(lines.join(Term.newline) + Term.newline);
     return 0;
@@ -573,7 +575,8 @@ export async function runLine(ctx: CommandContext, line: string): Promise<RunRes
     const target = submap.get(sub);
     if (!target) {
       ctx.write(
-        Term.err(`git: 不支持子命令 '${sub}'。可用：status / commit / pull`) + Term.newline,
+        Term.err(`git: 不支持子命令 '${sub}'。可用：status / commit / pull / clone / log`) +
+          Term.newline,
       );
       return { exit: 1, newCwd: null };
     }
