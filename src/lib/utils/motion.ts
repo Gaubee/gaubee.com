@@ -117,12 +117,15 @@ export const blurTransition: Action<HTMLElement, { hiddenClass: string }> = (nod
         { filter: `blur(${BLUR_PX}px)`, opacity: 0 },
         { filter: "none", opacity: 1 },
       ],
-      { duration: WAAPI_DURATION, easing: WAAPI_EASE, fill: "forwards" },
+      { duration: WAAPI_DURATION, easing: WAAPI_EASE },
     );
     currentAnim.onfinish = () => {
-      // 动画结束后清除内联样式，filter 归 none（不残留合成层）
-      node.style.filter = "";
-      node.style.opacity = "";
+      // commitStyles 提交最终帧为内联样式，cancel 释放 WAAPI 的 fill 占用。
+      // 这样 filter:none 被写入内联样式（而非 blur(0px)），无残留合成层。
+      currentAnim?.commitStyles();
+      currentAnim?.cancel();
+      // 显式覆盖，确保 filter 是 none（commitStyles 可能序列化成 blur(0px)）
+      node.style.filter = "none";
     };
   }
 
@@ -134,8 +137,12 @@ export const blurTransition: Action<HTMLElement, { hiddenClass: string }> = (nod
         { filter: "none", opacity: 1 },
         { filter: `blur(${BLUR_PX}px)`, opacity: 0 },
       ],
-      { duration: WAAPI_DURATION, easing: WAAPI_EASE, fill: "forwards" },
+      { duration: WAAPI_DURATION, easing: WAAPI_EASE },
     );
+    currentAnim.onfinish = () => {
+      currentAnim?.commitStyles();
+      currentAnim?.cancel();
+    };
   }
 
   // MutationObserver 监听 class 变化
