@@ -312,20 +312,30 @@
               aria-label="桌面背景预览"
             >
               <!-- 亮模式预览（左半，默认） -->
-              <div class="preview-pane preview-light relative">
-                <div class="flex gap-1.5 p-2.5">
+              <div class="preview-pane preview-light relative flex flex-col gap-2 p-2.5">
+                <div class="flex gap-1.5">
                   <span class="preview-icon"><span class="preview-icon-dot"></span></span>
                   <span class="preview-icon"></span>
                 </div>
-                <span class="text-muted-foreground absolute bottom-2 left-2.5 text-[10px]">亮色</span>
+                <span class="preview-widget mt-auto">
+                  <span class="preview-widget-bar"></span>
+                  <span class="preview-widget-bar short"></span>
+                  <span class="preview-widget-bar"></span>
+                </span>
+                <span class="text-muted-foreground absolute bottom-1 right-2 text-[10px]">亮色</span>
               </div>
               <!-- 暗模式预览（右半，.dark 隔离） -->
-              <div class="preview-pane dark relative">
-                <div class="flex gap-1.5 p-2.5">
+              <div class="preview-pane dark relative flex flex-col gap-2 p-2.5">
+                <div class="flex gap-1.5">
                   <span class="preview-icon"><span class="preview-icon-dot"></span></span>
                   <span class="preview-icon"></span>
                 </div>
-                <span class="text-muted-foreground absolute bottom-2 left-2.5 text-[10px]">暗色</span>
+                <span class="preview-widget mt-auto">
+                  <span class="preview-widget-bar"></span>
+                  <span class="preview-widget-bar short"></span>
+                  <span class="preview-widget-bar"></span>
+                </span>
+                <span class="text-muted-foreground absolute bottom-1 right-2 text-[10px]">暗色</span>
               </div>
             </div>
           </Tooltip.Trigger>
@@ -588,6 +598,31 @@
     border-radius: 9999px;
     background: var(--primary);
     border: 1.5px solid var(--background);
+  }
+  /* 模拟 widget 卡片（毛玻璃，同图标标准搭配），内含纯色条模拟列表内容（无文字）。 */
+  .preview-widget {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    border-radius: 0.625rem;
+    background: color-mix(in oklch, var(--card) 70%, transparent);
+    border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+    backdrop-filter: blur(8px) contrast(2) brightness(0.8);
+  }
+  .dark .preview-widget,
+  .preview-pane.dark .preview-widget {
+    backdrop-filter: blur(8px) contrast(0.8) brightness(1.2);
+  }
+  /* 内容条：用 muted-foreground 模拟文字行（不含实际文字，纯视觉占位）。 */
+  .preview-widget-bar {
+    height: 0.25rem;
+    border-radius: 9999px;
+    background: var(--muted-foreground);
+    opacity: 0.5;
+  }
+  .preview-widget-bar.short {
+    width: 50%;
   }
 
   /* 色相滑块：彩虹渐变背景，直观呈现色相空间。 */
