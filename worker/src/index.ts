@@ -51,17 +51,28 @@ function isProd(env: Env): boolean {
 }
 
 /**
- * 代理路径限定：只允许 GitHub REST API 的 repos/* 路径。
+ * 代理路径白名单：GithubApp 列表页/详情页所需的 GitHub REST API 端点。
  *
- * 设计权衡：GithubApp 重设计后需要浏览任意公开仓库的历史/文件树（只读）。
- * 因此路径白名单从「仅本仓库」放宽为「任意 repos/{owner}/{repo}/...」：
- * - 有 token：任意仓库可读写（权限由 token 的 scope 与目标仓库权限决定，GitHub 强制）。
- * - 无 token：只读（GET/HEAD）公开仓库，写操作拒绝。
+ * 设计权衡：GithubApp 重设计后需要：
+ * - 浏览任意公开仓库的历史/文件树/issues（repos/*）
+ * - 列出当前用户的仓库/orgs（user/repos、user/orgs）
+ * - 列出指定用户/org 的仓库（users/{u}/repos、orgs/{o}/repos）
+ * - 搜索仓库/issues（search/repositories、search/issues）
  *
- * 仍限定以 repos/ 开头，防止 SSRF 到 GitHub 其它 API（/user、/gists、/user/repos 等
- * 会改写账户状态或泄露 token 持有者信息的端点）。
+ * 安全：仍限定只读端点（GET/HEAD）或 token 持有者本人可写的端点。
+ * - 有 token：白名单内端点可读写（权限由 token scope 决定，GitHub 强制）。
+ * - 无 token：只读（GET/HEAD）公开资源，写操作拒绝。
+ * - 未列入白名单的路径（如 /user、/gists、/admin/*）一律 403，防 SSRF。
  */
-const PROXY_PATH_PREFIX = "repos/";
+const PROXY_ALLOWED_PREFIXES = [
+  "repos/", // 仓库文件/历史/issues/提交（核心）
+  "user/repos", // 列表页：我的仓库
+  "user/orgs", // 列表页：我的 orgs
+  "users/", // 列表页：用户仓库 /users/{u}/repos
+  "orgs/", // 列表页：org 仓库 /orgs/{o}/repos
+  "search/repositories", // 列表页：搜索仓库
+  "search/issues", // 详情页：issues 搜索
+];
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -210,10 +221,11 @@ app.all("/api/proxy/*", async (c) => {
   // 去掉 /api/proxy 前缀与前导斜杠，规范化
   const ghPath = c.req.path.replace(/^\/api\/proxy\/?/, "");
 
-  // 路径白名单校验：只放行 GitHub REST API 的 repos/* 路径（防 SSRF 到
-  // /user、/gists 等会改写账户状态或泄露 token 持有者信息的端点）。
-  if (!ghPath.startsWith(PROXY_PATH_PREFIX)) {
-    return c.json({ error: "forbidden: path not allowed (only repos/ allowed)" }, 403);
+  // 路径白名单校验：只放行 GithubApp 列表页/详情页所需的 GitHub REST API 端点
+  // （防 SSRF 到 /user、/gists 等会改写账户状态或泄露 token 持有者信息的端点）。
+  const allowed = PROXY_ALLOWED_PREFIXES.some((prefix) => ghPath.startsWith(prefix));
+  if (!allowed) {
+    return c.json({ error: "forbidden: path not allowed" }, 403);
   }
 
   const token = getCookie(c, COOKIE_NAME);

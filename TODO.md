@@ -651,3 +651,60 @@ LOGO 系统菜单（6项）、应用菜单（自注册+最小化/退出）、tra
 
 - check 0 错误、238 单测全过、build 成功。
 - Playwright：--primary-h 注入（16.935→250）+ chart calc 计算式 + 纯色桌面背景 oklch(0.514 0.222 200) + 持久化恢复 全部通过。
+
+## GithubApp v3：列表页 + 详情页导航架构（2026-07-23）
+
+GithubApp 从「单仓库 4-Tab 控制台」升级为「列表页 + 详情页导航架构」，支持多仓库浏览、收藏、搜索、Issues。
+
+### 核心决策
+
+| 维度 | 决策 |
+|---|---|
+| 导航模式 | main 区 tabView + 单组件 pathname 二级分发（参考 AppStoreView） |
+| 区域 | defaultArea 从 bottom 改 main，去掉 hiddenFromNav（主屏应用）|
+| 编辑策略 | 扩展 EditorView 支持任意路径（raw 模式，复用 CodeMirror） |
+| issues | 仓库内列表 + 站内搜索（searchIssues 限定 repo） |
+| 收藏 | 本地 meta-store（v4 新增 repo_favorites store） |
+| README | hosted-git-info fromUrl + info.file 重写相对路径为 raw URL |
+
+### 路由
+
+```
+/app/github                       → 列表页（聚合卡片）
+/app/github/repo/{owner}/{repo}   → 仓库详情页（5 Tab）
+/app/github/list/{type}           → 分页列表（展开全部）
+/app/github-edit/{owner}/{repo}/{...path} → 任意文件编辑（EditorView raw 模式，归属 writer）
+```
+
+### 文件树 BUG 修复
+
+旧实现 `{#each [...expanded].sort() as dir}` 按路径字符串字典序遍历扁平 Set，子目录渲染到列表末尾。改为递归组件 RepoFileTree，子目录渲染在父目录 DOM 内部，缩进自然产生。
+
+### 列表页（RepoListView）
+
+聚合卡片：收藏（本地，置顶）+ 我的仓库（listUserRepos）+ 各 org 仓库（listUserOrgs → listOrgRepos）。每卡片限 3 个，支持「展开全部」进入分页列表。顶部搜索框（searchRepos，登录时限定 user:{login}）。
+
+### 详情页（RepoDetailView）
+
+元数据栏（owner/repo + 收藏星标 + 仓库统计 + GitHub 外链 + 仓库快速搜索）+ 5 Tab：
+- 文件：递归文件树 + README 渲染（默认），点击文件 → FilePreviewDialog
+- 历史：listCommits REST API
+- 变更：仅主仓库（vfsStore dirty + gitService.commit）
+- Issues：listIssues + 站内搜索（searchIssues），详情 IssueDetailDialog
+- 日志：activityLog 过滤当前 repo
+
+### Worker 白名单扩展
+
+从单一 `repos/` 前缀扩展为白名单数组：`repos/`、`user/repos`、`user/orgs`、`users/`、`orgs/`、`search/repositories`、`search/issues`。保持写操作守卫（无 token 拒绝）。
+
+### EditorView raw 模式
+
+新增 `/app/github-edit` 路由解析（target.kind: 'raw'），无 frontmatter 解析/序列化，无发表按钮。可写判定：仅主仓库（owner===OWNER && repo===REPO）允许写。只读仓库显示提示。
+
+### 死循环修复
+
+RepoDetailView 的 $effect 调用 loadAll → loadDir 同步读+写 loadingDirs state，被 effect 追踪为依赖导致死循环。修复：用 untrack 包裹 loadAll 调用。
+
+### 验证
+
+- 类型检查 0 错误；277 单测全过（含新增 9 个 repo-api 单测 + 3 个 GithubView 分发器测试）；build 成功。

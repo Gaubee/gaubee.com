@@ -19,6 +19,7 @@
   import { handlePublishError } from '$lib/os/services/publish-helper'
   import { notifySuccess } from '$lib/apps/builtin/notifications/service.svelte'
   import { parseMarkdown, serializeMarkdown, type ArticleMetadata } from '$lib/data/frontmatter'
+  import { OWNER, REPO } from '$lib/github/client'
   import { Button } from '$lib/components/ui/button'
   import * as Dialog from '$lib/components/ui/dialog'
   import { Skeleton } from '$lib/components/ui/skeleton'
@@ -30,6 +31,7 @@
   import SaveIcon from '@lucide/svelte/icons/save'
   import SendIcon from '@lucide/svelte/icons/send'
   import XIcon from '@lucide/svelte/icons/x'
+  import LockIcon from '@lucide/svelte/icons/lock'
 
   type View = 'edit' | 'split' | 'preview'
 
@@ -52,36 +54,76 @@
   /** 是否正在发表（提交到 GitHub）。 */
   let publishing = $state(false)
 
-  // 从路径解析文章：/app/editor/articles/0057.tc39-signals 或 /app/editor/draft/xxx
-  const targetPost = $derived.by(() => {
+  /**
+   * 从路径解析编辑目标，支持两种模式：
+   * - content：/app/editor/{articles|events|draft}/{stem}（内容管线，frontmatter + 发表）
+   * - raw：/app/github-edit/{owner}/{repo}/{...path}（GithubApp 任意文件，纯文本，仅主仓库可写）
+   */
+  const target = $derived.by(() => {
     const path = navState.mainLocation.pathname
-    const match = path.match(/^\/app\/editor\/(articles|events|draft)\/(.+)$/)
-    if (!match) return null
-    return { collection: match[1] as 'articles' | 'events' | 'draft', stem: match[2] }
+    // GithubApp 任意文件编辑（raw 模式）
+    const gitMatch = path.match(/^\/app\/github-edit\/([^/]+)\/([^/]+)\/(.+)$/)
+    if (gitMatch) {
+      const [_, owner, repo, filePath] = gitMatch
+      return {
+        kind: 'raw' as const,
+        owner,
+        repo,
+        filePath,
+        writable: owner === OWNER && repo === REPO,
+      }
+    }
+    // 内容管线编辑
+    const contentMatch = path.match(/^\/app\/editor\/(articles|events|draft)\/(.+)$/)
+    if (contentMatch) {
+      return {
+        kind: 'content' as const,
+        collection: contentMatch[1] as 'articles' | 'events' | 'draft',
+        stem: contentMatch[2],
+      }
+    }
+    return null
   })
 
+  /** raw 模式是否只读（非主仓库）。 */
+  const isRawReadonly = $derived(target?.kind === 'raw' && !target.writable)
+
   async function loadPost() {
-    if (!targetPost) {
+    if (!target) {
       currentPath = null
       body = ''
       metadata = { date: new Date(), tags: [] }
       return
     }
     const mySeq = ++loadSeq
-    const path = `src/content/${targetPost.collection}/${targetPost.stem}.md`
     loading = true
     error = null
     // 立即清空，避免切换期间显示旧内容（审查 #8 闪烁）
     body = ''
     try {
+      let path: string
+      if (target.kind === 'raw') {
+        path = target.filePath
+      } else {
+        path = `src/content/${target.collection}/${target.stem}.md`
+      }
       // VFS.read：三层自动取本地修改 > 只读层 > 在线拉
       const text = await vfsStore.read(path)
       if (mySeq !== loadSeq) return // 已切到别的文章，丢弃结果（竞态防护）
-      const { metadata: meta, body: parsedBody } = parseMarkdown(text)
       currentPath = path
-      metadata = structuredClone(meta ?? { date: new Date(0), tags: [] })
-      body = parsedBody
       docId = path
+      if (target.kind === 'content') {
+        // content 模式：解析 frontmatter
+        const { metadata: meta, body: parsedBody } = parseMarkdown(text)
+        metadata = structuredClone(meta ?? { date: new Date(0), tags: [] })
+        body = parsedBody
+      } else {
+        // raw 模式：纯文本，无 frontmatter 解析
+        metadata = { date: new Date(), tags: [] }
+        body = text
+      }
+      // 记录本次加载的 kind，供切换文章前 flush 判断（raw 只读不 flush）
+      lastKind = target.kind === 'raw' ? (target.writable ? 'raw' : 'readonly') : 'content'
       dirty = false
     } catch (e) {
       if (mySeq !== loadSeq) return
@@ -92,22 +134,25 @@
     }
   }
 
-  // 监听目标文章变化。
-  // effect 只追踪 targetPost（同步读取建立依赖）。旧文章状态（currentPath/body 等）
+  // 监听目标变化。
+  // effect 只追踪 target（同步读取建立依赖）。旧文章状态（currentPath/body 等）
   // 的捕获与 loadPost 调用都放进 untrack，避免它们被注册为依赖导致无限重跑（闪烁 bug）。
   // 切换文章前，非阻塞地 flush 旧内容（同步捕获旧值，不阻塞新文章加载）。
   $effect(() => {
-    const next = targetPost
+    const next = target
     untrack(() => {
       // 同步捕获旧文章状态，用于切换后非阻塞落盘
       const prevPath = currentPath
       const prevBody = body
       const prevMeta = metadata
       const prevDirty = dirty
+      const prevKind = lastKind
       if (next) {
         // 若有未保存的旧内容，非阻塞写入（不 await，不阻塞新文章加载）
-        if (prevPath && prevDirty) {
-          vfsStore.write(prevPath, serializeMarkdown(prevMeta, prevBody))
+        if (prevPath && prevDirty && prevKind !== 'readonly') {
+          const content =
+            prevKind === 'content' ? serializeMarkdown(prevMeta, prevBody) : prevBody
+          vfsStore.write(prevPath, content)
         }
         loadPost()
       } else {
@@ -116,13 +161,20 @@
     })
   })
 
+  /** 最近一次加载的 target kind（'content' | 'raw' | 'readonly'），供切换前 flush 判断。 */
+  let lastKind: 'content' | 'raw' | 'readonly' = 'content'
+
   function handleInput(value: string) {
+    // 只读模式忽略输入
+    if (isRawReadonly) return
     body = value
     dirty = true
     scheduleSave()
   }
 
   function scheduleSave() {
+    // 只读模式不调度保存
+    if (isRawReadonly) return
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(async () => {
       saveTimer = null
@@ -134,6 +186,7 @@
    * 立即将当前内容写入 VFS（如有 currentPath）。
    * handleSave/handlePublish/切文章前调用，确保内容不丢。
    * 取消 pending debounce timer，避免重复/错位写入。
+   * raw 模式纯文本写入；content 模式 serializeMarkdown。
    */
   async function flushSave(): Promise<void> {
     if (saveTimer) {
@@ -141,9 +194,12 @@
       saveTimer = null
     }
     if (!currentPath) return
-    const content = serializeMarkdown(metadata, body)
+    if (isRawReadonly) return
+    const content =
+      target?.kind === 'content' ? serializeMarkdown(metadata, body) : body
     await vfsStore.write(currentPath, content)
-    contentQuery.refresh()
+    // raw 模式不影响内容管线缓存，跳过 refresh
+    if (target?.kind === 'content') contentQuery.refresh()
     dirty = false
   }
 
@@ -188,8 +244,17 @@
   <!-- 工具栏 -->
   <div class="flex items-center gap-2 border-b border-border px-3 py-1.5">
     <span class="text-muted-foreground truncate text-xs">
-      {targetPost ? `${targetPost.collection}/${targetPost.stem}` : '未选择文章'}
+      {#if target?.kind === 'content'}
+        {target.collection}/{target.stem}
+      {:else if target?.kind === 'raw'}
+        <span class="font-mono">{target.owner}/{target.repo}/{target.filePath}</span>
+      {:else}
+        未选择文章
+      {/if}
     </span>
+    {#if isRawReadonly}
+      <span class="text-muted-foreground rounded bg-muted px-1.5 py-0.5 text-[10px]">只读</span>
+    {/if}
 
     <div class="ml-auto flex items-center gap-1">
       <!-- 视图切换 -->
@@ -208,31 +273,43 @@
 
       <div class="mx-1 h-5 w-px bg-border"></div>
 
-      <Button size="sm" variant="ghost" onclick={() => (metadataOpen = true)}>
-        <TagsIcon data-icon="inline-start" />
-        <span class="hidden sm:inline">元数据</span>
-      </Button>
-      <Button size="sm" variant="default" onclick={handleSave} disabled={!currentPath}>
+      <!-- 元数据 + 发表仅 content 模式显示 -->
+      {#if target?.kind === 'content'}
+        <Button size="sm" variant="ghost" onclick={() => (metadataOpen = true)}>
+          <TagsIcon data-icon="inline-start" />
+          <span class="hidden sm:inline">元数据</span>
+        </Button>
+      {/if}
+      <Button size="sm" variant="default" onclick={handleSave} disabled={!currentPath || isRawReadonly}>
         <SaveIcon data-icon="inline-start" />
         <span class="hidden sm:inline">保存</span>
       </Button>
-      <Button
-        size="sm"
-        variant="secondary"
-        onclick={handlePublish}
-        disabled={!currentPath || publishing}
-      >
-        <SendIcon data-icon="inline-start" />
-        <span class="hidden sm:inline">{publishing ? '发表中…' : '发表'}</span>
-      </Button>
+      {#if target?.kind === 'content'}
+        <Button
+          size="sm"
+          variant="secondary"
+          onclick={handlePublish}
+          disabled={!currentPath || publishing}
+        >
+          <SendIcon data-icon="inline-start" />
+          <span class="hidden sm:inline">{publishing ? '发表中…' : '发表'}</span>
+        </Button>
+      {/if}
     </div>
   </div>
 
   <!-- 内容区 -->
   <div class="min-h-0 flex-1">
-    {#if !targetPost}
+    {#if !target}
       <div class="text-muted-foreground flex h-full items-center justify-center text-sm">
         请从文件或阅读流中选择一篇文章编辑
+      </div>
+    {:else if isRawReadonly && !loading}
+      <!-- 只读仓库提示（非主仓库不可编辑）-->
+      <div class="text-muted-foreground flex h-full flex-col items-center justify-center gap-2 text-sm">
+        <LockIcon class="size-6" />
+        <p>只读仓库 {target?.owner}/{target?.repo} 不可编辑</p>
+        <p class="text-xs">仅主仓库 {OWNER}/{REPO} 支持在线编辑。</p>
       </div>
     {:else if loading}
       <div class="space-y-2 p-6">

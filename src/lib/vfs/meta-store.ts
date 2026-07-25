@@ -12,6 +12,8 @@
  * 旧数据无 origin/dirty 元信息无法迁移，直接弃用（首次使用本 store 时为空）。
  *
  * v3 schema：新增 `activities` store（GithubApp 活动日志中心，记录 commit/sync/revert）。
+ *
+ * v4 schema：新增 `repo_favorites` store（GithubApp 仓库收藏，列表页首页聚合卡片用）。
  */
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 
@@ -77,6 +79,19 @@ export interface GitActivity {
   };
 }
 
+/**
+ * 仓库收藏记录（GithubApp 列表页首页聚合卡片用）。
+ * 只存 owner/repo 身份标识，元数据（star/description 等）在渲染时实时从 GitHub 拉。
+ */
+export interface RepoFavorite {
+  /** 唯一标识：owner/repo（如 "gaubee/gaubee.com"）。 */
+  id: string;
+  owner: string;
+  repo: string;
+  /** 收藏时间戳（用于排序）。 */
+  favoritedAt: number;
+}
+
 interface GaubeeMetaDB extends DBSchema {
   meta: {
     key: string;
@@ -90,10 +105,14 @@ interface GaubeeMetaDB extends DBSchema {
     key: string;
     value: GitActivity;
   };
+  repo_favorites: {
+    key: string;
+    value: RepoFavorite;
+  };
 }
 
 const DB_NAME = "gaubee-meta";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let dbPromise: Promise<IDBPDatabase<GaubeeMetaDB>> | null = null;
 
@@ -111,6 +130,10 @@ function getDB(): Promise<IDBPDatabase<GaubeeMetaDB>> {
         // v3: 加 activities store（GithubApp 活动日志中心）
         if (!db.objectStoreNames.contains("activities")) {
           db.createObjectStore("activities", { keyPath: "id" });
+        }
+        // v4: 加 repo_favorites store（GithubApp 仓库收藏）
+        if (!db.objectStoreNames.contains("repo_favorites")) {
+          db.createObjectStore("repo_favorites", { keyPath: "id" });
         }
       },
     });
@@ -182,6 +205,23 @@ export async function activityAll(): Promise<GitActivity[]> {
 export async function activityClear(): Promise<void> {
   const db = await getDB();
   await db.clear("activities");
+}
+
+// ---- 仓库收藏 CRUD（GithubApp 列表页聚合卡片）----
+
+export async function favoritePut(fav: RepoFavorite): Promise<void> {
+  const db = await getDB();
+  await db.put("repo_favorites", fav);
+}
+
+export async function favoriteDelete(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete("repo_favorites", id);
+}
+
+export async function favoriteAll(): Promise<RepoFavorite[]> {
+  const db = await getDB();
+  return db.getAll("repo_favorites");
 }
 
 /**

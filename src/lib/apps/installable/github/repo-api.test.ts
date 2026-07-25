@@ -1,0 +1,151 @@
+/**
+ * repo-api 单元测试（server project，纯逻辑）。
+ *
+ * 验证 GitHub REST API 封装的请求构造与响应解析。
+ * fetchGithub 被 mock，断言调用的路径参数与返回值转换。
+ */
+import { describe, expect, it, vi, beforeEach } from "vitest";
+
+// mock fetchGithub（Worker 代理入口）
+const mockFetch = vi.fn();
+vi.mock("$lib/auth/session.svelte", () => ({
+  fetchGithub: (path: string, init?: RequestInit) => mockFetch(path, init),
+}));
+
+import {
+  listUserRepos,
+  listOrgRepos,
+  listUserOrgs,
+  searchRepos,
+  listIssues,
+  searchIssues,
+  getIssue,
+  getRepo,
+} from "./repo-api";
+
+const sampleRepo = {
+  id: 1,
+  name: "kit",
+  full_name: "sveltejs/kit",
+  owner: { login: "sveltejs", avatar_url: "https://x" },
+  description: "toolchain",
+  language: "TypeScript",
+  stargazers_count: 18000,
+  forks_count: 1500,
+  archived: false,
+  default_branch: "main",
+  pushed_at: "2026-07-01T00:00:00Z",
+  html_url: "https://github.com/sveltejs/kit",
+};
+
+const sampleIssue = {
+  id: 10,
+  number: 42,
+  title: "Bug",
+  state: "open" as const,
+  user: { login: "alice", avatar_url: "https://y" },
+  comments: 3,
+  created_at: "2026-07-01T00:00:00Z",
+  updated_at: "2026-07-02T00:00:00Z",
+  html_url: "https://github.com/sveltejs/kit/issues/42",
+  labels: [{ name: "bug", color: "red" }],
+};
+
+function jsonResponse(data: unknown, ok = true): Response {
+  return {
+    ok,
+    status: 200,
+    json: async () => data,
+    text: async () => JSON.stringify(data),
+  } as Response;
+}
+
+beforeEach(() => {
+  mockFetch.mockReset();
+});
+
+describe("repo-api", () => {
+  it("listUserRepos 构造 user/repos 路径并解析", async () => {
+    mockFetch.mockResolvedValue(jsonResponse([sampleRepo]));
+    const repos = await listUserRepos({ perPage: 5 });
+    expect(mockFetch).toHaveBeenCalledOnce();
+    const [path] = mockFetch.mock.calls[0];
+    expect(path).toContain("user/repos");
+    expect(path).toContain("per_page=5");
+    expect(repos).toHaveLength(1);
+    expect(repos[0].full_name).toBe("sveltejs/kit");
+    expect(repos[0].stargazers_count).toBe(18000);
+  });
+
+  it("listOrgRepos 构造 orgs/{org}/repos 路径", async () => {
+    mockFetch.mockResolvedValue(jsonResponse([sampleRepo]));
+    await listOrgRepos("sveltejs");
+    const [path] = mockFetch.mock.calls[0];
+    expect(path).toContain("orgs/sveltejs/repos");
+  });
+
+  it("listUserOrgs 返回 login + avatar", async () => {
+    mockFetch.mockResolvedValue(jsonResponse([{ login: "sveltejs", avatar_url: "https://z" }]));
+    const orgs = await listUserOrgs();
+    expect(orgs).toEqual([{ login: "sveltejs", avatar_url: "https://z" }]);
+  });
+
+  it("searchRepos 构造 search/repositories?q= 路径", async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ total_count: 1, items: [sampleRepo] }));
+    const result = await searchRepos("kit user:sveltejs");
+    const [path] = mockFetch.mock.calls[0];
+    expect(path).toContain("search/repositories");
+    expect(path).toContain("q=kit+user%3Asveltejs");
+    expect(result.total).toBe(1);
+    expect(result.items[0].name).toBe("kit");
+  });
+
+  it("listIssues 过滤掉 PR", async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse([sampleIssue, { ...sampleIssue, id: 11, number: 43, pull_request: {} }]),
+    );
+    const issues = await listIssues("sveltejs", "kit");
+    const [path] = mockFetch.mock.calls[0];
+    expect(path).toContain("repos/sveltejs/kit/issues");
+    // PR 被过滤
+    expect(issues).toHaveLength(1);
+    expect(issues[0].number).toBe(42);
+  });
+
+  it("searchIssues 构造 repo 限定符", async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ total_count: 1, items: [sampleIssue] }));
+    await searchIssues("sveltejs", "kit", "bug");
+    const [path] = mockFetch.mock.calls[0];
+    expect(path).toContain("search/issues");
+    expect(path).toContain("repo%3Asveltejs%2Fkit");
+    expect(path).toContain("is%3Aissue");
+  });
+
+  it("getIssue 返回含 body", async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ ...sampleRepo, body: "# hi" }));
+    // 用 issue 结构替代
+    mockFetch.mockResolvedValue(jsonResponse({ ...sampleIssue, body: "# hello" }));
+    const issue = await getIssue("sveltejs", "kit", 42);
+    expect(issue.body).toBe("# hello");
+    expect(issue.number).toBe(42);
+  });
+
+  it("getRepo 返回仓库元数据", async () => {
+    mockFetch.mockResolvedValue(jsonResponse(sampleRepo));
+    const repo = await getRepo("sveltejs", "kit");
+    expect(mockFetch).toHaveBeenCalledWith("repos/sveltejs/kit", undefined);
+    expect(repo.full_name).toBe("sveltejs/kit");
+    expect(repo.default_branch).toBe("main");
+  });
+
+  it("404 时 listIssues 返回空数组", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => [],
+      text: async () => "",
+    } as Response);
+    const issues = await listIssues("no", "exist");
+    expect(issues).toEqual([]);
+  });
+});

@@ -32,7 +32,9 @@ export function ensureViewsRegistered(): void {
   registerTabView("/app/theme", () => import("$lib/apps/views/ThemeView.svelte"));
 
   // ===== 可安装应用（默认安装）=====
-  // github/terminal 是 hiddenFromNav（DEFAULT_HIDDEN），通过 deep link 进入
+  // github v3：提升为 main 区 tabView（列表页/详情页导航架构）。
+  registerTabView("/app/github", () => import("$lib/apps/views/GithubView.svelte"));
+  // terminal 是 hiddenFromNav（DEFAULT_HIDDEN），通过 deep link 进入
   registerDeepLinkView("/app/terminal", () => import("./TerminalView.svelte"));
   // 文件管理应用入口
   registerTabView("/app/files", () => import("./FilesView.svelte"));
@@ -53,11 +55,11 @@ export function ensureViewsRegistered(): void {
   // hiddenFromNav 应用的 entry route 走 deep link（不注册 tabView）
   registerDeepLinkView("/app/account", () => import("$lib/apps/views/AccountView.svelte"));
   registerDeepLinkView("/app/store", () => import("$lib/apps/views/AppStoreView.svelte"));
-  // hiddenFromNav 应用的 entry route 走 deep link（不注册 tabView，避免死代码常驻层）
-  registerDeepLinkView("/app/github", () => import("$lib/apps/views/GithubView.svelte"));
   // 写作应用场景（编辑器、变更），入口 /app/writer 已注册为 tab view。
   registerDeepLinkView("/app/editor", () => import("./EditorView.svelte"));
   registerDeepLinkView("/app/changes", () => import("./ChangesView.svelte"));
+  // GithubApp 任意文件编辑（raw 模式，复用 EditorView）：/app/github-edit/{owner}/{repo}/{...path}
+  registerDeepLinkView("/app/github-edit", () => import("./EditorView.svelte"));
 
   // ===== pop views（hiddenFromNav pop 应用，只走浮层）=====
   registerPopView("/app/search", () => import("./SearchView.svelte"));

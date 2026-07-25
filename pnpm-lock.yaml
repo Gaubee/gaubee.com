@@ -77,6 +77,9 @@ importers:
       codemirror:
         specifier: ^6.0.2
         version: 6.0.2
+      hosted-git-info:
+        specifier: ^10.1.1
+        version: 10.1.1
       idb:
         specifier: ^8.0.3
         version: 8.0.3
@@ -1772,6 +1775,10 @@ packages:
     resolution: {integrity: sha512-emn+JoJjrN9YTpRDS5it/UI2SO9BAE37T6I3d963RxcZ81G9A4pr2SZTEiiaiKbzx+NKRg5BZ89fCL7gCJCUog==}
     engines: {node: '>=16.9.0'}
 
+  hosted-git-info@10.1.1:
+    resolution: {integrity: sha512-DeOnSPAvOndYKfw075gt8yZzQ7S2hNztw34zBTfhIzLhmBTswIBg5/y+pqu/VD5cYWm5goAFTusDmUEmKZ0PEQ==}
+    engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
+
   html-void-elements@3.0.0:
     resolution: {integrity: sha512-bEqo66MRXsUGxWHV5IP0PUiAWwoEjba4VCzg0LjFJBpchPaTfyfCKTG6bc5F8ucKec3q5y6qOdGyYTSBEvhCrg==}
 
@@ -1903,6 +1910,10 @@ packages:
 
   locate-character@3.0.0:
     resolution: {integrity: sha512-SW13ws7BjaeJ6p7Q6CO2nchbYEc3X3J6WrmTTDto7yMPqVSZTUyY5Tjbid+Ab8gLnATtygYtiDIJGQRRn2ZOiA==}
+
+  lru-cache@11.5.2:
+    resolution: {integrity: sha512-4pfM1Ff0x50o0tQwb5ucw/RzNyD0/YJME6IVcStalZuMWxdt3sR3huStTtxz4PUmvZfRguvDejasvQ2kifR11g==}
+    engines: {node: 20 || >=22}
 
   lz-string@1.5.0:
     resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
@@ -4101,6 +4112,10 @@ snapshots:
 
   hono@4.12.30: {}
 
+  hosted-git-info@10.1.1:
+    dependencies:
+      lru-cache: 11.5.2
+
   html-void-elements@3.0.0: {}
 
   idb@8.0.3: {}
@@ -4206,6 +4221,8 @@ snapshots:
       lightningcss-win32-x64-msvc: 1.32.0
 
   locate-character@3.0.0: {}
+
+  lru-cache@11.5.2: {}
 
   lz-string@1.5.0: {}
 

@@ -32,6 +32,12 @@ export const writerApp: AppEntry = {
         view: () => import("$lib/views/EditorView.svelte"),
       },
       {
+        // GithubApp 跳转的任意文件编辑（raw 模式），复用 EditorView。
+        // 路由域归属 writer，使 Dock 高亮写作应用。
+        route: "/app/github-edit",
+        view: () => import("$lib/views/EditorView.svelte"),
+      },
+      {
         route: "/app/changes",
         view: () => import("$lib/views/ChangesView.svelte"),
       },

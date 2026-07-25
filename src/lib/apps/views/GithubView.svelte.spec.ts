@@ -1,16 +1,29 @@
 /**
  * GithubView 组件测试（vitest-browser-svelte）。
  *
- * GithubApp 推倒重设计后的新 UI：仓库选择器 + 4 Tab（历史/文件/变更/日志）。
- * 覆盖：挂载、标题与仓库标识渲染、4 个 Tab 触发器、默认仓库（主仓库）标记。
+ * v3 架构：GithubView 是路由分发器，按 pathname 分发到列表页（RepoListView）
+ * 或详情页（RepoDetailView）。本测试覆盖：
+ * - 列表页渲染（默认 /app/github）：标题、搜索框、收藏卡片。
+ * - 详情页分发（/app/github/repo/{owner}/{repo}）。
  *
- * 网络层（listCommits / listContents / getFileText）与 GitService 在此 mock，
- * 避免触达真实 GitHub API / Worker 代理。
+ * 网络层（repo-api / client / VFS / activityLog）在此 mock。
  */
 import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 
-// mock github/client（REST API 调用）
+// mock repo-api（列表页 API）
+vi.mock("$lib/apps/installable/github/repo-api", () => ({
+  listUserRepos: vi.fn().mockResolvedValue([]),
+  listUserOrgs: vi.fn().mockResolvedValue([]),
+  listOrgRepos: vi.fn().mockResolvedValue([]),
+  searchRepos: vi.fn().mockResolvedValue({ total: 0, items: [] }),
+  getRepo: vi.fn().mockResolvedValue(null),
+  listIssues: vi.fn().mockResolvedValue([]),
+  searchIssues: vi.fn().mockResolvedValue({ total: 0, items: [] }),
+  getIssue: vi.fn().mockResolvedValue(null),
+}));
+
+// mock github/client（详情页文件树/历史 + EditorView 判定用）
 vi.mock("$lib/github/client", () => ({
   OWNER: "gaubee",
   REPO: "gaubee.com",
@@ -20,24 +33,37 @@ vi.mock("$lib/github/client", () => ({
   getFileText: vi.fn().mockResolvedValue(""),
 }));
 
-// mock VFS（变更 Tab 调用 dirtyFiles）
+// mock README 渲染
+vi.mock("$lib/apps/installable/github/readme", () => ({
+  fetchReadme: vi.fn().mockResolvedValue({ content: null, path: null }),
+  renderReadme: vi.fn().mockReturnValue(""),
+}));
+
+// mock VFS
 vi.mock("$lib/vfs/vfs.svelte", () => ({
   vfs: { dirtyFiles: vi.fn().mockResolvedValue([]) },
   vfsStore: {},
 }));
 
-// mock 活动日志（日志 Tab 读 activities）
-const mockActivities = vi.fn().mockReturnValue([]);
+// mock 活动日志
 vi.mock("$lib/apps/installable/github/activity-log.svelte", () => ({
   activityLog: {
     init: vi.fn().mockResolvedValue(undefined),
-    get activities() {
-      return mockActivities();
-    },
+    activities: [],
   },
 }));
 
-// mock os/services（requestAppService / handlePublishError 等）
+// mock 收藏 store
+vi.mock("$lib/apps/installable/github/favorites.svelte", () => ({
+  repoFavorites: {
+    init: vi.fn().mockResolvedValue(undefined),
+    items: [],
+    has: vi.fn().mockReturnValue(false),
+    toggle: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+// mock os/services
 vi.mock("$lib/os/services", () => ({
   gaubeeos: { requestAppService: vi.fn() },
 }));
@@ -45,38 +71,53 @@ vi.mock("$lib/os/services/publish-helper", () => ({
   handlePublishError: vi.fn(),
 }));
 vi.mock("$lib/nav/nav-controller-instance", () => ({
-  navController: {},
+  navController: { navigateMain: vi.fn() },
 }));
 vi.mock("$lib/apps/builtin/notifications/service.svelte", () => ({
   notifySuccess: vi.fn(),
   notifyWarning: vi.fn(),
 }));
+vi.mock("$lib/apps/builtin/account/service", () => ({
+  accountService: {
+    state: { loaded: true, authenticated: false, user: null, error: null },
+    login: vi.fn(),
+  },
+}));
+
+// mock navStore（控制 pathname 分发）
+const mockPathname = vi.fn().mockReturnValue("/app/github");
+vi.mock("$lib/nav/nav.svelte", () => ({
+  navStore: {
+    get current() {
+      return { mainLocation: { pathname: mockPathname() } };
+    },
+  },
+}));
 
 import GithubView from "./GithubView.svelte";
 
-describe("GithubView", () => {
-  it("挂载并显示 Github 标题与默认仓库", async () => {
+describe("GithubView（路由分发器）", () => {
+  it("默认路径 /app/github 渲染列表页标题", async () => {
+    mockPathname.mockReturnValue("/app/github");
     const { container } = render(GithubView);
     await new Promise((r) => setTimeout(r, 100));
     const h1 = container.querySelector("h1");
     expect(h1?.textContent).toContain("Github");
-    // 默认仓库标识 owner/repo
-    expect(container.textContent).toContain("gaubee/gaubee.com");
   });
 
-  it("渲染 4 个 Tab（历史/文件/变更/日志）", async () => {
+  it("列表页渲染搜索框", async () => {
+    mockPathname.mockReturnValue("/app/github");
     const { container } = render(GithubView);
     await new Promise((r) => setTimeout(r, 100));
-    const text = container.textContent || "";
-    expect(text).toContain("历史");
-    expect(text).toContain("文件");
-    expect(text).toContain("变更");
-    expect(text).toContain("日志");
+    const input = container.querySelector('input[placeholder*="搜索"]');
+    expect(input).toBeTruthy();
   });
 
-  it("默认仓库标记为主仓库", async () => {
+  it("详情页路径 /app/github/repo/{owner}/{repo} 渲染仓库标识", async () => {
+    mockPathname.mockReturnValue("/app/github/repo/sveltejs/kit");
     const { container } = render(GithubView);
-    await new Promise((r) => setTimeout(r, 100));
-    expect(container.textContent).toContain("主仓库");
+    await new Promise((r) => setTimeout(r, 2000));
+    // 详情页顶部显示 owner/repo
+    expect(container.textContent).toContain("sveltejs/kit");
   });
 });
