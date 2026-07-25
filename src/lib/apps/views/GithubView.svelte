@@ -36,6 +36,7 @@
   const commits = $derived(gitStore.commits)
   const loading = $derived(gitStore.loading)
   const error = $derived(gitStore.error)
+  const progress = $derived(gitStore.progress)
 
   async function handleClone() {
     const config: RepoConfig = {
@@ -119,6 +120,31 @@
           拉取
         </Button>
       </div>
+      <!-- clone/pull 进度条 -->
+      {#if progress}
+        <div class="space-y-1">
+          <div class="text-muted-foreground flex items-center justify-between text-xs">
+            <span>{progress.phase}</span>
+            {#if progress.total > 0}
+              <span class="font-mono">{Math.round((progress.loaded / progress.total) * 100)}%</span>
+            {/if}
+          </div>
+          {#if progress.total > 0}
+            <!-- 确定进度条 -->
+            <div class="bg-muted h-1.5 w-full overflow-hidden rounded-full">
+              <div
+                class="bg-primary h-full rounded-full transition-all duration-300"
+                style="width: {Math.min(100, (progress.loaded / progress.total) * 100)}%"
+              ></div>
+            </div>
+          {:else}
+            <!-- 不确定进度条（indeterminate 动画） -->
+            <div class="bg-muted h-1.5 w-full overflow-hidden rounded-full">
+              <div class="bg-primary h-full w-1/3 rounded-full git-progress-indeterminate"></div>
+            </div>
+          {/if}
+        </div>
+      {/if}
       {#if error}
         <p class="text-destructive text-sm">{error}</p>
       {/if}
@@ -166,3 +192,24 @@
     </Card.Root>
   {/if}
 </div>
+
+<style>
+  /* indeterminate 进度条动画（不可计算总量时的滑动效果）。 */
+  .git-progress-indeterminate {
+    animation: git-progress-slide 1.2s ease-in-out infinite;
+  }
+  @keyframes git-progress-slide {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(400%);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .git-progress-indeterminate {
+      animation: none;
+      opacity: 0.6;
+    }
+  }
+</style>

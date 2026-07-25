@@ -38,6 +38,16 @@ export interface GitCommit {
   parent: string[];
 }
 
+/** clone/pull 进度（isomorphic-git onProgress 回调格式）。 */
+export interface CloneProgress {
+  /** 阶段：Compressing objects / Receiving objects / Resolving deltas / Updating files 等 */
+  phase: string;
+  /** 已加载字节/对象数。 */
+  loaded: number;
+  /** 总字节/对象数（total > 0 时可计算百分比）。 */
+  total: number;
+}
+
 // ---------------------------------------------------------------------------
 // 状态（Svelte 5 runes）
 // ---------------------------------------------------------------------------
@@ -58,6 +68,8 @@ class GitStore {
   loading = $state(false);
   /** 错误信息。 */
   error = $state<string | null>(null);
+  /** clone/pull 进度（null = 无操作/完成）。 */
+  progress = $state<CloneProgress | null>(null);
 
   /** 获取（懒加载）已初始化的 ZenFS 实例。 */
   private async fs(): Promise<ZenFs> {
@@ -84,6 +96,7 @@ class GitStore {
   async clone(config: RepoConfig): Promise<void> {
     this.loading = true;
     this.error = null;
+    this.progress = { phase: "准备中", loaded: 0, total: 0 };
     try {
       const fs = await this.fs();
       await this.cleanGitRoot();
@@ -96,6 +109,9 @@ class GitStore {
         url,
         ref: config.branch,
         corsProxy: "https://cors.isomorphic-git.org",
+        onProgress: (p: CloneProgress) => {
+          this.progress = p;
+        },
       });
 
       this.repo = config;
@@ -106,6 +122,7 @@ class GitStore {
       throw e;
     } finally {
       this.loading = false;
+      this.progress = null;
     }
   }
 
@@ -114,6 +131,7 @@ class GitStore {
     if (!this.repo) return;
     this.loading = true;
     this.error = null;
+    this.progress = { phase: "拉取中", loaded: 0, total: 0 };
     try {
       const fs = await this.fs();
       await git.pull({
@@ -123,12 +141,16 @@ class GitStore {
         ref: this.branch,
         author: { name: "GaubeeOS", email: "os@gaubee.com" },
         corsProxy: "https://cors.isomorphic-git.org",
+        onProgress: (p: CloneProgress) => {
+          this.progress = p;
+        },
       });
       await this.refresh();
     } catch (e) {
       this.error = e instanceof Error ? e.message : String(e);
     } finally {
       this.loading = false;
+      this.progress = null;
     }
   }
 
