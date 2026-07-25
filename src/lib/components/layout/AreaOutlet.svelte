@@ -14,12 +14,14 @@
 -->
 <script lang="ts">
   import { navStore } from '$lib/nav/nav.svelte'
+  import { navController } from '$lib/nav/nav-controller-instance'
   import {
     getAllTabLoaders,
     activeTabIdForLocation,
     getPopLoader,
-    getDeepLinkLoader,
   } from '$lib/views/registry'
+  import { resolveMainView } from '$lib/views/resolver'
+  import { resolveNotFound, type NotFoundResult } from '$lib/views/not-found-registry'
   import { appManager } from '$lib/apps/AppManager.svelte'
   import { appLoadStore } from '$lib/apps/app-load.svelte'
   import { routeDomainRegistry } from '$lib/apps/route-domain'
@@ -27,6 +29,7 @@
   import { blurTransition } from '$lib/utils/motion'
   import AppShell from '$lib/app-scaffold/AppShell.svelte'
   import DesktopView from '$lib/apps/views/DesktopView.svelte'
+  import NotFoundView from '$lib/views/NotFoundView.svelte'
   import type { AppManifest } from '$lib/apps/types'
   import type { Area, TabId } from '$lib/nav/controller'
   import type { Component } from 'svelte'
@@ -50,7 +53,20 @@
   )
 
   const allTabLoaders = $derived(getAllTabLoaders())
-  const activeTabId = $derived(activeTabIdForLocation(location, area, tabIdsInArea))
+
+  // ---- URL-first 视图解析（main 区）----
+  // main 区用 resolveMainView（纯 URL 驱动，不查 mainTabs）；
+  // bottom 区仍用 activeTabIdForLocation（bottom 有独立的 tab 激活语义）。
+  const mainResolution = $derived(
+    area === 'main' ? resolveMainView(location.pathname) : null,
+  )
+  const activeTabId = $derived(
+    area === 'main'
+      ? mainResolution?.kind === 'tab'
+        ? mainResolution.tabId
+        : null
+      : activeTabIdForLocation(location, area, tabIdsInArea),
+  )
 
   // ---- tab view 异步加载 + 缓存保活 ----
   // 已加载组件数组（Svelte 5 deep reactivity：push/pop/splice 自动触发响应）。
@@ -83,9 +99,10 @@
   })
 
   // ---- deep link view 异步加载（非常驻）----
+  // URL-first：deepLink loader 从 resolveMainView 派生（mainResolution.kind === 'deeplink'）。
   // 按路径缓存已加载组件（同一文章二次进入不重复 import）+ inFlight 守卫防 effect 重入死循环。
   const deepLinkLoader = $derived(
-    area === 'main' && !activeTabId ? getDeepLinkLoader(location.pathname) : undefined,
+    area === 'main' && mainResolution?.kind === 'deeplink' ? mainResolution.loader : undefined,
   )
   let deepLinkView = $state<Component | undefined>(undefined)
   const deepLinkCache = new Map<string, Component>()
@@ -152,11 +169,34 @@
       })
   })
 
-  // 桌面作为 shell 级背景层（main 区独有）：无应用浮层激活、无 deep-link 时显现。
-  // mainLocation 为 /（桌面）或无激活 tab 时，桌面是顶层。
-  const desktopVisible = $derived(
-    area === 'main' && (activeTabId === null) && !deepLinkLoader,
+  // 桌面作为 shell 级背景层（main 区独有）：无应用浮层、无 deep-link、非 NotFound 时显现。
+  // mainLocation 为 /（桌面）时桌面是顶层（/ 不走视图解析，直接显示桌面）。
+  const isDesktop = $derived(area === 'main' && location.pathname === '/')
+  const isNotFound = $derived(
+    area === 'main' && !isDesktop && mainResolution?.kind === 'not-found',
   )
+  const desktopVisible = $derived(
+    area === 'main' && (isDesktop || (activeTabId === null && !deepLinkLoader && !isNotFound)),
+  )
+
+  // ---- NotFound 处理（方向二）----
+  // URL 解析为 not-found 时，跑中间件链；redirect 结果触发导航，render 结果由模板渲染 NotFoundView。
+  // 用 lastNotFoundPath 守卫，避免 effect 重入死循环（redirect 后 location 变化重新解析）。
+  let lastNotFoundPath = ''
+  $effect(() => {
+    if (!isNotFound) {
+      lastNotFoundPath = ''
+      return
+    }
+    const path = location.pathname
+    if (path === lastNotFoundPath) return // 已处理过此路径，避免重入
+    lastNotFoundPath = path
+    const result: NotFoundResult = resolveNotFound(path)
+    if (result.kind === 'redirect') {
+      // 中间件要求重定向（如 github 把 /app/github/不存在 重定向到列表页）
+      navController.navigateMain(result.path, 'REPLACE')
+    }
+  })
 
   // deep-link 详情页激活时，桌面层与 tab 浮层都要让位（隐藏但不卸载，保留 scroll/状态）。
   // 之前的实现把 deep-link 与 tab 放在互斥 {#if} 链里——切换时 tab DOM 整个卸载，
@@ -197,7 +237,7 @@
       </div>
     {/if}
     {#each allTabLoaders as { tabId } (tabId)}
-      {@const inThisArea = tabIdsInArea.includes(tabId)}
+      {@const inThisArea = tabIdsInArea.includes(tabId) || activeTabId === tabId}
       {@const isThisActive = inThisArea && isActive && activeTabId === tabId}
       {@const View = loadedComponentFor(tabId)}
       {@const manifest = manifestForTab(tabId)}
@@ -246,6 +286,18 @@
             {:else}
               <div class="app-skeleton h-full" aria-label="加载中"></div>
             {/if}
+          </div>
+        {/if}
+      </div>
+    {/if}
+
+    {#if area === 'main'}
+      <!-- NotFound 层（方向二）：URL 解析为 not-found 且中间件未 redirect 时渲染。
+           z:30 覆盖桌面/tab/deep-link 之上。 -->
+      <div class="not-found-layer" class:not-found-layer-hidden={!isNotFound}>
+        {#if isNotFound}
+          <div class="h-full overflow-auto bg-background" in:motionBlur>
+            <NotFoundView path={location.pathname} />
           </div>
         {/if}
       </div>
@@ -307,6 +359,16 @@
     z-index: 20;
   }
   .deep-link-layer-hidden {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  /* NotFound 层：覆盖桌面/tab/deep-link 之上（z:30）。仅 not-found 解析命中时可见。 */
+  .not-found-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+  }
+  .not-found-layer-hidden {
     visibility: hidden;
     pointer-events: none;
   }

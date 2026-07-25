@@ -329,18 +329,10 @@ function sanitizeMainLocation(
   location: HistoryLocation,
   mainTabs: readonly TabId[],
 ): HistoryLocation {
-  // location=/（桌面）时保留。
-  if (location.pathname === "/") return location;
-
-  // 区分「应用 entry route」与「deep link 子路径」：
-  // - entry route（如 /app/github）：该应用必须在 mainTabs 才合法，否则清洗。
-  // - deep link（如 /article/xxx、/tags/xxx）：归属某应用但非其 entry route，
-  //   AreaOutlet 会走 deep link 渲染分支（无需应用在任务栏），应保留。
-  //   仅当路径恰好等于某 tab 的 entry route 才视为"应用入口"，需要 mainTabs 校验。
-  const exactTab = tabRegistry.allTabs.find((tab) => location.pathname === tab);
-  if (exactTab && !mainTabs.includes(exactTab)) {
-    return parseHref("/");
-  }
+  // URL-first 模型：location 合法性由 resolveMainView（视图解析器）判断，
+  // 不再用 mainTabs 作为白名单清洗。无效 URL 走 NotFound 中间件处理。
+  // mainTabs 参数保留（normalizeState 调用签名兼容），但不再使用。
+  void mainTabs;
   return location;
 }
 
@@ -488,13 +480,28 @@ const carryActiveOnMovePlugin: KernelBehaviorPlugin = ({ prevState, nextState, e
 };
 
 /**
- * 任务栏模型（2026-07-23 重构）：location '/' = 桌面（合法态），不再强制跳 mainTabs[0]。
- * 原 ensureMainHasActivePlugin（main 有 tab 就强制激活首个）已废弃——新模型桌面是 '/'，
- * 空闲态显示桌面背景层，打开应用才进任务栏。
- * 保留此空插件占位（BUILTIN_BEHAVIOR_PLUGINS 数组结构不变），未来如需引导逻辑可在此扩展。
+ * URL-first 任务栏同步：main location 命中的 tabView 应用若不在 mainTabs，自动加入。
+ *
+ * 取代旧 bootstrap 深链接拉起补丁，系统性覆盖运行时所有场景：
+ * - 直接访问 /app/github/repo/x（URL 表达 github 应用激活）→ /app/github 进 mainTabs
+ * - navigateMain 到某应用 → 该应用进 mainTabs（Dock 高亮）
+ * - 应用已在 mainTabs → 无操作（幂等）
+ *
+ * 仅 tabView 应用生效（pathToTabId 走路由域反查，deepLinkView 应用的 entry route
+ * 不在 tabRegistry.allTabs，不会被误加入任务栏）。
  */
+const syncTabsFromUrlPlugin: KernelBehaviorPlugin = ({ nextState }) => {
+  const mainApp = pathToTabId(nextState.mainLocation.pathname);
+  if (mainApp && tabRegistry.allTabs.includes(mainApp) && !nextState.mainTabs.includes(mainApp)) {
+    return { ...nextState, mainTabs: [...nextState.mainTabs, mainApp] };
+  }
+  return nextState;
+};
 
-const BUILTIN_BEHAVIOR_PLUGINS: readonly KernelBehaviorPlugin[] = [carryActiveOnMovePlugin];
+const BUILTIN_BEHAVIOR_PLUGINS: readonly KernelBehaviorPlugin[] = [
+  carryActiveOnMovePlugin,
+  syncTabsFromUrlPlugin,
+];
 
 function applyBehaviorPlugins(
   prevState: KernelState,
@@ -1041,8 +1048,8 @@ export class NavController {
     };
 
     // 2.5 初始化 per-app 场景记忆：把首屏 main/bottom location 记入对应应用。
-    //     + 深链接拉起：直接访问应用 URL（如 /app/github/repo/...）时，若归属应用
-    //       不在 mainTabs，自动加入（等同 openApp），否则 sanitize 会清洗到桌面导致白屏。
+    //    URL-first 模型下，任务栏（mainTabs）的 URL 同步由 syncTabsFromUrlPlugin
+    //    在 step 3 的行为插件链统一处理，此处只管场景记忆。
     {
       const scenes: Record<string, HistoryLocation> = {};
       const mainApp = pathToTabId(parsed.main.pathname);
@@ -1051,19 +1058,6 @@ export class NavController {
       if (bottomApp) scenes[bottomApp] = parsed.bottom;
       if (Object.keys(scenes).length > 0) {
         this.state = { ...this.state, appScenes: scenes };
-      }
-      // 深链接拉起：main location 归属的 tabView 应用若不在任务栏，加入 mainTabs。
-      // 这样直接访问 /app/github/repo/x 或 /app/github 都能正确渲染（entry route
-      // 和子路径都需要应用在任务栏才能激活 tabView 浮层）。
-      if (
-        mainApp &&
-        tabRegistry.allTabs.includes(mainApp) &&
-        !this.state.mainTabs.includes(mainApp)
-      ) {
-        this.state = {
-          ...this.state,
-          mainTabs: [...this.state.mainTabs, mainApp],
-        };
       }
     }
 

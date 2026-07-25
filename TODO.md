@@ -718,3 +718,32 @@ agent-browser 双端走查（手机 390x844 / 平板 834x1194 / 桌面 1280）�
 - **GithubApp 桌面不可见**：DEFAULT_HIDDEN 硬编码 "github"（bottom 区遗留），导致去掉 hiddenFromNav 后仍不在桌面网格。从 DEFAULT_HIDDEN 移除 github + 桌面布局 schema 版本迁移（v1→v2，持久化数据补充 github）。
 - **详情页文件树 grid 溢出**：`md:grid-cols-[minmax(0,280px)_1fr]` 第一列被 `1fr` 压成 0px（平板），且移动端单列时子元素无 `min-w-0` 被内容撑到 1389px 溢出视口。修复：`minmax(200px,280px)` 保底 + grid 容器及子元素加 `min-w-0` + README `overflow-hidden break-words`。
 - **搜索框移动端过宽**：placeholder 缩短 + `w-32 sm:w-56`。
+
+## 路由重构：URL-first 渲染 + NotFound 中间件（2026-07-26）
+
+### 问题本质
+
+「任务栏（mainTabs）决定渲染」与「URL 是一等公民」冲突：直接访问应用 URL 时 mainTabs 为空 → 白屏（靠 bootstrap 补丁勉强修复）；路径匹配不到任何 view 时静默落桌面，无 404。
+
+### 方向一：URL-first 渲染解耦
+
+渲染决策纯 URL 驱动，不查 mainTabs：
+
+- **resolveMainView（resolver.ts）**：统一视图解析器。路由域反查 → tabView / deepLink 前缀匹配 / not-found。纯函数，不依赖任务栏状态。
+- **AreaOutlet 改造**：main 区用 `resolveMainView` 替代 `activeTabIdForLocation(loc, tabIdsInArea)`。activeTabId 只看 URL；deepLinkLoader 从 resolution 派生；tabView 浮层渲染条件 `inThisArea = tabIdsInArea.includes || activeTabId === tabId`（直接访问的应用也能渲染）。
+- **syncTabsFromUrlPlugin（controller.ts）**：新增 behavior plugin，每次 transition 后把 main location 命中的 tabView 应用自动加入 mainTabs（系统性取代 bootstrap 补丁，覆盖运行时导航）。
+- **sanitizeMainLocation 改造**：移除 mainTabs 白名单清洗（URL-first：合法性交给 resolveMainView 判断，无效 URL 走 NotFound）。
+- **删除 bootstrap 深链接拉起补丁**（被 syncTabsFromUrlPlugin 取代）。
+
+### 方向二：NotFound 中间件链
+
+错误链接优雅处理，应用可自定义接管：
+
+- **not-found-registry.ts**：NotFound 处理器注册表 + 中间件链。`resolveNotFound(path)` 按归属应用优先 → 全局 → 默认 render 执行。handler 可返回 redirect（重定向）/ render（默认 404）/ pass（放行）。
+- **NotFoundView.svelte**：系统默认 404 页（404 + 错误路径 + 双按钮：回到应用首页[若路由域可推断归属] / 回到桌面）。
+- **AreaOutlet 集成**：resolveMainView 返回 not-found 时，跑中间件链；redirect 触发导航，否则渲染 NotFoundView。桌面判定 `isNotFound` 排除，`/` 路径优先显示桌面。
+
+### 验证
+
+- 类型检查 0 错误；308 单测全过（新增 resolver 6 + not-found-registry 7）；build 成功。
+- agent-browser 走查：① 直接访问 `/app/github/repo/Gaubee/gaubee.com` → 详情页正常 ② `/app/nonexistent` → 404 + 回到桌面 ③ 桌面 openApp + 列表页 → 正常无回归。
