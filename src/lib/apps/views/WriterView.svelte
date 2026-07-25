@@ -13,8 +13,8 @@
   import { gaubeeos } from '$lib/os/services'
   import { ACCOUNT_UNAVAILABLE } from '$lib/apps/builtin/account/service'
   import { handlePublishError } from '$lib/os/services/publish-helper'
+  import { contentQuery } from '$lib/content-pipeline/query.svelte'
   import { vfsStore } from '$lib/vfs/vfs.svelte'
-  import { contentStore } from '$lib/data/content.svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
   import { Button } from '$lib/components/ui/button'
   import { Skeleton } from '$lib/components/ui/skeleton'
@@ -36,11 +36,17 @@
   // VFS dirty 文件数（待发表的本地变更）
   const dirtyCount = $derived(vfsStore.dirtyCount)
 
+  /** 同步 VFS（可写态）并重建内容管道。 */
+  async function refresh(): Promise<void> {
+    await vfsStore.sync('src/content')
+    contentQuery.refresh()
+  }
+
   onMount(async () => {
     // 从 VFS 获取文件列表（包含只读层 + 可写层）
-    await contentStore.refresh()
-    const articles = contentStore.articles.map(p => p.path)
-    const events = contentStore.events.map(p => p.path)
+    await refresh()
+    const articles = contentQuery.listArticles().map((p) => p.path)
+    const events = contentQuery.listEvents().map((p) => p.path)
     files = [...articles, ...events].sort()
     loading = false
   })
@@ -68,7 +74,7 @@
         label: '查看变更',
         href: '/app/changes',
       })
-      await contentStore.refresh()
+      await refresh()
     } catch (e) {
       handlePublishError(e, navController)
     } finally {
@@ -86,7 +92,7 @@
         文件
       </Button>
       {#if accountState.authenticated}
-        <Button size="sm" variant="outline" onclick={() => contentStore.refresh()}>
+        <Button size="sm" variant="outline" onclick={refresh}>
           刷新
         </Button>
       {/if}

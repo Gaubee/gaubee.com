@@ -8,7 +8,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { vfs, vfsStore, type VfsNode } from '$lib/vfs/vfs.svelte'
-  import { contentStore } from '$lib/data/content.svelte'
+  import { contentQuery } from '$lib/content-pipeline/query.svelte'
   import { gaubeeos } from '$lib/os/services'
   import { handlePublishError } from '$lib/os/services/publish-helper'
   import { navController } from '$lib/nav/nav-controller-instance'
@@ -53,8 +53,8 @@
       notifySuccess(`已提交（${sha.slice(0, 7)}）`)
       await load()
       message = ''
-      // 刷新内容派生视图（commit 后 VFS 已 sync）
-      contentStore.refresh()
+      // 刷新内容管道（commit 后 VFS 已 sync，重建查询缓存）
+      contentQuery.refresh()
     } catch (e) {
       // 复用发表流程的错误处理（未登录引导 /app/account，未装提示安装等）
       handlePublishError(e, navController)

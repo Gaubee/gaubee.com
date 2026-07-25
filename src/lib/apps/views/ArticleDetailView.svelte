@@ -2,10 +2,11 @@
 	正交意图：
 	1. 原始需求（2026-07-21）：长文需要桌面和移动 TOC。
 	2. 原始需求（2026-07-22）：桌面 TOC 位于右侧；拉伸的侧栏承载吸顶，内部目录独立滚动，避免与应用导航叠加在左侧。
-	3. 从 ReadonlyVFS 阅读文章，并保持前后文章导航。
+	3. 从内容管道（contentQuery）阅读文章，并保持前后文章导航。
 -->
 <script lang="ts">
-  import { readonlyVfs, type ReadonlyPost } from '$lib/vfs/readonly'
+  import { contentQuery } from '$lib/content-pipeline/query.svelte'
+  import type { ContentEntry } from '$lib/content-pipeline/types'
   import { navController } from '$lib/nav/nav-controller-instance'
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
   import TocTree from './TocTree.svelte'
@@ -33,14 +34,17 @@
   })
 
   /** 当前文章。 */
-  const post = $derived(
-    target ? readonlyVfs.findPost(target.collection, target.stem) : undefined
-  )
+  const post = $derived.by<ContentEntry | null>(() => {
+    void contentQuery.version
+    if (!target) return null
+    return contentQuery.findPost(target.collection, target.stem)
+  })
 
-  /** 同集合所有文章（排序）。 */
-  const siblings = $derived(
-    target ? readonlyVfs.getPostsByCollection(target.collection) : []
-  )
+  /** 同集合所有文章（按 date 降序）。 */
+  const siblings = $derived.by<ContentEntry[]>(() => {
+    void contentQuery.version
+    return target ? contentQuery.siblings(target.collection) : []
+  })
 
   /** 当前索引。 */
   const currentIndex = $derived(
@@ -64,7 +68,7 @@
     })
   }
 
-  function gotoPost(p: ReadonlyPost) {
+  function gotoPost(p: ContentEntry) {
     navController.navigateMain(`/article/${p.collection}/${p.id.stem}`)
   }
 
@@ -98,27 +102,27 @@
         <!-- 文章头部 -->
         <header class="mb-8">
           <h1 class="mb-4 text-balance text-3xl font-bold leading-tight sm:text-4xl">
-            {post.metadata.title ?? post.id.slug ?? post.id.stem}
+            {post.title}
           </h1>
 
           <div class="text-muted-foreground flex flex-wrap items-center gap-4 text-sm">
             <div class="flex items-center gap-1.5">
               <CalendarIcon class="size-4" />
-              <time>{formatDate(post.metadata.date)}</time>
+              <time>{formatDate(post.date)}</time>
             </div>
 
-            {#if post.metadata.updated && post.metadata.updated.getTime() !== post.metadata.date.getTime()}
+            {#if post.updated && post.updated.getTime() !== post.date.getTime()}
               <div class="flex items-center gap-1.5">
                 <ClockIcon class="size-4" />
-                <span>更新于 {formatDate(post.metadata.updated)}</span>
+                <span>更新于 {formatDate(post.updated)}</span>
               </div>
             {/if}
           </div>
 
-          {#if post.metadata.tags.length > 0}
+          {#if post.tags.length > 0}
             <div class="mt-4 flex flex-wrap items-center gap-2">
               <TagIcon class="text-muted-foreground size-4" />
-              {#each post.metadata.tags as tag}
+              {#each post.tags as tag}
                 <Badge variant="secondary" class="text-xs">{tag}</Badge>
               {/each}
             </div>
@@ -146,7 +150,7 @@
                 <ChevronLeftIcon class="size-3" /> 上一篇
               </span>
               <span class="font-medium">
-                {newer.metadata.title ?? newer.id.slug ?? newer.id.stem}
+                {newer.title}
               </span>
             </button>
           {:else}
@@ -162,7 +166,7 @@
                 下一篇 <ChevronRightIcon class="size-3" />
               </span>
               <span class="font-medium">
-                {older.metadata.title ?? older.id.slug ?? older.id.stem}
+                {older.title}
               </span>
             </button>
           {:else}

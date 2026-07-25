@@ -5,7 +5,7 @@
 	3. 在桌面侧栏和移动 Sheet 提供相同的年份项目。
 -->
 <script lang="ts">
-  import type { ReadonlyPost } from '$lib/vfs/readonly'
+  import type { ContentEntry } from '$lib/content-pipeline/types'
   import * as Sheet from '$lib/components/ui/sheet'
   import { Button } from '$lib/components/ui/button'
   import CalendarDaysIcon from '@lucide/svelte/icons/calendar-days'
@@ -15,13 +15,13 @@
     count: number
   }
 
-  let { posts, onSelectYear }: { posts: ReadonlyPost[]; onSelectYear: (year: number) => void } = $props()
+  let { posts, onSelectYear }: { posts: ContentEntry[]; onSelectYear: (year: number) => void } = $props()
   let mobileOpen = $state(false)
 
   const yearGroups = $derived.by((): YearGroup[] => {
     const groups = new Map<number, number>()
     for (const post of posts) {
-      const year = post.metadata.date.getFullYear()
+      const year = post.date.getFullYear()
       groups.set(year, (groups.get(year) ?? 0) + 1)
     }
     return [...groups]

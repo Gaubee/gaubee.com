@@ -8,6 +8,11 @@ import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { createExcerpt } from "../src/lib/content-pipeline/excerpt";
+import {
+  entryToSearchDocument,
+  sortSearchDocuments,
+} from "../src/lib/content-pipeline/processors/search-index";
 import { parseArticleId, parseMarkdown } from "../src/lib/data/frontmatter";
 import type {
   SearchIndexApplication,
@@ -44,14 +49,8 @@ async function listMarkdownFiles(directoryPath: string): Promise<string[]> {
   return files.flat();
 }
 
-function createExcerpt(markdown: string): string {
-  return markdown
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/!?(\[[^\]]*\])\([^)]*\)/g, "$1")
-    .replace(/[#>*_`~]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 180);
+function createExcerptLocal(markdown: string): string {
+  return createExcerpt(markdown);
 }
 
 async function loadDocuments(source: ApplicationSource): Promise<SearchIndexDocument[]> {
@@ -62,21 +61,26 @@ async function loadDocuments(source: ApplicationSource): Promise<SearchIndexDocu
       const raw = await readFile(file, "utf8");
       const { metadata, body } = parseMarkdown(raw);
       const articleId = parseArticleId(basename(file));
-      const date = metadata?.date.getTime() ?? 0;
-      const title = metadata?.title ?? (articleId.slug || articleId.stem);
       const contentPath = relative(projectRoot, file).replaceAll("\\", "/");
-      return {
-        id: contentPath,
-        title,
-        content: body,
-        tags: metadata?.tags.join(" ") ?? "",
-        excerpt: createExcerpt(body),
-        href: `/article/${source.directory}/${articleId.stem}`,
-        date,
-      } satisfies SearchIndexDocument;
+      // 复用 content-pipeline 的统一投影（约束 4：构建期与运行时格式一致）
+      const entry = {
+        uid: contentPath,
+        path: contentPath,
+        collection: source.directory,
+        filename: basename(file),
+        id: articleId,
+        title: metadata?.title ?? (articleId.slug || articleId.stem),
+        date: metadata?.date ?? new Date(0),
+        updated: metadata?.updated,
+        tags: metadata?.tags ?? [],
+        body,
+        excerpt: createExcerptLocal(body),
+        metadata: metadata ?? { date: new Date(0), tags: [] },
+      };
+      return entryToSearchDocument(entry);
     }),
   );
-  return documents.sort((left, right) => right.date - left.date || left.id.localeCompare(right.id));
+  return sortSearchDocuments(documents);
 }
 
 function serialize(documents: readonly SearchIndexDocument[]): string {

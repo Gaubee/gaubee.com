@@ -5,9 +5,12 @@
 	- 标题、日期、标签
 	- 上一篇/下一篇导航（同集合按 date 排序）
 	- 编辑按钮（跳转编辑器）
+	数据源 contentQuery（内容管道，背后 readonlyVfs + vfsStore）。
 -->
 <script lang="ts">
-  import { contentStore } from '$lib/data/content.svelte'
+  import { contentQuery } from '$lib/content-pipeline/query.svelte'
+  import type { ContentEntry } from '$lib/content-pipeline/types'
+  import { vfsStore } from '$lib/vfs/vfs.svelte'
   import { navStore } from '$lib/nav/nav.svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
@@ -28,17 +31,23 @@
     return { collection: match[1] as 'articles' | 'events', stem: match[2] }
   })
 
-  const post = $derived(
-    target ? contentStore.findPost(target.collection, target.stem) : undefined
-  )
+  const post = $derived.by<ContentEntry | null>(() => {
+    void contentQuery.version
+    if (!target) return null
+    return contentQuery.findPost(target.collection, target.stem)
+  })
 
   // 同集合的文章列表（按 date 降序），用于上下篇
-  const siblings = $derived(
-    target ? (target.collection === 'articles' ? contentStore.articles : contentStore.events) : []
-  )
+  const siblings = $derived.by<ContentEntry[]>(() => {
+    void contentQuery.version
+    return target ? contentQuery.siblings(target.collection) : []
+  })
   const currentIndex = $derived(post ? siblings.findIndex((p) => p.path === post.path) : -1)
   const newer = $derived(currentIndex > 0 ? siblings[currentIndex - 1] : null)
   const older = $derived(currentIndex >= 0 && currentIndex < siblings.length - 1 ? siblings[currentIndex + 1] : null)
+
+  // 是否正在后台刷新（vfsStore.loading 作为代理）
+  const refreshing = $derived(vfsStore.loading)
 
   function formatDate(d: Date): string {
     return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -47,13 +56,19 @@
   function goto(p: { collection: string; id: { stem: string } }) {
     navController.navigateMain(`/article/${p.collection}/${p.id.stem}`)
   }
+
+  /** 刷新：重新同步 VFS（可写态）后重建内容管道。 */
+  async function refresh() {
+    await vfsStore.sync('src/content')
+    contentQuery.refresh()
+  }
 </script>
 
 <div class="mx-auto max-w-3xl p-4 sm:p-6">
   {#if !target}
     <p class="text-muted-foreground">未指定文章</p>
   {:else if !post}
-    {#if contentStore.state.loading}
+    {#if refreshing}
       <div class="space-y-3">
         <Skeleton class="h-8 w-2/3" />
         <Skeleton class="h-4 w-1/4" />
@@ -64,7 +79,7 @@
       <Card.Root>
         <Card.Content class="pt-6">
           <p class="text-muted-foreground">文章未找到。可能需要刷新内容列表。</p>
-          <Button variant="outline" size="sm" class="mt-3" onclick={() => contentStore.refresh()}>
+          <Button variant="outline" size="sm" class="mt-3" onclick={refresh}>
             刷新内容
           </Button>
         </Card.Content>
@@ -76,16 +91,16 @@
       <div class="text-muted-foreground mb-2 flex items-center gap-2 text-xs">
         <span>{post.collection === 'articles' ? '文章' : '短评'}</span>
         <span>·</span>
-        <time>{formatDate(post.metadata.date)}</time>
-        {#if post.metadata.updated && post.metadata.updated.getTime() !== post.metadata.date.getTime()}
+        <time>{formatDate(post.date)}</time>
+        {#if post.updated && post.updated.getTime() !== post.date.getTime()}
           <span>·</span>
-          <span>更新于 {formatDate(post.metadata.updated)}</span>
+          <span>更新于 {formatDate(post.updated)}</span>
         {/if}
       </div>
-      <h1 class="mb-3 text-3xl font-bold">{post.metadata.title ?? post.id.slug ?? post.id.stem}</h1>
-      {#if post.metadata.tags.length > 0}
+      <h1 class="mb-3 text-3xl font-bold">{post.title}</h1>
+      {#if post.tags.length > 0}
         <div class="flex flex-wrap gap-1.5">
-          {#each post.metadata.tags as tag}
+          {#each post.tags as tag}
             <Badge variant="secondary">{tag}</Badge>
           {/each}
         </div>
@@ -124,7 +139,7 @@
             <ChevronLeftIcon class="size-3" /> 上一篇
           </div>
           <div class="mt-1 truncate font-medium">
-            {older.metadata.title ?? older.id.slug ?? older.id.stem}
+            {older.title}
           </div>
         </button>
       {/if}
@@ -137,7 +152,7 @@
             下一篇 <ChevronRightIcon class="size-3" />
           </div>
           <div class="mt-1 truncate font-medium">
-            {newer.metadata.title ?? newer.id.slug ?? newer.id.stem}
+            {newer.title}
           </div>
         </button>
       {/if}

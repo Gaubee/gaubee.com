@@ -1,12 +1,12 @@
 <!--
 	正交意图：
 	1. 原始需求（2026-07-21）：说说列表接近 X 的时间线，并正确渲染 Markdown。
-	2. 从 ReadonlyVFS 按时间倒序读取 events。
+	2. 从内容管道（contentQuery）按时间倒序读取 events。
 	3. 对长内容提供局部展开，且不截断 Markdown 的语义结构。
 -->
 <script lang="ts">
-  import { onMount } from 'svelte'
-  import { readonlyVfs, type ReadonlyPost } from '$lib/vfs/readonly'
+  import { contentQuery } from '$lib/content-pipeline/query.svelte'
+  import type { ContentEntry } from '$lib/content-pipeline/types'
   import { navController } from '$lib/nav/nav-controller-instance'
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
   import { Skeleton } from '$lib/components/ui/skeleton'
@@ -18,16 +18,13 @@
   const LONG_SHOUT_CHARACTERS = 560
   const LONG_SHOUT_LINES = 8
 
-  let shouts = $state<ReadonlyPost[]>([])
-  let loading = $state(true)
-  let expandedIds = $state<Set<string>>(new Set())
-
-  onMount(() => {
-    shouts = readonlyVfs
-      .getPostsByCollection('events')
-      .sort((a, b) => b.metadata.date.getTime() - a.metadata.date.getTime())
-    loading = false
+  // contentQuery 已在 AppManager.init() 投影内容管道后初始化（同步内存读取）
+  const shouts = $derived.by<ContentEntry[]>(() => {
+    void contentQuery.version
+    return contentQuery.listEvents()
   })
+  const loading = $derived(!contentQuery.initialized)
+  let expandedIds = $state<Set<string>>(new Set())
 
   function formatDate(date: Date): string {
     const elapsedDays = Math.floor((Date.now() - date.getTime()) / 86_400_000)
@@ -38,16 +35,16 @@
     return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })
   }
 
-  function hrefFor(shout: ReadonlyPost): string {
+  function hrefFor(shout: ContentEntry): string {
     return `/article/${shout.collection}/${shout.id.stem}`
   }
 
-  function openShout(event: MouseEvent, shout: ReadonlyPost): void {
+  function openShout(event: MouseEvent, shout: ContentEntry): void {
     event.preventDefault()
     navController.navigateMain(hrefFor(shout))
   }
 
-  function isLong(shout: ReadonlyPost): boolean {
+  function isLong(shout: ContentEntry): boolean {
     return shout.body.length > LONG_SHOUT_CHARACTERS || shout.body.split('\n').length > LONG_SHOUT_LINES
   }
 
@@ -58,7 +55,7 @@
     expandedIds = next
   }
 
-  function titleFor(shout: ReadonlyPost): string {
+  function titleFor(shout: ContentEntry): string {
     return shout.metadata.title ?? shout.id.slug ?? '查看说说详情'
   }
 </script>
@@ -120,11 +117,11 @@
               <a
                 class="text-muted-foreground inline-flex shrink-0 items-center gap-1 hover:underline"
                 href={hrefFor(shout)}
-                aria-label={`${titleFor(shout)}，发布于 ${formatDate(shout.metadata.date)}`}
+                aria-label={`${titleFor(shout)}，发布于 ${formatDate(shout.date)}`}
                 onclick={(event) => openShout(event, shout)}
               >
                 <CalendarIcon class="size-3" />
-                <time>{formatDate(shout.metadata.date)}</time>
+                <time>{formatDate(shout.date)}</time>
               </a>
             </div>
 

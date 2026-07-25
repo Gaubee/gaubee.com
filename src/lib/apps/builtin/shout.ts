@@ -1,12 +1,19 @@
+import { searchIndexProcessor } from "$lib/content-pipeline/processors/search-index";
+import { tagsProcessor } from "$lib/content-pipeline/processors/tags";
+import { eventsSource } from "$lib/content-pipeline/sources/events";
 import { createFileSearchService } from "$lib/search/file-service";
 /**
  * 说说应用（系统内置，不可卸载）。
  *
  * 功能：浏览短评/碎碎念列表。
- * 数据来自 ReadonlyVFS（构建时静态数据），无需登录即可阅读。
+ * 数据来自内容管道（底层 readonlyVfs 构建时静态数据），无需登录即可阅读。
  *
  * 注意：说说详情走 /article/events/{stem}，由 articles 应用的 ArticleDetailView
  * 统一渲染（阅读器共享）。因此 shout 只声明列表入口场景。
+ *
+ * 内容管道：声明 events 源；shout 也参与标签和搜索（投影 tags/search-index 处理器，
+ * 但 tags/search-index 已由 articles 注册且按 collection 去重，这里仅声明意图，
+ * 实际执行时全量 entries 会被同一处理器消费）。
  */
 import MessageSquare from "@lucide/svelte/icons/message-square";
 
@@ -29,6 +36,11 @@ export const shoutApp: AppEntry = {
     ],
     vfsOwnership: ["src/content/events/"],
     searchService: () => createFileSearchService({ appId: "shout", appName: "说说" }),
+    // ★ 声明式内容管道：events 源；处理器与 articles 共享（注册表按 id 去重）
+    contentPipeline: {
+      source: eventsSource,
+      processors: [tagsProcessor, searchIndexProcessor],
+    },
     // 桌面小组件：最近说说
     widgets: [
       {

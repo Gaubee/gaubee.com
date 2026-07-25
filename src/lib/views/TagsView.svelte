@@ -2,16 +2,15 @@
 	TagsView：标签页（深链接 /tags 和 /tags/{tag}）。
 	- /tags（无标签）：标签云，显示所有标签 + 文章数，点击进筛选。
 	- /tags/{tag}：显示带指定标签的所有文章。
+	数据源 contentQuery（内容管道，背后是 tags processor 的频次缓存 + byTag 筛选）。
 -->
 <script lang="ts">
-  import { contentStore } from '$lib/data/content.svelte'
+  import { contentQuery } from '$lib/content-pipeline/query.svelte'
   import { navStore } from '$lib/nav/nav.svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
   import * as Card from '$lib/components/ui/card'
   import { Badge } from '$lib/components/ui/badge'
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left'
-
-  type TagCount = { tag: string; count: number }
 
   const navState = $derived(navStore.current)
   // /tags → 无标签（标签云）；/tags/{tag} → 筛选
@@ -21,23 +20,17 @@
   })
   const isTagCloud = $derived(tag === '')
 
-  // 标签云：统计所有文章/说说的标签频次
-  const allTags = $derived.by<TagCount[]>(() => {
-    const counts = new Map<string, number>()
-    for (const p of contentStore.allPosts) {
-      for (const t of p.metadata.tags ?? []) {
-        counts.set(t, (counts.get(t) ?? 0) + 1)
-      }
-    }
-    return [...counts.entries()]
-      .map(([t, count]) => ({ tag: t, count }))
-      .sort((a, b) => b.count - a.count)
+  // 标签频次来自 contentQuery.listTags()（tags processor 缓存）；依赖 version 触发重算
+  const allTags = $derived.by(() => {
+    void contentQuery.version
+    return contentQuery.listTags()
   })
 
-  // 筛选：带指定标签的文章
-  const posts = $derived(
-    tag ? contentStore.allPosts.filter((p) => p.metadata.tags.includes(tag)) : []
-  )
+  // 筛选：带指定标签的内容（按 date 降序）
+  const posts = $derived.by(() => {
+    void contentQuery.version
+    return tag ? contentQuery.byTag(tag) : []
+  })
 
   function formatDate(d: Date): string {
     return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -75,7 +68,7 @@
     {#if allTags.length === 0}
       <Card.Root>
         <Card.Content class="text-muted-foreground pt-6">
-          {contentStore.state.loaded ? '暂无标签' : '正在加载内容...'}
+          {contentQuery.initialized ? '暂无标签' : '正在加载内容...'}
         </Card.Content>
       </Card.Root>
     {:else}
@@ -100,7 +93,7 @@
     {#if posts.length === 0}
       <Card.Root>
         <Card.Content class="text-muted-foreground pt-6">
-          {contentStore.state.loaded ? '没有带此标签的内容' : '正在加载内容...'}
+          {contentQuery.initialized ? '没有带此标签的内容' : '正在加载内容...'}
         </Card.Content>
       </Card.Root>
     {:else}
@@ -119,9 +112,9 @@
         >
           <Card.Content class="pt-5">
             <div class="text-muted-foreground mb-1 text-xs">
-              {post.collection === 'articles' ? '文章' : '短评'} · {formatDate(post.metadata.date)}
+              {post.collection === 'articles' ? '文章' : '短评'} · {formatDate(post.date)}
             </div>
-            <h2 class="font-semibold">{post.metadata.title ?? post.id.slug ?? post.id.stem}</h2>
+            <h2 class="font-semibold">{post.title}</h2>
           </Card.Content>
         </Card.Root>
       {/each}

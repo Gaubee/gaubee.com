@@ -1,23 +1,22 @@
 <!--
 	最近文章 Widget：桌面小组件，展示最近 5 篇文章。
-	数据源 readonlyVfs（构建时静态数据，零延迟）。点击跳转文章详情。
+	数据源 contentQuery（内容管道，底层 readonlyVfs 构建时静态数据，零延迟）。点击跳转文章详情。
 -->
 <script lang="ts">
-  import { readonlyVfs, type ReadonlyPost } from '$lib/vfs/readonly'
+  import { contentQuery } from '$lib/content-pipeline/query.svelte'
+  import type { ContentEntry } from '$lib/content-pipeline/types'
   import { navController } from '$lib/nav/nav-controller-instance'
 
-  // readonlyVfs 是构建时静态数据（同步），用 $derived 派生最近 5 篇文章
-  const posts = $derived(
-    readonlyVfs
-      .getPostsByCollection('articles')
-      .sort((a, b) => b.metadata.date.getTime() - a.metadata.date.getTime())
-      .slice(0, 5),
-  )
+  // contentQuery 同步派生最近 5 篇文章；依赖 version 触发响应式重算
+  const posts = $derived.by<ContentEntry[]>(() => {
+    void contentQuery.version
+    return contentQuery.listArticles({ limit: 5 })
+  })
 
-  function titleOf(p: ReadonlyPost): string {
-    return p.metadata.title ?? p.id.slug ?? p.id.stem
+  function titleOf(p: ContentEntry): string {
+    return p.title
   }
-  function open(p: ReadonlyPost) {
+  function open(p: ContentEntry) {
     navController.navigateMain(`/article/articles/${p.id.stem}`)
   }
 </script>
@@ -31,7 +30,7 @@
         <button class="widget-item" onclick={() => open(p)}>
           <span class="widget-item-title">{titleOf(p)}</span>
           <span class="widget-item-date">
-            {p.metadata.date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
+            {p.date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
           </span>
         </button>
       </li>

@@ -1,3 +1,5 @@
+import { contentQuery } from "$lib/content-pipeline/query.svelte";
+import { contentPipelineRegistry } from "$lib/content-pipeline/registry";
 import { appServiceRegistry } from "$lib/os/services";
 import { searchServiceRegistry } from "$lib/search/registry";
 
@@ -212,6 +214,7 @@ class AppManager {
     this.syncSettingsSections();
     this.syncWidgets();
     this.syncAppMenus();
+    this.syncContentPipelines();
     this.initialized = true;
   }
 
@@ -237,6 +240,7 @@ class AppManager {
     this.registerSettingsSections(entry.manifest);
     this.registerWidgets(entry.manifest);
     this.registerAppMenus(entry.manifest);
+    this.registerContentPipelines(entry.manifest);
 
     // 注册 CLI 命令到 PATH
     if (entry.manifest.cliCommands) {
@@ -266,6 +270,7 @@ class AppManager {
     this.unregisterSettingsSections(id);
     this.unregisterWidgets(id);
     this.unregisterAppMenus(id);
+    this.unregisterContentPipelines(id);
     if (entry?.manifest.cliCommands) {
       for (const cli of entry.manifest.cliCommands) {
         pathManager.unregisterApp(id);
@@ -411,6 +416,45 @@ class AppManager {
     for (const menu of manifest.appMenus) {
       appMenuRegistry.unregister(menu.id);
     }
+  }
+
+  // ---- 扩展点投影（内容管道） ----
+
+  /** 将已安装应用声明的 contentPipeline 投影到注册表，并刷新查询层。 */
+  private syncContentPipelines(): void {
+    for (const id of this.installedIds) {
+      const entry = this.registry.get(id);
+      if (entry) this.registerContentPipelines(entry.manifest);
+    }
+    // 投影后刷新管道缓存（让 contentQuery 立即可用）
+    contentQuery.init();
+  }
+
+  private registerContentPipelines(manifest: AppManifest): void {
+    if (!manifest.contentPipeline) return;
+    const { source, processors } = manifest.contentPipeline;
+    if (source) contentPipelineRegistry.registerSource(source);
+    if (processors) {
+      for (const processor of processors) {
+        contentPipelineRegistry.registerProcessor(processor);
+      }
+    }
+    // 注册后重新执行管道（纳入新 source/processor）
+    contentQuery.init();
+  }
+
+  private unregisterContentPipelines(appId: string): void {
+    const manifest = this.findById(appId);
+    if (!manifest?.contentPipeline) return;
+    const { source, processors } = manifest.contentPipeline;
+    if (source) contentPipelineRegistry.unregisterSource(source.collection);
+    if (processors) {
+      for (const processor of processors) {
+        contentPipelineRegistry.unregisterProcessor(processor.id);
+      }
+    }
+    // 卸载后重新执行管道（移除已注销的 source/processor）
+    contentQuery.init();
   }
 
   // ---- 扩展点投影（路由域） ----
