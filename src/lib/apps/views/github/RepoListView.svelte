@@ -33,7 +33,7 @@
   import SearchIcon from '@lucide/svelte/icons/search'
   import StarIcon from '@lucide/svelte/icons/star'
   import GitForkIcon from '@lucide/svelte/icons/git-fork'
-  import PinIcon from '@lucide/svelte/icons/pin'
+  import TagIcon from '@lucide/svelte/icons/tag'
   import UserIcon from '@lucide/svelte/icons/user'
   import BuildingIcon from '@lucide/svelte/icons/building-2'
   import ChevronRightIcon from '@lucide/svelte/icons/chevron-right'
@@ -304,7 +304,7 @@
     <!-- 收藏卡片（固定置顶）-->
     <section class="space-y-2">
       <div class="flex items-center gap-2">
-        <PinIcon class="size-4 text-amber-500" />
+        <TagIcon class="size-4 text-amber-500" />
         <h2 class="text-base font-medium">收藏的仓库</h2>
         <Badge variant="secondary" class="text-xs">{favorites.length}</Badge>
       </div>

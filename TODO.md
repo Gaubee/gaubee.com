@@ -658,14 +658,14 @@ GithubApp 从「单仓库 4-Tab 控制台」升级为「列表页 + 详情页导
 
 ### 核心决策
 
-| 维度 | 决策 |
-|---|---|
+| 维度     | 决策                                                            |
+| -------- | --------------------------------------------------------------- |
 | 导航模式 | main 区 tabView + 单组件 pathname 二级分发（参考 AppStoreView） |
-| 区域 | defaultArea 从 bottom 改 main，去掉 hiddenFromNav（主屏应用）|
-| 编辑策略 | 扩展 EditorView 支持任意路径（raw 模式，复用 CodeMirror） |
-| issues | 仓库内列表 + 站内搜索（searchIssues 限定 repo） |
-| 收藏 | 本地 meta-store（v4 新增 repo_favorites store） |
-| README | hosted-git-info fromUrl + info.file 重写相对路径为 raw URL |
+| 区域     | defaultArea 从 bottom 改 main，去掉 hiddenFromNav（主屏应用）   |
+| 编辑策略 | 扩展 EditorView 支持任意路径（raw 模式，复用 CodeMirror）       |
+| issues   | 仓库内列表 + 站内搜索（searchIssues 限定 repo）                 |
+| 收藏     | 本地 meta-store（v4 新增 repo_favorites store）                 |
+| README   | hosted-git-info fromUrl + info.file 重写相对路径为 raw URL      |
 
 ### 路由
 
@@ -687,6 +687,7 @@ GithubApp 从「单仓库 4-Tab 控制台」升级为「列表页 + 详情页导
 ### 详情页（RepoDetailView）
 
 元数据栏（owner/repo + 收藏星标 + 仓库统计 + GitHub 外链 + 仓库快速搜索）+ 5 Tab：
+
 - 文件：递归文件树 + README 渲染（默认），点击文件 → FilePreviewDialog
 - 历史：listCommits REST API
 - 变更：仅主仓库（vfsStore dirty + gitService.commit）
@@ -708,3 +709,12 @@ RepoDetailView 的 $effect 调用 loadAll → loadDir 同步读+写 loadingDirs 
 ### 验证
 
 - 类型检查 0 错误；277 单测全过（含新增 9 个 repo-api 单测 + 3 个 GithubView 分发器测试）；build 成功。
+
+### 走查修复（2026-07-26）
+
+agent-browser 双端走查（手机 390x844 / 平板 834x1194 / 桌面 1280）发现并修复：
+
+- **收藏图标冲突**：收藏用 StarIcon 与 GitHub star 数统计混淆，改用 TagIcon（标签语义）。
+- **GithubApp 桌面不可见**：DEFAULT_HIDDEN 硬编码 "github"（bottom 区遗留），导致去掉 hiddenFromNav 后仍不在桌面网格。从 DEFAULT_HIDDEN 移除 github + 桌面布局 schema 版本迁移（v1→v2，持久化数据补充 github）。
+- **详情页文件树 grid 溢出**：`md:grid-cols-[minmax(0,280px)_1fr]` 第一列被 `1fr` 压成 0px（平板），且移动端单列时子元素无 `min-w-0` 被内容撑到 1389px 溢出视口。修复：`minmax(200px,280px)` 保底 + grid 容器及子元素加 `min-w-0` + README `overflow-hidden break-words`。
+- **搜索框移动端过宽**：placeholder 缩短 + `w-32 sm:w-56`。

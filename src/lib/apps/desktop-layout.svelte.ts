@@ -18,13 +18,33 @@ const PERSIST_DEBOUNCE_MS = 300;
 /**
  * 默认隐藏的应用（桌面网格不显示）。
  * - search/notifications/settings：系统服务类，通过状态栏 tray/菜单进入。
- * - github/terminal：bottom 区应用（Dock 任务栏层），不属于桌面网格。
+ * - terminal：bottom 区应用（Dock 任务栏层），不属于桌面网格。
+ *   github v3 已提升为 main 区主屏应用，纳入桌面网格。
  */
-const DEFAULT_HIDDEN = ["search", "notifications", "settings", "github", "terminal"];
+const DEFAULT_HIDDEN = ["search", "notifications", "settings", "terminal"];
 
 interface PersistedDesktopLayout {
   desktopApps: string[];
   updatedAt: number;
+  /** schema 版本，用于一次性迁移（如应用从 hidden 晋升为可见）。 */
+  version?: number;
+}
+
+/** 当前 schema 版本。升级时递增，配合 MIGRATIONS 做一次性数据迁移。 */
+const CURRENT_VERSION = 2;
+
+/**
+ * 版本迁移：把"曾经默认隐藏、现已晋升为可见"的应用补充进持久化列表。
+ * - v1→v2：github 从 bottom 区晋升为 main 区主屏应用（2026-07-26），纳入桌面网格。
+ */
+function migrateLayout(persisted: PersistedDesktopLayout): PersistedDesktopLayout {
+  const v = persisted.version ?? 1;
+  let apps = [...persisted.desktopApps];
+  if (v < 2 && !apps.includes("github")) {
+    // github 晋升为可见，追加到末尾（用户后续可自行隐藏）
+    apps.push("github");
+  }
+  return { desktopApps: apps, updatedAt: persisted.updatedAt, version: CURRENT_VERSION };
 }
 
 function readStorage(): PersistedDesktopLayout | null {
@@ -75,10 +95,13 @@ class DesktopLayoutStore {
     const knownIds = new Set(allInstalled.filter((a) => a.id !== "desktop").map((a) => a.id));
     const persisted = readStorage();
     if (persisted) {
-      // 清洗：过滤已卸载的残留 id
-      this.desktopApps = persisted.desktopApps.filter((id) => knownIds.has(id));
+      // 迁移（版本升级时补充新晋升为可见的应用）+ 清洗已卸载残留 id
+      const migrated = migrateLayout(persisted);
+      this.desktopApps = migrated.desktopApps.filter((id) => knownIds.has(id));
+      // 迁移产生变更时落盘
+      if (migrated.version !== persisted.version) this.schedulePersist();
     } else {
-      // 首次访问：默认显示所有非隐藏应用（按 registry 顺序），隐藏 search/notifications/settings
+      // 首次访问：默认显示所有非隐藏应用（按 registry 顺序），隐藏 search/notifications/settings/terminal
       this.desktopApps = allInstalled
         .filter((a) => a.id !== "desktop" && !DEFAULT_HIDDEN.includes(a.id))
         .map((a) => a.id);
@@ -156,6 +179,7 @@ class DesktopLayoutStore {
       writeStorage({
         desktopApps: [...this.desktopApps],
         updatedAt: Date.now(),
+        version: CURRENT_VERSION,
       });
     }, PERSIST_DEBOUNCE_MS);
   }

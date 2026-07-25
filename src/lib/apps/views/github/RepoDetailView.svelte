@@ -54,6 +54,7 @@
   import * as Card from '$lib/components/ui/card'
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left'
   import StarIcon from '@lucide/svelte/icons/star'
+  import TagIcon from '@lucide/svelte/icons/tag'
   import GitForkIcon from '@lucide/svelte/icons/git-fork'
   import ExternalLinkIcon from '@lucide/svelte/icons/external-link'
   import HistoryIcon from '@lucide/svelte/icons/history'
@@ -389,7 +390,7 @@
       onclick={toggleFavorite}
       aria-label={favorited ? '取消收藏' : '收藏'}
     >
-      <StarIcon class="size-4 {favorited ? 'fill-current' : ''}" />
+      <TagIcon class="size-4 {favorited ? 'fill-current' : ''}" />
     </Button>
     <!-- 仓库快速搜索（默认限定仓库类型）：owner/repo 直跳 或 关键词搜索 -->
     <form
@@ -403,8 +404,8 @@
         <SearchIcon class="text-muted-foreground absolute left-2 top-1/2 size-3.5 -translate-y-1/2" />
         <Input
           bind:value={repoSearchInput}
-          placeholder="搜索仓库（owner/repo 直跳）"
-          class="h-8 w-40 pl-7 text-xs sm:w-56"
+          placeholder="owner/repo 或关键词"
+          class="h-8 w-32 pl-7 text-xs sm:w-56"
         />
         {#if repoSearchResults && repoSearchResults.length > 0}
           <div class="bg-background absolute right-0 top-9 z-10 max-h-60 w-full overflow-auto rounded-md border border-border shadow-lg">
@@ -476,9 +477,9 @@
 
       <!-- 文件 + README -->
       <Tabs.Content value="files" class="p-4">
-        <div class="grid gap-4 md:grid-cols-[minmax(0,280px)_1fr]">
+        <div class="grid min-w-0 gap-4 md:grid-cols-[minmax(200px,280px)_1fr]">
           <!-- 文件树 -->
-          <div class="border-border max-h-[60vh] overflow-auto rounded border p-2 text-sm">
+          <div class="border-border max-h-[60vh] min-w-0 overflow-auto rounded border p-2 text-sm">
             <RepoFileTree
               dir=""
               label="根目录"
@@ -491,11 +492,11 @@
             />
           </div>
           <!-- README -->
-          <div class="border-border min-h-[200px] rounded border p-4">
+          <div class="border-border min-h-[200px] min-w-0 overflow-hidden rounded border p-4">
             {#if readmeLoading}
               <Skeleton class="h-40" />
             {:else if readmeHtml}
-              <div class="prose prose-sm dark:prose-invert max-w-none">
+              <div class="prose prose-sm dark:prose-invert max-w-none break-words">
                 {@html readmeHtml}
               </div>
             {:else}
