@@ -32,8 +32,8 @@ export function ensureViewsRegistered(): void {
   registerTabView("/app/theme", () => import("$lib/apps/views/ThemeView.svelte"));
 
   // ===== 可安装应用（默认安装）=====
-  registerTabView("/app/github", () => import("$lib/apps/views/GithubView.svelte"));
-  registerTabView("/app/terminal", () => import("./TerminalView.svelte"));
+  // github/terminal 是 hiddenFromNav（DEFAULT_HIDDEN），通过 deep link 进入
+  registerDeepLinkView("/app/terminal", () => import("./TerminalView.svelte"));
   // 文件管理应用入口
   registerTabView("/app/files", () => import("./FilesView.svelte"));
 
@@ -53,6 +53,8 @@ export function ensureViewsRegistered(): void {
   // hiddenFromNav 应用的 entry route 走 deep link（不注册 tabView）
   registerDeepLinkView("/app/account", () => import("$lib/apps/views/AccountView.svelte"));
   registerDeepLinkView("/app/store", () => import("$lib/apps/views/AppStoreView.svelte"));
+  // hiddenFromNav 应用的 entry route 走 deep link（不注册 tabView，避免死代码常驻层）
+  registerDeepLinkView("/app/github", () => import("$lib/apps/views/GithubView.svelte"));
   // 写作应用场景（编辑器、变更），入口 /app/writer 已注册为 tab view。
   registerDeepLinkView("/app/editor", () => import("./EditorView.svelte"));
   registerDeepLinkView("/app/changes", () => import("./ChangesView.svelte"));

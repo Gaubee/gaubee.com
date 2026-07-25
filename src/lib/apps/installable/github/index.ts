@@ -26,6 +26,8 @@ export const githubApp: AppEntry = {
         view: () => import("$lib/apps/views/GithubView.svelte"),
       },
     ],
+    // bottom 区 + 不在桌面默认网格（DEFAULT_HIDDEN），通过 Dock / 全部应用打开。
+    hiddenFromNav: true,
     vfsOwnership: [".git/"],
     // git 聚合命令（status/commit/pull），实现走 GitService（鉴权 + 类型化错误）。
     // 注意：git 是聚合命令，shell runLine 对 "git" 特判分发，不进 PathManager 扁平注册。

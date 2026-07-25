@@ -22,6 +22,8 @@ export const terminalApp: AppEntry = {
         view: () => import("$lib/views/TerminalView.svelte"),
       },
     ],
+    // bottom 区 + 不在桌面默认网格（DEFAULT_HIDDEN），通过 Dock / 全部应用打开。
+    hiddenFromNav: true,
     vfsOwnership: [],
     description: "终端命令行",
     longDescription: "内置 shell，暴露 PATH 中所有应用的 CLI 命令。支持文件操作、Git 命令等。",
