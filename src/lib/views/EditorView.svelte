@@ -12,6 +12,7 @@
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
   import { untrack } from 'svelte'
   import { vfsStore } from '$lib/vfs/vfs.svelte'
+  import { contentQuery } from '$lib/content-pipeline/query.svelte'
   import { navStore } from '$lib/nav/nav.svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
   import { gaubeeos } from '$lib/os/services'
@@ -142,6 +143,7 @@
     if (!currentPath) return
     const content = serializeMarkdown(metadata, body)
     await vfsStore.write(currentPath, content)
+    contentQuery.refresh()
     dirty = false
   }
 

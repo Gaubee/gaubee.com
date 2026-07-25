@@ -4,6 +4,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { createExcerpt } from "$lib/content-pipeline/excerpt";
 import { parseMarkdown, parseArticleId, type Collection } from "$lib/data/frontmatter";
 
 export const prerender = true;
@@ -41,11 +42,7 @@ export async function load(): Promise<{ posts: FeedPost[] }> {
           title: metadata?.title ?? parseArticleId(filename).stem,
           date: (metadata?.date ?? new Date(0)).toISOString(),
           tags: metadata?.tags ?? [],
-          excerpt: body
-            .replace(/[#*>`\[\]()!-]/g, "")
-            .replace(/\s+/g, " ")
-            .trim()
-            .slice(0, 200),
+          excerpt: createExcerpt(body),
         });
       } catch (e) {
         console.warn(`读取 ${filename} 失败`, e);

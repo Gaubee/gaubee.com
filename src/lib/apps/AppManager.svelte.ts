@@ -420,13 +420,13 @@ class AppManager {
 
   // ---- 扩展点投影（内容管道） ----
 
-  /** 将已安装应用声明的 contentPipeline 投影到注册表，并刷新查询层。 */
+  /** 将已安装应用声明的 contentPipeline 投影到注册表，并刷新查询层。
+   *  contentQuery.init() 内部有 browser 守卫（SSR 时跳过），浏览器端幂等。 */
   private syncContentPipelines(): void {
     for (const id of this.installedIds) {
       const entry = this.registry.get(id);
       if (entry) this.registerContentPipelines(entry.manifest);
     }
-    // 投影后刷新管道缓存（让 contentQuery 立即可用）
     contentQuery.init();
   }
 
@@ -439,7 +439,6 @@ class AppManager {
         contentPipelineRegistry.registerProcessor(processor);
       }
     }
-    // 注册后重新执行管道（纳入新 source/processor）
     contentQuery.init();
   }
 
@@ -453,7 +452,6 @@ class AppManager {
         contentPipelineRegistry.unregisterProcessor(processor.id);
       }
     }
-    // 卸载后重新执行管道（移除已注销的 source/processor）
     contentQuery.init();
   }
 

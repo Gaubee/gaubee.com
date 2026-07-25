@@ -11,6 +11,7 @@
     void contentQuery.version
     return contentQuery.listEvents({ limit: 5 })
   })
+  const loading = $derived(!contentQuery.initialized)
 
   function relTime(date: Date): string {
     const days = Math.floor((Date.now() - date.getTime()) / 86_400_000)
@@ -30,7 +31,9 @@
   }
 </script>
 
-{#if shouts.length === 0}
+{#if loading}
+  <p class="text-muted-foreground text-xs">加载中…</p>
+{:else if shouts.length === 0}
   <p class="text-muted-foreground text-xs">暂无说说</p>
 {:else}
   <ul class="widget-list">

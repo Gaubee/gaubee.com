@@ -11,6 +11,7 @@
     void contentQuery.version
     return contentQuery.listTags().slice(0, 20)
   })
+  const loading = $derived(!contentQuery.initialized)
 
   function open(tag: string) {
     navController.navigateMain(`/tags/${tag}`)
@@ -23,7 +24,9 @@
   }
 </script>
 
-{#if tags.length === 0}
+{#if loading}
+  <p class="text-muted-foreground text-xs">加载中…</p>
+{:else if tags.length === 0}
   <p class="text-muted-foreground text-xs">暂无标签</p>
 {:else}
   <div class="tag-cloud">

@@ -12,6 +12,7 @@
     void contentQuery.version
     return contentQuery.listArticles({ limit: 5 })
   })
+  const loading = $derived(!contentQuery.initialized)
 
   function titleOf(p: ContentEntry): string {
     return p.title
@@ -21,7 +22,9 @@
   }
 </script>
 
-{#if posts.length === 0}
+{#if loading}
+  <p class="text-muted-foreground text-xs">加载中…</p>
+{:else if posts.length === 0}
   <p class="text-muted-foreground text-xs">暂无文章</p>
 {:else}
   <ul class="widget-list">

@@ -42,7 +42,7 @@ export function ensureViewsRegistered(): void {
 
   // ===== 深链接 views（main 区非 tab 路径，含 hiddenFromNav 应用的 entry route）=====
   // AreaOutlet 渲染深链接视图时统一传入 { pathname }（见 AreaOutlet.svelte）。
-  // ArticleView 声明了 pathname props 并实际使用它；其余视图忽略该 prop。
+  // ArticleDetailView 声明了 pathname props 并实际使用它；其余视图忽略该 prop。
   // 受 Svelte Component 逆变特性限制，此处用 asView 断言宽放
   // （运行时契约由 AreaOutlet 保证，所有深链接视图都会收到 pathname）。
   registerDeepLinkView(
