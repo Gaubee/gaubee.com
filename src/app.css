@@ -21,6 +21,16 @@
 }
 
 /*
+ * 不透明退化态（与 .glass-surface 对偶）。
+ * 当 desktopService 无壁纸（default）时使用——毛玻璃此时透不出任何东西，
+ * 反而暴露 body 纯色导致文字不可读，故退化成纯 var(--background)。
+ * shell 层由 desktopService.isWallpaperActive 在两者间二选一。
+ */
+.app-surface-opaque {
+  background: var(--background);
+}
+
+/*
  * 运行时色相旋钮（仅 :root 声明，不进 .force-light）。
  * themeService 通过 documentElement.style.setProperty 注入到 <html>，
  * .force-light 和 .dark 都继承 <html> 的运行时值，不在此重复声明（否则覆盖注入值）。

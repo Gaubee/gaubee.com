@@ -43,6 +43,12 @@ export interface DesktopService extends AppService {
   readonly appId: "desktop";
   /** 当前桌面背景配置（响应式）。 */
   readonly background: DesktopBackground;
+  /**
+   * 当前是否处于"有壁纸"态（非 default）。
+   * 单一真相源：shell 层据此在毛玻璃（透出壁纸）与纯色底（退化态）间二选一，
+   * 避免 default 时毛玻璃透出 body 纯色导致文字不可读。
+   */
+  readonly isWallpaperActive: boolean;
   /** 设置桌面背景并持久化。 */
   setBackground(bg: DesktopBackground): void;
   /** 重置为默认背景。 */
@@ -74,6 +80,11 @@ class DesktopServiceImpl implements DesktopService {
   readonly appId = "desktop" as const;
 
   background = $state<DesktopBackground>(DEFAULT_BACKGROUND);
+
+  // 直接读 $state 即响应式（Svelte 5 getter 访问 $state 自动追踪依赖）。
+  get isWallpaperActive(): boolean {
+    return this.background.type !== "default";
+  }
 
   constructor() {
     if (browser) {
