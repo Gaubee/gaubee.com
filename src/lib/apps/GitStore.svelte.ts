@@ -1,3 +1,4 @@
+import { getFs, type ZenFs } from "$lib/fs/zenfs-instance";
 /**
  * GitStore：基于 isomorphic-git 的公开仓库只读浏览器（GithubApp 私有实现）。
  *
@@ -6,9 +7,14 @@
  *   isomorphic-git 拿不到，故只能匿名操作公开仓库）。
  * - 与 GitService（走 VFS + Git Data API，认证有效）是两条独立路径：
  *   本 store 仅用于 GithubView 的「浏览公开仓库提交历史」，不参与编辑/发表。
- * - 编辑/发表/提交请走 GitService（gaubeeos.getAppService('git')）。
+ *   编辑/发表/提交请走 GitService（gaubeeos.getAppService('git')）。
+ * - clone 结果持久化到 ZenFS（IndexedDB），刷新页面后历史仍在。
  *
  * Svelte 5 runes 响应式。
+ *
+ * 存储：使用 ZenFS 单例（@lib/fs/zenfs-instance），挂载点 /git。
+ * isomorphic-git 的 PromiseFsClient 只要求 fs.promises.{readFile,...}，
+ * ZenFS 原生提供该 promises 命名空间，直接作为 fs client 传入即可。
  */
 import * as git from "isomorphic-git";
 import http from "isomorphic-git/http/web";
@@ -33,126 +39,17 @@ export interface GitCommit {
 }
 
 // ---------------------------------------------------------------------------
-// 内存文件系统适配器（isomorphic-git 需要的接口）
-// ---------------------------------------------------------------------------
-
-class MemFS {
-  files = new Map<string, string | Uint8Array>();
-
-  private _get(path: string): string | Uint8Array | undefined {
-    return this.files.get(path);
-  }
-
-  readFileSync = (path: string): Uint8Array => {
-    const data = this._get(path);
-    if (data === undefined) throw new Error(`ENOENT: ${path}`);
-    if (typeof data === "string") return new TextEncoder().encode(data);
-    return data;
-  };
-
-  writeFileSync = (path: string, data: string | Uint8Array): void => {
-    this.files.set(path, data);
-  };
-
-  mkdirSync = (path: string, _opts?: { recursive?: boolean }): void => {
-    // 内存中不需要实际创建目录，writeFile 时会自动处理
-    this.files.set(path, new Uint8Array());
-  };
-
-  readdirSync = (path: string): string[] => {
-    const prefix = path.endsWith("/") ? path : path + "/";
-    const seen = new Set<string>();
-    for (const key of this.files.keys()) {
-      if (key.startsWith(prefix)) {
-        const rest = key.slice(prefix.length);
-        const first = rest.split("/")[0];
-        if (first) seen.add(first);
-      }
-    }
-    return [...seen];
-  };
-
-  statSync = (path: string): { isDirectory: () => boolean; size: number } => {
-    const data = this._get(path);
-    if (data !== undefined) {
-      return {
-        isDirectory: () => false,
-        size: typeof data === "string" ? data.length : data.byteLength,
-      };
-    }
-    // 检查是否是目录
-    const prefix = path.endsWith("/") ? path : path + "/";
-    for (const key of this.files.keys()) {
-      if (key.startsWith(prefix)) {
-        return { isDirectory: () => true, size: 0 };
-      }
-    }
-    throw new Error(`ENOENT: ${path}`);
-  };
-
-  lstatSync = this.statSync;
-
-  unlinkSync = (path: string): void => {
-    this.files.delete(path);
-  };
-
-  rmdirSync = (path: string): void => {
-    const prefix = path.endsWith("/") ? path : path + "/";
-    for (const key of [...this.files.keys()]) {
-      if (key.startsWith(prefix)) this.files.delete(key);
-    }
-  };
-
-  existsSync = (path: string): boolean => {
-    if (this.files.has(path)) return true;
-    const prefix = path.endsWith("/") ? path : path + "/";
-    for (const key of this.files.keys()) {
-      if (key.startsWith(prefix)) return true;
-    }
-    return false;
-  };
-
-  // 适配 isomorphic-git 的 PromiseFsClient 接口。
-  // isomorphic-git 的 isPromiseFs 检测会调 fs.readFile()（无参数）看是否返回 Promise，
-  // 然后调 fs[command].bind(fs) 直接从 fs 顶层取方法。
-  // 因此 promise 方法必须在 fs 顶层声明（不能只放 promises 子对象），
-  // 否则 isPromiseFs 返回 false → 走 callback 分支 → fs.readFile 是 undefined → .bind 报错。
-  readFile = (path: string, _opts?: string): Promise<Uint8Array> =>
-    Promise.resolve(this.readFileSync(path));
-  writeFile = (path: string, data: string | Uint8Array): Promise<void> =>
-    Promise.resolve(this.writeFileSync(path, data));
-  mkdir = (path: string, opts?: { recursive?: boolean }): Promise<void> =>
-    Promise.resolve(this.mkdirSync(path, opts));
-  readdir = (path: string): Promise<string[]> => Promise.resolve(this.readdirSync(path));
-  stat = (path: string): Promise<{ isDirectory: () => boolean; size: number }> =>
-    Promise.resolve(this.statSync(path));
-  lstat = (path: string): Promise<{ isDirectory: () => boolean; size: number }> =>
-    Promise.resolve(this.lstatSync(path));
-  unlink = (path: string): Promise<void> => Promise.resolve(this.unlinkSync(path));
-  rmdir = (path: string): Promise<void> => Promise.resolve(this.rmdirSync(path));
-
-  // promises 子对象保留（部分库会查 fs.promises，如 Node.js 兼容层）
-  promises = {
-    readFile: this.readFile,
-    writeFile: this.writeFile,
-    mkdir: this.mkdir,
-    readdir: this.readdir,
-    stat: this.stat,
-    lstat: this.lstat,
-    unlink: this.unlink,
-    rmdir: this.rmdir,
-  };
-}
-
-// ---------------------------------------------------------------------------
 // 状态（Svelte 5 runes）
 // ---------------------------------------------------------------------------
+
+/** isomorphic-git 的 clone 根目录（与主工作区 /workspace 分离）。 */
+const GIT_ROOT = "/git";
 
 class GitStore {
   /** 当前绑定的仓库。 */
   repo = $state<RepoConfig | null>(null);
-  /** 内存文件系统。 */
-  private fs = new MemFS();
+  /** ZenFS fs 句柄（懒加载，首次 clone 时初始化）。 */
+  private fsInstance: ZenFs | null = null;
   /** 当前分支。 */
   branch = $state("main");
   /** 提交历史。 */
@@ -162,6 +59,25 @@ class GitStore {
   /** 错误信息。 */
   error = $state<string | null>(null);
 
+  /** 获取（懒加载）已初始化的 ZenFS 实例。 */
+  private async fs(): Promise<ZenFs> {
+    if (!this.fsInstance) {
+      this.fsInstance = await getFs();
+    }
+    return this.fsInstance;
+  }
+
+  /** clone 前清空 /git 目录，避免上次 clone 残留污染本次。 */
+  private async cleanGitRoot(): Promise<void> {
+    const fs = await this.fs();
+    try {
+      await fs.promises.rm(GIT_ROOT, { recursive: true, force: true });
+    } catch {
+      // 不存在忽略
+    }
+    await fs.promises.mkdir(GIT_ROOT, { recursive: true });
+  }
+
   // ---- 核心 Git 操作 ----
 
   /** 克隆仓库（匿名，仅公开仓库；token 在 Worker 端，isomorphic-git 拿不到）。 */
@@ -169,12 +85,14 @@ class GitStore {
     this.loading = true;
     this.error = null;
     try {
+      const fs = await this.fs();
+      await this.cleanGitRoot();
       const url = `https://github.com/${config.owner}/${config.repo}`;
 
       await git.clone({
-        fs: this.fs as unknown as git.PromiseFsClient,
+        fs: fs as unknown as git.PromiseFsClient,
         http,
-        dir: "/",
+        dir: GIT_ROOT,
         url,
         ref: config.branch,
         corsProxy: "https://cors.isomorphic-git.org",
@@ -197,10 +115,11 @@ class GitStore {
     this.loading = true;
     this.error = null;
     try {
+      const fs = await this.fs();
       await git.pull({
-        fs: this.fs as unknown as git.PromiseFsClient,
+        fs: fs as unknown as git.PromiseFsClient,
         http,
-        dir: "/",
+        dir: GIT_ROOT,
         ref: this.branch,
         author: { name: "GaubeeOS", email: "os@gaubee.com" },
         corsProxy: "https://cors.isomorphic-git.org",
@@ -219,9 +138,10 @@ class GitStore {
     this.loading = true;
     this.error = null;
     try {
+      const fs = await this.fs();
       const log = await git.log({
-        fs: this.fs as unknown as git.PromiseFsClient,
-        dir: "/",
+        fs: fs as unknown as git.PromiseFsClient,
+        dir: GIT_ROOT,
         ref: this.branch,
         depth: 50,
       });

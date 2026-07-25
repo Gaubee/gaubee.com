@@ -1,12 +1,16 @@
-import { IDBFactory } from "fake-indexeddb";
-// fake-indexeddb/auto 自动注册所有 IndexedDB 全局符号到 globalThis
-import "fake-indexeddb/auto";
 /**
  * VFS 核心单元测试。
  *
- * 用 fake-indexeddb 提供内存 IndexedDB，mock 掉 GitHub client。
- * 覆盖：读写删除、dirty 追踪、三层读取、readdir、commit。
+ * 存储分层（ZenFS 重构后）：
+ * - 文件内容 → ZenFS（测试用 InMemory 后端，每个测试全新实例，避免状态泄漏）。
+ * - 业务元数据（dirty/sha/origin/baseContent）→ meta-store（fake-indexeddb 隔离）。
+ * mock 掉 GitHub client。覆盖：读写删除、dirty 追踪、三层读取、readdir、commit。
  */
+import { configureSingle, fs as zenfs } from "@zenfs/core";
+// fake-indexeddb/auto 自动注册所有 IndexedDB 全局符号到 globalThis
+import "fake-indexeddb/auto";
+import { InMemory } from "@zenfs/core";
+import { IDBFactory } from "fake-indexeddb";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // mock GitHub client（VFS 依赖 fetchGithub → fetch，这里全替换）
@@ -37,9 +41,19 @@ vi.mock("$lib/github/client", () => ({
 
 vi.mock("$app/environment", () => ({ browser: true }));
 
+// mock ZenFS 单例：getFs 返回共享的 zenfs（用 InMemory 后端，每测试 fresh）。
+vi.mock("$lib/fs/zenfs-instance", () => ({
+  getFs: async () => {
+    await configureSingle({ backend: InMemory });
+    await zenfs.promises.mkdir("/workspace", { recursive: true });
+    return zenfs;
+  },
+  getCachedFs: () => zenfs,
+}));
+
 // 动态 import（确保 mock 生效）
 const { vfs } = await import("./vfs");
-const { vfsClear } = await import("$lib/db");
+const { metaClear, _resetMetaDbForTest } = await import("./meta-store");
 
 function freshIndexedDB() {
   // 每个测试用全新 IndexedDB 实例（auto 已注册全局符号）
@@ -51,9 +65,11 @@ beforeAll(() => {
 });
 
 beforeEach(async () => {
-  // 每个测试用全新 IndexedDB 实例
+  // 每个测试用全新 IndexedDB 实例（meta-store 用）+ 全新 ZenFS（InMemory）
   freshIndexedDB();
-  await vfsClear();
+  _resetMetaDbForTest();
+  vfs._resetFsForTest();
+  await metaClear();
   mockGetFileText.mockReset();
   mockFetchTree.mockReset();
   mockCommitChanges.mockReset();
@@ -72,6 +88,13 @@ describe("VFS 读写", () => {
     expect(stat?.dirty).toBe(true);
     expect(stat?.origin).toBe("local");
     expect(stat?.sha).toBeNull();
+  });
+
+  it("writeFile 支持 Uint8Array 二进制内容", async () => {
+    const bytes = new Uint8Array([1, 2, 3, 255]);
+    await vfs.writeFile("bin/file.dat", bytes);
+    const read = await vfs.readFileBytes("bin/file.dat");
+    expect(Array.from(read)).toEqual([1, 2, 3, 255]);
   });
 
   it("readFile 无缓存时在线拉取并写入 VFS", async () => {
