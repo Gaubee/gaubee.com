@@ -162,6 +162,9 @@ class GitStore {
         corsProxy: "https://cors.isomorphic-git.org",
         depth: shallow ? 1 : undefined,
         singleBranch: true,
+        // nonBlocking：checkout 阶段分批 yield 主线程，避免大量同步 fs 写入卡死 UI。
+        // 浏览器必需（否则 checkout 写文件阻塞主线程，进度条停在 Compressing 100%）。
+        nonBlocking: true,
         onProgress: (p: CloneProgress) => {
           this.progress = p;
         },
