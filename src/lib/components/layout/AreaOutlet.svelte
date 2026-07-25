@@ -152,11 +152,17 @@
       })
   })
 
-  // 桌面作为 shell 级背景层（main 区独有）：无应用浮层激活时显现。
+  // 桌面作为 shell 级背景层（main 区独有）：无应用浮层激活、无 deep-link 时显现。
   // mainLocation 为 /（桌面）或无激活 tab 时，桌面是顶层。
   const desktopVisible = $derived(
     area === 'main' && (activeTabId === null) && !deepLinkLoader,
   )
+
+  // deep-link 详情页激活时，桌面层与 tab 浮层都要让位（隐藏但不卸载，保留 scroll/状态）。
+  // 之前的实现把 deep-link 与 tab 放在互斥 {#if} 链里——切换时 tab DOM 整个卸载，
+  // scrollTop 与组件状态全部丢失。现在改成并存：详情页叠在 tab 之上（z:20），
+  // tab 仍在 DOM 中（visibility:hidden + pointer-events:none），返回时无重挂/无丢状态。
+  const deepLinkActive = $derived(area === 'main' && !activeTabId && !!deepLinkLoader)
 
   // 按 entry route（tabId）查 manifest，供 AppShell 隔离包裹。
   function manifestForTab(tabId: TabId): AppManifest | undefined {
@@ -178,29 +184,10 @@
   {:else if navState.popActive && popLoader}
     <div class="app-skeleton" aria-label="加载中"></div>
   {/if}
-{:else if area === 'main' && !activeTabId && deepLinkLoader}
-  {@const manifest = manifestForPath(location.pathname)}
-  {@const shellApp = manifest}
-  <div class="h-full overflow-auto bg-background">
-    {#if deepLinkView}
-      {@const DeepView = deepLinkView}
-      <div in:motionBlur>
-        {#if shellApp}
-          <AppShell app={shellApp} pathname={location.pathname}>
-            <DeepView pathname={location.pathname} />
-          </AppShell>
-        {:else}
-          <DeepView pathname={location.pathname} />
-        {/if}
-      </div>
-    {:else}
-      <div class="app-skeleton h-full" aria-label="加载中"></div>
-    {/if}
-  </div>
 {:else}
   <div class="main-area-root">
     {#if area === 'main'}
-      <!-- 桌面：shell 级背景层（始终常驻 DOM 保活，无应用浮层时显现） -->
+      <!-- 桌面：shell 级背景层（始终常驻 DOM 保活，无应用浮层、无 deep-link 时显现） -->
       <div
         class="desktop-layer"
         class:desktop-layer-hidden={!desktopVisible}
@@ -214,10 +201,11 @@
       {@const isThisActive = inThisArea && isActive && activeTabId === tabId}
       {@const View = loadedComponentFor(tabId)}
       {@const manifest = manifestForTab(tabId)}
-      <!-- 应用浮层：常驻 DOM 保活，激活时覆盖桌面层。显隐用 WAAPI blurIn/blurOut。 -->
+      <!-- 应用浮层：常驻 DOM 保活，激活时覆盖桌面层。显隐用 WAAPI blurIn/blurOut。
+           deep-link 详情页激活时也隐藏（让位给详情页），但 DOM 保留以维持 scroll/状态。 -->
       <div
         class="app-overlay-layer"
-        class:app-overlay-hidden={!isThisActive}
+        class:app-overlay-hidden={!isThisActive || deepLinkActive}
         use:blurTransition={{ hiddenClass: 'app-overlay-hidden' }}
       >
         {#if View}
@@ -234,6 +222,34 @@
         {/if}
       </div>
     {/each}
+
+    {#if area === 'main'}
+      <!-- deep-link 详情页层：与桌面/tab 浮层并存（z:20 覆盖其上）。
+           常驻 main-area-root，仅当 deepLinkLoader 激活时可见。
+           tab 浮层在此期间隐藏但保留 DOM——根治列表→详情→返回的 scroll/状态丢失。 -->
+      {@const manifest = manifestForPath(location.pathname)}
+      {@const shellApp = manifest}
+      <div class="deep-link-layer" class:deep-link-layer-hidden={!deepLinkActive}>
+        {#if deepLinkActive}
+          <div class="h-full overflow-auto bg-background">
+            {#if deepLinkView}
+              {@const DeepView = deepLinkView}
+              <div in:motionBlur>
+                {#if shellApp}
+                  <AppShell app={shellApp} pathname={location.pathname}>
+                    <DeepView pathname={location.pathname} />
+                  </AppShell>
+                {:else}
+                  <DeepView pathname={location.pathname} />
+                {/if}
+              </div>
+            {:else}
+              <div class="app-skeleton h-full" aria-label="加载中"></div>
+            {/if}
+          </div>
+        {/if}
+      </div>
+    {/if}
   </div>
 {/if}
 
@@ -281,6 +297,18 @@
     visibility: hidden;
     pointer-events: none;
     overflow: hidden;
+  }
+  /* deep-link 详情页层：常驻 main-area-root，激活时（z:20）覆盖桌面+tab 浮层。
+   * 与 tab 浮层并存：tab 不卸载、scrollTop 保留；详情页退出时 DOM 移除。
+   * 隐藏态用 visibility:hidden 锁交互，但保留布局（避免 main-area-root 高度坍缩）。 */
+  .deep-link-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+  }
+  .deep-link-layer-hidden {
+    visibility: hidden;
+    pointer-events: none;
   }
   /* 加载骨架（shadcn skeleton 风格脉冲） */
   .app-skeleton {
