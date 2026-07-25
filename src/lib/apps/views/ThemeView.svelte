@@ -299,39 +299,8 @@
       </Card.Description>
     </Card.Header>
     <Card.Content class="space-y-4">
-      <!-- 桌面背景预览：模拟桌面背景效果（16:9 缩略图） -->
-      <div class="bg-muted/40 relative aspect-video w-full overflow-hidden rounded-lg border">
-        <div
-          class="absolute inset-0"
-          style={backgroundPreviewCss || 'background: var(--background)'}
-          aria-label="桌面背景预览"
-        ></div>
-        <!-- 预览层：模拟桌面内容（图标网格占位 + primary 色按钮） -->
-        <div class="absolute inset-0 flex flex-col gap-2 p-3 opacity-70">
-          <div class="flex gap-1.5">
-            <span
-              class="flex size-8 items-center justify-center rounded-lg border border-border bg-card"
-              style="color: var(--primary)"
-            >
-              <span class="size-4 rounded bg-primary/80"></span>
-            </span>
-            <span
-              class="flex size-8 items-center justify-center rounded-lg border border-border bg-card"
-              style="color: var(--primary)"
-            >
-              <span class="size-4 rounded bg-primary/60"></span>
-            </span>
-          </div>
-          <div class="mt-auto flex items-center gap-2">
-            <span
-              class="rounded-md px-2 py-1 text-xs font-medium text-primary-foreground"
-              style="background: var(--primary)"
-            >
-              按钮
-            </span>
-            <span class="text-xs text-muted-foreground">主题色 {hue.toFixed(0)}°</span>
-          </div>
-        </div>
+      <!-- 桌面背景预览：16:9 缩略图，纯背景展示（调色相时整页实时变化，此处专看背景） -->
+      <div class="aspect-video w-full overflow-hidden rounded-lg border" style={backgroundPreviewCss || 'background: var(--background)'} aria-label="桌面背景预览">
       </div>
       <!-- 背景类型切换 + 配置 -->
       <Tabs.Root value={currentBgType} onValueChange={(v) => switchBgType(v as BgType)}>
