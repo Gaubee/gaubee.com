@@ -1041,6 +1041,8 @@ export class NavController {
     };
 
     // 2.5 初始化 per-app 场景记忆：把首屏 main/bottom location 记入对应应用。
+    //     + 深链接拉起：直接访问应用 URL（如 /app/github/repo/...）时，若归属应用
+    //       不在 mainTabs，自动加入（等同 openApp），否则 sanitize 会清洗到桌面导致白屏。
     {
       const scenes: Record<string, HistoryLocation> = {};
       const mainApp = pathToTabId(parsed.main.pathname);
@@ -1049,6 +1051,19 @@ export class NavController {
       if (bottomApp) scenes[bottomApp] = parsed.bottom;
       if (Object.keys(scenes).length > 0) {
         this.state = { ...this.state, appScenes: scenes };
+      }
+      // 深链接拉起：main location 归属的 tabView 应用若不在任务栏，加入 mainTabs。
+      // 这样直接访问 /app/github/repo/x 或 /app/github 都能正确渲染（entry route
+      // 和子路径都需要应用在任务栏才能激活 tabView 浮层）。
+      if (
+        mainApp &&
+        tabRegistry.allTabs.includes(mainApp) &&
+        !this.state.mainTabs.includes(mainApp)
+      ) {
+        this.state = {
+          ...this.state,
+          mainTabs: [...this.state.mainTabs, mainApp],
+        };
       }
     }
 
