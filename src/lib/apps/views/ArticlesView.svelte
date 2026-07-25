@@ -2,11 +2,11 @@
 	正交意图：
 	1. 原始需求（2026-07-21）：文章列表需要按年份 TOC，移动端也必须有项目。
 	2. 原始需求（2026-07-22）：宽桌面将年份 TOC 放在列表右侧；拉伸的侧栏承载吸顶，内部目录独立滚动。
-	3. 从 ReadonlyVFS 读取并按发布时间分组展示文章。
+	3. 从内容管道（contentQuery）读取并按发布时间分组展示文章。
 -->
 <script lang="ts">
-  import { onMount } from 'svelte'
-  import { readonlyVfs } from '$lib/vfs/readonly'
+  import { contentQuery } from '$lib/content-pipeline/query.svelte'
+  import type { ContentEntry } from '$lib/content-pipeline/types'
   import { navController } from '$lib/nav/nav-controller-instance'
   import YearToc from './YearToc.svelte'
   import { Skeleton } from '$lib/components/ui/skeleton'
@@ -15,23 +15,22 @@
   import FileTextIcon from '@lucide/svelte/icons/file-text'
   import CalendarIcon from '@lucide/svelte/icons/calendar'
   import ArrowRightIcon from '@lucide/svelte/icons/arrow-right'
-  import type { ReadonlyPost } from '$lib/vfs/readonly'
 
-  let posts = $state<ReadonlyPost[]>([])
-  let loading = $state(true)
-  let yearRefs = $state<Map<number, HTMLElement>>(new Map())
-
-  onMount(() => {
-    const articles = readonlyVfs.getPostsByCollection('articles')
-    posts = articles.sort((a, b) => b.metadata.date.getTime() - a.metadata.date.getTime())
-    loading = false
+  // contentQuery 已在 AppManager.init() 投影内容管道后初始化（同步内存读取）
+  // 依赖 version 触发响应式重算（编辑器写入后 refresh 自增）
+  const posts = $derived.by<ContentEntry[]>(() => {
+    void contentQuery.version
+    return contentQuery.listArticles()
   })
+  // 首帧骨架屏：管道尚未初始化时显示
+  const loading = $derived(!contentQuery.initialized)
+  let yearRefs = $state<Map<number, HTMLElement>>(new Map())
 
   function formatDate(d: Date): string {
     return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
   }
 
-  function navigateToArticle(post: ReadonlyPost) {
+  function navigateToArticle(post: ContentEntry) {
     navController.navigateMain(`/article/${post.collection}/${post.id.stem}`)
   }
 
@@ -56,15 +55,7 @@
     }
   }
 
-  function groupByYear(posts: ReadonlyPost[]): Map<number, ReadonlyPost[]> {
-    const groups = new Map<number, ReadonlyPost[]>()
-    for (const post of posts) {
-      const year = post.metadata.date.getFullYear()
-      if (!groups.has(year)) groups.set(year, [])
-      groups.get(year)!.push(post)
-    }
-    return new Map([...groups.entries()].sort((a, b) => b[0] - a[0]))
-  }
+  const grouped = $derived(contentQuery.groupByYear(posts))
 </script>
 
 <div class="mx-auto max-w-[78rem] px-4 py-8 sm:px-6 lg:px-8">
@@ -107,7 +98,7 @@
       {:else}
         <!-- 按年份分组的文章列表 -->
         <div class="space-y-12">
-          {#each [...groupByYear(posts).entries()] as [year, yearPosts], yearIndex (year)}
+          {#each [...grouped.entries()] as [year, yearPosts], yearIndex (year)}
             <section use:yearAnchor={year} aria-labelledby={`year-${year}`}>
               <!-- 年份标题 -->
               <div class="flex items-center gap-4 mb-6">
@@ -135,12 +126,12 @@
                       <div class="mb-3 flex flex-wrap items-center gap-2">
                         <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
                           <CalendarIcon class="size-3.5" />
-                          <time>{formatDate(post.metadata.date)}</time>
+                          <time>{formatDate(post.date)}</time>
                         </div>
-                        {#if post.metadata.tags.length > 0}
+                        {#if post.tags.length > 0}
                           <span class="text-muted-foreground">·</span>
                           <div class="flex flex-wrap gap-1">
-                            {#each post.metadata.tags.slice(0, 3) as tag}
+                            {#each post.tags.slice(0, 3) as tag}
                               <Badge variant="secondary" class="text-[10px] px-1.5 py-0 h-5 font-normal">
                                 {tag}
                               </Badge>
@@ -156,12 +147,12 @@
 
                       <!-- 标题 -->
                       <h3 class="mb-2 text-xl font-semibold leading-snug tracking-tight group-hover:text-primary transition-colors">
-                        {post.metadata.title ?? post.id.slug ?? post.id.stem}
+                        {post.title}
                       </h3>
 
-                      <!-- 摘要 -->
+                      <!-- 摘要（统一管道产物） -->
                       <p class="text-muted-foreground text-sm leading-relaxed line-clamp-2 mb-4">
-                        {post.body.slice(0, 200).replace(/^#+\s*.+\n?/m, '').trim()}
+                        {post.excerpt}
                       </p>
 
                       <!-- 阅读更多 -->

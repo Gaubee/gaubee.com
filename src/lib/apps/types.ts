@@ -1,3 +1,4 @@
+import type { ContentProcessor, ContentSource } from "$lib/content-pipeline/types";
 import type { ServiceDeclaration } from "$lib/os/services";
 import type { SearchServiceFactory } from "$lib/search/types";
 /**
@@ -159,6 +160,12 @@ export interface AppManifest {
   /** ★ 声明式状态栏菜单（AppManager 投影到 appMenuRegistry，SystemStatusBar 渲染）。
    *  三种位置：system（苹果菜单）/ app（当前应用菜单）/ tray（右上角快捷入口）。 */
   appMenus?: AppMenuDeclaration[];
+  /** ★ 声明式内容管道（AppManager 投影到 contentPipelineRegistry，pipelineExecutor 执行）。
+   *  source 声明该应用拥有的内容集合；processors 声明该应用贡献的派生产物（如标签/搜索索引）。 */
+  contentPipeline?: {
+    source?: ContentSource;
+    processors?: ContentProcessor[];
+  };
 
   // ---- 面向用户的展示元数据（应用市场详情页） ----
 

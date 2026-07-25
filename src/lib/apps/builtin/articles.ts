@@ -1,16 +1,21 @@
 import { defineApp } from "$lib/app-scaffold/define-app";
+import { searchIndexProcessor } from "$lib/content-pipeline/processors/search-index";
+import { tagsProcessor } from "$lib/content-pipeline/processors/tags";
+import { articlesSource } from "$lib/content-pipeline/sources/articles";
 import { createFileSearchService } from "$lib/search/file-service";
 import ListIcon from "@lucide/svelte/icons/list";
 /**
  * 文章应用（系统内置，不可卸载）。
  *
  * 功能：浏览文章列表、阅读文章详情、按标签浏览。
- * 数据来自 ReadonlyVFS（构建时静态数据），无需登录即可阅读。
+ * 数据来自内容管道（底层 readonlyVfs 构建时静态数据），无需登录即可阅读。
  *
  * 场景（activities）：
  * - /app/articles（entry）：文章列表。
  * - /article：文章详情（/article/{collection}/{stem}）。
  * - /tags：标签聚合（/tags/{tag}）。
+ *
+ * 内容管道：声明 articles 源 + tags/search-index 处理器（投影到 contentPipelineRegistry）。
  */
 import Newspaper from "@lucide/svelte/icons/newspaper";
 import TagsIcon from "@lucide/svelte/icons/tags";
@@ -43,6 +48,11 @@ export const articlesApp = defineApp({
   ],
   vfsOwnership: ["src/content/articles/"],
   searchService: () => createFileSearchService({ appId: "articles", appName: "文章" }),
+  // ★ 声明式内容管道：articles 源 + 标签/搜索索引处理器
+  contentPipeline: {
+    source: articlesSource,
+    processors: [tagsProcessor, searchIndexProcessor],
+  },
   // 桌面小组件：最近文章 + 标签云（文章应用拥有这些内容）
   widgets: [
     {

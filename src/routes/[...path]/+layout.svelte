@@ -19,6 +19,7 @@
   import '$lib/apps/registry'
   // import placeholders 触发模块加载时的 view 注册
   import '$lib/views/placeholders'
+  import { contentQuery } from '$lib/content-pipeline/query.svelte'
   import { initNavController } from '$lib/nav/nav-controller-instance'
   import { navStore } from '$lib/nav/nav.svelte'
   import { gaubeeos } from '$lib/os/services'
@@ -43,6 +44,10 @@
   const systemBackground = $derived(backgroundToCss(desktopService.background))
 
   onMount(() => {
+    // 0. 初始化内容管道（用 readonlyVfs 作为 reader，browser-only）
+    //    AppManager.init 已在模块加载时投影 source/processor；此处确保 browser 端执行一次。
+    contentQuery.init()
+
     // 1. 从 AppManager 构建 TabRegistry 并初始化 NavController
     const allRoutes = appManager.allRoutes
     const mainRoutes = appManager.mainApps.map(a => a.route)

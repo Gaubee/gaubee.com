@@ -1,17 +1,16 @@
 <!--
 	最近说说 Widget：桌面小组件，展示最近 5 条说说摘要。
-	数据源 readonlyVfs。点击跳转说说详情。相对时间格式（今天/N 天前）。
+	数据源 contentQuery（内容管道）。点击跳转说说详情。相对时间格式（今天/N 天前）。
 -->
 <script lang="ts">
-  import { readonlyVfs, type ReadonlyPost } from '$lib/vfs/readonly'
+  import { contentQuery } from '$lib/content-pipeline/query.svelte'
+  import type { ContentEntry } from '$lib/content-pipeline/types'
   import { navController } from '$lib/nav/nav-controller-instance'
 
-  const shouts = $derived(
-    readonlyVfs
-      .getPostsByCollection('events')
-      .sort((a, b) => b.metadata.date.getTime() - a.metadata.date.getTime())
-      .slice(0, 5),
-  )
+  const shouts = $derived.by<ContentEntry[]>(() => {
+    void contentQuery.version
+    return contentQuery.listEvents({ limit: 5 })
+  })
 
   function relTime(date: Date): string {
     const days = Math.floor((Date.now() - date.getTime()) / 86_400_000)
@@ -21,12 +20,12 @@
     if (days < 30) return `${Math.floor(days / 7)} 周前`
     return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
   }
-  function preview(p: ReadonlyPost): string {
-    // 去掉 frontmatter 后的纯文本首行摘要
-    const text = p.body.replace(/^#.*$/m, '').trim()
+  function preview(p: ContentEntry): string {
+    // 统一管道 excerpt（已去 markdown 符号），取前 40 字
+    const text = p.excerpt.trim()
     return text.slice(0, 40) || '(无内容)'
   }
-  function open(p: ReadonlyPost) {
+  function open(p: ContentEntry) {
     navController.navigateMain(`/article/events/${p.id.stem}`)
   }
 </script>

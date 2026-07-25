@@ -8,7 +8,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { vfsStore } from '$lib/vfs/vfs.svelte'
-  import { contentStore } from '$lib/data/content.svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
   import { Button } from '$lib/components/ui/button'
   import * as Card from '$lib/components/ui/card'
@@ -33,8 +32,8 @@
   const drafts = $derived(vfsStore.filesInCollection('draft'))
 
   onMount(() => {
-    // 确保 VFS 已同步（contentStore.refresh 会触发）
-    if (!vfsStore.loaded) contentStore.refresh()
+    // 确保 VFS 已同步（直接触发 vfsStore.sync）
+    if (!vfsStore.loaded) vfsStore.sync('src/content')
   })
 
   function basename(path: string): string {

@@ -1,7 +1,7 @@
 /**
  * 写作应用（可选安装，手动安装）。
  *
- * 完整「创作 → 发表」流水线，三场景共享 git.commit + handlePublishError + contentStore：
+ * 完整「创作 → 发表」流水线，三场景共享 git.commit + handlePublishError + vfsStore/contentQuery：
  * - /app/writer（entry）：总览（文件清单 + 批量发表入口）。
  * - /app/editor：编辑器（三视图 + 自动保存 + 单篇发表）。
  * - /app/changes：变更（diff 预览 + 撤销 + 手动 commit，发表兜底）。

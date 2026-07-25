@@ -1,24 +1,15 @@
 <!--
 	标签云 Widget：桌面小组件，展示热门标签。
-	数据源 readonlyVfs（统计所有文章/说说的标签频次）。点击跳转标签页。
+	数据源 contentQuery（内容管道的 tags 处理器，统计所有文章/说说的标签频次）。点击跳转标签页。
 -->
 <script lang="ts">
-  import { readonlyVfs } from '$lib/vfs/readonly'
+  import { contentQuery } from '$lib/content-pipeline/query.svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
 
-  type TagCount = { tag: string; count: number }
-
-  const tags = $derived.by<TagCount[]>(() => {
-    const counts = new Map<string, number>()
-    for (const p of readonlyVfs.getPosts()) {
-      for (const t of p.metadata.tags ?? []) {
-        counts.set(t, (counts.get(t) ?? 0) + 1)
-      }
-    }
-    return [...counts.entries()]
-      .map(([tag, count]) => ({ tag, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 20)
+  // 标签频次来自 contentQuery.listTags()（背后是 tags processor 的缓存产物）
+  const tags = $derived.by(() => {
+    void contentQuery.version
+    return contentQuery.listTags().slice(0, 20)
   })
 
   function open(tag: string) {
