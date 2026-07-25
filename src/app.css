@@ -22,31 +22,35 @@
 
 :root {
   --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0.008 326);
+  --foreground: oklch(0.145 0.008 var(--base-h));
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0.008 326);
+  --card-foreground: oklch(0.145 0.008 var(--base-h));
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0.008 326);
+  --popover-foreground: oklch(0.145 0.008 var(--base-h));
   /*
-   * 主题色相旋钮（2026-07-24）：唯一运行时换肤入口。
-   * themeService 通过 documentElement.style.setProperty('--primary-h', ...) 注入，
-   * 所有橙红系变量（primary / chart-* / sidebar-primary）基于此计算式派生，
-   * L/C 保持字面量（锁定亮度 = 可访问性保证），仅色相旋转。
-   * calc 偏移保留原 chart 间约 6° 微差（设计精度零误差还原）。
+   * 主题色相旋钮（2026-07-24）：运行时换肤双旋钮。
+   * - --primary-h：品牌强调色（primary / chart 系列 / sidebar-primary），橙红系。
+   * - --base-h：中性表面色（foreground / muted / border / ring / sidebar 系列等），mauve 系。
+   * themeService 通过 documentElement.style.setProperty 注入，L/C 保持字面量
+   * （锁定亮度 = 可访问性保证），仅色相旋转。
+   * 中性色规律（色彩学推导，参考 shadcn-svelte base color 体系）：
+   *   所有中性色的 H = base-h，C 极低（0.001-0.034），L 按表面层级固定。
+   *   亮模式 background 永远纯白（oklch(1 0 0)），不随 base 变。
    */
   --primary-h: 16.935;
+  --base-h: 326;
   --primary: oklch(0.514 0.222 var(--primary-h));
   --primary-foreground: oklch(0.969 0.015 calc(var(--primary-h) - 4.513));
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.96 0.003 325.6);
-  --muted-foreground: oklch(0.542 0.034 322.5);
-  --accent: oklch(0.96 0.003 325.6);
-  --accent-foreground: oklch(0.212 0.019 322.12);
+  --secondary: oklch(0.967 0.001 var(--base-h));
+  --secondary-foreground: oklch(0.21 0.006 var(--base-h));
+  --muted: oklch(0.96 0.003 var(--base-h));
+  --muted-foreground: oklch(0.542 0.034 var(--base-h));
+  --accent: oklch(0.96 0.003 var(--base-h));
+  --accent-foreground: oklch(0.212 0.019 var(--base-h));
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0.005 325.62);
-  --input: oklch(0.922 0.005 325.62);
-  --ring: oklch(0.711 0.019 323.02);
+  --border: oklch(0.922 0.005 var(--base-h));
+  --input: oklch(0.922 0.005 var(--base-h));
+  --ring: oklch(0.711 0.019 var(--base-h));
   --chart-1: oklch(0.81 0.117 calc(var(--primary-h) - 5.297));
   --chart-2: oklch(0.645 0.246 calc(var(--primary-h) - 0.496));
   --chart-3: oklch(0.586 0.253 calc(var(--primary-h) + 0.65));
@@ -54,13 +58,13 @@
   --chart-5: oklch(0.455 0.188 calc(var(--primary-h) - 3.238));
   --radius: 0.5rem;
   --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0.008 326);
+  --sidebar-foreground: oklch(0.145 0.008 var(--base-h));
   --sidebar-primary: var(--chart-3);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.96 0.003 325.6);
-  --sidebar-accent-foreground: oklch(0.212 0.019 322.12);
-  --sidebar-border: oklch(0.922 0.005 325.62);
-  --sidebar-ring: oklch(0.711 0.019 323.02);
+  --sidebar-accent: oklch(0.96 0.003 var(--base-h));
+  --sidebar-accent-foreground: oklch(0.212 0.019 var(--base-h));
+  --sidebar-border: oklch(0.922 0.005 var(--base-h));
+  --sidebar-ring: oklch(0.711 0.019 var(--base-h));
 
   /* z-index 层级 token（堆叠上下文规范）。
    * 数值递增 = 越靠近用户。AppShell 用 isolation:isolate 建独立堆叠上下文，
@@ -78,33 +82,33 @@
 }
 
 .dark {
-  --background: oklch(0.145 0.008 326);
+  --background: oklch(0.145 0.008 var(--base-h));
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.212 0.019 322.12);
+  --card: oklch(0.212 0.019 var(--base-h));
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.212 0.019 322.12);
+  --popover: oklch(0.212 0.019 var(--base-h));
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.455 0.188 calc(var(--primary-h) - 3.238));
   --primary-foreground: oklch(0.969 0.015 calc(var(--primary-h) - 4.513));
-  --secondary: oklch(0.274 0.006 286.033);
+  --secondary: oklch(0.274 0.006 var(--base-h));
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.263 0.024 320.12);
-  --muted-foreground: oklch(0.711 0.019 323.02);
-  --accent: oklch(0.263 0.024 320.12);
+  --muted: oklch(0.263 0.024 var(--base-h));
+  --muted-foreground: oklch(0.711 0.019 var(--base-h));
+  --accent: oklch(0.263 0.024 var(--base-h));
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.542 0.034 322.5);
+  --ring: oklch(0.542 0.034 var(--base-h));
   /* chart-1~5 亮暗一致（原设计），用 :root 的 calc 计算式跟随 --primary-h，不在此覆盖 */
-  --sidebar: oklch(0.21 0.006 285.885);
+  --sidebar: oklch(0.21 0.006 var(--base-h));
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: var(--chart-2);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.263 0.024 320.12);
+  --sidebar-accent: oklch(0.263 0.024 var(--base-h));
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.542 0.034 322.5);
+  --sidebar-ring: oklch(0.542 0.034 var(--base-h));
 }
 
 @theme inline {

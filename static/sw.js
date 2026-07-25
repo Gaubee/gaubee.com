@@ -14,7 +14,7 @@
  * 注册：见 src/lib/sw/register.ts，仅在 production + browser 注册（dev 下避免破坏 HMR）。
  */
 
-const CACHE_VERSION = "gaubee-sw-v5";
+const CACHE_VERSION = "gaubee-sw-v6";
 const CACHE_KEY = `gaubee-cache-${CACHE_VERSION}`;
 /**
  * 主题色相持久化的特殊 cache key。
@@ -91,24 +91,26 @@ self.addEventListener("fetch", (event) => {
 });
 
 /**
- * SPA navigation：网络优先，拿到 HTML 后注入当前主题色相。
- * 注入 <style>:root{--primary-h:X}</style> 到 </head> 前，首屏即带主题态。
+ * SPA navigation：网络优先，拿到 HTML 后注入当前主题色相（双旋钮）。
+ * 注入 <style>:root{--primary-h:X;--base-h:Y}</style> 到 </head> 前，首屏即带主题态。
  */
 async function spaNavigationWithTheme(request) {
   try {
     const response = await fetch(request);
     if (!response.ok) return response;
 
-    const hue = await readThemeHue();
-    if (hue === null) return response; // 无主题态，原样返回
+    const theme = await readThemeHue();
+    if (theme === null) return response; // 无主题态，原样返回
 
-    // 注入主题色 inline style 到 HTML
+    // 注入主题色 inline style 到 HTML（primary-h + base-h 双旋钮）
     const html = await response.text();
-    // 暗模式 primary-h 需偏移 -3.238（见 app.css .dark），但 --primary-h 是基准色相，
-    // .dark 的 calc 偏移已在 app.css 定义，此处只注入基准值。
+    const rules = [];
+    if (typeof theme.hue === "number") rules.push(`--primary-h:${theme.hue}`);
+    if (typeof theme.baseHue === "number") rules.push(`--base-h:${theme.baseHue}`);
+    if (rules.length === 0) return response;
     const injected = html.replace(
       "</head>",
-      `<style id="sw-theme">:root{--primary-h:${hue}}</style></head>`,
+      `<style id="sw-theme">:root{${rules.join(";")}}</style></head>`,
     );
 
     return new Response(injected, {
@@ -167,7 +169,7 @@ async function staleWhileRevalidate(request) {
 
 // ---- 主题色相持久化（Cache Storage）----
 
-/** 读取持久化的主题色相。SW 重启后从 Cache 恢复。 */
+/** 读取持久化的主题色相 {hue, baseHue}。SW 重启后从 Cache 恢复。 */
 async function readThemeHue() {
   const cache = await caches.open(CACHE_KEY);
   const res = await cache.match(THEME_CACHE_KEY);
@@ -179,10 +181,10 @@ async function readThemeHue() {
   }
 }
 
-/** 持久化主题色相到 Cache Storage。 */
-async function writeThemeHue(hue) {
+/** 持久化主题色相到 Cache Storage。存 {hue, baseHue} 对象。 */
+async function writeThemeHue(theme) {
   const cache = await caches.open(CACHE_KEY);
-  const res = new Response(JSON.stringify(hue), {
+  const res = new Response(JSON.stringify(theme), {
     headers: { "Content-Type": "application/json" },
   });
   await cache.put(THEME_CACHE_KEY, res);
@@ -195,14 +197,16 @@ self.addEventListener("message", async (event) => {
     self.skipWaiting();
     return;
   }
-  if (data?.type === "THEME_HUE" && typeof data.hue === "number") {
-    // 持久化主题色到 Cache Storage，下次 navigation 时注入。
-    // 直接 await（async handler），不依赖 event.waitUntil。
+  if (data?.type === "THEME_HUE") {
+    // 持久化主题色 {hue, baseHue} 到 Cache Storage，下次 navigation 时注入。
+    const theme = {
+      hue: typeof data.hue === "number" ? data.hue : undefined,
+      baseHue: typeof data.baseHue === "number" ? data.baseHue : undefined,
+    };
     try {
-      await writeThemeHue(data.hue);
-      // 回复 client 确认（用于调试/双向通信）
+      await writeThemeHue(theme);
       if (event.source) {
-        event.source.postMessage({ type: "THEME_HUE_ACK", hue: data.hue });
+        event.source.postMessage({ type: "THEME_HUE_ACK", ...theme });
       }
     } catch (err) {
       console.error("[SW] themeHue 持久化失败:", err);

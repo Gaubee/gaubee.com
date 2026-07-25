@@ -14,8 +14,8 @@
   import type { DesktopBackground } from '$lib/apps/builtin/desktop/service.svelte'
   import { backgroundToCss } from '$lib/apps/builtin/desktop/background-render'
   import { SVG_TEMPLATES } from '$lib/apps/builtin/theme/svg-templates'
-  import { DEFAULT_PRIMARY_HUE } from '$lib/apps/builtin/theme/service.svelte'
-  import { extractHuesFromImage } from '$lib/color/extract'
+  import { DEFAULT_PRIMARY_HUE, DEFAULT_BASE_HUE } from '$lib/apps/builtin/theme/service.svelte'
+  import { extractThemeHues, type ExtractedThemeHues } from '$lib/color/extract'
   import * as Card from '$lib/components/ui/card'
   import * as Tabs from '$lib/components/ui/tabs'
   import { Button } from '$lib/components/ui/button'
@@ -25,8 +25,9 @@
   import UploadIcon from '@lucide/svelte/icons/upload'
   import ExternalLinkIcon from '@lucide/svelte/icons/external-link'
 
-  // 主题色相（响应式订阅 themeService）
+  // 主题色相（响应式订阅 themeService，双旋钮）
   const hue = $derived(themeService.hue)
+  const baseHue = $derived(themeService.baseHue)
   // 桌面背景（响应式订阅 desktopService）
   const background = $derived(desktopService.background)
   // 桌面背景预览 CSS（实时派生，模拟桌面背景效果）
@@ -48,6 +49,10 @@
   function onHueInput(e: Event) {
     const value = Number((e.target as HTMLInputElement).value)
     themeService.setHue(value)
+  }
+  function onBaseHueInput(e: Event) {
+    const value = Number((e.target as HTMLInputElement).value)
+    themeService.setBaseHue(value)
   }
 
   // ---- 桌面背景类型切换 ----
@@ -151,8 +156,8 @@
     })
   }
 
-  // ---- 图片主色提取（从背景图片提取候选主题色相供用户挑选）----
-  let extractedHues = $state<number[]>([])
+  // ---- 图片主色提取（双套：primary 鲜艳色 + base 中性色）----
+  let extracted = $state<ExtractedThemeHues>({ primary: [], base: [] })
   let extracting = $state(false)
   let extractError = $state('')
 
@@ -160,9 +165,9 @@
     if (!imageUrl || extracting) return
     extracting = true
     extractError = ''
-    extractedHues = []
+    extracted = { primary: [], base: [] }
     try {
-      extractedHues = await extractHuesFromImage(imageUrl, 5)
+      extracted = await extractThemeHues(imageUrl, 5)
     } catch (e) {
       extractError = e instanceof Error ? e.message : '提取失败（图片可能跨域）'
     } finally {
@@ -186,25 +191,21 @@
     </Button>
   </header>
 
-  <!-- 主题色相（核心高频区） -->
+  <!-- 主题色相（双旋钮：primary 品牌色 + base 中性色） -->
   <Card.Root>
     <Card.Header>
       <Card.Title>主题色</Card.Title>
       <Card.Description>
-        拖动滑块即时预览。亮度锁定（保证可访问性），仅旋转色相。
+        双旋钮独立调整。亮度锁定（保证可访问性），仅旋转色相。
       </Card.Description>
     </Card.Header>
     <Card.Content class="space-y-5">
-      <!-- 色相滑块 -->
+      <!-- Primary 色相（品牌强调色） -->
       <div class="space-y-2">
         <div class="flex items-center justify-between">
-          <Label>色相</Label>
+          <Label class="font-medium">Primary（品牌色）</Label>
           <span class="text-muted-foreground font-mono text-xs">{hue.toFixed(1)}°</span>
         </div>
-        <!--
-          色相滑块背景：conic 渐变呈现完整色环，thumb 位置即当前色相。
-          滑块本身用彩虹渐变让用户直观感知色相空间。
-        -->
         <input
           type="range"
           min="0"
@@ -213,14 +214,10 @@
           value={hue}
           oninput={onHueInput}
           class="hue-slider h-3 w-full cursor-pointer appearance-none rounded-full"
-          aria-label="主题色相"
+          aria-label="Primary 色相"
         />
-      </div>
-
-      <!-- 预设色板 -->
-      <div class="space-y-2">
-        <Label>预设</Label>
-        <div class="flex flex-wrap gap-2">
+        <!-- 预设色板 -->
+        <div class="flex flex-wrap gap-2 pt-1">
           {#each PRESET_HUES as preset (preset.name)}
             <button
               class="flex flex-col items-center gap-1"
@@ -237,6 +234,40 @@
         </div>
       </div>
 
+      <!-- Base 色相（中性表面色） -->
+      <div class="space-y-2 border-t pt-4">
+        <div class="flex items-center justify-between">
+          <Label class="font-medium">Base（中性色）</Label>
+          <span class="text-muted-foreground font-mono text-xs">{baseHue.toFixed(1)}°</span>
+        </div>
+        <input
+          type="range"
+          min="0"
+          max="360"
+          step="0.5"
+          value={baseHue}
+          oninput={onBaseHueInput}
+          class="hue-slider-muted h-3 w-full cursor-pointer appearance-none rounded-full"
+          aria-label="Base 色相"
+        />
+        <!-- 预设色板（低彩度，模拟中性表面色） -->
+        <div class="flex flex-wrap gap-2 pt-1">
+          {#each PRESET_HUES as preset (preset.name)}
+            <button
+              class="flex flex-col items-center gap-1"
+              onclick={() => themeService.setBaseHue(preset.hue)}
+              aria-label="Base {preset.name}"
+            >
+              <span
+                class="size-8 rounded-full transition-all hover:scale-110 {Math.abs(baseHue - preset.hue) < 2 ? 'ring-primary ring-2 ring-offset-2 ring-offset-background' : ''}"
+                style="background: oklch(0.5 0.02 {preset.hue})"
+              ></span>
+              <span class="text-muted-foreground text-xs">{preset.name}</span>
+            </button>
+          {/each}
+        </div>
+      </div>
+
       <!-- 实时预览样本 -->
       <div class="flex items-center gap-3 rounded-lg border p-3">
         <span
@@ -244,10 +275,15 @@
           style="background: oklch(0.514 0.222 {hue})"
           aria-label="primary 色预览"
         ></span>
+        <span
+          class="border-border size-12 rounded-lg border shadow-sm"
+          style="background: oklch(0.96 0.003 {baseHue})"
+          aria-label="base 色预览"
+        ></span>
         <div class="text-sm">
           <p class="font-medium">实时预览</p>
           <p class="text-muted-foreground font-mono text-xs">
-            oklch(0.514 0.222 {hue.toFixed(3)})
+            primary {hue.toFixed(0)}° · base {baseHue.toFixed(0)}°
           </p>
         </div>
       </div>
@@ -437,20 +473,40 @@
               <p class="text-destructive text-xs">{extractError}</p>
             {/if}
 
-            {#if extractedHues.length > 0}
-              <div class="space-y-1.5">
-                <p class="text-muted-foreground text-xs">点击候选色应用为主题色：</p>
-                <div class="flex flex-wrap gap-2">
-                  {#each extractedHues as h (h)}
-                    <button
-                      class="size-8 rounded-full transition-all hover:scale-110 {Math.abs(hue - h) < 2 ? 'ring-primary ring-2 ring-offset-2 ring-offset-background' : ''}"
-                      style="background: oklch(0.514 0.222 {h})"
-                      onclick={() => themeService.setHue(h)}
-                      aria-label={`应用色相 ${h.toFixed(0)}°`}
-                      title={`${h.toFixed(1)}°`}
-                    ></button>
-                  {/each}
-                </div>
+            {#if extracted.primary.length > 0 || extracted.base.length > 0}
+              <div class="space-y-3">
+                {#if extracted.primary.length > 0}
+                  <div class="space-y-1.5">
+                    <p class="text-muted-foreground text-xs">Primary 候选（鲜艳色 → 品牌色）：</p>
+                    <div class="flex flex-wrap gap-2">
+                      {#each extracted.primary as h (h)}
+                        <button
+                          class="size-8 rounded-full transition-all hover:scale-110 {Math.abs(hue - h) < 2 ? 'ring-primary ring-2 ring-offset-2 ring-offset-background' : ''}"
+                          style="background: oklch(0.514 0.222 {h})"
+                          onclick={() => themeService.setHue(h)}
+                          aria-label={`Primary 色相 ${h.toFixed(0)}°`}
+                          title={`${h.toFixed(1)}°`}
+                        ></button>
+                      {/each}
+                    </div>
+                  </div>
+                {/if}
+                {#if extracted.base.length > 0}
+                  <div class="space-y-1.5">
+                    <p class="text-muted-foreground text-xs">Base 候选（中性色 → 背景色）：</p>
+                    <div class="flex flex-wrap gap-2">
+                      {#each extracted.base as h (h)}
+                        <button
+                          class="border-border size-8 rounded-full border transition-all hover:scale-110 {Math.abs(baseHue - h) < 2 ? 'ring-primary ring-2 ring-offset-2 ring-offset-background' : ''}"
+                          style="background: oklch(0.5 0.02 {h})"
+                          onclick={() => themeService.setBaseHue(h)}
+                          aria-label={`Base 色相 ${h.toFixed(0)}°`}
+                          title={`${h.toFixed(1)}°`}
+                        ></button>
+                      {/each}
+                    </div>
+                  </div>
+                {/if}
               </div>
             {/if}
           </div>
@@ -522,6 +578,38 @@
     border-radius: 50%;
     background: white;
     border: 2px solid var(--primary);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+    cursor: pointer;
+  }
+  /* base 色相滑块：低彩度渐变（对应中性表面色语义，C=0.02）。 */
+  .hue-slider-muted {
+    background: linear-gradient(
+      to right,
+      oklch(0.5 0.02 0),
+      oklch(0.5 0.02 60),
+      oklch(0.5 0.02 120),
+      oklch(0.5 0.02 180),
+      oklch(0.5 0.02 240),
+      oklch(0.5 0.02 300),
+      oklch(0.5 0.02 360)
+    );
+  }
+  .hue-slider-muted::-webkit-slider-thumb {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid var(--ring);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+    cursor: pointer;
+  }
+  .hue-slider-muted::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid var(--ring);
     box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
     cursor: pointer;
   }
