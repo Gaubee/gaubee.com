@@ -77,7 +77,7 @@
         {#each toc as item (item.id)}
           {@const ratio = highlights.get(item.id) ?? 0}
           <button
-            class="toc-item block w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors {item.level === 3 ? 'ml-3 w-[calc(100%-0.75rem)]' : ''}"
+            class="toc-item block w-full rounded-e-md rounded-s-none px-2 py-1.5 text-left text-sm transition-colors {item.level === 3 ? 'ml-3 w-[calc(100%-0.75rem)]' : ''}"
             style="--toc-highlight: {ratio}"
             aria-current={ratio > 0.5 ? 'location' : undefined}
             onclick={() => scrollToHeading(item.id)}
@@ -110,7 +110,7 @@
           {#each toc as item (item.id)}
             {@const ratio = highlights.get(item.id) ?? 0}
             <button
-              class="toc-item flex w-full items-center rounded-md px-3 py-2.5 text-left text-sm transition-colors {item.level === 3 ? 'pl-7' : ''}"
+              class="toc-item flex w-full items-center rounded-e-md rounded-s-none px-3 py-2.5 text-left text-sm transition-colors {item.level === 3 ? 'ml-3 w-[calc(100%-0.75rem)]' : ''}"
               style="--toc-highlight: {ratio}"
               aria-current={ratio > 0.5 ? 'location' : undefined}
               onclick={() => scrollToHeading(item.id)}

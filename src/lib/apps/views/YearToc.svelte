@@ -59,7 +59,7 @@
       {#each yearGroups as group (group.year)}
         {@const ratio = highlights.get(`year-${group.year}`) ?? 0}
         <button
-          class="toc-item flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors"
+          class="toc-item flex w-full items-center justify-between rounded-e-md rounded-s-none px-3 py-2 text-left text-sm transition-colors"
           style="--toc-highlight: {ratio}"
           aria-current={ratio > 0.5 ? 'location' : undefined}
           onclick={() => selectYear(group.year)}
@@ -93,7 +93,7 @@
         {#each yearGroups as group (group.year)}
           {@const ratio = highlights.get(`year-${group.year}`) ?? 0}
           <button
-            class="toc-item flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-sm transition-colors"
+            class="toc-item flex w-full items-center justify-between rounded-e-md rounded-s-none px-3 py-2.5 text-left text-sm transition-colors"
             style="--toc-highlight: {ratio}"
             aria-current={ratio > 0.5 ? 'location' : undefined}
             onclick={() => selectYear(group.year)}
