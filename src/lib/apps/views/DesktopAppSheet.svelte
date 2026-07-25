@@ -25,8 +25,10 @@
   function launch(route: string, area: string) {
     if (area === 'pop') {
       navController.activatePop(route)
-    } else {
+    } else if (appManager.isEntryRouteVisible(route)) {
       navController.openApp(route)
+    } else {
+      navController.navigateMain(route)
     }
     desktopLayout.closeAllApps()
   }

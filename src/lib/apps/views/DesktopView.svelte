@@ -66,9 +66,12 @@
   function launch(route: string, area: string) {
     if (area === 'pop') {
       navController.activatePop(route)
-    } else {
-      // main/bottom 应用：openApp（加入任务栏 + 聚焦）
+    } else if (appManager.isEntryRouteVisible(route)) {
+      // 非隐藏 entry activity：openApp（加入任务栏 + 聚焦）
       navController.openApp(route)
+    } else {
+      // hiddenFromNav entry activity 或非 entry route：navigateMain（deep link 渲染）
+      navController.navigateMain(route)
     }
   }
 
