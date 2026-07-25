@@ -16,11 +16,11 @@ describe("GithubView", () => {
     expect(h1?.textContent).toContain("Github");
   });
 
-  it("显示仓库绑定表单", async () => {
+  it("显示添加仓库表单", async () => {
     const { container } = render(GithubView);
     await new Promise((r) => setTimeout(r, 100));
     const text = container.textContent || "";
-    expect(text).toContain("绑定仓库");
+    expect(text).toContain("添加仓库");
     expect(text).toContain("克隆仓库");
   });
 });

@@ -26,7 +26,7 @@ export interface FileMeta {
   /** 修改时间戳。 */
   mtime: number;
   /**
-   * 修改前的原始内容快照（首次 dirty 时保存，commit/revert 后清除）。用于 diff。
+   * 修改后的原始内容快照（首次 dirty 时保存，commit/revert 后清除）。用于 diff。
    * 二进制文件为 Uint8Array。
    */
   baseContent: string | Uint8Array | null;
@@ -34,15 +34,34 @@ export interface FileMeta {
   deleted: boolean;
 }
 
+/** 已克隆仓库的管理记录（GithubApp 多仓库管理）。 */
+export interface ManagedRepo {
+  /** 唯一标识：owner/repo（如 "gaubee/gaubee.com"）。 */
+  id: string;
+  owner: string;
+  repo: string;
+  branch: string;
+  /** ZenFS 路径（如 /repos/gaubee/gaubee.com）。 */
+  dir: string;
+  /** 是否浅克隆。 */
+  shallow: boolean;
+  /** clone 时间戳。 */
+  clonedAt: number;
+}
+
 interface GaubeeMetaDB extends DBSchema {
   meta: {
     key: string;
     value: FileMeta;
   };
+  repos: {
+    key: string;
+    value: ManagedRepo;
+  };
 }
 
 const DB_NAME = "gaubee-meta";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<GaubeeMetaDB>> | null = null;
 
@@ -52,6 +71,10 @@ function getDB(): Promise<IDBPDatabase<GaubeeMetaDB>> {
       upgrade(db) {
         if (!db.objectStoreNames.contains("meta")) {
           db.createObjectStore("meta", { keyPath: "path" });
+        }
+        // v2: 加 repos store（GithubApp 多仓库管理）
+        if (!db.objectStoreNames.contains("repos")) {
+          db.createObjectStore("repos", { keyPath: "id" });
         }
       },
     });
@@ -84,6 +107,28 @@ export async function metaAll(): Promise<FileMeta[]> {
 export async function metaClear(): Promise<void> {
   const db = await getDB();
   await db.clear("meta");
+}
+
+// ---- 已克隆仓库 CRUD（GithubApp 多仓库管理）----
+
+export async function repoGet(id: string): Promise<ManagedRepo | undefined> {
+  const db = await getDB();
+  return db.get("repos", id);
+}
+
+export async function repoPut(repo: ManagedRepo): Promise<void> {
+  const db = await getDB();
+  await db.put("repos", repo);
+}
+
+export async function repoDelete(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete("repos", id);
+}
+
+export async function repoAll(): Promise<ManagedRepo[]> {
+  const db = await getDB();
+  return db.getAll("repos");
 }
 
 /**

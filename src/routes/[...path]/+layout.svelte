@@ -5,6 +5,13 @@
 	- PopAreaRouter：浮层（Dialog），任何视口都可用
 -->
 <script lang="ts">
+  // isomorphic-git 全局 Buffer polyfill（浏览器无原生 Buffer，必须运行时注入）。
+  // 放在最前（所有 import 之前），确保 isomorphic-git 的 typeof Buffer 检查通过。
+  import { Buffer } from 'buffer'
+  if (typeof globalThis.Buffer === 'undefined') {
+    ;(globalThis as Record<string, unknown>).Buffer = Buffer
+  }
+
   import '../../app.css'
   import { onMount } from 'svelte'
   import { appManager } from '$lib/apps/AppManager.svelte'
