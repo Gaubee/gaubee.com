@@ -112,21 +112,35 @@ class MemFS {
     return false;
   };
 
-  // 适配 isomorphic-git 的 promisified 接口
+  // 适配 isomorphic-git 的 PromiseFsClient 接口。
+  // isomorphic-git 的 isPromiseFs 检测会调 fs.readFile()（无参数）看是否返回 Promise，
+  // 然后调 fs[command].bind(fs) 直接从 fs 顶层取方法。
+  // 因此 promise 方法必须在 fs 顶层声明（不能只放 promises 子对象），
+  // 否则 isPromiseFs 返回 false → 走 callback 分支 → fs.readFile 是 undefined → .bind 报错。
+  readFile = (path: string, _opts?: string): Promise<Uint8Array> =>
+    Promise.resolve(this.readFileSync(path));
+  writeFile = (path: string, data: string | Uint8Array): Promise<void> =>
+    Promise.resolve(this.writeFileSync(path, data));
+  mkdir = (path: string, opts?: { recursive?: boolean }): Promise<void> =>
+    Promise.resolve(this.mkdirSync(path, opts));
+  readdir = (path: string): Promise<string[]> => Promise.resolve(this.readdirSync(path));
+  stat = (path: string): Promise<{ isDirectory: () => boolean; size: number }> =>
+    Promise.resolve(this.statSync(path));
+  lstat = (path: string): Promise<{ isDirectory: () => boolean; size: number }> =>
+    Promise.resolve(this.lstatSync(path));
+  unlink = (path: string): Promise<void> => Promise.resolve(this.unlinkSync(path));
+  rmdir = (path: string): Promise<void> => Promise.resolve(this.rmdirSync(path));
+
+  // promises 子对象保留（部分库会查 fs.promises，如 Node.js 兼容层）
   promises = {
-    readFile: (path: string, _opts?: string): Promise<Uint8Array> =>
-      Promise.resolve(this.readFileSync(path)),
-    writeFile: (path: string, data: string | Uint8Array): Promise<void> =>
-      Promise.resolve(this.writeFileSync(path, data)),
-    mkdir: (path: string, opts?: { recursive?: boolean }): Promise<void> =>
-      Promise.resolve(this.mkdirSync(path, opts)),
-    readdir: (path: string): Promise<string[]> => Promise.resolve(this.readdirSync(path)),
-    stat: (path: string): Promise<{ isDirectory: () => boolean; size: number }> =>
-      Promise.resolve(this.statSync(path)),
-    lstat: (path: string): Promise<{ isDirectory: () => boolean; size: number }> =>
-      Promise.resolve(this.lstatSync(path)),
-    unlink: (path: string): Promise<void> => Promise.resolve(this.unlinkSync(path)),
-    rmdir: (path: string): Promise<void> => Promise.resolve(this.rmdirSync(path)),
+    readFile: this.readFile,
+    writeFile: this.writeFile,
+    mkdir: this.mkdir,
+    readdir: this.readdir,
+    stat: this.stat,
+    lstat: this.lstat,
+    unlink: this.unlink,
+    rmdir: this.rmdir,
   };
 }
 
