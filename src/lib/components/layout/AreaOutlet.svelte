@@ -231,11 +231,13 @@
 <style>
   /* main 区根：桌面底层 + 应用浮层的堆叠上下文。
    * 桌面与应用都常驻 DOM（保活），靠 visibility/z-index 决定显隐层级。
-   * overflow:hidden 裁剪子层溢出，避免隐藏浮层的内容污染父级 scrollHeight（杜绝滚动嵌套）。 */
+   * overflow:hidden 裁剪子层溢出，避免隐藏浮层的内容污染父级 scrollHeight（杜绝滚动嵌套）。
+   * 注意：不使用 isolation:isolate——它会创建合成层边界，阻断 .app-layout 系统背景
+   * 到后代 .app-icon-box/.widget-card backdrop-filter 的透传。堆叠隔离由 .main-content
+   * 的 position:relative + isolation:isolate 提供（见 app.css）。 */
   .main-area-root {
     position: relative;
     height: 100%;
-    isolation: isolate;
     overflow: hidden;
   }
   /* 桌面层：常驻底层背景。无应用浮层时可见可交互；有浮层时隐藏（被遮挡）。
