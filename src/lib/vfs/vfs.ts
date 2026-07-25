@@ -162,10 +162,10 @@ export class Vfs {
     const existing = await metaGet(p);
     // 首次 dirty（existing 非 dirty 或不存在）→ 保存原始内容作为 base 快照（供 diff）。
     // 后续 dirty 不覆盖 base（保留最初原始态）；commit/revert 清除 base。
-    // 注：base 仅对 string 内容有意义（用于 diff/markdown）；二进制不存 base。
+    // 注：base 仅对 string 内容有意义（用于 diff/markdown）；二进制写入跳过 base 快照。
     const isFirstDirty = !existing || !existing.dirty || existing.deleted;
     let baseContent: string | null;
-    if (isFirstDirty) {
+    if (isFirstDirty && typeof content === "string") {
       const prev = existing && !existing.deleted ? await this.loadContentOptional(p) : null;
       baseContent = typeof prev === "string" ? prev : null;
     } else {
