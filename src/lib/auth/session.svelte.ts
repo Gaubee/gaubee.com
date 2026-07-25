@@ -118,7 +118,7 @@ if (browser) {
  * Worker 行为：
  * - GET/HEAD：无 token 时回退匿名请求（公开仓库可读，受 60/h 限速）
  * - POST/PUT/PATCH/DELETE：必须有 token（未登录返回 401）
- * - 路径限定 repos/gaubee/gaubee.com/（防 SSRF）
+ * - 路径限定 repos/*（GitHub REST API 仓库端点；有 token 任意仓库可读写）
  */
 export async function fetchGithub(path: string, init?: RequestInit): Promise<Response> {
   const cleanPath = path.startsWith("/") ? path.slice(1) : path;

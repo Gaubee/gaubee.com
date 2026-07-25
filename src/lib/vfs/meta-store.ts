@@ -10,6 +10,8 @@
  * v2 schema：独立 db「gaubee-meta」单一 `meta` store。
  * 旧的 gaubee-editor/vfs store（含 content 字段）由 db.ts 提供，迁移后不再使用，
  * 旧数据无 origin/dirty 元信息无法迁移，直接弃用（首次使用本 store 时为空）。
+ *
+ * v3 schema：新增 `activities` store（GithubApp 活动日志中心，记录 commit/sync/revert）。
  */
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 
@@ -49,6 +51,32 @@ export interface ManagedRepo {
   clonedAt: number;
 }
 
+/**
+ * Git 活动日志条目（GithubApp 活动日志中心）。
+ * 记录各 App 的 git 操作（commit/sync/revert），供「日志」Tab 展示与审计。
+ */
+export interface GitActivity {
+  /** 唯一 ID（timestamp + 随机后缀）。 */
+  id: string;
+  /** 发生时间（ms epoch）。 */
+  timestamp: number;
+  /** 操作类型。 */
+  action: "commit" | "sync" | "revert";
+  /** 发起者标识（callerId，如 'github' / 'writer' / 'publish'）。 */
+  actor: string;
+  /** 目标仓库（owner/repo，如 "gaubee/gaubee.com"）。 */
+  repo: string;
+  /** 详情：commit message / sha / 影响的文件列表等。 */
+  details: {
+    /** commit message（action=commit 时）。 */
+    message?: string;
+    /** 产生或回退到的 commit sha（commit/revert 时）。 */
+    sha?: string;
+    /** 影响的文件路径列表。 */
+    files?: string[];
+  };
+}
+
 interface GaubeeMetaDB extends DBSchema {
   meta: {
     key: string;
@@ -58,10 +86,14 @@ interface GaubeeMetaDB extends DBSchema {
     key: string;
     value: ManagedRepo;
   };
+  activities: {
+    key: string;
+    value: GitActivity;
+  };
 }
 
 const DB_NAME = "gaubee-meta";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbPromise: Promise<IDBPDatabase<GaubeeMetaDB>> | null = null;
 
@@ -75,6 +107,10 @@ function getDB(): Promise<IDBPDatabase<GaubeeMetaDB>> {
         // v2: 加 repos store（GithubApp 多仓库管理）
         if (!db.objectStoreNames.contains("repos")) {
           db.createObjectStore("repos", { keyPath: "id" });
+        }
+        // v3: 加 activities store（GithubApp 活动日志中心）
+        if (!db.objectStoreNames.contains("activities")) {
+          db.createObjectStore("activities", { keyPath: "id" });
         }
       },
     });
@@ -129,6 +165,23 @@ export async function repoDelete(id: string): Promise<void> {
 export async function repoAll(): Promise<ManagedRepo[]> {
   const db = await getDB();
   return db.getAll("repos");
+}
+
+// ---- 活动日志 CRUD（GithubApp 活动日志中心）----
+
+export async function activityPut(activity: GitActivity): Promise<void> {
+  const db = await getDB();
+  await db.put("activities", activity);
+}
+
+export async function activityAll(): Promise<GitActivity[]> {
+  const db = await getDB();
+  return db.getAll("activities");
+}
+
+export async function activityClear(): Promise<void> {
+  const db = await getDB();
+  await db.clear("activities");
 }
 
 /**

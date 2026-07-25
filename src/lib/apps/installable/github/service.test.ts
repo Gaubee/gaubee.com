@@ -30,6 +30,15 @@ vi.mock("$lib/apps/builtin/account/service", () => ({
   accountService: mockAccountService,
 }));
 
+// mock activityLog（GitService 写操作后记录活动日志；避免触达 IndexedDB）
+const mockActivityLog = {
+  log: vi.fn().mockResolvedValue(undefined),
+};
+vi.mock("./activity-log.svelte", () => ({
+  activityLog: mockActivityLog,
+  DEFAULT_REPO: "gaubee/gaubee.com",
+}));
+
 const { gitService } = await import("./service");
 const { NotAuthenticatedError, NoChangesError } = await import("$lib/os/services");
 
@@ -70,6 +79,36 @@ describe("GitService", () => {
       const sha = await gitService.commit("msg");
       expect(sha).toBe("abcdef1234567890");
       expect(mockVfsStore.commit).toHaveBeenCalledWith("msg");
+      // 活动日志：默认 actor='github'，记录 message/sha/files
+      expect(mockActivityLog.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "commit",
+          actor: "github",
+          details: expect.objectContaining({
+            message: "msg",
+            sha: "abcdef1234567890",
+          }),
+        }),
+      );
+    });
+
+    it("commit(message, callerId) → 活动日志 actor 用 callerId", async () => {
+      mockAccountService.requireAuthenticated.mockReturnValue(undefined);
+      mockVfs.dirtyFiles.mockResolvedValue([
+        {
+          path: "a.md",
+          content: "x",
+          sha: null,
+          origin: "local",
+          dirty: true,
+          mtime: 0,
+        },
+      ]);
+      mockVfsStore.commit.mockResolvedValue("deadbeef");
+      await gitService.commit("msg", "writer");
+      expect(mockActivityLog.log).toHaveBeenCalledWith(
+        expect.objectContaining({ action: "commit", actor: "writer" }),
+      );
     });
   });
 
@@ -92,14 +131,28 @@ describe("GitService", () => {
       expect(mockVfs.dirtyFiles).toHaveBeenCalled();
     });
 
-    it("revert 委托 vfsStore.revert", async () => {
+    it("revert 委托 vfsStore.revert + 记录活动日志", async () => {
       await gitService.revert("a.md");
       expect(mockVfsStore.revert).toHaveBeenCalledWith("a.md");
+      expect(mockActivityLog.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "revert",
+          actor: "github",
+          details: { files: ["a.md"] },
+        }),
+      );
     });
 
-    it("sync 委托 vfsStore.sync", async () => {
+    it("sync 委托 vfsStore.sync + 记录活动日志", async () => {
       await gitService.sync("src/content");
       expect(mockVfsStore.sync).toHaveBeenCalledWith("src/content");
+      expect(mockActivityLog.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "sync",
+          actor: "github",
+          details: { message: "sync src/content" },
+        }),
+      );
     });
   });
 });
