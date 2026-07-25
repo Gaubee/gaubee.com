@@ -14,10 +14,14 @@
  * 注册：见 src/lib/sw/register.ts，仅在 production + browser 注册（dev 下避免破坏 HMR）。
  */
 
-const CACHE_VERSION = "gaubee-sw-v4";
+const CACHE_VERSION = "gaubee-sw-v5";
 const CACHE_KEY = `gaubee-cache-${CACHE_VERSION}`;
-/** 主题色相持久化的特殊 cache key。 */
-const THEME_CACHE_KEY = "gaubee:theme-hue";
+/**
+ * 主题色相持久化的特殊 cache key。
+ * 必须是合法 URL 路径（Cache.put 会解析为 Request），用 / 开头避免协议解析错误。
+ * 用特殊前缀 __sw__/ 避免与真实路由冲突。
+ */
+const THEME_CACHE_KEY = "/__sw__/theme-hue";
 
 // 预缓存的核心 SSG 入口（install 时主动拉取，保证首次离线可用）
 const PRECACHE_URLS = ["/pages", "/pages/archive"];

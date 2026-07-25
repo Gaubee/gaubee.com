@@ -160,6 +160,9 @@
   html {
     @apply font-sans;
   }
+  button {
+    cursor: pointer;
+  }
   /* 全局键盘焦点环：自定义可点击元素（div[role=button]、Card onclick 等）兜底 */
   :where([role="button"], [tabindex]):focus-visible {
     outline: 2px solid var(--ring);
@@ -185,8 +188,12 @@
     background: color-mix(in srgb, currentColor 60%, transparent);
   }
   @supports (corner-shape: squircle) {
-    * {
+    :root {
       --radius: 1rem;
+    }
+    *,
+    *::before,
+    *::after {
       corner-shape: squircle;
     }
   }
