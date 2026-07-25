@@ -93,6 +93,12 @@ export interface AppActivity {
    * - 缺省：取 activities 中首个，或唯一标记 entry 的那个。
    * 每个 manifest 应恰好有一个 entry 场景。 */
   entry?: boolean;
+  /**
+   * 该场景是否从 Dock 任务栏隐藏（不占图标，通过深链接/菜单进入）。
+   * 粒度跟随 Activity 而非 App——一个应用可有主场景进 Dock、辅助场景隐藏。
+   * 缺省时继承 manifest.hiddenFromNav（作为该 app 所有 activity 的默认值）。
+   */
+  hiddenFromNav?: boolean;
 }
 
 /** 应用对外拉起契约（iPadOS URL Scheme / Android Intent）。
@@ -127,7 +133,8 @@ export interface AppManifest {
   /** 对外拉起契约（搜索/通知/URL 可直达）。 */
   deepLinks?: AppDeepLink[];
   /**
-   * 是否从 Dock 隐藏（不占图标，但仍作为应用安装、提供 service）。
+   * 该应用所有 Activity 的 hiddenFromNav 默认值。
+   * Activity 级别的 hiddenFromNav（AppActivity.hiddenFromNav）优先于此。
    * 用于只通过深链接或浮层进入的应用（如 account、search、notifications）。
    */
   hiddenFromNav?: boolean;

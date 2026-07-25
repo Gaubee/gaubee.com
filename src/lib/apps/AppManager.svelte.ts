@@ -17,9 +17,19 @@ import { routeDomainRegistry } from "./route-domain";
  * 4. 提供应用元数据给 AreaNav / DesktopSidebar。
  * 5. 管理应用加载状态（视图组件按需加载）。
  */
-import type { AppEntry, AppManifest, CliCommand, InstalledApp } from "./types";
+import type { AppEntry, AppManifest, AppActivity, CliCommand, InstalledApp } from "./types";
 import { getEntryRoute } from "./types";
 import { widgetRegistry } from "./widget/registry";
+
+/**
+ * 判断应用的 entry activity 是否从导航隐藏。
+ * Activity 级别的 hiddenFromNav 优先于 App 级别（manifest.hiddenFromNav 作为默认值）。
+ */
+function isEntryHidden(manifest: { hiddenFromNav?: boolean; activities: AppActivity[] }): boolean {
+  const entry = manifest.activities.find((a) => a.entry) ?? manifest.activities[0];
+  if (!entry) return manifest.hiddenFromNav ?? false;
+  return entry.hiddenFromNav ?? manifest.hiddenFromNav ?? false;
+}
 
 // ---------------------------------------------------------------------------
 // 工具：将 CliCommand 转换为 shell Command
@@ -85,19 +95,19 @@ class AppManager {
     return this.installedIds.map((id) => this.toInstalledApp(id)).filter(Boolean) as InstalledApp[];
   }
 
-  /** main 区的应用（不含隐藏应用）。 */
+  /** main 区的应用（entry activity 未隐藏）。 */
   get mainApps(): InstalledApp[] {
-    return this.allInstalled.filter((app) => app.defaultArea === "main" && !app.hiddenFromNav);
+    return this.allInstalled.filter((app) => app.defaultArea === "main" && !isEntryHidden(app));
   }
 
-  /** bottom 区的应用（不含隐藏应用）。 */
+  /** bottom 区的应用（entry activity 未隐藏）。 */
   get bottomApps(): InstalledApp[] {
-    return this.allInstalled.filter((app) => app.defaultArea === "bottom" && !app.hiddenFromNav);
+    return this.allInstalled.filter((app) => app.defaultArea === "bottom" && !isEntryHidden(app));
   }
 
-  /** 所有已安装应用的 entry route（用于 NavController ALL_TABS，不含隐藏应用）。 */
+  /** 所有已安装应用的 entry route（用于 NavController ALL_TABS，entry activity 未隐藏）。 */
   get allRoutes(): string[] {
-    return this.allInstalled.filter((app) => !app.hiddenFromNav).map((app) => getEntryRoute(app));
+    return this.allInstalled.filter((app) => !isEntryHidden(app)).map((app) => getEntryRoute(app));
   }
 
   /** 可卸载的应用（非系统内置）。 */
@@ -137,6 +147,16 @@ class AppManager {
   /** 检查 entry route 是否属于某个应用。 */
   isAppRoute(route: string): boolean {
     return this.allRoutes.includes(route);
+  }
+
+  /**
+   * 判断某 route 是否是某已安装应用的**非隐藏 entry activity** route。
+   * 用于 SystemStatusBar.runItem 判断菜单 link 走 openApp 还是 navigateMain。
+   */
+  isEntryRouteVisible(route: string): boolean {
+    const app = this.findByRoute(route);
+    if (!app) return false;
+    return !isEntryHidden(app);
   }
 
   // ---- 注册 ----
