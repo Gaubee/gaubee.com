@@ -18,10 +18,12 @@
   import { extractThemeHues, type ExtractedThemeHues } from '$lib/color/extract'
   import * as Card from '$lib/components/ui/card'
   import * as Tabs from '$lib/components/ui/tabs'
+  import * as Tooltip from '$lib/components/ui/tooltip'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import { Label } from '$lib/components/ui/label'
   import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw'
+  import InfoIcon from '@lucide/svelte/icons/info'
   import UploadIcon from '@lucide/svelte/icons/upload'
   import ExternalLinkIcon from '@lucide/svelte/icons/external-link'
 
@@ -299,9 +301,42 @@
       </Card.Description>
     </Card.Header>
     <Card.Content class="space-y-4">
-      <!-- 桌面背景预览：16:9 缩略图，纯背景展示（调色相时整页实时变化，此处专看背景） -->
-      <div class="aspect-video w-full overflow-hidden rounded-lg border" style={backgroundPreviewCss || 'background: var(--background)'} aria-label="桌面背景预览">
-      </div>
+      <!-- 桌面背景预览：16:9 缩略图，左右并排亮/暗模式，叠加模拟桌面图标。
+           Tooltip 说明占位图标仅为展示主题色效果，非真实桌面。 -->
+      <Tooltip.Provider>
+        <Tooltip.Root>
+          <Tooltip.Trigger class="block w-full cursor-help">
+            <div
+              class="grid aspect-video w-full grid-cols-2 overflow-hidden rounded-lg border"
+              style={backgroundPreviewCss || 'background: var(--background)'}
+              aria-label="桌面背景预览"
+            >
+              <!-- 亮模式预览（左半，默认） -->
+              <div class="preview-pane preview-light relative">
+                <div class="flex gap-1.5 p-2.5">
+                  <span class="preview-icon"><span class="preview-icon-dot"></span></span>
+                  <span class="preview-icon"></span>
+                </div>
+                <span class="text-muted-foreground absolute bottom-2 left-2.5 text-[10px]">亮色</span>
+              </div>
+              <!-- 暗模式预览（右半，.dark 隔离） -->
+              <div class="preview-pane dark relative">
+                <div class="flex gap-1.5 p-2.5">
+                  <span class="preview-icon"><span class="preview-icon-dot"></span></span>
+                  <span class="preview-icon"></span>
+                </div>
+                <span class="text-muted-foreground absolute bottom-2 left-2.5 text-[10px]">暗色</span>
+              </div>
+            </div>
+          </Tooltip.Trigger>
+          <Tooltip.Content>
+            <p class="flex items-center gap-1.5 text-xs">
+              <InfoIcon class="size-3" />
+              模拟桌面图标仅展示主题色效果，非真实桌面
+            </p>
+          </Tooltip.Content>
+        </Tooltip.Root>
+      </Tooltip.Provider>
       <!-- 背景类型切换 + 配置 -->
       <Tabs.Root value={currentBgType} onValueChange={(v) => switchBgType(v as BgType)}>
         <Tabs.List class="grid w-full grid-cols-5">
@@ -518,6 +553,43 @@
 </div>
 
 <style>
+  /*
+   * 桌面背景预览：模拟桌面图标（毛玻璃风格，遵循毛玻璃标准搭配）。
+   * preview-pane 是隔离容器（亮/暗各一），内部 CSS 变量随 .dark class 切换。
+   * preview-icon 模拟桌面图标方块（半透明 card + backdrop-blur），preview-icon-dot 模拟应用运行指示点（primary 色）。
+   * 占位图标仅为展示主题色效果，非真实桌面（Tooltip 已说明）。
+   */
+  .preview-pane {
+    /* 半透明叠加，让背景透出 */
+    background: transparent;
+  }
+  .preview-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 0.5rem;
+    background: color-mix(in oklch, var(--card) 70%, transparent);
+    border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+    backdrop-filter: blur(8px) contrast(2) brightness(0.8);
+  }
+  .dark .preview-icon,
+  .preview-pane.dark .preview-icon {
+    backdrop-filter: blur(8px) contrast(0.8) brightness(1.2);
+  }
+  .preview-icon-dot {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 9999px;
+    background: var(--primary);
+    border: 1.5px solid var(--background);
+  }
+
   /* 色相滑块：彩虹渐变背景，直观呈现色相空间。 */
   .hue-slider {
     background: linear-gradient(
