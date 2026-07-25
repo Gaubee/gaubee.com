@@ -24,6 +24,7 @@
   import { appLoadStore } from '$lib/apps/app-load.svelte'
   import { routeDomainRegistry } from '$lib/apps/route-domain'
   import { motionBlur } from '$lib/utils/motion'
+  import { blurTransition } from '$lib/utils/motion'
   import AppShell from '$lib/app-scaffold/AppShell.svelte'
   import DesktopView from '$lib/apps/views/DesktopView.svelte'
   import type { AppManifest } from '$lib/apps/types'
@@ -200,7 +201,11 @@
   <div class="main-area-root">
     {#if area === 'main'}
       <!-- 桌面：shell 级背景层（始终常驻 DOM 保活，无应用浮层时显现） -->
-      <div class="desktop-layer" class:desktop-layer-hidden={!desktopVisible}>
+      <div
+        class="desktop-layer"
+        class:desktop-layer-hidden={!desktopVisible}
+        use:blurTransition={{ hiddenClass: 'desktop-layer-hidden' }}
+      >
         <DesktopView />
       </div>
     {/if}
@@ -209,8 +214,12 @@
       {@const isThisActive = inThisArea && isActive && activeTabId === tabId}
       {@const View = loadedComponentFor(tabId)}
       {@const manifest = manifestForTab(tabId)}
-      <!-- 应用浮层：常驻 DOM 保活（display 切换），激活时覆盖桌面层。 -->
-      <div class="app-overlay-layer" class:app-overlay-hidden={!isThisActive}>
+      <!-- 应用浮层：常驻 DOM 保活，激活时覆盖桌面层。显隐用 WAAPI blurIn/blurOut。 -->
+      <div
+        class="app-overlay-layer"
+        class:app-overlay-hidden={!isThisActive}
+        use:blurTransition={{ hiddenClass: 'app-overlay-hidden' }}
+      >
         {#if View}
           {#if manifest}
             <AppShell app={manifest} pathname={location.pathname}>
@@ -241,50 +250,32 @@
     overflow: hidden;
   }
   /* 桌面层：常驻底层背景。无应用浮层时可见可交互；有浮层时隐藏（被遮挡）。
-   * 显隐用 blur+opacity 过渡（与启动屏 blurIn/blurOut 风格一致），visibility 锁交互。
-   * display:none 无法 transition，故用 visibility/opacity/filter 组合。 */
+   * 显隐用 WAAPI blurIn/blurOut 动画（见 use:blurTransition action），visibility 锁交互。
+   * 注意：默认态 filter:none（不是 blur(0px)），避免创建合成层影响子元素 backdrop-filter 绘制。 */
   .desktop-layer {
     position: absolute;
     inset: 0;
     z-index: 1;
     overflow: auto;
-    visibility: visible;
-    opacity: 1;
-    filter: blur(0px);
-    transition:
-      opacity 0.18s ease,
-      filter 0.18s ease,
-      visibility 0.18s ease;
   }
   .desktop-layer-hidden {
     visibility: hidden;
-    opacity: 0;
-    filter: blur(12px);
     pointer-events: none;
     /* 隐藏时不滚动（避免贡献 scrollHeight，虽然被父级 overflow:hidden 裁剪已无害） */
     overflow: hidden;
   }
-  /* 应用浮层：常驻 DOM 保活（blur+opacity 过渡而非 display:none/销毁），
-   * 保留组件状态/滚动/编辑器/终端会话。激活时显示并覆盖桌面。
-   * 显隐用 blurIn/blurOut（与启动屏风格一致），隐藏态 overflow:hidden 避免内容参与父级尺寸计算。 */
+  /* 应用浮层：常驻 DOM 保活，激活时显示并覆盖桌面。
+   * 显隐用 WAAPI blurIn/blurOut 动画（见 use:blurTransition action），visibility 锁交互。
+   * 默认态 filter:none，隐藏态 overflow:hidden 避免内容参与父级尺寸计算。 */
   .app-overlay-layer {
     position: absolute;
     inset: 0;
     z-index: 10;
     background: var(--background);
     overflow: auto;
-    visibility: visible;
-    opacity: 1;
-    filter: blur(0px);
-    transition:
-      opacity 0.2s ease,
-      filter 0.2s ease,
-      visibility 0.2s ease;
   }
   .app-overlay-hidden {
     visibility: hidden;
-    opacity: 0;
-    filter: blur(12px);
     pointer-events: none;
     overflow: hidden;
   }

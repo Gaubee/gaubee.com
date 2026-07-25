@@ -1,5 +1,6 @@
+import type { Action } from "svelte/action";
 /**
- * 系统级动画工具（纯 svelte 内置 transition/animate 封装）。
+ * 系统级动画工具（纯 svelte 内置 transition/animate 封装 + WAAPI action）。
  *
  * 统一 prefers-reduced-motion 兜底（尊重用户系统偏好，归零/缩短动画）。
  * 提供常用 transition 工厂，供 AreaOutlet/DesktopView/AreaNav 等系统级动画复用。
@@ -83,3 +84,83 @@ export function motionBlur(
     css: (t: number) => `filter: blur(${(1 - t) * BLUR_PX}px); opacity: ${t};`,
   };
 }
+
+/** WAAPI 动画参数（与启动屏 boot.ts 一致）。 */
+const WAAPI_DURATION = 200;
+const WAAPI_EASE = "cubic-bezier(0.22, 0.61, 0.36, 1)";
+
+/**
+ * blurTransition：常驻 DOM 元素的显隐 WAAPI 动画（blurIn/blurOut + opacity）。
+ *
+ * 监听元素的 hidden class 变化（通过 MutationObserver），class 添加时触发 blurOut，
+ * class 移除时触发 blurIn。动画用 WAAPI（element.animate），默认态 filter:none
+ * （不是 blur(0px)），不创建合成层，不影响子元素 backdrop-filter 绘制。
+ *
+ * 用法（AreaOutlet 的桌面层/应用浮层）：
+ * ```svelte
+ * <div class="desktop-layer" class:desktop-layer-hidden={!visible} use:blurTransition>
+ * ```
+ *
+ * 与 CSS transition 的区别：WAAPI 动画结束后 filter 归 none（无残留合成层），
+ * CSS transition 的 filter:blur(0px) 会持续创建合成层影响子元素绘制。
+ */
+export const blurTransition: Action<HTMLElement, { hiddenClass: string }> = (node, params) => {
+  const hiddenClass = params?.hiddenClass ?? "hidden";
+
+  let currentAnim: Animation | null = null;
+
+  function playBlurIn() {
+    if (prefersReducedMotion()) return;
+    currentAnim?.cancel();
+    currentAnim = node.animate(
+      [
+        { filter: `blur(${BLUR_PX}px)`, opacity: 0 },
+        { filter: "none", opacity: 1 },
+      ],
+      { duration: WAAPI_DURATION, easing: WAAPI_EASE, fill: "forwards" },
+    );
+    currentAnim.onfinish = () => {
+      // 动画结束后清除内联样式，filter 归 none（不残留合成层）
+      node.style.filter = "";
+      node.style.opacity = "";
+    };
+  }
+
+  function playBlurOut() {
+    if (prefersReducedMotion()) return;
+    currentAnim?.cancel();
+    currentAnim = node.animate(
+      [
+        { filter: "none", opacity: 1 },
+        { filter: `blur(${BLUR_PX}px)`, opacity: 0 },
+      ],
+      { duration: WAAPI_DURATION, easing: WAAPI_EASE, fill: "forwards" },
+    );
+  }
+
+  // MutationObserver 监听 class 变化
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type === "attributes" && mutation.attributeName === "class") {
+        const isHidden = node.classList.contains(hiddenClass);
+        if (isHidden) {
+          playBlurOut();
+        } else {
+          playBlurIn();
+        }
+      }
+    }
+  });
+
+  observer.observe(node, { attributes: true, attributeFilter: ["class"] });
+
+  return {
+    update(newParams) {
+      // hiddenClass 不可变（class 名固定），无需处理
+    },
+    destroy() {
+      observer.disconnect();
+      currentAnim?.cancel();
+    },
+  };
+};
