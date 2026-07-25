@@ -608,6 +608,11 @@ export function reduceKernel(state: KernelState, event: KernelEvent): KernelTran
     case "OPEN_APP": {
       // 打开应用：若不在任务栏则加入（按 defaultArea 决定 main/bottom），再聚焦。
       const tabId = event.tabId;
+      // 防御：hiddenFromNav 路径不在 tabRegistry.allTabs，不应走 OPEN_APP
+      // （会污染 mainTabs/bottomTabs 并持久化）。调用方应走 navigateMain（deep link）。
+      if (!tabRegistry.allTabs.includes(tabId)) {
+        return { nextState: state, changed: false, notify: [], persist: "none" };
+      }
       const targetArea: "main" | "bottom" = tabRegistry.defaultBottomTabs.includes(tabId)
         ? "bottom"
         : "main";

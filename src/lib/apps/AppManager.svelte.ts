@@ -428,10 +428,11 @@ class AppManager {
     return {
       ...entry.manifest,
       route: getEntryRoute(entry.manifest),
-      installedAt: 0,
+      // builtin 应用用 0（系统初始化时刻），可安装应用用实际时间
+      installedAt: this.isSystemApp(id) ? 0 : Date.now(),
       builtin: this.isSystemApp(id),
-      // 当前视图由 placeholders.ts 静态注册（非懒加载），无加载状态可追踪。
-      // TODO: 切换到 activity.view 懒加载后，此处追踪加载状态。
+      // loaded 标记视图是否已加载。当前 AreaOutlet 通过 placeholders.ts 注册的
+      // loader 异步加载并缓存，loaded 字段保留供未来按需追踪（当前未消费）。
       loaded: false,
     };
   }

@@ -23,13 +23,11 @@ export function ensureViewsRegistered(): void {
 
   // ===== 系统应用（不可卸载）=====
   // 注意：桌面（/desktop）不经 tab 机制，由 AreaOutlet 作为 shell 级背景层直接渲染。
+  // 注意：hiddenFromNav 应用（search/notifications/account/app-store）不注册 tabView，
+  // 只注册 popView 或 deepLinkView，避免 AreaOutlet 创建永远隐藏的死代码常驻层。
   registerTabView("/app/articles", () => import("$lib/apps/views/ArticlesView.svelte"));
   registerTabView("/app/shout", () => import("$lib/apps/views/ShoutView.svelte"));
-  registerTabView("/app/search", () => import("./SearchView.svelte"));
   registerTabView("/app/settings", () => import("./SettingsView.svelte"));
-  registerTabView("/app/notifications", () => import("$lib/apps/views/NotificationsView.svelte"));
-  // 应用市场（hiddenFromNav，通过设置页/桌面图标进入）
-  registerTabView("/app/store", () => import("$lib/apps/views/AppStoreView.svelte"));
   // 主题应用（自定义 primary 色相 + 桌面背景）
   registerTabView("/app/theme", () => import("$lib/apps/views/ThemeView.svelte"));
 
@@ -42,7 +40,7 @@ export function ensureViewsRegistered(): void {
   // ===== 可选安装 =====
   registerTabView("/app/writer", () => import("$lib/apps/views/WriterView.svelte"));
 
-  // ===== 深链接 views（main 区非 tab 路径）=====
+  // ===== 深链接 views（main 区非 tab 路径，含 hiddenFromNav 应用的 entry route）=====
   // AreaOutlet 渲染深链接视图时统一传入 { pathname }（见 AreaOutlet.svelte）。
   // ArticleView 声明了 pathname props 并实际使用它；其余视图忽略该 prop。
   // 受 Svelte Component 逆变特性限制，此处用 asView 断言宽放
@@ -52,12 +50,14 @@ export function ensureViewsRegistered(): void {
     asView(() => import("$lib/apps/views/ArticleDetailView.svelte")),
   );
   registerDeepLinkView("/tags", () => import("./TagsView.svelte"));
+  // hiddenFromNav 应用的 entry route 走 deep link（不注册 tabView）
   registerDeepLinkView("/app/account", () => import("$lib/apps/views/AccountView.svelte"));
+  registerDeepLinkView("/app/store", () => import("$lib/apps/views/AppStoreView.svelte"));
   // 写作应用场景（编辑器、变更），入口 /app/writer 已注册为 tab view。
   registerDeepLinkView("/app/editor", () => import("./EditorView.svelte"));
   registerDeepLinkView("/app/changes", () => import("./ChangesView.svelte"));
 
-  // ===== pop views =====
+  // ===== pop views（hiddenFromNav pop 应用，只走浮层）=====
   registerPopView("/app/search", () => import("./SearchView.svelte"));
   registerPopView("/app/notifications", () => import("$lib/apps/views/NotificationsView.svelte"));
 }

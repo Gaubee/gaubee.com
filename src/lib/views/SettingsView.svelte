@@ -75,7 +75,7 @@
     <Card.Content class="pt-4">
       <button
         class="hover:bg-accent flex w-full items-center gap-3 rounded-md px-2 py-3 text-left transition-colors"
-        onclick={() => navController.openApp('/app/store')}
+        onclick={() => navController.navigateMain('/app/store')}
       >
         <StoreIcon class="text-muted-foreground size-4" />
         <div class="flex-1">
