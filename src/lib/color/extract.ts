@@ -19,8 +19,13 @@ import { kmeans, type LchPoint } from "./kmeans";
 const SAMPLE_SIZE = 64;
 /** 聚类簇数（略大于输出数，过滤空簇后取 top-N）。 */
 const CLUSTER_K = 8;
-/** 彩度分流阈值：C ≥ 此值归 primary 候选（鲜艳色），C < 此值归 base 候选（中性色）。 */
-const CHROMA_SPLIT = 0.08;
+/**
+ * 彩度分流阈值（= 原 Primary 过滤的 MIN_CHROMA）。
+ * - C ≥ 此值 → primary 候选（保持原 extractHuesFromImage 的过滤范围不变）。
+ * - 0.005 ≤ C < 此值 → base 候选（低彩度中性色）。
+ * - C < 0.005 → 纯灰丢弃（无主色价值）。
+ */
+const CHROMA_SPLIT = 0.05;
 /** 极端亮度过滤：过暗/过亮像素不参与聚类。 */
 const MIN_LIGHTNESS = 0.1;
 const MAX_LIGHTNESS = 0.9;
