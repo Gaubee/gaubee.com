@@ -6,6 +6,9 @@
  */
 import { fade, fly, scale, type TransitionConfig } from "svelte/transition";
 
+/** blur 进场/离场量（与启动屏 blurIn/blurOut 风格一致，filter:blur 配合 opacity）。 */
+const BLUR_PX = 12;
+
 /** 检测用户是否偏好减少动画（SSR 安全）。 */
 export function prefersReducedMotion(): boolean {
   if (typeof window === "undefined" || !window.matchMedia) return false;
@@ -56,4 +59,27 @@ export function motionScale(
 /** flip duration（用于 svelte/animate，列表重排）。 */
 export function flipDuration(ms = 220): { duration: number } {
   return { duration: scaledDuration(ms) };
+}
+
+/**
+ * blur 进场/离场（与启动屏 blurIn/blurOut 风格一致）。
+ * 进场：blur(12px)+opacity0 → blur(0)+opacity1。
+ * 离场：blur(0)+opacity1 → blur(12px)+opacity0。
+ * 用于 deep link 视图等非常驻 DOM 的进场/离场（{#if} 切换场景）。
+ * 常驻 DOM（应用浮层/桌面层）用 CSS transition 实现同效果（见 AreaOutlet）。
+ */
+export function motionBlur(
+  node: Element,
+  params?: { delay?: number; duration?: number },
+): TransitionConfig {
+  const duration = scaledDuration(params?.duration ?? 200);
+  const delay = params?.delay ?? 0;
+  // 用 opacity（fade）+ filter（blur）组合，与启动屏一致
+  const baseFade = fade(node, { delay, duration });
+  return {
+    ...baseFade,
+    duration,
+    delay,
+    css: (t: number) => `filter: blur(${(1 - t) * BLUR_PX}px); opacity: ${t};`,
+  };
 }

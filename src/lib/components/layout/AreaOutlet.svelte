@@ -23,6 +23,7 @@
   import { appManager } from '$lib/apps/AppManager.svelte'
   import { appLoadStore } from '$lib/apps/app-load.svelte'
   import { routeDomainRegistry } from '$lib/apps/route-domain'
+  import { motionBlur } from '$lib/utils/motion'
   import AppShell from '$lib/app-scaffold/AppShell.svelte'
   import DesktopView from '$lib/apps/views/DesktopView.svelte'
   import type { AppManifest } from '$lib/apps/types'
@@ -170,7 +171,9 @@
 {#if area === 'pop'}
   {#if navState.popActive && popView}
     {@const PopView = popView}
-    <PopView />
+    <div in:motionBlur>
+      <PopView />
+    </div>
   {:else if navState.popActive && popLoader}
     <div class="app-skeleton" aria-label="加载中"></div>
   {/if}
@@ -180,13 +183,15 @@
   <div class="h-full overflow-auto">
     {#if deepLinkView}
       {@const DeepView = deepLinkView}
-      {#if shellApp}
-        <AppShell app={shellApp} pathname={location.pathname}>
+      <div in:motionBlur>
+        {#if shellApp}
+          <AppShell app={shellApp} pathname={location.pathname}>
+            <DeepView pathname={location.pathname} />
+          </AppShell>
+        {:else}
           <DeepView pathname={location.pathname} />
-        </AppShell>
-      {:else}
-        <DeepView pathname={location.pathname} />
-      {/if}
+        {/if}
+      </div>
     {:else}
       <div class="app-skeleton h-full" aria-label="加载中"></div>
     {/if}
@@ -234,7 +239,8 @@
     overflow: hidden;
   }
   /* 桌面层：常驻底层背景。无应用浮层时可见可交互；有浮层时隐藏（被遮挡）。
-   * 用 visibility/opacity 过渡（display:none 无法 transition）。 */
+   * 显隐用 blur+opacity 过渡（与启动屏 blurIn/blurOut 风格一致），visibility 锁交互。
+   * display:none 无法 transition，故用 visibility/opacity/filter 组合。 */
   .desktop-layer {
     position: absolute;
     inset: 0;
@@ -242,20 +248,23 @@
     overflow: auto;
     visibility: visible;
     opacity: 1;
+    filter: blur(0px);
     transition:
       opacity 0.18s ease,
+      filter 0.18s ease,
       visibility 0.18s ease;
   }
   .desktop-layer-hidden {
     visibility: hidden;
     opacity: 0;
+    filter: blur(12px);
     pointer-events: none;
     /* 隐藏时不滚动（避免贡献 scrollHeight，虽然被父级 overflow:hidden 裁剪已无害） */
     overflow: hidden;
   }
-  /* 应用浮层：常驻 DOM 保活（visibility/opacity 过渡而非 display:none/销毁），
+  /* 应用浮层：常驻 DOM 保活（blur+opacity 过渡而非 display:none/销毁），
    * 保留组件状态/滚动/编辑器/终端会话。激活时显示并覆盖桌面。
-   * 隐藏态 overflow:hidden 避免内容参与父级尺寸计算（杜绝隐藏浮层撑高 scrollHeight）。 */
+   * 显隐用 blurIn/blurOut（与启动屏风格一致），隐藏态 overflow:hidden 避免内容参与父级尺寸计算。 */
   .app-overlay-layer {
     position: absolute;
     inset: 0;
@@ -264,13 +273,16 @@
     overflow: auto;
     visibility: visible;
     opacity: 1;
+    filter: blur(0px);
     transition:
       opacity 0.2s ease,
+      filter 0.2s ease,
       visibility 0.2s ease;
   }
   .app-overlay-hidden {
     visibility: hidden;
     opacity: 0;
+    filter: blur(12px);
     pointer-events: none;
     overflow: hidden;
   }
