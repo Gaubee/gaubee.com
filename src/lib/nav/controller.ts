@@ -208,6 +208,39 @@ export function setAppRouteResolver(resolver: ((path: string) => TabId | null) |
   appRouteResolver = resolver;
 }
 
+/**
+ * History 适配器：把 URL + state 写入浏览器历史。
+ *
+ * 默认 null → 退化到 window.history.pushState/replaceState（会有 SvelteKit 警告）。
+ * SvelteKit 项目应注入 $app/navigation 的 pushState/replaceState 实现（见
+ * nav-controller-instance.ts），避免与 SvelteKit router 冲突。
+ */
+export type HistoryAction = "PUSH" | "REPLACE";
+export interface HistoryAdapter {
+  push(url: string, state: UrlHistoryState): void;
+  replace(url: string, state: UrlHistoryState): void;
+}
+
+let historyAdapter: HistoryAdapter | null = null;
+
+/** 注入 history 适配器（SvelteKit 项目初始化时调用）。 */
+export function setHistoryAdapter(adapter: HistoryAdapter | null): void {
+  historyAdapter = adapter;
+}
+
+/** 读 history.state（兼容 SvelteKit 包装与原生结构）。 */
+function readHistoryState(): UrlHistoryState | null {
+  const raw = window.history.state as Record<string, unknown> | UrlHistoryState | null;
+  if (!raw) return null;
+  // SvelteKit pushState 把 state 包在 'sveltekit:states' key 里
+  const skState = (raw as Record<string, unknown>)["sveltekit:states"];
+  if (skState && typeof skState === "object") {
+    return skState as UrlHistoryState;
+  }
+  // 原生结构（测试或未注入适配器时）
+  return raw as UrlHistoryState;
+}
+
 // ---------------------------------------------------------------------------
 // 工具函数
 // ---------------------------------------------------------------------------
@@ -397,7 +430,7 @@ export function parseBrowserLocation(
   url.searchParams.delete("_b");
   url.searchParams.delete("_p");
 
-  const historyState = window.history.state as UrlHistoryState | null;
+  const historyState = readHistoryState();
   let main = parseHref(`${url.pathname}${url.search}${url.hash}`, historyState?.main);
   let bottom = parseHref(rawBottomHref ?? "/", historyState?.bottom);
   let pop = parseHref(rawPopHref ?? "/", historyState?.pop);
@@ -1075,7 +1108,12 @@ export class NavController {
     if (
       canonical !== `${window.location.pathname}${window.location.search}${window.location.hash}`
     ) {
-      window.history.replaceState(this.buildHistoryState(), "", canonical);
+      const state = this.buildHistoryState();
+      if (historyAdapter) {
+        historyAdapter.replace(canonical, state);
+      } else {
+        window.history.replaceState(state, "", canonical);
+      }
     }
 
     // 5. 注册 popstate 监听。
@@ -1176,11 +1214,21 @@ export class NavController {
 
   private syncToUrl(action: BrowserAction): void {
     const url = buildCanonicalUrl(this.state);
-    const historyState = this.buildHistoryState();
-    if (action === "PUSH") {
-      window.history.pushState(historyState, "", url);
+    const state = this.buildHistoryState();
+    if (historyAdapter) {
+      // SvelteKit：用 $app/navigation 的 pushState/replaceState（避免与 router 冲突）
+      if (action === "PUSH") {
+        historyAdapter.push(url, state);
+      } else {
+        historyAdapter.replace(url, state);
+      }
     } else {
-      window.history.replaceState(historyState, "", url);
+      // fallback：原生 history API（测试或未注入适配器）
+      if (action === "PUSH") {
+        window.history.pushState(state, "", url);
+      } else {
+        window.history.replaceState(state, "", url);
+      }
     }
   }
 

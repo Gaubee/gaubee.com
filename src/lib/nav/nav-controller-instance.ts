@@ -5,9 +5,16 @@
  * 不触发 `$app/environment` 与 window 副作用）。
  */
 import { browser } from "$app/environment";
+import { pushState, replaceState } from "$app/navigation";
 import { routeDomainRegistry } from "$lib/apps/route-domain";
 
-import { NavController, setAppRouteResolver, setTabRegistry, type TabRegistry } from "./controller";
+import {
+  NavController,
+  setAppRouteResolver,
+  setHistoryAdapter,
+  setTabRegistry,
+  type TabRegistry,
+} from "./controller";
 
 export const navController = new NavController();
 
@@ -18,6 +25,12 @@ export function initNavController(registry: TabRegistry): void {
   // path → entry route（Dock tabId），由 route-domain 表提供（含应用完整领地）。
   // controller.ts 是纯逻辑不能 import route-domain，故由本桥接层注入闭包。
   setAppRouteResolver((path) => routeDomainRegistry.entryRouteForPath(path));
+  // 注入 SvelteKit history 适配器：用 $app/navigation 的 pushState/replaceState
+  // 替代 window.history.*，避免与 SvelteKit router 冲突（消除 pushState 警告）。
+  setHistoryAdapter({
+    push: (url, state) => pushState(url, state),
+    replace: (url, state) => replaceState(url, state),
+  });
   if (browser) {
     navController.init();
   }
