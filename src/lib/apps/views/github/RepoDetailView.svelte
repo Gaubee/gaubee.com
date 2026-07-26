@@ -466,9 +466,11 @@
 
       <!-- 文件 + README -->
       <Tabs.Content value="files" class="p-4">
-        <div class="grid min-h-[60vh] min-w-0 gap-4 md:grid-cols-[minmax(200px,280px)_1fr]">
+        <!-- 双栏 grid：固定高度 h-[60vh]，两个子栏各自 overflow-auto 独立滚动。
+             min-w-0 防内容撑开 grid 列宽。 -->
+        <div class="grid h-[60vh] min-w-0 gap-4 md:grid-cols-[minmax(200px,280px)_1fr]">
           <!-- 文件树（左，独立滚动）-->
-          <div class="border-border max-h-[60vh] min-w-0 overflow-auto rounded border p-2 text-sm">
+          <div class="border-border min-h-0 min-w-0 overflow-auto rounded border p-2 text-sm">
             <RepoFileTree
               dir=""
               label="根目录"
@@ -484,7 +486,7 @@
           {#if selectedFile}
             <RepoFileContent path={selectedFile} {owner} {repo} />
           {:else}
-            <div class="border-border text-muted-foreground flex min-w-0 items-center justify-center rounded border py-8 text-sm">
+            <div class="border-border text-muted-foreground flex min-h-0 min-w-0 items-center justify-center rounded border py-8 text-sm">
               选择左侧文件查看内容
             </div>
           {/if}

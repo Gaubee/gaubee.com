@@ -75,7 +75,7 @@
   }
 </script>
 
-<div class="border-border flex min-h-0 min-w-0 flex-1 flex-col rounded border">
+<div class="border-border flex h-full min-h-0 min-w-0 flex-col rounded border">
   <!-- 工具栏：文件路径 + Raw|Preview toggle -->
   <div class="border-border flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
     <FileTextIcon class="text-muted-foreground size-3.5 shrink-0" />
