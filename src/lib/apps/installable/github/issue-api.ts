@@ -226,6 +226,27 @@ export async function getIssue(owner: string, repo: string, number: number): Pro
   return toIssueDetail(data);
 }
 
+/**
+ * 更新 issue（如关闭/重新打开/修改标题）。
+ * PATCH /repos/{owner}/{repo}/issues/{number}
+ * @param fields 要更新的字段（state: open|closed, title, body, labels 等）
+ */
+export async function updateIssue(
+  owner: string,
+  repo: string,
+  number: number,
+  fields: { state?: "open" | "closed"; title?: string; body?: string; state_reason?: string },
+): Promise<IssueDetail> {
+  const resp = await fetchGithub(`repos/${owner}/${repo}/issues/${number}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
+  });
+  await assertOk(resp, `updateIssue(${owner}/${repo}#${number})`);
+  const data = (await resp.json()) as GhIssueResponse;
+  return toIssueDetail(data);
+}
+
 // =========================================================================
 // 评论 CRUD（新增）
 // =========================================================================

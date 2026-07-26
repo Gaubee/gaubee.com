@@ -421,15 +421,17 @@
     background: var(--muted);
     backdrop-filter: blur(0);
     left: 0%;
+    border-radius: 0;
   }
   100% {
     /* 毛玻璃：半透明背景 + backdrop-blur（遵循 AGENTS.md 毛玻璃标准搭配） */
     background: color-mix(in oklch, var(--background) 60%, transparent);
     backdrop-filter: blur(12px) contrast(2) brightness(0.8);
-    top: 10px;
-    width: 50%;
-    left: 25%;
+    top: 1rem;
+    width: 16rem;
+    left: calc(50% - 8rem);
     box-shadow: 0 3px 12px -6px currentColor;
+    border-radius: 9999px;
   }
 }
 :global(.dark) .repo-tabs {
@@ -465,6 +467,7 @@
   100% {
     opacity: 0;
     max-width: 0;
+    margin-right: -6px;
   }
 }
 

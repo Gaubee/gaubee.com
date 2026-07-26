@@ -28,6 +28,8 @@
   import ImageIcon from '@lucide/svelte/icons/image'
   import CodeIcon from '@lucide/svelte/icons/code'
   import ListIcon from '@lucide/svelte/icons/list'
+  import ListChecksIcon from '@lucide/svelte/icons/list-checks'
+  import HeadingIcon from '@lucide/svelte/icons/heading'
   import QuoteIcon from '@lucide/svelte/icons/quote'
   import AtSignIcon from '@lucide/svelte/icons/at-sign'
   import LoaderIcon from '@lucide/svelte/icons/loader-circle'
@@ -46,6 +48,8 @@
     submitLabel = '评论',
     onSubmit,
     onCancel,
+    issueState,
+    onToggleIssue,
   }: {
     owner: string
     repo: string
@@ -56,6 +60,10 @@
     submitLabel?: string
     onSubmit: (body: string) => Promise<void>
     onCancel?: () => void
+    /** 当前 issue 状态（'open' | 'closed'），用于显示 Close/Reopen 按钮。 */
+    issueState?: 'open' | 'closed'
+    /** 切换 issue 状态（Close/Reopen）回调。 */
+    onToggleIssue?: () => Promise<void>
   } = $props()
 
   /** 当前 tab：write | preview。 */
@@ -83,6 +91,18 @@
 
   /** 提交按钮是否禁用：内容为空或正在提交。 */
   const canSubmit = $derived(body.trim().length > 0 && !submitting && !uploading)
+  /** 是否正在切换 issue 状态。 */
+  let togglingIssue = $state(false)
+
+  async function handleToggleIssue() {
+    if (!onToggleIssue || togglingIssue) return
+    togglingIssue = true
+    try {
+      await onToggleIssue()
+    } finally {
+      togglingIssue = false
+    }
+  }
 
   /** 草稿自动保存 timer（debounce 1s）。 */
   let draftTimer: ReturnType<typeof setTimeout> | null = null
@@ -172,6 +192,12 @@
   }
   function insertList() {
     insertSyntax('- 列表项')
+  }
+  function insertTaskList() {
+    insertSyntax('- [ ] 待办项')
+  }
+  function insertHeading() {
+    insertSyntax('## 标题')
   }
   function insertQuote() {
     insertSyntax('> 引用')
@@ -352,6 +378,24 @@
       <button
         type="button"
         class="hover:bg-muted text-muted-foreground hover:text-foreground rounded-md p-1.5 transition-colors"
+        title="任务列表"
+        aria-label="任务列表"
+        onclick={insertTaskList}
+      >
+        <ListChecksIcon class="size-4" />
+      </button>
+      <button
+        type="button"
+        class="hover:bg-muted text-muted-foreground hover:text-foreground rounded-md p-1.5 transition-colors"
+        title="标题"
+        aria-label="标题"
+        onclick={insertHeading}
+      >
+        <HeadingIcon class="size-4" />
+      </button>
+      <button
+        type="button"
+        class="hover:bg-muted text-muted-foreground hover:text-foreground rounded-md p-1.5 transition-colors"
         title="引用"
         aria-label="引用"
         onclick={insertQuote}
@@ -372,7 +416,7 @@
 
     <!-- 编辑器区域（容器绑 paste/drop 事件，捕获图片粘贴/拖拽上传） -->
     <div
-      class="min-h-32"
+      class="min-h-24"
       onpaste={handlePaste}
       ondrop={handleDrop}
       role="region"
@@ -390,7 +434,7 @@
     </div>
   {:else}
     <!-- Preview 模式 -->
-    <div class="min-h-32 p-4">
+    <div class="min-h-24 p-4">
       {#if body.trim().length === 0}
         <p class="text-muted-foreground text-sm">{placeholder}</p>
       {:else}
@@ -400,28 +444,45 @@
   {/if}
 
   <!-- 底部操作栏 -->
-  <div class="flex items-center justify-end gap-2 border-t border-border px-3 py-2">
-    {#if onCancel}
-      <Button variant="ghost" size="sm" onclick={handleCancel} disabled={submitting}>
-        <XIcon class="size-3.5" />
-        取消
+  <div class="flex items-center gap-2 border-t border-border px-3 py-2">
+    <!-- Close/Reopen issue 按钮（仅新评论模式且有 issueState 时显示）-->
+    {#if issueState && onToggleIssue && !commentId}
+      <Button
+        variant="outline"
+        size="sm"
+        onclick={handleToggleIssue}
+        disabled={togglingIssue || submitting}
+      >
+        {#if togglingIssue}
+          <LoaderIcon class="size-3.5 animate-spin" />
+        {/if}
+        {issueState === 'open' ? 'Close issue' : 'Reopen issue'}
       </Button>
     {/if}
-    <Button size="sm" onclick={handleSubmit} disabled={!canSubmit}>
-      {#if submitting}
-        <LoaderIcon class="size-3.5 animate-spin" />
-        提交中...
-      {:else}
-        <SendIcon class="size-3.5" />
-        {submitLabel}
+
+    <div class="ml-auto flex items-center gap-2">
+      {#if onCancel}
+        <Button variant="ghost" size="sm" onclick={handleCancel} disabled={submitting}>
+          <XIcon class="size-3.5" />
+          取消
+        </Button>
       {/if}
-    </Button>
+      <Button size="sm" onclick={handleSubmit} disabled={!canSubmit}>
+        {#if submitting}
+          <LoaderIcon class="size-3.5 animate-spin" />
+          提交中...
+        {:else}
+          <SendIcon class="size-3.5" />
+          {submitLabel}
+        {/if}
+      </Button>
+    </div>
   </div>
 </div>
 
 <style>
   /* 让 CodeMirror 占满编辑区域高度（与 EditorView 风格一致的最小高度） */
   :global(.codemirror-host) {
-    min-height: 8rem;
+    min-height: 5rem;
   }
 </style>

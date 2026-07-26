@@ -29,6 +29,7 @@ vi.mock("$lib/apps/installable/github/issue-api", () => ({
   listIssues: vi.fn().mockResolvedValue([]),
   searchIssues: vi.fn().mockResolvedValue({ total: 0, items: [] }),
   getIssue: vi.fn().mockResolvedValue(null),
+  updateIssue: vi.fn().mockResolvedValue(null),
   listIssueComments: vi.fn().mockResolvedValue([]),
   createIssueComment: vi.fn().mockResolvedValue({}),
   updateIssueComment: vi.fn().mockResolvedValue({}),

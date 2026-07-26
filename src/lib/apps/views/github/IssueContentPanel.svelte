@@ -13,6 +13,7 @@
     type IssueComment,
     type Reactions,
   } from '$lib/apps/installable/github/issue-api'
+  import { updateIssue } from '$lib/apps/installable/github/issue-api'
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
   import IssueCommentItem from './IssueCommentItem.svelte'
   import CommentEditor from './CommentEditor.svelte'
@@ -22,6 +23,7 @@
   import { Badge } from '$lib/components/ui/badge'
   import BugIcon from '@lucide/svelte/icons/bug'
   import MessageCircleIcon from '@lucide/svelte/icons/message-circle'
+  import ExternalLinkIcon from '@lucide/svelte/icons/external-link'
 
   let {
     issueNumber,
@@ -142,6 +144,17 @@
     comments = [...comments, created]
   }
 
+  /** 切换 issue 状态（Close/Reopen） */
+  async function handleToggleIssue() {
+    if (!issue) return
+    const newState = issue.state === 'open' ? 'closed' : 'open'
+    const updated = await updateIssue(owner, repo, issueNumber, {
+      state: newState,
+      state_reason: newState === 'closed' ? 'completed' : 'reopened',
+    })
+    issue = updated
+  }
+
   // reactions 类型守卫辅助（仅用于模板类型收窄）
   function reactionOf(r: Reactions | undefined, key: keyof typeof reactionFields): number {
     return r ? (r[key] ?? 0) : 0
@@ -174,9 +187,19 @@
         >
           {issue.state === 'open' ? '开启' : '关闭'}
         </Badge>
+        <!-- GitHub 外链 -->
+        <a
+          href={issue.html_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-muted-foreground hover:text-foreground shrink-0"
+          aria-label="在 GitHub 查看"
+        >
+          <ExternalLinkIcon class="size-3.5" />
+        </a>
       </div>
 
-      <!-- 作者 + 创建时间 + 评论数 -->
+      <!-- 作者 + 时间 + 评论数 + state_reason -->
       <div class="text-muted-foreground mb-2 flex flex-wrap items-center gap-2 text-xs">
         <img
           src={issue.user.avatar_url}
@@ -184,12 +207,16 @@
           class="size-4 rounded-full"
           loading="lazy"
         />
-        <span>{issue.user.login}</span>
-        <span>· 创建于 {new Date(issue.created_at).toLocaleDateString('zh-CN')}</span>
+        <span class="font-medium text-foreground">{issue.user.login}</span>
+        <span>· {new Date(issue.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })} 创建</span>
+        <span>· {new Date(issue.updated_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })} 更新</span>
         <span class="inline-flex items-center gap-0.5">
           <MessageCircleIcon class="size-3" />
           {issue.comments} 评论
         </span>
+        {#if issue.state_reason && issue.state === 'closed'}
+          <span>· {issue.state_reason === 'completed' ? '已完成' : issue.state_reason === 'not_planned' ? '未计划' : issue.state_reason === 'duplicate' ? '重复' : issue.state_reason}</span>
+        {/if}
       </div>
 
       <!-- 标签 -->
@@ -279,6 +306,8 @@
         placeholder="写下你的评论…"
         submitLabel="评论"
         onSubmit={handleCreateComment}
+        issueState={issue?.state}
+        onToggleIssue={handleToggleIssue}
       />
     {:else}
       <p class="text-muted-foreground text-center text-xs">登录后评论</p>

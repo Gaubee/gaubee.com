@@ -661,7 +661,7 @@
             {:else}
               {#each issues as it (it.id)}
                 <button
-                  class="hover:bg-accent flex items-start gap-2 rounded-md p-2 text-left transition-colors {selectedIssue === it.number ? 'bg-accent' : ''}"
+                  class="hover:bg-accent flex w-full items-start gap-2 rounded-md p-2 text-left transition-colors {selectedIssue === it.number ? 'bg-accent' : ''}"
                   onclick={() => openIssue(it.number)}
                 >
                   <div class="min-w-0 flex-1">
