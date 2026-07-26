@@ -12,7 +12,7 @@
 	列表状态（滚动位置/展开）天然保活（display 切换不卸载组件实例）。
 -->
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
   import { accountService } from '$lib/apps/builtin/account/service'
   import { repoFavorites } from '$lib/apps/installable/github/favorites.svelte'
@@ -39,6 +39,7 @@
   import BuildingIcon from '@lucide/svelte/icons/building-2'
   import ChevronRightIcon from '@lucide/svelte/icons/chevron-right'
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left'
+  import LoaderIcon from '@lucide/svelte/icons/loader-circle'
   import ChevronDownIcon from '@lucide/svelte/icons/chevron-down'
 
   // ---- props ----
@@ -55,6 +56,20 @@
   let filterError = $state<string | null>(null)
   /** 分页列表"加载更多"中。 */
   let filterLoadingMore = $state(false)
+  /** 分页列表本地搜索词（客户端过滤已加载的 repos）。 */
+  let filterSearchInput = $state('')
+  /** 分页列表本地过滤后的 repos（按名称/描述模糊匹配）。 */
+  const filteredRepos = $derived(
+    filterCache && filterSearchInput.trim()
+      ? filterCache.repos.filter((r) => {
+          const q = filterSearchInput.toLowerCase()
+          return (
+            r.full_name.toLowerCase().includes(q) ||
+            (r.description?.toLowerCase().includes(q) ?? false)
+          )
+        })
+      : filterCache?.repos ?? [],
+  )
 
   // ---- 账户状态 ----
   const accountState = $derived(accountService.state)
@@ -83,9 +98,10 @@
 
   const PREVIEW_COUNT = 3
 
-  // listFilter 变化时加载分页列表（缓存命中则跳过，除非刷新）
+  // listFilter 变化时加载分页列表（缓存命中则跳过）+ 重置本地搜索词
   $effect(() => {
     const f = listFilter
+    filterSearchInput = ''
     if (f && !listCache.filters[f]) {
       void loadFilterList(true)
     }
@@ -100,6 +116,10 @@
       // 首页：缓存命中直接用，过期或无缓存才刷新
       if (listCache.homeStale()) void loadMyData()
     }
+  })
+
+  onDestroy(() => {
+    if (searchTimer) clearTimeout(searchTimer)
   })
 
   /**
@@ -269,6 +289,20 @@
     listCache.homeInFlight = false
   }
 
+  /** 搜索 debounce timer（300ms，实时搜索）。 */
+  let searchTimer: ReturnType<typeof setTimeout> | null = null
+  /** 搜索请求序号（竞态防护：只应用最新一次结果）。 */
+  let searchSeq = 0
+
+  /** 实时搜索：输入时 debounce 300ms 自动触发。 */
+  function scheduleSearch() {
+    if (searchTimer) clearTimeout(searchTimer)
+    searchTimer = setTimeout(() => {
+      searchTimer = null
+      void handleSearch()
+    }, 300)
+  }
+
   async function handleSearch() {
     const q = searchInput.trim()
     if (!q) {
@@ -276,20 +310,22 @@
       searchTotal = 0
       return
     }
+    const mySeq = ++searchSeq
     searchLoading = true
     searchError = null
     try {
-      // 登录时默认限定到当前用户的仓库，否则全局搜索
-      const query = login ? `${q} user:${login}` : q
-      const { items, total } = await searchRepos(query, { perPage: 30 })
+      // 全局搜索 GitHub 仓库（不限定 user，覆盖 orgs + 全站）
+      const { items, total } = await searchRepos(q, { perPage: 30 })
+      if (mySeq !== searchSeq) return // 竞态：已有更新的搜索请求
       searchResults = items
       searchTotal = total
     } catch (e) {
+      if (mySeq !== searchSeq) return
       searchError = e instanceof Error ? e.message : '搜索失败'
       searchResults = []
       searchTotal = 0
     } finally {
-      searchLoading = false
+      if (mySeq === searchSeq) searchLoading = false
     }
   }
 
@@ -351,15 +387,28 @@
         <Badge variant="secondary" class="text-xs">{filterCache.total}</Badge>
       {/if}
     </div>
+    {#if filterCache}
+      <!-- 分页列表本地搜索（客户端过滤已加载 repos，实时无 debounce）-->
+      <div class="relative">
+        <SearchIcon class="text-muted-foreground absolute left-2.5 top-1/2 size-4 -translate-y-1/2" />
+        <Input
+          bind:value={filterSearchInput}
+          placeholder="过滤已加载的仓库…"
+          class="h-9 pl-8 text-sm"
+        />
+      </div>
+    {/if}
     {#if filterLoading && !filterCache}
       {#each Array(6) as _}<Skeleton class="h-16" />{/each}
     {:else if filterError && !filterCache}
       <p class="text-destructive text-sm">{filterError}</p>
-    {:else if (filterCache?.repos ?? []).length === 0}
-      <p class="text-muted-foreground py-4 text-center text-sm">暂无仓库</p>
+    {:else if filteredRepos.length === 0 && filterCache}
+      <p class="text-muted-foreground py-4 text-center text-sm">
+        {filterSearchInput.trim() ? '无匹配仓库' : '暂无仓库'}
+      </p>
     {:else if filterCache}
-      {@render repoGrid(filterCache.repos)}
-      {#if filterCache.hasMore}
+      {@render repoGrid(filteredRepos)}
+      {#if filterCache.hasMore && !filterSearchInput.trim()}
         <button
           class="hover:bg-accent flex w-full items-center justify-center gap-1.5 rounded-md py-2 text-xs"
           onclick={() => loadFilterList(false)}
@@ -368,37 +417,27 @@
           <ChevronDownIcon class="size-3.5 {filterLoadingMore ? 'animate-bounce' : ''}" />
           {filterLoadingMore ? '加载中…' : '加载更多'}
         </button>
-      {:else if filterCache.repos.length > 10}
+      {:else if filterCache.repos.length > 10 && !filterSearchInput.trim()}
         <p class="text-muted-foreground py-2 text-center text-xs">已加载全部 {filterCache.repos.length} 个</p>
       {/if}
     {/if}
   {:else}
-  <!-- 标题 + 搜索 -->
+  <!-- 标题 + 搜索（实时搜索，debounce 300ms）-->
   <div class="flex flex-wrap items-center gap-3">
     <GitHubMark class="size-6" />
     <h1 class="text-2xl font-semibold">Github</h1>
-    <form
-      class="ml-auto flex w-full max-w-sm items-center gap-1.5"
-      onsubmit={(e) => {
-        e.preventDefault()
-        void handleSearch()
-      }}
-    >
-      <div class="relative flex-1">
-        <SearchIcon class="text-muted-foreground absolute left-2.5 top-1/2 size-4 -translate-y-1/2" />
-        <Input
-          bind:value={searchInput}
-          placeholder={login ? `搜索 ${login} 的仓库` : '搜索仓库'}
-          class="pl-8"
-          onkeydown={(e) => {
-            if (e.key === 'Enter') void handleSearch()
-          }}
-        />
-      </div>
-      <Button type="submit" size="sm" disabled={searchLoading}>
-        {searchLoading ? '搜索中…' : '搜索'}
-      </Button>
-    </form>
+    <div class="relative ml-auto w-full max-w-sm">
+      <SearchIcon class="text-muted-foreground absolute left-2.5 top-1/2 size-4 -translate-y-1/2" />
+      <Input
+        bind:value={searchInput}
+        placeholder="搜索仓库（支持 org/user 关键词）"
+        class="pl-8"
+        oninput={scheduleSearch}
+      />
+      {#if searchLoading}
+        <LoaderIcon class="text-muted-foreground absolute right-2.5 top-1/2 size-4 -translate-y-1/2 animate-spin" />
+      {/if}
+    </div>
   </div>
 
   <!-- 搜索结果（优先展示）-->
