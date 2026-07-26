@@ -463,15 +463,15 @@
     {/if}
   {/if}
 
-  <!-- Tab 区 -->
-  <div class="min-h-0 flex-1 overflow-auto">
+  <!-- Tab 区。滚动容器命名 scroll-timeline，供 .repo-tabs 的 scroll-driven 动画引用。 -->
+  <div class="repo-tab-scroll min-h-0 flex-1 overflow-auto">
     <Tabs.Root value="files" class="w-full">
-      <Tabs.List class="grid w-full grid-cols-5">
-        <Tabs.Trigger value="files" class="gap-1.5"><FolderIcon class="size-4" />文件</Tabs.Trigger>
-        <Tabs.Trigger value="history" class="gap-1.5"><HistoryIcon class="size-4" />历史</Tabs.Trigger>
-        <Tabs.Trigger value="changes" class="gap-1.5"><FilePenIcon class="size-4" />变更</Tabs.Trigger>
-        <Tabs.Trigger value="issues" class="gap-1.5"><BugIcon class="size-4" />Issues</Tabs.Trigger>
-        <Tabs.Trigger value="log" class="gap-1.5"><ScrollTextIcon class="size-4" />日志</Tabs.Trigger>
+      <Tabs.List class="repo-tabs grid w-full grid-cols-5">
+        <Tabs.Trigger value="files" class="gap-1.5"><FolderIcon class="size-4" /><span class="tab-label">文件</span></Tabs.Trigger>
+        <Tabs.Trigger value="history" class="gap-1.5"><HistoryIcon class="size-4" /><span class="tab-label">历史</span></Tabs.Trigger>
+        <Tabs.Trigger value="changes" class="gap-1.5"><FilePenIcon class="size-4" /><span class="tab-label">变更</span></Tabs.Trigger>
+        <Tabs.Trigger value="issues" class="gap-1.5"><BugIcon class="size-4" /><span class="tab-label">Issues</span></Tabs.Trigger>
+        <Tabs.Trigger value="log" class="gap-1.5"><ScrollTextIcon class="size-4" /><span class="tab-label">日志</span></Tabs.Trigger>
       </Tabs.List>
 
       <!-- 文件 + README -->

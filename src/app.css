@@ -378,3 +378,95 @@
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
+
+/* -------------------------------------------------------------------------
+ * GithubApp 仓库详情页 sticky tabs（scroll-driven 渐变收起）
+ *
+ * 三态行为（由 scroll-driven animation 驱动）：
+ * - 顶部（未滚动）：tabs 全展开（icon + 文字），bg-muted 实色背景
+ * - 滚动中：背景变半透明 + backdrop-blur（毛玻璃），文字标签逐渐收起
+ * - 滚动深处：icon-only tabs，最小化对内容区的视觉占用
+ *
+ * 实现：滚动容器（.repo-tab-scroll）声明命名 scroll-timeline，
+ * .repo-tabs 和 .tab-label 用 animation-timeline: var(--repo-tab-scroll) 引用。
+ * 用 timeline-scope 让 .repo-tabs（在滚动容器内）能访问该 timeline。
+ *
+ * 浏览器支持：Chrome/Edge 115+。不支持者降级为普通 sticky tabs（@supports 守卫）。
+ * ------------------------------------------------------------------------- */
+
+/* 滚动容器：声明命名 scroll-timeline */
+.repo-tab-scroll {
+  scroll-timeline-name: --repo-tab-scroll;
+  /* timeline-scope 让后代（.repo-tabs）能引用此 timeline */
+  timeline-scope: --repo-tab-scroll;
+}
+
+.repo-tabs {
+  /* 移除 shadcn 默认的 h-9 限制，让 Trigger 自然撑开 */
+  height: auto !important;
+  /* sticky 定位：滚动时固定在滚动容器顶部 */
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--muted);
+  backdrop-filter: blur(0);
+  /* scroll-driven 动画：引用滚动容器的命名 timeline */
+  animation: repo-tabs-scroll linear forwards;
+  animation-timeline: --repo-tab-scroll;
+  animation-range: 0 120px;
+}
+
+@keyframes repo-tabs-scroll {
+  0% {
+    background: var(--muted);
+    backdrop-filter: blur(0);
+  }
+  100% {
+    /* 毛玻璃：半透明背景 + backdrop-blur（遵循 AGENTS.md 毛玻璃标准搭配） */
+    background: color-mix(in oklch, var(--background) 70%, transparent);
+    backdrop-filter: blur(12px) contrast(2) brightness(0.8);
+  }
+}
+:global(.dark) .repo-tabs {
+  animation-name: repo-tabs-scroll-dark;
+}
+@keyframes repo-tabs-scroll-dark {
+  0% {
+    background: var(--muted);
+    backdrop-filter: blur(0);
+  }
+  100% {
+    background: color-mix(in oklch, var(--background) 70%, transparent);
+    backdrop-filter: blur(12px) contrast(0.8) brightness(1.2);
+  }
+}
+
+/* tab 文字标签：scroll-driven 收起（opacity + max-width 渐变） */
+.repo-tabs .tab-label {
+  display: inline-block;
+  max-width: 4em;
+  opacity: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  animation: repo-tab-label-scroll linear forwards;
+  animation-timeline: --repo-tab-scroll;
+  animation-range: 0 120px;
+}
+@keyframes repo-tab-label-scroll {
+  0% {
+    opacity: 1;
+    max-width: 4em;
+  }
+  100% {
+    opacity: 0;
+    max-width: 0;
+  }
+}
+
+/* 不支持 animation-timeline 的浏览器：保持默认展开态 */
+@supports not (animation-timeline: --repo-tab-scroll) {
+  .repo-tabs,
+  .repo-tabs .tab-label {
+    animation: none;
+  }
+}
