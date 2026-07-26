@@ -188,6 +188,12 @@
     }
   })
 
+  /**
+   * 加载聚合首页数据（增量渲染：谁先回来谁先写缓存，触发渐进式显示）。
+   * - myRepos 先回 → 先写 home（orgs 空），用户立即看到个人仓库
+   * - orgs 列表回 → 更新 home（补 org 标题，org 仓库还空）
+   * - 每个 org 的仓库回 → 增量更新 home.orgRepos（逐个 org 出现仓库卡片）
+   */
   async function loadMyData() {
     if (!login) return
     if (listCache.homeInFlight) return
@@ -195,57 +201,72 @@
     myReposLoading = true
     myReposError = null
     orgsLoading = true
-    try {
-      const PER_PAGE = 30
-      // 用 allSettled 隔离失败：orgs 加载失败不拖垮个人仓库展示（反之亦然）
-      const [reposResult, orgsResult] = await Promise.allSettled([
-        listUserRepos({ perPage: PER_PAGE }),
-        listUserOrgs(),
-      ])
+    const PER_PAGE = 30
 
-      let newMyRepos: RepoSummary[] = []
-      let myReposTotal = 0
-      if (reposResult.status === 'fulfilled') {
-        newMyRepos = reposResult.value.repos
-        // total 是 GitHub Link 头推算的下界；无 Link 头时用当前页数量
-        myReposTotal = reposResult.value.total || newMyRepos.length
-      } else {
-        myReposError = reposResult.reason instanceof Error ? reposResult.reason.message : '加载仓库列表失败'
-      }
-
-      let newOrgs: OrgSummary[] = []
-      let newOrgRepos: Record<string, RepoSummary[]> = {}
-      let newOrgReposTotal: Record<string, number> = {}
-      if (orgsResult.status === 'fulfilled') {
-        newOrgs = orgsResult.value
-        const entries = await Promise.all(
-          orgsResult.value.map(async (org): Promise<[string, RepoSummary[], number]> => {
-            const page = await listOrgRepos(org.login, { perPage: PER_PAGE }).catch(() => null)
-            const repos = page?.repos ?? []
-            const total = page?.total || repos.length
-            return [org.login, repos, total]
-          }),
-        )
-        for (const [login, repos, total] of entries) {
-          newOrgRepos[login] = repos
-          newOrgReposTotal[login] = total
-        }
-      }
-
-      // 写入缓存（响应式，触发组件重渲染）
-      listCache.home = {
-        myRepos: newMyRepos,
-        myReposTotal,
-        orgs: newOrgs,
-        orgRepos: newOrgRepos,
-        orgReposTotal: newOrgReposTotal,
-        loadedAt: Date.now(),
-      }
-    } finally {
-      listCache.homeInFlight = false
-      myReposLoading = false
-      orgsLoading = false
+    // 初始化空 home（已有则保留，渐进填充）
+    const base = listCache.home ?? {
+      myRepos: [],
+      myReposTotal: 0,
+      orgs: [],
+      orgRepos: {},
+      orgReposTotal: {},
+      loadedAt: Date.now(),
     }
+
+    // myRepos 与 orgs 列表并发，各自完成后立即写缓存（增量渲染）。
+    // 注意：每次写入都要读当时的 listCache.home（而非函数开头的 base），
+    // 避免并发完成顺序不同导致互相覆盖（如 repos 后完成时用旧 base 清掉 orgs）。
+    const reposPromise = listUserRepos({ perPage: PER_PAGE })
+      .then((page) => {
+        const cur = listCache.home ?? base
+        listCache.home = {
+          ...cur,
+          myRepos: page.repos,
+          myReposTotal: page.total || page.repos.length,
+          loadedAt: Date.now(),
+        }
+      })
+      .catch((e) => {
+        myReposError = e instanceof Error ? e.message : '加载仓库列表失败'
+      })
+      .finally(() => {
+        myReposLoading = false
+      })
+
+    const orgsPromise = listUserOrgs()
+      .then(async (userOrgs) => {
+        // org 列表回来，先写 home（org 仓库还空，但标题出来了）
+        const current = listCache.home ?? base
+        listCache.home = {
+          ...current,
+          orgs: userOrgs,
+          loadedAt: Date.now(),
+        }
+        orgsLoading = false
+        // 并发拉每个 org 的仓库，每个回来就增量更新（独立 catch）
+        for (const org of userOrgs) {
+          listOrgRepos(org.login, { perPage: PER_PAGE })
+            .then((page) => {
+              const cur = listCache.home
+              if (!cur) return
+              listCache.home = {
+                ...cur,
+                orgRepos: { ...cur.orgRepos, [org.login]: page.repos },
+                orgReposTotal: { ...cur.orgReposTotal, [org.login]: page.total || page.repos.length },
+                loadedAt: Date.now(),
+              }
+            })
+            .catch(() => {
+              // 单个 org 仓库加载失败静默（保留标题，仓库为空）
+            })
+        }
+      })
+      .catch(() => {
+        orgsLoading = false
+      })
+
+    await Promise.allSettled([reposPromise, orgsPromise])
+    listCache.homeInFlight = false
   }
 
   async function handleSearch() {
@@ -414,10 +435,11 @@
         <Badge variant="secondary" class="text-xs">{favorites.length}</Badge>
         {#if favoriteRepos.length > PREVIEW_COUNT}
           <button
-            class="text-primary hover:bg-accent ml-auto rounded-md px-2 py-0.5 text-xs"
+            class="text-primary hover:bg-accent ml-auto flex items-center gap-0.5 rounded-md px-2 py-0.5 text-xs"
             onclick={() => navController.navigateMain('/app/github/list/favorites')}
           >
-            查看全部 {favoriteRepos.length} 个 →
+            查看全部 {favoriteRepos.length} 个
+            <ChevronRightIcon class="size-3" />
           </button>
         {/if}
       </div>
@@ -441,10 +463,11 @@
           <Badge variant="secondary" class="text-xs">{myReposTotal}</Badge>
           {#if myReposTotal > PREVIEW_COUNT}
             <button
-              class="text-primary hover:bg-accent ml-auto rounded-md px-2 py-0.5 text-xs"
+              class="text-primary hover:bg-accent ml-auto flex items-center gap-0.5 rounded-md px-2 py-0.5 text-xs"
               onclick={() => navController.navigateMain(`/app/github/list/user:${login}`)}
             >
-              查看全部 {myReposTotal} 个 →
+              查看全部 {myReposTotal} 个
+              <ChevronRightIcon class="size-3" />
             </button>
           {/if}
         </div>
@@ -477,10 +500,11 @@
               <Badge variant="secondary" class="text-xs">{total}</Badge>
               {#if total > PREVIEW_COUNT}
                 <button
-                  class="text-primary hover:bg-accent ml-auto rounded-md px-2 py-0.5 text-xs"
+                  class="text-primary hover:bg-accent ml-auto flex items-center gap-0.5 rounded-md px-2 py-0.5 text-xs"
                   onclick={() => navController.navigateMain(`/app/github/list/org:${org.login}`)}
                 >
-                  查看全部 {total} 个 →
+                  查看全部 {total} 个
+                  <ChevronRightIcon class="size-3" />
                 </button>
               {/if}
             </div>
