@@ -1,14 +1,15 @@
 import { fetchGithub } from "$lib/auth/session.svelte";
 import GitHost, { type GitHostInstance } from "hosted-git-info";
 /**
- * README 拉取 + 渲染（带相对路径重写）。
+ * 仓库 Markdown 渲染 + 媒体 raw URL 生成（hosted-git-info）。
  *
- * 用 hosted-git-info 解析当前仓库，把 README 里的相对路径（./docs/x.png、docs/api.md）
- * 重写为 raw.githubusercontent.com 绝对 URL，确保离线渲染时图片/链接可用。
+ * 用 hosted-git-info 解析当前仓库，把 Markdown 里的相对路径（./docs/x.png、api.md）
+ * 重写为 raw.githubusercontent.com / GitHub browse 绝对 URL。
  *
  * 与 MarkdownViewer 的分工：
  * - MarkdownViewer：通用 Markdown 渲染（文章正文），无路径重写。
- * - readme.ts：GitHub 仓库 README 专用，用 hosted-git-info 做相对路径 → raw URL 转换。
+ * - readme.ts：仓库内 Markdown 专用（README 或任意 .md），用 hosted-git-info 做相对路径转换。
+ *   另提供 fileRawUrl 生成任意文件（图片/视频/音频）的 raw URL。
  */
 import { Marked } from "marked";
 
@@ -58,12 +59,33 @@ export function parseRepo(
 /**
  * 把相对路径转成 GitHub raw URL。
  * @param info 仓库 GitHost 实例（由 parseRepo 创建）
- * @param baseDir README 所在目录
+ * @param baseDir 文件所在目录
  * @param href 相对路径
  */
 export function toRawUrl(info: GitHostInstance, baseDir: string, href: string): string {
   const resolved = resolveRelative(baseDir, href);
   return info.file(resolved);
+}
+
+/**
+ * 便捷生成仓库内任意文件的 raw URL（供 img/video/audio src 用）。
+ * @param owner 仓库 owner
+ * @param repo 仓库名
+ * @param filePath 仓库内文件路径（如 'docs/logo.png'）
+ * @param committish 分支/ref（默认 HEAD）
+ */
+export function fileRawUrl(
+  owner: string,
+  repo: string,
+  filePath: string,
+  committish = "HEAD",
+): string {
+  const info = parseRepo(owner, repo, committish);
+  if (!info) {
+    // parseRepo 失败时 fallback 到 raw.githubusercontent.com 直接拼接
+    return `https://raw.githubusercontent.com/${owner}/${repo}/${committish}/${filePath}`;
+  }
+  return info.file(filePath);
 }
 
 /**
@@ -98,12 +120,12 @@ export async function fetchReadme(
 }
 
 /**
- * README 所在目录（用于解析相对路径）。
- * 通常为 ''（根目录），子目录仓库的 README 才非空。
+ * 文件所在目录（用于解析相对路径）。
+ * 通常为 ''（根目录），子目录文件才非空。
  */
-function readmeDir(readmePath: string): string {
-  const idx = readmePath.lastIndexOf("/");
-  return idx === -1 ? "" : readmePath.slice(0, idx);
+function fileDir(filePath: string): string {
+  const idx = filePath.lastIndexOf("/");
+  return idx === -1 ? "" : filePath.slice(0, idx);
 }
 
 function escapeHtml(s: string): string {
@@ -111,22 +133,26 @@ function escapeHtml(s: string): string {
 }
 
 /**
- * 渲染 README 为 HTML（带相对路径重写）。
- * @param markdown README 文本
- * @param readmePath README 在仓库中的路径（如 'README.md' 或 'docs/README.md'）
+ * 渲染仓库内任意 Markdown 文件为 HTML（带相对路径重写）。
+ *
+ * 通用化的 README 渲染：把文件内的相对路径（./docs/x.png、api.md）重写为
+ * raw.githubusercontent.com（图片）/ GitHub browse（链接）绝对 URL。
+ *
+ * @param markdown 文件文本
+ * @param filePath 文件在仓库中的路径（如 'README.md' 或 'docs/guide.md'），用于推导相对路径基准
  * @param owner 仓库 owner
  * @param repo 仓库名
- * @param opts hosted-git-info 选项（committish 等，通过 parseRepo 传入）
+ * @param opts hosted-git-info 选项（committish 等）
  */
-export function renderReadme(
+export function renderRepoMarkdown(
   markdown: string,
-  readmePath: string,
+  filePath: string,
   owner: string,
   repo: string,
   opts?: { committish?: string },
 ): string {
   const info = parseRepo(owner, repo, opts?.committish ?? "HEAD");
-  const baseDir = readmeDir(readmePath);
+  const baseDir = fileDir(filePath);
 
   // 独立 Marked 实例（避免污染 MarkdownViewer 的全局配置）
   const marked = new Marked();

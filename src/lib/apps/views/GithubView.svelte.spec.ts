@@ -37,7 +37,8 @@ vi.mock("$lib/github/client", () => ({
 // mock README 渲染
 vi.mock("$lib/apps/installable/github/readme", () => ({
   fetchReadme: vi.fn().mockResolvedValue({ content: null, path: null }),
-  renderReadme: vi.fn().mockReturnValue(""),
+  renderRepoMarkdown: vi.fn().mockReturnValue(""),
+  fileRawUrl: vi.fn().mockReturnValue("https://raw.githubusercontent.com/x/y/HEAD/x"),
 }));
 
 // mock VFS

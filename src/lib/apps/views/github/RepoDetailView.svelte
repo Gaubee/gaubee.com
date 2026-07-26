@@ -42,9 +42,9 @@
     type IssueSummary,
     type RepoSummary,
   } from '$lib/apps/installable/github/repo-api'
-  import { fetchReadme, renderReadme } from '$lib/apps/installable/github/readme'
+  import { fetchReadme } from '$lib/apps/installable/github/readme'
   import RepoFileTree, { type TreeNode } from './RepoFileTree.svelte'
-  import FilePreviewDialog from './FilePreviewDialog.svelte'
+  import RepoFileContent from './RepoFileContent.svelte'
   import IssueDetailDialog from './IssueDetailDialog.svelte'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
@@ -78,17 +78,12 @@
   let repoInfo = $state<RepoSummary | null>(null)
   let repoInfoLoading = $state(false)
 
-  // ---- README ----
-  let readmeHtml = $state('')
-  let readmeLoading = $state(false)
-  let readmePath = $state('')
-
-  // ---- 文件树 ----
+  // ---- 文件树 + 内容 ----
   let tree = $state<Map<string, TreeNode>>(new Map())
   let expanded = $state<Set<string>>(new Set(['']))
   let loadingDirs = $state<Set<string>>(new Set())
-  let previewPath = $state('')
-  let previewOpen = $state(false)
+  /** 当前选中的文件路径（进详情页自动选中 README）。 */
+  let selectedFile = $state('')
 
   // ---- 历史 ----
   let commits = $state<CommitInfo[]>([])
@@ -166,7 +161,7 @@
 
   async function loadAll(o: string, r: string) {
     void loadRepoInfo(o, r)
-    void loadReadme(o, r)
+    void autoSelectReadme(o, r)
     void loadCommits(o, r)
     void loadDir('', o, r)
     if (o === OWNER && r === REPO) void loadChanges()
@@ -185,22 +180,17 @@
     }
   }
 
-  // ---- README ----
-  async function loadReadme(o: string, r: string) {
-    readmeLoading = true
-    readmeHtml = ''
+  // ---- 自动选中 README（进详情页默认展示 README 内容）----
+  // 用 fetchReadme 的 /readme 端点获取 README 路径，设为 selectedFile。
+  // 实际内容由 RepoFileContent 加载渲染（统一走 getFileText + renderRepoMarkdown）。
+  async function autoSelectReadme(o: string, r: string) {
     try {
       const result = await fetchReadme(o, r)
-      if (result.content) {
-        readmePath = result.path
-        readmeHtml = renderReadme(result.content, result.path, o, r, {
-          committish: 'HEAD',
-        })
+      if (result.path) {
+        selectedFile = result.path
       }
     } catch {
-      // 无 README 或加载失败，静默
-    } finally {
-      readmeLoading = false
+      // 无 README 或加载失败，静默（selectedFile 保持空，显示提示）
     }
   }
 
@@ -235,8 +225,7 @@
   }
 
   function selectFile(path: string) {
-    previewPath = path
-    previewOpen = true
+    selectedFile = path
   }
 
   // ---- 历史 ----
@@ -477,8 +466,8 @@
 
       <!-- 文件 + README -->
       <Tabs.Content value="files" class="p-4">
-        <div class="grid min-w-0 gap-4 md:grid-cols-[minmax(200px,280px)_1fr]">
-          <!-- 文件树 -->
+        <div class="grid min-h-[60vh] min-w-0 gap-4 md:grid-cols-[minmax(200px,280px)_1fr]">
+          <!-- 文件树（左，独立滚动）-->
           <div class="border-border max-h-[60vh] min-w-0 overflow-auto rounded border p-2 text-sm">
             <RepoFileTree
               dir=""
@@ -486,23 +475,19 @@
               {tree}
               {expanded}
               {loadingDirs}
-              selectedFile={previewPath}
+              selectedFile={selectedFile}
               ontoggledir={toggleDir}
               onselectfile={selectFile}
             />
           </div>
-          <!-- README -->
-          <div class="border-border min-h-[200px] min-w-0 overflow-hidden rounded border p-4">
-            {#if readmeLoading}
-              <Skeleton class="h-40" />
-            {:else if readmeHtml}
-              <div class="prose prose-sm dark:prose-invert max-w-none break-words">
-                {@html readmeHtml}
-              </div>
-            {:else}
-              <p class="text-muted-foreground py-8 text-center text-sm">无 README</p>
-            {/if}
-          </div>
+          <!-- 文件内容（右，独立滚动，自动选中 README）-->
+          {#if selectedFile}
+            <RepoFileContent path={selectedFile} {owner} {repo} />
+          {:else}
+            <div class="border-border text-muted-foreground flex min-w-0 items-center justify-center rounded border py-8 text-sm">
+              选择左侧文件查看内容
+            </div>
+          {/if}
         </div>
       </Tabs.Content>
 
@@ -739,9 +724,6 @@
     </Tabs.Root>
   </div>
 </div>
-
-<!-- 文件预览 Dialog -->
-<FilePreviewDialog bind:open={previewOpen} path={previewPath} {owner} {repo} />
 
 <!-- Issue 详情 Dialog -->
 {#if issueNumber !== null}
