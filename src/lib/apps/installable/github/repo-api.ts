@@ -243,113 +243,6 @@ export async function searchRepos(
   return { total: data.total_count, items: data.items.map(toRepoSummary) };
 }
 
-/** Issue 摘要（列表/搜索结果用）。 */
-export interface IssueSummary {
-  id: number;
-  number: number;
-  title: string;
-  state: "open" | "closed";
-  /** 是否 PR（GitHub Issues API 同时返回 PR）。 */
-  pull_request?: unknown;
-  user: { login: string; avatar_url: string };
-  comments: number;
-  created_at: string;
-  updated_at: string;
-  html_url: string;
-  /** 标签。 */
-  labels: Array<{ name: string; color: string }>;
-}
-
-interface GhIssueResponse {
-  id: number;
-  number: number;
-  title: string;
-  state: "open" | "closed";
-  pull_request?: unknown;
-  user: { login: string; avatar_url: string };
-  comments: number;
-  created_at: string;
-  updated_at: string;
-  html_url: string;
-  labels: Array<{ name: string; color: string }>;
-}
-
-function toIssueSummary(i: GhIssueResponse): IssueSummary {
-  return {
-    id: i.id,
-    number: i.number,
-    title: i.title,
-    state: i.state,
-    pull_request: i.pull_request,
-    user: { login: i.user.login, avatar_url: i.user.avatar_url },
-    comments: i.comments,
-    created_at: i.created_at,
-    updated_at: i.updated_at,
-    html_url: i.html_url,
-    labels: i.labels,
-  };
-}
-
-/**
- * 列出仓库的 issues（排除 PR）。
- * GET /repos/{owner}/{repo}/issues?state=open&per_page=N
- */
-export async function listIssues(
-  owner: string,
-  repo: string,
-  opts?: { state?: "open" | "closed" | "all"; perPage?: number; page?: number },
-): Promise<IssueSummary[]> {
-  const params = new URLSearchParams({
-    state: opts?.state ?? "open",
-    per_page: String(opts?.perPage ?? 30),
-    page: String(opts?.page ?? 1),
-  });
-  const resp = await fetchGithub(`repos/${owner}/${repo}/issues?${params.toString()}`);
-  if (resp.status === 404) return [];
-  await assertOk(resp, `listIssues(${owner}/${repo})`);
-  const data = (await resp.json()) as GhIssueResponse[];
-  // 排除 PR（GitHub Issues API 同时返回 PR）
-  return data.filter((i) => !i.pull_request).map(toIssueSummary);
-}
-
-/**
- * 搜索仓库内 issues。
- * GET /search/issues?q={query}+repo:{owner}/{repo}+is:issue
- */
-export async function searchIssues(
-  owner: string,
-  repo: string,
-  query: string,
-  opts?: { perPage?: number; page?: number },
-): Promise<{ total: number; items: IssueSummary[] }> {
-  const q = `${query} repo:${owner}/${repo} is:issue`;
-  const params = new URLSearchParams({
-    q,
-    per_page: String(opts?.perPage ?? 20),
-    page: String(opts?.page ?? 1),
-  });
-  const resp = await fetchGithub(`search/issues?${params.toString()}`);
-  await assertOk(resp, `searchIssues(${owner}/${repo})`);
-  const data = (await resp.json()) as { total_count: number; items: GhIssueResponse[] };
-  return { total: data.total_count, items: data.items.map(toIssueSummary) };
-}
-
-/** Issue 详情（含正文）。 */
-export interface IssueDetail extends IssueSummary {
-  body: string | null;
-}
-
-/**
- * 获取单个 issue 详情。
- * GET /repos/{owner}/{repo}/issues/{number}
- */
-export async function getIssue(owner: string, repo: string, number: number): Promise<IssueDetail> {
-  const resp = await fetchGithub(`repos/${owner}/${repo}/issues/${number}`);
-  await assertOk(resp, `getIssue(${owner}/${repo}#${number})`);
-  const data = (await resp.json()) as GhIssueResponse & { body: string | null };
-  return { ...toIssueSummary(data), body: data.body };
-}
-
 /**
  * 获取仓库元数据（详情页顶部展示）。
  * GET /repos/{owner}/{repo}
@@ -360,3 +253,13 @@ export async function getRepo(owner: string, repo: string): Promise<RepoSummary>
   const data = (await resp.json()) as GhRepoResponse;
   return toRepoSummary(data);
 }
+
+// Issue/Comment 相关 API 已迁移到 ./issue-api.ts（含评论 CRUD、@mention 搜索、图片上传）。
+// 此处 re-export 保持向后兼容（现有调用方仍可从 repo-api import）。
+export {
+  listIssues,
+  searchIssues,
+  getIssue,
+  type IssueSummary,
+  type IssueDetail,
+} from "./issue-api";

@@ -92,6 +92,19 @@ export interface RepoFavorite {
   favoritedAt: number;
 }
 
+/**
+ * 评论草稿（GithubApp Issues 评论编辑器自动保存）。
+ * key 格式：`${owner}/${repo}#${issueNumber}`（新评论）或 `comment-${commentId}`（编辑）。
+ */
+export interface CommentDraft {
+  /** 草稿 key（issue 或 comment 标识）。 */
+  key: string;
+  /** 草稿内容（markdown 原文）。 */
+  body: string;
+  /** 更新时间戳。 */
+  updatedAt: number;
+}
+
 interface GaubeeMetaDB extends DBSchema {
   meta: {
     key: string;
@@ -109,10 +122,14 @@ interface GaubeeMetaDB extends DBSchema {
     key: string;
     value: RepoFavorite;
   };
+  comment_drafts: {
+    key: string;
+    value: CommentDraft;
+  };
 }
 
 const DB_NAME = "gaubee-meta";
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 let dbPromise: Promise<IDBPDatabase<GaubeeMetaDB>> | null = null;
 
@@ -134,6 +151,10 @@ function getDB(): Promise<IDBPDatabase<GaubeeMetaDB>> {
         // v4: 加 repo_favorites store（GithubApp 仓库收藏）
         if (!db.objectStoreNames.contains("repo_favorites")) {
           db.createObjectStore("repo_favorites", { keyPath: "id" });
+        }
+        // v5: 加 comment_drafts store（GithubApp 评论草稿自动保存）
+        if (!db.objectStoreNames.contains("comment_drafts")) {
+          db.createObjectStore("comment_drafts", { keyPath: "key" });
         }
       },
     });
@@ -222,6 +243,23 @@ export async function favoriteDelete(id: string): Promise<void> {
 export async function favoriteAll(): Promise<RepoFavorite[]> {
   const db = await getDB();
   return db.getAll("repo_favorites");
+}
+
+// ---- 评论草稿 CRUD（GithubApp 评论编辑器自动保存）----
+
+export async function draftGet(key: string): Promise<CommentDraft | undefined> {
+  const db = await getDB();
+  return db.get("comment_drafts", key);
+}
+
+export async function draftPut(draft: CommentDraft): Promise<void> {
+  const db = await getDB();
+  await db.put("comment_drafts", draft);
+}
+
+export async function draftDelete(key: string): Promise<void> {
+  const db = await getDB();
+  await db.delete("comment_drafts", key);
 }
 
 /**

@@ -24,7 +24,19 @@ vi.mock("$lib/apps/installable/github/repo-api", () => ({
   getIssue: vi.fn().mockResolvedValue(null),
 }));
 
-// mock github/client（详情页文件树/历史 + EditorView 判定用）
+// mock issue-api（IssueContentPanel/IssueCommentItem 用）
+vi.mock("$lib/apps/installable/github/issue-api", () => ({
+  listIssues: vi.fn().mockResolvedValue([]),
+  searchIssues: vi.fn().mockResolvedValue({ total: 0, items: [] }),
+  getIssue: vi.fn().mockResolvedValue(null),
+  listIssueComments: vi.fn().mockResolvedValue([]),
+  createIssueComment: vi.fn().mockResolvedValue({}),
+  updateIssueComment: vi.fn().mockResolvedValue({}),
+  deleteIssueComment: vi.fn().mockResolvedValue(undefined),
+  searchUsers: vi.fn().mockResolvedValue({ total: 0, items: [] }),
+  searchCode: vi.fn().mockResolvedValue({ total: 0, items: [] }),
+  uploadIssueImage: vi.fn().mockResolvedValue(""),
+}));
 vi.mock("$lib/github/client", () => ({
   OWNER: "gaubee",
   REPO: "gaubee.com",
@@ -65,9 +77,10 @@ vi.mock("$lib/apps/installable/github/favorites.svelte", () => ({
   },
 }));
 
-// mock os/services
+// mock os/services（issue-api.ts import NotAuthenticatedError）
 vi.mock("$lib/os/services", () => ({
   gaubeeos: { requestAppService: vi.fn() },
+  NotAuthenticatedError: class extends Error {},
 }));
 vi.mock("$lib/os/services/publish-helper", () => ({
   handlePublishError: vi.fn(),
@@ -78,6 +91,7 @@ vi.mock("$lib/nav/nav-controller-instance", () => ({
 vi.mock("$lib/apps/builtin/notifications/service.svelte", () => ({
   notifySuccess: vi.fn(),
   notifyWarning: vi.fn(),
+  notifyError: vi.fn(),
 }));
 vi.mock("$lib/apps/builtin/account/service", () => ({
   accountService: {

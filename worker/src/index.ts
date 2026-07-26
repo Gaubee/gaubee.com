@@ -99,6 +99,59 @@ app.use(
 
 app.get("/", (c) => c.json({ name: "gaubee-auth", ok: true }));
 
+// ---- 图片上传（GithubApp Issues 评论插图）----
+// 前端发送 multipart（owner + repo + file），Worker 用 token 调 GitHub Contents API
+// PUT 上传到 .github-issue-assets/{timestamp}-{rand}.{ext}，返回 raw URL。
+app.post("/upload/image", async (c) => {
+  const token = getCookie(c, COOKIE_NAME);
+  // 新架构 token 在前端内存，但 Worker 上传端点仍需 token（通过 Authorization header 透传）
+  const authHeader = c.req.header("Authorization");
+  const effectiveToken = authHeader?.replace(/^Bearer\s+/i, "") ?? token;
+  if (!effectiveToken) {
+    return c.json({ error: "unauthorized: upload requires login" }, 401);
+  }
+  const formData = await c.req.formData();
+  const owner = formData.get("owner");
+  const repo = formData.get("repo");
+  const file = formData.get("file");
+  if (typeof owner !== "string" || typeof repo !== "string" || !(file instanceof File)) {
+    return c.json({ error: "invalid: owner/repo/file required" }, 400);
+  }
+
+  // 生成仓库内路径：.github-issue-assets/{timestamp}-{rand}.{ext}
+  const ext = file.name.split(".").pop() || "png";
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const path = `.github-issue-assets/${filename}`;
+
+  // File → base64
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  const base64 = btoa(binary);
+
+  // GitHub Contents API PUT
+  const resp = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${effectiveToken}`,
+      Accept: "application/vnd.github+json",
+      "User-Agent": "gaubee-auth-worker",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      message: `upload issue image: ${filename}`,
+      content: base64,
+    }),
+  });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    return c.json({ error: `upload failed: ${resp.status} ${text}` }, resp.status);
+  }
+  const data = (await resp.json()) as { content: { download_url: string } };
+  const url = data.content.download_url;
+  return c.json({ url });
+});
+
 // ---- 1. 发起 OAuth：重定向到 GitHub ----
 app.get("/auth/github", (c) => {
   const state = crypto.randomUUID();

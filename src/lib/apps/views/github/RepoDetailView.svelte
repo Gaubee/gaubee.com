@@ -8,7 +8,7 @@
 	    点击文件 → FilePreviewDialog。
 	  - 历史 Tab：listCommits REST API。
 	  - 变更 Tab：仅主仓库（vfsStore dirty + gitService.commit）；其它仓库只读提示。
-	  - Issues Tab：listIssues + 站内搜索（searchIssues）；详情 IssueDetailDialog。
+	  - Issues Tab：列表（sticky 左栏）+ IssueContentPanel（详情+评论+编辑器）；移动端列表收进 Sheet。
 	  - 日志 Tab：activityLog 过滤当前 repo。
 
 	状态：本组件由 GithubView（tabView 常驻）按 pathname 分发渲染，
@@ -45,7 +45,7 @@
   import { fetchReadme } from '$lib/apps/installable/github/readme'
   import RepoFileTree, { type TreeNode } from './RepoFileTree.svelte'
   import RepoFileContent from './RepoFileContent.svelte'
-  import IssueDetailDialog from './IssueDetailDialog.svelte'
+  import IssueContentPanel from './IssueContentPanel.svelte'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import { Badge } from '$lib/components/ui/badge'
@@ -138,8 +138,10 @@
   let issuesLoading = $state(false)
   let issuesError = $state<string | null>(null)
   let issueSearchInput = $state('')
-  let issueNumber = $state<number | null>(null)
-  let issueDetailOpen = $state(false)
+  /** 当前选中的 issue 编号（null 时右侧显示提示）。 */
+  let selectedIssue = $state<number | null>(null)
+  /** 移动端 issue 列表浮层开关。 */
+  let issueListSheetOpen = $state(false)
 
   // ---- 日志 ----
   const activities = $derived(
@@ -328,8 +330,9 @@
   }
 
   function openIssue(num: number) {
-    issueNumber = num
-    issueDetailOpen = true
+    selectedIssue = num
+    // 移动端：选中 issue 后关闭列表浮层
+    issueListSheetOpen = false
   }
 
   // ---- 收藏 ----
@@ -644,74 +647,109 @@
         </Card.Root>
       </Tabs.Content>
 
-      <!-- Issues -->
+      <!-- Issues（双栏：列表左 sticky + 内容右展开，移动端列表收进 Sheet）-->
       <Tabs.Content value="issues" class="p-4">
-        <Card.Root>
-          <Card.Header class="space-y-3">
-            <Card.Title class="flex items-center gap-2 text-base">
-              <BugIcon class="size-4" />
-              Issues
-            </Card.Title>
-            <form
-              class="flex items-center gap-1.5"
-              onsubmit={(e) => {
-                e.preventDefault()
-                void handleIssueSearch()
-              }}
-            >
-              <div class="relative flex-1">
-                <SearchIcon class="text-muted-foreground absolute left-2.5 top-1/2 size-4 -translate-y-1/2" />
-                <Input
-                  bind:value={issueSearchInput}
-                  placeholder="搜索当前仓库的 issues"
-                  class="pl-8"
-                />
-              </div>
-              <Button type="submit" size="sm" disabled={issuesLoading}>
-                {issuesLoading ? '搜索中' : '搜索'}
-              </Button>
-              {#if issueSearchInput}
-                <Button type="button" size="sm" variant="ghost" onclick={() => { issueSearchInput = ''; void loadIssues(owner, repo) }}>
-                  清除
-                </Button>
-              {/if}
-            </form>
-          </Card.Header>
-          <Card.Content>
+        <div class="grid min-w-0 gap-4 md:grid-cols-[minmax(260px,360px)_1fr]">
+          <!-- issue 列表 snippet（桌面端左栏和移动端 Sheet 共用渲染逻辑）-->
+          {#snippet issueList()}
             {#if issuesLoading && issues.length === 0}
               {#each Array(4) as _}<Skeleton class="mb-2 h-12" />{/each}
             {:else if issuesError}
-              <p class="text-destructive text-sm">{issuesError}</p>
+              <p class="text-destructive p-2 text-sm">{issuesError}</p>
             {:else if issues.length === 0}
               <p class="text-muted-foreground py-4 text-center text-sm">暂无 Issues</p>
             {:else}
-              <div class="space-y-1">
-                {#each issues as it (it.id)}
-                  <button
-                    class="hover:bg-accent flex items-start gap-3 rounded-md p-2 text-left transition-colors"
-                    onclick={() => openIssue(it.number)}
-                  >
-                    <div class="min-w-0 flex-1">
-                      <p class="truncate text-sm font-medium">{it.title}</p>
-                      <p class="text-muted-foreground text-xs">
-                        #{it.number} · {it.user.login} · {formatTime(it.updated_at)}
-                        {#if it.comments > 0}· {it.comments} 评论{/if}
-                      </p>
-                      {#if it.labels.length > 0}
-                        <div class="mt-1 flex flex-wrap gap-1">
-                          {#each it.labels.slice(0, 3) as label}
-                            <Badge variant="outline" class="text-[10px]">{label.name}</Badge>
-                          {/each}
-                        </div>
-                      {/if}
-                    </div>
-                    <ChevronRightIcon class="text-muted-foreground mt-1 size-4 shrink-0" />
-                  </button>
-                {/each}
-              </div>
+              {#each issues as it (it.id)}
+                <button
+                  class="hover:bg-accent flex items-start gap-2 rounded-md p-2 text-left transition-colors {selectedIssue === it.number ? 'bg-accent' : ''}"
+                  onclick={() => openIssue(it.number)}
+                >
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-medium">{it.title}</p>
+                    <p class="text-muted-foreground text-xs">
+                      #{it.number} · {it.user.login}
+                      {#if it.comments > 0} · {it.comments} 评论{/if}
+                    </p>
+                    {#if it.labels.length > 0}
+                      <div class="mt-1 flex flex-wrap gap-1">
+                        {#each it.labels.slice(0, 3) as label}
+                          <Badge variant="outline" class="text-[10px]">{label.name}</Badge>
+                        {/each}
+                      </div>
+                    {/if}
+                  </div>
+                </button>
+              {/each}
             {/if}
-          </Card.Content>
-        </Card.Root>
+          {/snippet}
+          <!-- issue 列表：桌面端 sticky 左栏（独立滚动），移动端隐藏（用 Sheet 触发）-->
+          <div class="max-md:hidden">
+            <div class="border-border max-h-[calc(100dvh-12rem)] min-w-0 overflow-auto overscroll-contain rounded border md:sticky md:top-2">
+              <!-- 搜索框 -->
+              <div class="border-border sticky top-0 z-[1] bg-background p-2">
+                <form
+                  class="flex items-center gap-1.5"
+                  onsubmit={(e) => {
+                    e.preventDefault()
+                    void handleIssueSearch()
+                  }}
+                >
+                  <div class="relative flex-1">
+                    <SearchIcon class="text-muted-foreground absolute left-2.5 top-1/2 size-4 -translate-y-1/2" />
+                    <Input
+                      bind:value={issueSearchInput}
+                      placeholder="搜索 issues"
+                      class="h-8 pl-8 text-sm"
+                    />
+                  </div>
+                  <Button type="submit" size="sm" disabled={issuesLoading}>
+                    {issuesLoading ? '...' : '搜索'}
+                  </Button>
+                </form>
+              </div>
+              <!-- issue 列表项 -->
+              <div class="p-1">
+                {@render issueList()}
+              </div>
+            </div>
+          </div>
+
+          <!-- issue 内容面板（右）：桌面端展开，移动端让 app 滚动 -->
+          {#if selectedIssue !== null}
+            <IssueContentPanel
+              issueNumber={selectedIssue}
+              {owner}
+              {repo}
+              branch={repoInfo?.default_branch ?? 'main'}
+              onopenissuelist={() => (issueListSheetOpen = true)}
+            />
+          {:else}
+            <div class="border-border text-muted-foreground flex min-w-0 flex-col items-center justify-center gap-3 rounded border py-12 text-sm">
+              <p>选择 issue 查看详情</p>
+              <!-- 移动端：列表入口（桌面端隐藏，左栏可见）-->
+              <Button size="sm" variant="default" class="md:hidden" onclick={() => (issueListSheetOpen = true)}>
+                <BugIcon class="size-4" />
+                查看 Issue 列表
+              </Button>
+            </div>
+          {/if}
+
+          <!-- 移动端 issue 列表浮层（桌面端隐藏）。Sheet 是 portal 浮层，放 grid 内不影响布局。-->
+          <Sheet.Root bind:open={issueListSheetOpen}>
+            <Sheet.Content side="bottom" class="max-h-[75dvh] rounded-t-lg p-0 md:hidden" showCloseButton={false}>
+              <Sheet.Header class="flex-row items-center justify-between border-b px-4 py-3">
+                <Sheet.Title class="flex items-center gap-2 text-sm font-medium">
+                  <BugIcon class="size-4" />
+                  Issues
+                </Sheet.Title>
+                <Sheet.Description class="sr-only">浏览 issue 列表，选择查看详情</Sheet.Description>
+              </Sheet.Header>
+              <div class="max-h-[calc(75dvh-4rem)] overflow-auto overscroll-contain p-2">
+                {@render issueList()}
+              </div>
+            </Sheet.Content>
+          </Sheet.Root>
+        </div>
       </Tabs.Content>
 
       <!-- 日志 -->
@@ -768,8 +806,3 @@
     </Tabs.Root>
   </div>
 </div>
-
-<!-- Issue 详情 Dialog -->
-{#if issueNumber !== null}
-  <IssueDetailDialog bind:open={issueDetailOpen} number={issueNumber} {owner} {repo} onclose={() => { issueNumber = null }} />
-{/if}
