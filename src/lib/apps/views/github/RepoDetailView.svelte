@@ -481,7 +481,7 @@
              移动端（<md）：fileTree 收进 Sheet 浮动浮层。 -->
         <div class="grid min-w-0 gap-4 md:grid-cols-[minmax(200px,280px)_1fr]">
           <!-- 文件树：桌面端 sticky 左栏（独立滚动），移动端隐藏（用 Sheet 触发）-->
-          <div class="border-border max-h-[calc(100dvh-12rem)] min-w-0 overflow-auto rounded border p-2 text-sm md:sticky md:top-2 md:block max-md:hidden">
+          <div class="border-border max-h-[calc(100dvh-12rem)] min-w-0 overflow-auto overscroll-contain rounded border p-2 text-sm md:sticky md:top-2 md:block max-md:hidden">
             <RepoFileTree
               dir=""
               label="根目录"
@@ -519,7 +519,7 @@
               </Sheet.Title>
               <Sheet.Description class="sr-only">浏览仓库文件树，选择文件查看内容</Sheet.Description>
             </Sheet.Header>
-            <div class="max-h-[calc(75dvh-4rem)] overflow-auto p-2 text-sm">
+            <div class="max-h-[calc(75dvh-4rem)] overflow-auto overscroll-contain p-2 text-sm">
               <RepoFileTree
                 dir=""
                 label="根目录"
