@@ -1,31 +1,60 @@
 <!--
 	RepoFileContent：仓库文件内容面板（文件 Tab 右侧）。
 
-	结构：工具栏（文件路径 + Raw|Preview toggle）+ 内容区（独立滚动）。
+	结构：工具栏（文件路径 + Raw|Preview toggle + download/edit）+ 内容区（独立滚动）。
 	- markdown：Preview 用 renderRepoMarkdown 渲染（相对路径重写），Raw 用 <pre> 源码
 	- image：<img src={rawUrl}> + photoswipe 全屏查看
-	- video：<video src={rawUrl} controls>
-	- audio：<audio src={rawUrl} controls>
-	- text（代码/纯文本）：<pre> 源码（无 Preview，只显示 Raw）
+	- video/audio：<video>/<audio src={rawUrl} controls>
+	- text（代码/纯文本）：Shiki 代码高亮（Raw 模式）
 
 	内容获取：text/markdown 走 getFileText；媒体走 fileRawUrl（不下载内容，直接用 raw URL）。
+	raw URL 用仓库 default_branch（如 main），GitHub raw 端点只认分支名。
+
+	响应式：
+	- 桌面端（md+）：h-full（grid cell 撑满）+ 内容区 overflow-auto 独立滚动
+	- 移动端（<md）：无固定高度，内容自然撑开，让 app 内容区滚动；
+	  工具栏含"文件列表"按钮（primary 样式）触发文件树 Sheet
 -->
 <script lang="ts">
-  import { getFileText } from '$lib/github/client'
+  import { getFileText, OWNER, REPO } from '$lib/github/client'
   import { getFileKind, canPreview, type FileKind } from '$lib/github/file-kind'
   import { renderRepoMarkdown, fileRawUrl } from '$lib/apps/installable/github/readme'
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
+  import { highlightCode, primeHighlighter } from '$lib/markdown/shiki-highlighter'
   import { photoswipe } from '$lib/photoswipe/action'
+  import { navController } from '$lib/nav/nav-controller-instance'
   import { Skeleton } from '$lib/components/ui/skeleton'
+  import { Button, buttonVariants } from '$lib/components/ui/button'
   import * as ToggleGroup from '$lib/components/ui/toggle-group'
   import FileTextIcon from '@lucide/svelte/icons/file-text'
+  import FolderTreeIcon from '@lucide/svelte/icons/folder-tree'
   import CodeIcon from '@lucide/svelte/icons/code'
   import EyeIcon from '@lucide/svelte/icons/eye'
+  import DownloadIcon from '@lucide/svelte/icons/download'
+  import PencilIcon from '@lucide/svelte/icons/pencil'
 
-  let { path, owner, repo }: { path: string; owner: string; repo: string } = $props()
+  let {
+    path,
+    owner,
+    repo,
+    branch = '',
+    onopenfiletree = () => {},
+  }: {
+    path: string
+    owner: string
+    repo: string
+    /** 仓库默认分支（用于 raw URL + markdown 相对路径重写）。 */
+    branch?: string
+    /** 移动端：打开文件树浮层（桌面端不显示触发按钮）。 */
+    onopenfiletree?: () => void
+  } = $props()
 
   const kind = $derived(getFileKind(path))
   const previewable = $derived(canPreview(kind))
+  /** 是否主仓库（可编辑）。GitHub owner/repo 不区分大小写。 */
+  const isMainRepo = $derived(
+    owner.toLowerCase() === OWNER.toLowerCase() && repo.toLowerCase() === REPO.toLowerCase(),
+  )
   /** 渲染模式：可预览文件默认 preview，纯文本固定 raw。 */
   let mode = $state<'raw' | 'preview'>('preview')
 
@@ -35,8 +64,10 @@
   let error = $state<string | null>(null)
   /** markdown Preview 模式的渲染 HTML。 */
   let renderedHtml = $state('')
-  /** 媒体文件的 raw URL。 */
-  const rawUrl = $derived(fileRawUrl(owner, repo, path))
+  /** text 类的高亮 HTML（Shiki）。 */
+  let highlightedHtml = $state('')
+  /** 媒体/下载用的 raw URL（含分支名）。 */
+  const rawUrl = $derived(fileRawUrl(owner, repo, path, branch))
 
   // path 变化时重置 + 加载
   $effect(() => {
@@ -44,6 +75,7 @@
     // 可预览文件默认 preview 模式，纯文本固定 raw
     mode = previewable ? 'preview' : 'raw'
     renderedHtml = ''
+    highlightedHtml = ''
     content = ''
     error = null
     if (kind === 'image' || kind === 'video' || kind === 'audio') {
@@ -54,12 +86,23 @@
     void loadContent(p)
   })
 
-  // mode 变化时（markdown 切到 preview）才渲染 HTML，避免每次都重算
+  // mode 变化或 content 就绪时计算渲染 HTML
   $effect(() => {
     if (kind === 'markdown' && mode === 'preview' && content) {
-      renderedHtml = renderRepoMarkdown(content, path, owner, repo, { committish: 'HEAD' })
+      renderedHtml = renderRepoMarkdown(content, path, owner, repo, { branch })
     } else {
       renderedHtml = ''
+    }
+  })
+
+  // text 类代码高亮：content 就绪 + Shiki 加载后计算
+  $effect(() => {
+    if (kind === 'text' && content) {
+      const lang = path.split('.').pop() ?? ''
+      const html = highlightCode(content, lang)
+      highlightedHtml = html ?? ''
+    } else {
+      highlightedHtml = ''
     }
   })
 
@@ -67,39 +110,86 @@
     loading = true
     try {
       content = await getFileText(p, { owner, repo })
+      // text 类需要 Shiki 加载完后才能高亮（首帧 highlightCode 返回 null，加载后重试）
+      if (kind === 'text') {
+        void primeHighlighter().then(() => {
+          const lang = p.split('.').pop() ?? ''
+          highlightedHtml = highlightCode(content, lang) ?? ''
+        })
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : '加载失败'
     } finally {
       loading = false
     }
   }
+
+  /** 跳转到 WriterApp 编辑器（仅主仓库可写）。 */
+  function handleEdit() {
+    if (!isMainRepo) return
+    navController.navigateMain(`/app/github-edit/${owner}/${repo}/${path}`)
+  }
+
+  /** 下载文件（用 raw URL）。 */
+  const downloadHref = $derived(rawUrl)
 </script>
 
-<div class="border-border flex h-full min-h-0 min-w-0 flex-col rounded border">
-  <!-- 工具栏：文件路径 + Raw|Preview toggle -->
-  <div class="border-border flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
-    <FileTextIcon class="text-muted-foreground size-3.5 shrink-0" />
+<div class="border-border flex min-h-0 min-w-0 flex-col rounded border md:h-full">
+  <!-- 工具栏：文件路径 + 操作按钮 + Raw|Preview toggle -->
+  <div class="border-border flex shrink-0 items-center gap-1.5 border-b px-2 py-1.5">
+    <!-- 移动端：文件列表触发按钮（primary 样式，桌面端隐藏）-->
+    <Button
+      size="sm"
+      variant="default"
+      class="md:hidden"
+      onclick={onopenfiletree}
+      aria-label="打开文件列表"
+    >
+      <FolderTreeIcon class="size-4" />
+    </Button>
+    <FileTextIcon class="text-muted-foreground size-3.5 shrink-0 max-md:hidden" />
     <span class="text-muted-foreground truncate font-mono text-xs" title={path}>{path}</span>
-    {#if previewable}
-      <ToggleGroup.Root
-        bind:value={mode}
-        type="single"
-        size="sm"
-        variant="outline"
-        class="ml-auto"
+
+    <!-- 操作按钮组（inline-end）-->
+    <div class="ml-auto flex shrink-0 items-center gap-0.5">
+      <!-- 下载（原生 a 标签，配 button 样式）-->
+      <a
+        href={downloadHref}
+        download={path.split('/').pop()}
+        target="_blank"
+        rel="noopener"
+        class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}
+        aria-label="下载"
       >
-        <ToggleGroup.Item value="raw" class="px-2" aria-label="源码">
-          <CodeIcon class="size-3.5" />
-        </ToggleGroup.Item>
-        <ToggleGroup.Item value="preview" class="px-2" aria-label="预览">
-          <EyeIcon class="size-3.5" />
-        </ToggleGroup.Item>
-      </ToggleGroup.Root>
-    {/if}
+        <DownloadIcon class="size-3.5" />
+      </a>
+      <!-- 编辑（仅主仓库）-->
+      {#if isMainRepo}
+        <Button size="icon-sm" variant="ghost" onclick={handleEdit} aria-label="编辑">
+          <PencilIcon class="size-3.5" />
+        </Button>
+      {/if}
+      <!-- Raw|Preview toggle（仅可预览文件）-->
+      {#if previewable}
+        <ToggleGroup.Root
+          bind:value={mode}
+          type="single"
+          size="sm"
+          variant="outline"
+        >
+          <ToggleGroup.Item value="raw" class="px-2" aria-label="源码">
+            <CodeIcon class="size-3.5" />
+          </ToggleGroup.Item>
+          <ToggleGroup.Item value="preview" class="px-2" aria-label="预览">
+            <EyeIcon class="size-3.5" />
+          </ToggleGroup.Item>
+        </ToggleGroup.Root>
+      {/if}
+    </div>
   </div>
 
-  <!-- 内容区（独立滚动）-->
-  <div class="min-h-0 flex-1 overflow-auto p-4">
+  <!-- 内容区：桌面端 overflow-auto 独立滚动；移动端无 overflow 让 app 内容区滚动 -->
+  <div class="min-h-0 flex-1 p-4 md:overflow-auto">
     {#if loading}
       <Skeleton class="h-40" />
     {:else if error}
@@ -123,8 +213,13 @@
       <div class="prose prose-sm dark:prose-invert max-w-none break-words">
         {@html renderedHtml}
       </div>
+    {:else if kind === 'text' && highlightedHtml}
+      <!-- Shiki 代码高亮（双主题）-->
+      <div class="dark:prose-invert prose prose-sm max-w-none">
+        {@html highlightedHtml}
+      </div>
     {:else}
-      <!-- text 或 markdown raw 模式：源码展示 -->
+      <!-- text 无高亮（Shiki 未加载或不支持的语言）或 markdown raw 模式：纯源码 -->
       <pre class="bg-muted/50 text-xs leading-relaxed whitespace-pre-wrap">{content}</pre>
     {/if}
   </div>

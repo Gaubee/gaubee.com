@@ -43,13 +43,10 @@ function resolveRelative(baseDir: string, rel: string): string {
  * 解析仓库为 GitHost 实例（用于 file/browse URL 生成）。
  * @param owner 仓库 owner
  * @param repo 仓库名
- * @param committish 分支/ref（默认 HEAD，跟随默认分支）
+ * @param committish 分支名（如 'main'）。GitHub raw 端点只认分支名，
+ *   不认 HEAD 或 refs/heads/main。调用方应传仓库的 default_branch。
  */
-export function parseRepo(
-  owner: string,
-  repo: string,
-  committish = "HEAD",
-): GitHostInstance | null {
+export function parseRepo(owner: string, repo: string, committish = ""): GitHostInstance | null {
   const info = GitHost.fromUrl(`https://github.com/${owner}/${repo}`);
   if (!info) return null;
   info.committish = committish;
@@ -72,18 +69,13 @@ export function toRawUrl(info: GitHostInstance, baseDir: string, href: string): 
  * @param owner 仓库 owner
  * @param repo 仓库名
  * @param filePath 仓库内文件路径（如 'docs/logo.png'）
- * @param committish 分支/ref（默认 HEAD）
+ * @param branch 分支名（如 'main'，传仓库 default_branch）。raw 端点只认分支名。
  */
-export function fileRawUrl(
-  owner: string,
-  repo: string,
-  filePath: string,
-  committish = "HEAD",
-): string {
-  const info = parseRepo(owner, repo, committish);
-  if (!info) {
-    // parseRepo 失败时 fallback 到 raw.githubusercontent.com 直接拼接
-    return `https://raw.githubusercontent.com/${owner}/${repo}/${committish}/${filePath}`;
+export function fileRawUrl(owner: string, repo: string, filePath: string, branch = ""): string {
+  const info = parseRepo(owner, repo, branch);
+  if (!info || !branch) {
+    // parseRepo 失败或无分支时 fallback 到 raw.githubusercontent.com 直接拼接
+    return `https://raw.githubusercontent.com/${owner}/${repo}/${branch || "HEAD"}/${filePath}`;
   }
   return info.file(filePath);
 }
@@ -149,9 +141,9 @@ export function renderRepoMarkdown(
   filePath: string,
   owner: string,
   repo: string,
-  opts?: { committish?: string },
+  opts?: { branch?: string },
 ): string {
-  const info = parseRepo(owner, repo, opts?.committish ?? "HEAD");
+  const info = parseRepo(owner, repo, opts?.branch ?? "");
   const baseDir = fileDir(filePath);
 
   // 独立 Marked 实例（避免污染 MarkdownViewer 的全局配置）

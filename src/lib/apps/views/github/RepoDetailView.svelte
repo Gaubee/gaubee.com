@@ -52,6 +52,7 @@
   import { Skeleton } from '$lib/components/ui/skeleton'
   import * as Tabs from '$lib/components/ui/tabs'
   import * as Card from '$lib/components/ui/card'
+  import * as Sheet from '$lib/components/ui/sheet'
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left'
   import StarIcon from '@lucide/svelte/icons/star'
   import TagIcon from '@lucide/svelte/icons/tag'
@@ -59,6 +60,7 @@
   import ExternalLinkIcon from '@lucide/svelte/icons/external-link'
   import HistoryIcon from '@lucide/svelte/icons/history'
   import FolderIcon from '@lucide/svelte/icons/folder'
+  import FolderTreeIcon from '@lucide/svelte/icons/folder-tree'
   import FilePenIcon from '@lucide/svelte/icons/file-pen'
   import BugIcon from '@lucide/svelte/icons/bug'
   import ScrollTextIcon from '@lucide/svelte/icons/scroll-text'
@@ -84,6 +86,8 @@
   let loadingDirs = $state<Set<string>>(new Set())
   /** 当前选中的文件路径（进详情页自动选中 README）。 */
   let selectedFile = $state('')
+  /** 移动端文件树浮层开关（桌面端用双栏 grid，不用此浮层）。 */
+  let fileTreeSheetOpen = $state(false)
 
   // ---- 历史 ----
   let commits = $state<CommitInfo[]>([])
@@ -226,6 +230,12 @@
 
   function selectFile(path: string) {
     selectedFile = path
+    // 移动端：选中文件后关闭文件树浮层。
+    // 用微任务延迟关闭，避免与 Sheet/Dialog 内部的 click 处理冲突（同步设 false
+    // 会被 bits-ui 的 pointerdown/click 交互判定覆盖）。
+    queueMicrotask(() => {
+      fileTreeSheetOpen = false
+    })
   }
 
   // ---- 历史 ----
@@ -466,11 +476,11 @@
 
       <!-- 文件 + README -->
       <Tabs.Content value="files" class="p-4">
-        <!-- 双栏 grid：固定高度 h-[60vh]，两个子栏各自 overflow-auto 独立滚动。
-             min-w-0 防内容撑开 grid 列宽。 -->
-        <div class="grid h-[60vh] min-w-0 gap-4 md:grid-cols-[minmax(200px,280px)_1fr]">
-          <!-- 文件树（左，独立滚动）-->
-          <div class="border-border min-h-0 min-w-0 overflow-auto rounded border p-2 text-sm">
+        <!-- 桌面端（md+）：双栏 grid，固定高度 h-[60vh]，两栏各自 overflow-auto 独立滚动。
+             移动端（<md）：fileTree 收进 Sheet 浮动浮层，fileContent 让 app 内容区滚动。 -->
+        <div class="grid min-w-0 gap-4 md:h-[60vh] md:grid-cols-[minmax(200px,280px)_1fr]">
+          <!-- 文件树：桌面端为 grid 左栏（独立滚动），移动端隐藏（用 Sheet 触发）-->
+          <div class="border-border min-h-0 min-w-0 overflow-auto rounded border p-2 text-sm md:block max-md:hidden">
             <RepoFileTree
               dir=""
               label="根目录"
@@ -482,15 +492,46 @@
               onselectfile={selectFile}
             />
           </div>
-          <!-- 文件内容（右，独立滚动，自动选中 README）-->
+          <!-- 文件内容（右）：桌面端独立滚动，移动端让 app 内容区滚动 -->
           {#if selectedFile}
-            <RepoFileContent path={selectedFile} {owner} {repo} />
+            <RepoFileContent
+              path={selectedFile}
+              {owner}
+              {repo}
+              branch={repoInfo?.default_branch ?? 'main'}
+              onopenfiletree={() => (fileTreeSheetOpen = true)}
+            />
           {:else}
             <div class="border-border text-muted-foreground flex min-h-0 min-w-0 items-center justify-center rounded border py-8 text-sm">
               选择左侧文件查看内容
             </div>
           {/if}
         </div>
+
+        <!-- 移动端文件树浮层（桌面端隐藏）：点击文件列表按钮触发，选中文件后自动关闭 -->
+        <Sheet.Root bind:open={fileTreeSheetOpen}>
+          <Sheet.Content side="bottom" class="max-h-[75dvh] rounded-t-lg p-0 md:hidden" showCloseButton={false}>
+            <Sheet.Header class="flex-row items-center justify-between border-b px-4 py-3">
+              <Sheet.Title class="flex items-center gap-2 text-sm font-medium">
+                <FolderTreeIcon class="size-4" />
+                文件列表
+              </Sheet.Title>
+              <Sheet.Description class="sr-only">浏览仓库文件树，选择文件查看内容</Sheet.Description>
+            </Sheet.Header>
+            <div class="max-h-[calc(75dvh-4rem)] overflow-auto p-2 text-sm">
+              <RepoFileTree
+                dir=""
+                label="根目录"
+                {tree}
+                {expanded}
+                {loadingDirs}
+                selectedFile={selectedFile}
+                ontoggledir={toggleDir}
+                onselectfile={selectFile}
+              />
+            </div>
+          </Sheet.Content>
+        </Sheet.Root>
       </Tabs.Content>
 
       <!-- 历史 -->
