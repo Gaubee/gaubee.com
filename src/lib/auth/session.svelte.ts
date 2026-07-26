@@ -1,15 +1,28 @@
 /**
- * GitHub 认证会话（runes）。
+ * GitHub 认证会话（runes）—— 前端直连 GitHub API。
  *
- * - 通过 Worker 的 /auth/me 获取登录态（cookie httpOnly，前端读不到 token）。
- * - 所有 GitHub API 调用走 Worker 的 /api/proxy/* 代理，token 在 Worker 端注入。
- * - 未登录访问需鉴权视图时，跳 settings 提示登录。
+ * ⚠️ 安全模型：token 存前端内存（$state），非 httpOnly cookie，XSS 可读。
+ * 这是有意的架构取舍——换取前端直连 api.github.com（零 Worker 代理消耗、无白名单）。
+ *
+ * 防护要求（必须遵守）：
+ * - 严禁第三方 JS 注入（无 CDN script、无 eval、无 dangerouslySetInnerHTML 未消毒内容）。
+ * - 推荐在 CI 中加 CSP 检查：第三方 JS 必须白名单，默认禁止注入。
+ * - 这是 token 安全的唯一防线——一旦 XSS 注入执行，token 会泄露。
+ *
+ * token 生命周期：
+ * - OAuth 回调后，Worker 重定向到 /#auth_token=xxx（hash fragment，不发服务器）。
+ * - 前端启动时从 fragment 读取 token，存 $state（内存），立即清除地址栏 fragment。
+ * - 刷新页面 → 内存丢失 → 需重新登录（token 不持久化，安全优先）。
+ * - 登出 → 清内存 token + 状态重置。
  */
 import { browser } from "$app/environment";
 
-/** Worker 基础 URL。开发时本地 wrangler dev，生产环境变量配置。 */
+/** Worker 基础 URL（仅用于 OAuth 发起/回调，不再用于 API 代理）。 */
 export const AUTH_BASE =
   (import.meta.env.VITE_AUTH_BASE as string | undefined) ?? "http://localhost:8787";
+
+/** GitHub API 基础 URL（前端直连）。 */
+const GITHUB_API = "https://api.github.com";
 
 export interface GithubUser {
   login: string;
@@ -19,7 +32,7 @@ export interface GithubUser {
 }
 
 interface SessionState {
-  /** 是否已加载（初次 fetch /auth/me 完成）。 */
+  /** 是否已加载（初次 fetch /user 完成）。 */
   loaded: boolean;
   /** 是否已认证。 */
   authenticated: boolean;
@@ -37,7 +50,25 @@ class AuthStore {
     error: null,
   });
 
+  /** GitHub access token（内存，不持久化）。 */
+  private token: string | null = null;
+
   private inFlight: Promise<void> | null = null;
+
+  /**
+   * 从 URL fragment 读取 OAuth 回调的 token（#auth_token=xxx）。
+   * 启动时调用一次，读取后立即清除地址栏 fragment（防泄露）。
+   */
+  consumeTokenFromFragment(): void {
+    if (!browser) return;
+    const hash = window.location.hash;
+    const match = hash.match(/auth_token=([^&]+)/);
+    if (match) {
+      this.token = match[1];
+      // 清除地址栏 fragment（history.replaceState，不触发导航）
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  }
 
   /** 拉取当前会话（幂等，并发合并）。 */
   async refresh(): Promise<void> {
@@ -52,24 +83,36 @@ class AuthStore {
 
   private async doRefresh(): Promise<void> {
     if (!browser) return;
+    // 首次启动：从 fragment 消费 token
+    if (!this.token) {
+      this.consumeTokenFromFragment();
+    }
+    if (!this.token) {
+      // 无 token：未登录
+      this.state.loaded = true;
+      this.state.authenticated = false;
+      this.state.user = null;
+      return;
+    }
     try {
-      const resp = await fetch(`${AUTH_BASE}/auth/me`, {
-        credentials: "include",
+      // 用 token 直连 GitHub /user
+      const resp = await fetch(`${GITHUB_API}/user`, {
+        headers: this.authHeaders(),
       });
-      if (resp.ok) {
-        const data = (await resp.json()) as {
-          authenticated: boolean;
-          user?: GithubUser;
-        };
-        this.state.loaded = true;
-        this.state.authenticated = data.authenticated;
-        this.state.user = data.user ?? null;
-        this.state.error = null;
-      } else {
+      if (!resp.ok) {
+        // token 失效（401/403），清空
+        this.token = null;
         this.state.loaded = true;
         this.state.authenticated = false;
         this.state.user = null;
+        this.state.error = resp.status === 401 ? "会话已过期" : null;
+        return;
       }
+      const user = (await resp.json()) as GithubUser;
+      this.state.loaded = true;
+      this.state.authenticated = true;
+      this.state.user = user;
+      this.state.error = null;
     } catch (e) {
       this.state.loaded = true;
       this.state.authenticated = false;
@@ -77,23 +120,15 @@ class AuthStore {
     }
   }
 
-  /** 跳转 GitHub 登录（Worker 重定向）。 */
+  /** 跳转 GitHub 登录（Worker 重定向发起 OAuth）。 */
   login(): void {
     if (!browser) return;
     window.location.href = `${AUTH_BASE}/auth/github`;
   }
 
-  /** 登出。 */
+  /** 登出（清内存 token + 状态）。 */
   async logout(): Promise<void> {
-    if (!browser) return;
-    try {
-      await fetch(`${AUTH_BASE}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-    } catch {
-      // 忽略网络错误，本地状态照样清
-    }
+    this.token = null;
     this.state.authenticated = false;
     this.state.user = null;
   }
@@ -101,6 +136,22 @@ class AuthStore {
   /** 是否已登录（便捷派生）。 */
   get isAuthenticated(): boolean {
     return this.state.authenticated;
+  }
+
+  /** 内部访问 token（同模块的 fetchGithub 用，不对外暴露）。 */
+  get apiToken(): string | null {
+    return this.token;
+  }
+
+  /** 构造 GitHub API 请求头（有 token 带 Authorization）。 */
+  private authHeaders(extra?: HeadersInit): Headers {
+    const headers = new Headers(extra);
+    headers.set("Accept", "application/vnd.github+json");
+    headers.set("User-Agent", "gaubee-app");
+    if (this.token) {
+      headers.set("Authorization", `Bearer ${this.token}`);
+    }
+    return headers;
   }
 }
 
@@ -112,18 +163,24 @@ if (browser) {
 }
 
 /**
- * 封装对 GitHub API 的调用（走 Worker 代理）。
+ * 封装对 GitHub API 的直连调用（前端直连 api.github.com）。
  * 路径不带前导斜杠，如 fetchGithub('repos/gaubee/gaubee.com/contents/src/content')。
  *
- * Worker 行为：
- * - GET/HEAD：无 token 时回退匿名请求（公开仓库可读，受 60/h 限速）
- * - POST/PUT/PATCH/DELETE：必须有 token（未登录返回 401）
- * - 路径限定 repos/*（GitHub REST API 仓库端点；有 token 任意仓库可读写）
+ * - 有 token：带 Authorization，任意仓库可读写（权限由 token scope 决定）。
+ * - 无 token：匿名请求（公开仓库可读，受 60/h 限速）。
+ * - 写操作（POST/PUT/PATCH/DELETE）：必须有 token（GitHub 强制）。
  */
 export async function fetchGithub(path: string, init?: RequestInit): Promise<Response> {
   const cleanPath = path.startsWith("/") ? path.slice(1) : path;
-  return fetch(`${AUTH_BASE}/api/proxy/${cleanPath}`, {
-    ...init,
-    credentials: "include",
-  });
+  const headers = new Headers(init?.headers);
+  headers.set("Accept", "application/vnd.github+json");
+  // GitHub API 强制要求 User-Agent
+  if (!headers.has("User-Agent")) {
+    headers.set("User-Agent", "gaubee-app");
+  }
+  if (authStore.isAuthenticated) {
+    // token 从 authStore 内存取（authStore 内部管理，不暴露）
+    headers.set("Authorization", `Bearer ${authStore.apiToken}`);
+  }
+  return fetch(`${GITHUB_API}/${cleanPath}`, { ...init, headers });
 }

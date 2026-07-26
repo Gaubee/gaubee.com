@@ -165,17 +165,15 @@ app.get("/auth/github/callback", async (c) => {
     return c.redirect(`${c.env.APP_ORIGIN}/?auth_error=no_token`);
   }
 
-  // token 存 httpOnly cookie
-  setCookie(c, COOKIE_NAME, tokenData.access_token, {
-    httpOnly: true,
-    secure: isProd(c.env),
-    sameSite: "Lax",
-    path: "/",
-    maxAge: COOKIE_MAX_AGE,
-  });
-
-  // 回应用首页（带 ?auth=success 让前端显示成功提示）
-  return c.redirect(`${c.env.APP_ORIGIN}/?auth=success`);
+  // token 通过 URL hash fragment 返回前端（#auth_token=...）。
+  // fragment 不会发到服务器/日志，比 query string 更安全。
+  // 前端读取后立即从地址栏清除（存内存 $state，刷新需重登）。
+  // 安全权衡：token 进前端内存，XSS 可读。代价是换取：
+  // - 前端直连 api.github.com，零 Worker 代理消耗
+  // - 无 Worker 白名单维护负担
+  // 防护要求：严禁第三方 JS 注入（见 session.svelte.ts 注释 + CI CSP 检查）。
+  const token = tokenData.access_token;
+  return c.redirect(`${c.env.APP_ORIGIN}/#auth_token=${token}`);
 });
 
 // ---- 3. 登出：清 cookie ----

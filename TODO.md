@@ -747,3 +747,29 @@ agent-browser 双端走查（手机 390x844 / 平板 834x1194 / 桌面 1280）�
 
 - 类型检查 0 错误；308 单测全过（新增 resolver 6 + not-found-registry 7）；build 成功。
 - agent-browser 走查：① 直接访问 `/app/github/repo/Gaubee/gaubee.com` → 详情页正常 ② `/app/nonexistent` → 404 + 回到桌面 ③ 桌面 openApp + 列表页 → 正常无回归。
+
+## Token 架构调整：前端直连 GitHub API（2026-07-27）
+
+### 问题
+
+原架构：所有 GitHub API 走 CF Worker 代理（token 在 httpOnly cookie）。前端拿不到 token，每次 API 消耗 Worker 额度，Worker 白名单成维护负担。
+
+### 新架构（前端直连）
+
+- token 存前端内存（`$state`，刷新需重登），非 httpOnly cookie
+- `fetchGithub` 直连 `https://api.github.com`，带 `Authorization: Bearer ${token}`
+- Worker 仅保留 OAuth 发起（/auth/github）+ 回调（/auth/github/callback）
+- OAuth 回调改为重定向 `/#auth_token=xxx`（hash fragment，不发服务器），前端消费后清除地址栏
+
+### 安全模型
+
+⚠️ token 存前端内存，XSS 可读。防护要求（必须遵守）：
+- 严禁第三方 JS 注入（无 CDN script、无 eval）
+- 推荐在 CI 中加 CSP 检查，第三方 JS 必须白名单
+- 这是 token 安全的唯一防线
+
+### 改动
+
+- `worker/src/index.ts`：OAuth 回调不再设 httpOnly cookie，改为重定向带 fragment；/api/proxy、/auth/me、/auth/logout 标记废弃
+- `src/lib/auth/session.svelte.ts`：token 存内存 $state；fetchGithub 直连 api.github.com；refresh 用 token 直调 /user；consumeTokenFromFragment 消费回调 token
+- `scripts/dev-login.sh`：改为构造 `#auth_token=xxx` URL 让浏览器消费（取代 cookie 注入）
