@@ -134,7 +134,7 @@
   const downloadHref = $derived(rawUrl)
 </script>
 
-<div class="border-border flex min-h-0 min-w-0 flex-col rounded border md:h-full">
+<div class="border-border flex min-w-0 flex-col rounded border">
   <!-- 工具栏：文件路径 + 操作按钮 + Raw|Preview toggle -->
   <div class="border-border flex shrink-0 items-center gap-1.5 border-b px-2 py-1.5">
     <!-- 移动端：文件列表触发按钮（primary 样式，桌面端隐藏）-->
@@ -188,8 +188,8 @@
     </div>
   </div>
 
-  <!-- 内容区：桌面端 overflow-auto 独立滚动；移动端无 overflow 让 app 内容区滚动 -->
-  <div class="min-h-0 flex-1 p-4 md:overflow-auto">
+  <!-- 内容区：直接展开，由 app 内容区滚动（桌面端和移动端统一）-->
+  <div class="p-4">
     {#if loading}
       <Skeleton class="h-40" />
     {:else if error}

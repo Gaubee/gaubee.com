@@ -476,11 +476,12 @@
 
       <!-- 文件 + README -->
       <Tabs.Content value="files" class="p-4">
-        <!-- 桌面端（md+）：双栏 grid，固定高度 h-[60vh]，两栏各自 overflow-auto 独立滚动。
-             移动端（<md）：fileTree 收进 Sheet 浮动浮层，fileContent 让 app 内容区滚动。 -->
-        <div class="grid min-w-0 gap-4 md:h-[60vh] md:grid-cols-[minmax(200px,280px)_1fr]">
-          <!-- 文件树：桌面端为 grid 左栏（独立滚动），移动端隐藏（用 Sheet 触发）-->
-          <div class="border-border min-h-0 min-w-0 overflow-auto rounded border p-2 text-sm md:block max-md:hidden">
+        <!-- 桌面端（md+）：双栏 grid（不固定高度，内容自然撑开）。
+             fileTree 左栏 sticky + 独立滚动，fileContent 右栏直接展开（由 app 内容区滚动）。
+             移动端（<md）：fileTree 收进 Sheet 浮动浮层。 -->
+        <div class="grid min-w-0 gap-4 md:grid-cols-[minmax(200px,280px)_1fr]">
+          <!-- 文件树：桌面端 sticky 左栏（独立滚动），移动端隐藏（用 Sheet 触发）-->
+          <div class="border-border max-h-[calc(100dvh-12rem)] min-w-0 overflow-auto rounded border p-2 text-sm md:sticky md:top-2 md:block max-md:hidden">
             <RepoFileTree
               dir=""
               label="根目录"
@@ -492,7 +493,7 @@
               onselectfile={selectFile}
             />
           </div>
-          <!-- 文件内容（右）：桌面端独立滚动，移动端让 app 内容区滚动 -->
+          <!-- 文件内容（右）：直接展开内容，由 app 内容区滚动 -->
           {#if selectedFile}
             <RepoFileContent
               path={selectedFile}
@@ -502,7 +503,7 @@
               onopenfiletree={() => (fileTreeSheetOpen = true)}
             />
           {:else}
-            <div class="border-border text-muted-foreground flex min-h-0 min-w-0 items-center justify-center rounded border py-8 text-sm">
+            <div class="border-border text-muted-foreground flex min-w-0 items-center justify-center rounded border py-8 text-sm">
               选择左侧文件查看内容
             </div>
           {/if}

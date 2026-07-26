@@ -411,20 +411,25 @@
   background: var(--muted);
   backdrop-filter: blur(0);
   /* scroll-driven 动画：引用滚动容器的命名 timeline */
-  animation: repo-tabs-scroll linear forwards;
+  animation: repo-tabs-scroll ease-out forwards;
   animation-timeline: --repo-tab-scroll;
-  animation-range: 0 120px;
+  animation-range: 0 160px;
 }
 
 @keyframes repo-tabs-scroll {
   0% {
     background: var(--muted);
     backdrop-filter: blur(0);
+    left: 0%;
   }
   100% {
     /* 毛玻璃：半透明背景 + backdrop-blur（遵循 AGENTS.md 毛玻璃标准搭配） */
-    background: color-mix(in oklch, var(--background) 70%, transparent);
+    background: color-mix(in oklch, var(--background) 60%, transparent);
     backdrop-filter: blur(12px) contrast(2) brightness(0.8);
+    top: 10px;
+    width: 50%;
+    left: 25%;
+    box-shadow: 0 3px 12px -6px currentColor;
   }
 }
 :global(.dark) .repo-tabs {
