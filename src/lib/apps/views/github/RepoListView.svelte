@@ -412,6 +412,14 @@
         <TagIcon class="size-4 text-amber-500" />
         <h2 class="text-base font-medium">收藏的仓库</h2>
         <Badge variant="secondary" class="text-xs">{favorites.length}</Badge>
+        {#if favoriteRepos.length > PREVIEW_COUNT}
+          <button
+            class="text-primary hover:bg-accent ml-auto rounded-md px-2 py-0.5 text-xs"
+            onclick={() => navController.navigateMain('/app/github/list/favorites')}
+          >
+            查看全部 {favoriteRepos.length} 个 →
+          </button>
+        {/if}
       </div>
       {#if favoritesLoading && favorites.length > 0}
         {#each Array(Math.min(favorites.length, PREVIEW_COUNT)) as _}<Skeleton class="h-16" />{/each}
@@ -421,14 +429,6 @@
         </p>
       {:else}
         {@render repoGrid(favoriteRepos.slice(0, PREVIEW_COUNT))}
-        {#if favoriteRepos.length > PREVIEW_COUNT}
-          <button
-            class="text-primary hover:bg-accent w-full rounded-md py-1.5 text-center text-xs"
-            onclick={() => navController.navigateMain('/app/github/list/favorites')}
-          >
-            查看全部 {favoriteRepos.length} 个 →
-          </button>
-        {/if}
       {/if}
     </section>
 
@@ -439,6 +439,14 @@
           <UserIcon class="size-4 text-muted-foreground" />
           <h2 class="text-base font-medium">{login} 的仓库</h2>
           <Badge variant="secondary" class="text-xs">{myReposTotal}</Badge>
+          {#if myReposTotal > PREVIEW_COUNT}
+            <button
+              class="text-primary hover:bg-accent ml-auto rounded-md px-2 py-0.5 text-xs"
+              onclick={() => navController.navigateMain(`/app/github/list/user:${login}`)}
+            >
+              查看全部 {myReposTotal} 个 →
+            </button>
+          {/if}
         </div>
         {#if myReposLoading}
           {#each Array(PREVIEW_COUNT) as _}<Skeleton class="h-16" />{/each}
@@ -448,14 +456,6 @@
           <p class="text-muted-foreground text-sm">暂无仓库</p>
         {:else}
           {@render repoGrid(myRepos.slice(0, PREVIEW_COUNT))}
-          {#if myReposTotal > PREVIEW_COUNT}
-            <button
-              class="text-primary hover:bg-accent w-full rounded-md py-1.5 text-center text-xs"
-              onclick={() => navController.navigateMain(`/app/github/list/user:${login}`)}
-            >
-              查看全部 {myReposTotal} 个 →
-            </button>
-          {/if}
         {/if}
       </section>
 
@@ -475,19 +475,19 @@
               {/if}
               <h2 class="text-base font-medium">{org.login} 的仓库</h2>
               <Badge variant="secondary" class="text-xs">{total}</Badge>
-            </div>
-            {#if repos.length === 0}
-              <p class="text-muted-foreground text-sm">暂无仓库</p>
-            {:else}
-              {@render repoGrid(repos.slice(0, PREVIEW_COUNT))}
               {#if total > PREVIEW_COUNT}
                 <button
-                  class="text-primary hover:bg-accent w-full rounded-md py-1.5 text-center text-xs"
+                  class="text-primary hover:bg-accent ml-auto rounded-md px-2 py-0.5 text-xs"
                   onclick={() => navController.navigateMain(`/app/github/list/org:${org.login}`)}
                 >
                   查看全部 {total} 个 →
                 </button>
               {/if}
+            </div>
+            {#if repos.length === 0}
+              <p class="text-muted-foreground text-sm">暂无仓库</p>
+            {:else}
+              {@render repoGrid(repos.slice(0, PREVIEW_COUNT))}
             {/if}
           </section>
         {/each}
