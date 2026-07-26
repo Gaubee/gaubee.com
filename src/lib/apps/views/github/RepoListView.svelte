@@ -137,23 +137,34 @@
     if (!login) return
     myReposLoading = true
     myReposError = null
+    orgsLoading = true
     try {
-      const [repos, userOrgs] = await Promise.all([
+      // 用 allSettled 隔离失败：orgs 加载失败不拖垮个人仓库展示（反之亦然）
+      const [reposResult, orgsResult] = await Promise.allSettled([
         listUserRepos({ perPage: 30 }),
         listUserOrgs(),
       ])
-      myRepos = repos
-      orgs = userOrgs
-      // 并发拉每个 org 的仓库（只拉前 30 个）
-      const entries = await Promise.all(
-        userOrgs.map(async (org) => [
-          org.login,
-          await listOrgRepos(org.login, { perPage: 30 }).catch(() => []),
-        ] as const),
-      )
-      orgRepos = Object.fromEntries(entries)
-    } catch (e) {
-      myReposError = e instanceof Error ? e.message : '加载仓库列表失败'
+
+      // 个人仓库
+      if (reposResult.status === 'fulfilled') {
+        myRepos = reposResult.value
+      } else {
+        myReposError = reposResult.reason instanceof Error ? reposResult.reason.message : '加载仓库列表失败'
+      }
+
+      // orgs + 各 org 仓库
+      if (orgsResult.status === 'fulfilled') {
+        orgs = orgsResult.value
+        // 并发拉每个 org 的仓库（独立 catch，单个失败不影响其它）
+        const entries = await Promise.all(
+          orgsResult.value.map(async (org) => [
+            org.login,
+            await listOrgRepos(org.login, { perPage: 30 }).catch(() => []),
+          ] as const),
+        )
+        orgRepos = Object.fromEntries(entries)
+      }
+      // orgs 失败时静默（orgs 保持空数组，不阻塞个人仓库）
     } finally {
       myReposLoading = false
       orgsLoading = false
