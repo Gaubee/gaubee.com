@@ -180,7 +180,7 @@
   {/if}
 
   <!-- 右：tray 快捷入口 -->
-  <div class="ml-auto flex items-center gap-0.5">
+  <div class="ml-auto flex items-center gap-1">
     <!-- 登录态指示（已登录显头像） -->
     {#if accountState.loaded && accountState.authenticated && accountState.user}
       <img src={accountState.user.avatar_url} alt="" class="size-5 rounded-full" />

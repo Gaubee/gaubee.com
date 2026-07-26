@@ -76,14 +76,16 @@ const PROXY_ALLOWED_PREFIXES = [
 
 const app = new Hono<{ Bindings: Env }>();
 
-// CORS：dev 允许 localhost 任意端口，prod 严格 APP_ORIGIN。
+// CORS：dev 允许 localhost 任意端口 + portless 的 *.localhost 域名，prod 严格 APP_ORIGIN。
 app.use(
   "*",
   cors({
     origin: (origin, c) => {
       const isDev = c.env.ENVIRONMENT !== "production";
-      // 开发环境：localhost/127.0.0.1 任意端口都允许
-      if (isDev && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      // 开发环境：
+      // - localhost/127.0.0.1 任意端口（vite 直连）
+      // - *.localhost 任意端口（portless 自动域名，如 gaubee.com.localhost:5173）
+      if (isDev && /^https?:\/\/([a-z0-9-]+\.)*localhost(:\d+)?$/.test(origin)) {
         return origin;
       }
       const allowed = c.env.APP_ORIGIN;
