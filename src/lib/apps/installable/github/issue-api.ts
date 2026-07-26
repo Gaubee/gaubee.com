@@ -4,7 +4,7 @@
  * 从 repo-api.ts 拆分 issue 相关 + 新增评论 CRUD、@mention 搜索、图片上传。
  * 前端直连 api.github.com（fetchGithub），无 Worker 代理。
  */
-import { fetchGithub } from "$lib/auth/session.svelte";
+import { fetchGithub, authStore } from "$lib/auth/session.svelte";
 import { NotAuthenticatedError } from "$lib/os/services";
 
 /** HTTP 响应检查（与 repo-api.ts assertOk 同语义）。 */
@@ -389,13 +389,14 @@ export async function searchCode(
  * 走 Worker /upload/image 端点（Worker 用 token 调 Contents API PUT）。
  * 路径：`.github-issue-assets/{timestamp}-{rand}.{ext}`
  *
+ * token 通过 Authorization header 传给 Worker（新架构 token 在前端内存，非 cookie）。
+ *
  * @param owner 仓库 owner
  * @param repo 仓库名
  * @param file 图片文件（前端 paste/drop 获取）
  * @returns raw URL（可直接用于 markdown ![](url)）
  */
 export async function uploadIssueImage(owner: string, repo: string, file: File): Promise<string> {
-  // Worker 基础 URL（与 OAuth 共用）
   const AUTH_BASE =
     (import.meta.env.VITE_AUTH_BASE as string | undefined) ?? "http://localhost:8787";
   const formData = new FormData();
@@ -403,10 +404,17 @@ export async function uploadIssueImage(owner: string, repo: string, file: File):
   formData.append("repo", repo);
   formData.append("file", file);
 
+  // token 从 authStore 内存取，通过 Authorization header 传给 Worker
+  const token = authStore.apiToken;
+  const headers: HeadersInit = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const resp = await fetch(`${AUTH_BASE}/upload/image`, {
     method: "POST",
     body: formData,
-    credentials: "include",
+    headers,
   });
 
   if (!resp.ok) {

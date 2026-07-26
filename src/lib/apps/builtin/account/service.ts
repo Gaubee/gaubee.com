@@ -2,7 +2,7 @@ import { authStore, type GithubUser } from "$lib/auth/session.svelte";
 /**
  * AccountService：账户能力接口（GaubeeOS 应用服务总线的一部分）。
  *
- * 这是「账户」能力的正式抽象，封装现有 authStore（GitHub OAuth + Worker httpOnly cookie）。
+ * 这是「账户」能力的正式抽象，封装现有 authStore（GitHub OAuth + 前端内存 token）。
  * 其它应用通过 gaubeeos.getAppService('account') 获取，不再直接 import authStore。
  *
  * 设计：

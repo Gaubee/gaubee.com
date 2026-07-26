@@ -6,7 +6,7 @@
  * - repo-api.ts：聚焦仓库发现/浏览（列表页的聚合卡片、搜索、issues），只读为主，
  *   覆盖 user/org 仓库列表、搜索、issues 等 client.ts 未覆盖的端点。
  *
- * 所有调用经 fetchGithub（Worker 代理，cookie httpOnly 注入 token）。
+ * 所有调用经 fetchGithub（前端直连 api.github.com，token 在前端内存）。
  */
 import { fetchGithub } from "$lib/auth/session.svelte";
 import { NotAuthenticatedError } from "$lib/os/services";

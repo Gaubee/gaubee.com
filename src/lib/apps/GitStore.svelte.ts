@@ -3,7 +3,7 @@
  *
  * 定位：
  * - 管理多个已克隆的公开 GitHub 仓库（clone/pull/log/unshallow/remove）。
- * - 匿名操作（token 在 Worker httpOnly cookie，isomorphic-git 拿不到）。
+ * - 匿名操作（isomorphic-git 无 token，公开仓库只读）。
  * - clone 结果持久化到 ZenFS（IndexedDB），仓库列表持久化到 meta-store。
  * - 与 GitService（走 VFS + Git Data API，认证有效）是两条独立路径。
  *

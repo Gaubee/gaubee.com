@@ -31,19 +31,14 @@ export default defineConfig({
     }),
   ],
   // 本地开发：vite 经 portless 暴露为 https://gaubee.com.localhost，
-  // Worker（wrangler dev，localhost:8787）的 /auth/* 与 /api/proxy/* 经 vite proxy 同源转发。
-  // 这样前端与 Worker 同源，规避 CORS 与 secure cookie 跨子域（SameSite）问题。
-  // 生产环境前端跨域直连 Worker（VITE_AUTH_BASE 指向 Worker 域名），此 proxy 仅 dev 生效。
+  // Worker（wrangler dev，localhost:8787）的 /auth/* 经 vite proxy 同源转发。
+  // 前端 OAuth 跳转走相对路径 /auth/github，vite proxy 转发到 Worker。
+  // 新架构前端直连 api.github.com（不走 proxy），Worker 仅处理 OAuth + 图片上传。
   server: {
     proxy: {
       "/auth": {
         target: "http://localhost:8787",
         changeOrigin: true, // 必需：portless 反代下避免 508 循环检测
-        secure: false,
-      },
-      "/api/proxy": {
-        target: "http://localhost:8787",
-        changeOrigin: true,
         secure: false,
       },
     },

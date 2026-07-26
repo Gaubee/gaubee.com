@@ -2,7 +2,7 @@
  * GitService：GitApp（Github 应用）提供的仓库操作能力接口。
  *
  * 这是「在浏览器中操作仓库内容」的统一抽象，收口两套历史路径：
- * 1. VFS + Git Data API（经 Worker 代理，认证有效）—— 写作/提交主路径。
+ * 1. VFS + Git Data API（前端直连 api.github.com，认证有效）—— 写作/提交主路径。
  * 2. isomorphic-git GitStore —— GithubApp 的 clone/log/branch 功能（已降级为 CLI）。
  *
  * 发表等流程走 GitService，由它委托 VFS（认证有效路径）。

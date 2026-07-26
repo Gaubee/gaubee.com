@@ -142,9 +142,9 @@
       <div class="text-muted-foreground flex flex-col gap-2 text-sm">
         <div class="flex items-start gap-2">
           <KeyRoundIcon class="mt-0.5 size-4 shrink-0" />
-          <p>访问令牌仅存储在服务端 httpOnly Cookie 中，前端代码无法读取，降低令牌泄露风险。</p>
+          <p>访问令牌存储在前端内存中，刷新页面后需重新登录。第三方脚本注入受严格限制以保护令牌安全。</p>
         </div>
-        <p>会话有效期约 30 天，期间无需重复登录。登出会立即清除服务端会话。</p>
+        <p>登出会立即清除内存中的令牌。</p>
       </div>
     </Card.Content>
   </Card.Root>

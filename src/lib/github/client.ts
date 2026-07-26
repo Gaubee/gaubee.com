@@ -1,15 +1,12 @@
 /**
  * GitHub 客户端：封装对仓库文件的读写操作 + 只读 REST API 浏览。
  *
- * 认证后通过 Worker 代理（fetchGithub，cookie httpOnce 注入 token）。
- * 所有 GitHub REST API 调用都走 /api/proxy/*，前端不接触 token。
+ * 前端直连 api.github.com（fetchGithub），token 在前端内存（authStore $state）。
+ * 有 token：任意仓库可读写（权限由 token scope 决定）。
+ * 无 token：匿名请求（公开仓库可读，受 60/h 限速）。
  *
  * 仓库：gaubee/gaubee.com（OWNER/REPO 常量，写作/提交主路径）。
  * 内容路径：src/content/articles、src/content/events。
- *
- * 多仓库只读浏览：listContents / getFileText / fetchTree / listCommits 均接受
- * 可选 { owner, repo } 参数（默认 OWNER/REPO，向后兼容），可浏览任意公开仓库的
- * 历史/文件/目录（经 Worker，有 token 任意仓库可读，无 token 受 60/h 限速）。
  */
 import { fetchGithub } from "$lib/auth/session.svelte";
 import type { Collection } from "$lib/data/frontmatter";
@@ -286,7 +283,7 @@ export interface StagedChange {
 
 /**
  * 批量提交变更到 GitHub（Git Data API: tree → commit → updateRef）。
- * 走 Worker 代理。返回新 commit sha。
+ * 前端直连 api.github.com（fetchGithub）。返回新 commit sha。
  *
  * 删除文件：在 tree 里显式提供 { path, mode, type, sha: null }，
  * GitHub 会从 base_tree 移除该 path（这是 Trees API 删除文件的正确语义）。
