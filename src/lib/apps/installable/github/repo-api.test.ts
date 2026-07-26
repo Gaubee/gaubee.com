@@ -51,12 +51,13 @@ const sampleIssue = {
   labels: [{ name: "bug", color: "red" }],
 };
 
-function jsonResponse(data: unknown, ok = true): Response {
+function jsonResponse(data: unknown, ok = true, headers?: Record<string, string>): Response {
   return {
     ok,
     status: 200,
     json: async () => data,
     text: async () => JSON.stringify(data),
+    headers: new Headers(headers),
   } as Response;
 }
 
@@ -67,14 +68,16 @@ beforeEach(() => {
 describe("repo-api", () => {
   it("listUserRepos 构造 user/repos 路径并解析", async () => {
     mockFetch.mockResolvedValue(jsonResponse([sampleRepo]));
-    const repos = await listUserRepos({ perPage: 5 });
+    const page = await listUserRepos({ perPage: 5 });
     expect(mockFetch).toHaveBeenCalledOnce();
     const [path] = mockFetch.mock.calls[0];
     expect(path).toContain("user/repos");
     expect(path).toContain("per_page=5");
-    expect(repos).toHaveLength(1);
-    expect(repos[0].full_name).toBe("sveltejs/kit");
-    expect(repos[0].stargazers_count).toBe(18000);
+    expect(page.repos).toHaveLength(1);
+    expect(page.repos[0].full_name).toBe("sveltejs/kit");
+    expect(page.repos[0].stargazers_count).toBe(18000);
+    // 无 Link 头时 hasMore=false
+    expect(page.hasMore).toBe(false);
   });
 
   it("listOrgRepos 构造 orgs/{org}/repos 路径", async () => {
@@ -82,6 +85,21 @@ describe("repo-api", () => {
     await listOrgRepos("sveltejs");
     const [path] = mockFetch.mock.calls[0];
     expect(path).toContain("orgs/sveltejs/repos");
+  });
+
+  it("listUserRepos 解析 Link 头分页（hasMore + total 下界）", async () => {
+    // 模拟 GitHub 分页响应：per_page=30，当前第 1 页，共 6 页（约 150+ 个）
+    mockFetch.mockResolvedValue(
+      jsonResponse([sampleRepo], true, {
+        Link: '<https://api.github.com/user/repos?per_page=30&page=2>; rel="next", <https://api.github.com/user/repos?per_page=30&page=6>; rel="last"',
+      }),
+    );
+
+    const page = await listUserRepos({ perPage: 30, page: 1 });
+    expect(page.hasMore).toBe(true);
+    expect(page.nextPage).toBe(2);
+    // total 下界 = (lastPage - 1) * perPage = 5 * 30 = 150
+    expect(page.total).toBe(150);
   });
 
   it("listUserOrgs 返回 login + avatar", async () => {

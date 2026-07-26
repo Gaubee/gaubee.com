@@ -11,11 +11,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 
-// mock repo-api（列表页 API）
+// mock repo-api（列表页 API）。listUserRepos/listOrgRepos 返回 RepoPage 结构。
+// 注意：vi.mock 是 hoisted 的，不能引用顶层变量，emptyPage 内联。
 vi.mock("$lib/apps/installable/github/repo-api", () => ({
-  listUserRepos: vi.fn().mockResolvedValue([]),
+  listUserRepos: vi.fn().mockResolvedValue({ repos: [], total: 0, hasMore: false, nextPage: null }),
   listUserOrgs: vi.fn().mockResolvedValue([]),
-  listOrgRepos: vi.fn().mockResolvedValue([]),
+  listOrgRepos: vi.fn().mockResolvedValue({ repos: [], total: 0, hasMore: false, nextPage: null }),
   searchRepos: vi.fn().mockResolvedValue({ total: 0, items: [] }),
   getRepo: vi.fn().mockResolvedValue(null),
   listIssues: vi.fn().mockResolvedValue([]),

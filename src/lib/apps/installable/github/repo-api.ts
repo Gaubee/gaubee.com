@@ -27,6 +27,54 @@ async function assertOk(resp: Response, context: string): Promise<void> {
   throw new Error(`${context} 失败: ${resp.status}`);
 }
 
+/**
+ * 分页结果（list 类 API 的统一返回结构）。
+ * - repos：当前页的仓库列表
+ * - total：GitHub 报告的总数（来自 Link 头 last page × perPage 推算，下界）
+ * - hasMore：是否有下一页（Link 头含 rel="next"）
+ * - nextPage：下一页页码（hasMore 时有效）
+ */
+export interface RepoPage {
+  repos: RepoSummary[];
+  /** 总数下界（实际总数 >= total）。无 Link 头时为当前页数量。 */
+  total: number;
+  hasMore: boolean;
+  nextPage: number | null;
+}
+
+/**
+ * 从响应的 Link 头解析分页信息。
+ * GitHub Link 头格式：<url?page=N>; rel="next", <url?page=M>; rel="last"
+ * - rel="next" 存在 → hasMore = true
+ * - rel="last" 的 page M → 总数下界 = (M-1) * perPage + 1（最后一页至少 1 个）
+ */
+function parsePagination(
+  resp: Response,
+  perPage: number,
+  currentPage: number,
+): {
+  hasMore: boolean;
+  nextPage: number | null;
+  total: number;
+} {
+  const link = resp.headers.get("Link") ?? "";
+  if (!link) {
+    // 无 Link 头：单页结果，无更多
+    return { hasMore: false, nextPage: null, total: 0 };
+  }
+  const nextMatch = link.match(/page=(\d+)>; rel="next"/);
+  const lastMatch = link.match(/page=(\d+)>; rel="last"/);
+  const hasMore = !!nextMatch;
+  const nextPage = nextMatch ? Number(nextMatch[1]) : null;
+  // 总数下界：last page 存在时 (lastPage-1)*perPage + 1；否则用当前页
+  let total = 0;
+  if (lastMatch) {
+    const lastPage = Number(lastMatch[1]);
+    total = (lastPage - 1) * perPage; // 下界（最后一页数量未知，至少 0 个，加上当前已加载）
+  }
+  return { hasMore, nextPage, total };
+}
+
 /** 仓库摘要（列表页/搜索结果用，裁剪自 GitHub Repo API 全量字段）。 */
 export interface RepoSummary {
   id: number;
@@ -92,21 +140,29 @@ export interface OrgSummary {
  * 列出当前认证用户的仓库（按 updated 倒序）。
  * GET /user/repos?sort=updated&per_page=N
  */
+/**
+ * 列出当前认证用户的仓库（按 updated 倒序）。
+ * GET /user/repos?sort=updated&per_page=N&page=P
+ * @returns RepoPage（含分页信息，total 为下界）
+ */
 export async function listUserRepos(opts?: {
   sort?: "updated" | "created" | "full_name" | "pushed";
   perPage?: number;
   page?: number;
-}): Promise<RepoSummary[]> {
+}): Promise<RepoPage> {
+  const perPage = opts?.perPage ?? 10;
+  const page = opts?.page ?? 1;
   const params = new URLSearchParams({
     sort: opts?.sort ?? "updated",
-    per_page: String(opts?.perPage ?? 10),
-    page: String(opts?.page ?? 1),
+    per_page: String(perPage),
+    page: String(page),
   });
   const resp = await fetchGithub(`user/repos?${params.toString()}`);
-  if (resp.status === 404) return [];
+  if (resp.status === 404) return { repos: [], total: 0, hasMore: false, nextPage: null };
   await assertOk(resp, "listUserRepos");
   const data = (await resp.json()) as GhRepoResponse[];
-  return data.map(toRepoSummary);
+  const { hasMore, nextPage, total } = parsePagination(resp, perPage, page);
+  return { repos: data.map(toRepoSummary), total, hasMore, nextPage };
 }
 
 /**
@@ -131,22 +187,26 @@ export async function listUserPublicRepos(
 
 /**
  * 列出指定组织的仓库。
- * GET /orgs/{org}/repos?sort=updated&per_page=N
+ * GET /orgs/{org}/repos?sort=updated&per_page=N&page=P
+ * @returns RepoPage（含分页信息，total 为下界）
  */
 export async function listOrgRepos(
   org: string,
   opts?: { sort?: string; perPage?: number; page?: number },
-): Promise<RepoSummary[]> {
+): Promise<RepoPage> {
+  const perPage = opts?.perPage ?? 10;
+  const page = opts?.page ?? 1;
   const params = new URLSearchParams({
     sort: opts?.sort ?? "updated",
-    per_page: String(opts?.perPage ?? 10),
-    page: String(opts?.page ?? 1),
+    per_page: String(perPage),
+    page: String(page),
   });
   const resp = await fetchGithub(`orgs/${org}/repos?${params.toString()}`);
-  if (resp.status === 404) return [];
+  if (resp.status === 404) return { repos: [], total: 0, hasMore: false, nextPage: null };
   await assertOk(resp, `listOrgRepos(${org})`);
   const data = (await resp.json()) as GhRepoResponse[];
-  return data.map(toRepoSummary);
+  const { hasMore, nextPage, total } = parsePagination(resp, perPage, page);
+  return { repos: data.map(toRepoSummary), total, hasMore, nextPage };
 }
 
 /**

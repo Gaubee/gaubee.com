@@ -266,8 +266,8 @@ app.all("/api/proxy/*", async (c) => {
   const respHeaders = new Headers();
   respHeaders.set("Content-Type", resp.headers.get("Content-Type") ?? "application/json");
   respHeaders.set("Cache-Control", "no-store");
-  // 透传 GitHub 的 rate limit 头（前端可据此提示）
-  for (const h of ["X-RateLimit-Limit", "X-RateLimit-Remaining", "ETag"]) {
+  // 透传 GitHub 的 rate limit 头（前端可据此提示）+ Link 头（分页，GithubApp 列表页推算总数用）
+  for (const h of ["X-RateLimit-Limit", "X-RateLimit-Remaining", "ETag", "Link"]) {
     const v = resp.headers.get(h);
     if (v) respHeaders.set(h, v);
   }

@@ -16,6 +16,7 @@
   import { navController } from '$lib/nav/nav-controller-instance'
   import { accountService } from '$lib/apps/builtin/account/service'
   import { repoFavorites } from '$lib/apps/installable/github/favorites.svelte'
+  import { listCache } from '$lib/apps/installable/github/list-cache.svelte'
   import {
     listUserRepos,
     listUserOrgs,
@@ -38,6 +39,7 @@
   import BuildingIcon from '@lucide/svelte/icons/building-2'
   import ChevronRightIcon from '@lucide/svelte/icons/chevron-right'
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left'
+  import ChevronDownIcon from '@lucide/svelte/icons/chevron-down'
 
   // ---- props ----
   /**
@@ -46,11 +48,13 @@
    */
   let { listFilter = null }: { listFilter?: string | null } = $props()
 
-  // ---- 分页列表模式状态 ----
+  // ---- 分页列表模式状态（从缓存读取，保持保活）----
+  const filterCache = $derived(listFilter ? listCache.filters[listFilter] : undefined)
   let filterTitle = $state('')
-  let filterRepos = $state<RepoSummary[]>([])
   let filterLoading = $state(false)
   let filterError = $state<string | null>(null)
+  /** 分页列表"加载更多"中。 */
+  let filterLoadingMore = $state(false)
 
   // ---- 账户状态 ----
   const accountState = $derived(accountService.state)
@@ -59,17 +63,19 @@
   // ---- 搜索 ----
   let searchInput = $state('')
   let searchResults = $state<RepoSummary[] | null>(null)
+  let searchTotal = $state(0)
   let searchLoading = $state(false)
   let searchError = $state<string | null>(null)
 
-  // ---- 我的仓库 ----
-  let myRepos = $state<RepoSummary[]>([])
+  // ---- 聚合首页：从缓存读取（保活），首次/过期时后台刷新 ----
+  const homeCache = $derived(listCache.home)
+  const myRepos = $derived(homeCache?.myRepos ?? [])
+  const myReposTotal = $derived(homeCache?.myReposTotal ?? 0)
+  const orgs = $derived(homeCache?.orgs ?? [])
+  const orgRepos = $derived(homeCache?.orgRepos ?? {})
+  const orgReposTotal = $derived(homeCache?.orgReposTotal ?? {})
   let myReposLoading = $state(false)
   let myReposError = $state<string | null>(null)
-
-  // ---- orgs ----
-  let orgs = $state<OrgSummary[]>([])
-  let orgRepos = $state<Record<string, RepoSummary[]>>({})
   let orgsLoading = $state(false)
 
   // ---- 收藏（响应式）----
@@ -77,95 +83,166 @@
 
   const PREVIEW_COUNT = 3
 
-  onMount(() => {
-    void repoFavorites.init()
-    if (listFilter) {
-      void loadFilterList()
-    } else {
-      void loadMyData()
+  // listFilter 变化时加载分页列表（缓存命中则跳过，除非刷新）
+  $effect(() => {
+    const f = listFilter
+    if (f && !listCache.filters[f]) {
+      void loadFilterList(true)
     }
   })
 
-  // listFilter 变化时重新加载分页列表
-  $effect(() => {
-    const f = listFilter
-    if (f) void loadFilterList()
+  /** 首次挂载或缓存为空时加载首页（缓存命中则跳过，保活）。 */
+  onMount(() => {
+    void repoFavorites.init()
+    if (listFilter) {
+      if (!listCache.filters[listFilter]) void loadFilterList(true)
+    } else {
+      // 首页：缓存命中直接用，过期或无缓存才刷新
+      if (listCache.homeStale()) void loadMyData()
+    }
   })
 
-  /** 分页列表模式：按 listFilter 加载单一列表（不限数量）。 */
-  async function loadFilterList() {
+  /**
+   * 分页列表模式：按 listFilter 加载第一页（reset=true）或下一页（reset=false）。
+   * 缓存到 listCache.filters[listFilter]，组件重新挂载时从缓存读（保活）。
+   */
+  async function loadFilterList(reset: boolean) {
     if (!listFilter) return
-    filterLoading = true
-    filterError = null
-    filterRepos = []
+    // 去重：同 key 已在加载中则跳过
+    if (listCache.filterInFlight.has(listFilter)) return
+
+    if (reset) {
+      filterLoading = true
+      filterError = null
+    } else {
+      filterLoadingMore = true
+    }
+    listCache.filterInFlight.add(listFilter)
+
     try {
-      const { getRepo } = await import('$lib/apps/installable/github/repo-api')
       if (listFilter === 'favorites') {
         filterTitle = '收藏的仓库'
-        // 等待 favorites init 完成
+        const { getRepo } = await import('$lib/apps/installable/github/repo-api')
         await repoFavorites.init()
         const favs = repoFavorites.items
         const results = await Promise.all(
           favs.map((f) => getRepo(f.owner, f.repo).catch(() => null)),
         )
-        filterRepos = results.filter((r): r is RepoSummary => r !== null)
+        const repos = results.filter((r): r is RepoSummary => r !== null)
+        // 收藏无分页概念，一次性加载
+        listCache.filters = {
+          ...listCache.filters,
+          [listFilter]: { title: '收藏的仓库', repos, total: repos.length, loadedPage: 1, hasMore: false },
+        }
       } else if (listFilter.startsWith('user:')) {
         const username = listFilter.slice(5)
         filterTitle = `${username} 的仓库`
-        filterRepos = await listUserRepos({ perPage: 100 })
+        const existing = listCache.filters[listFilter]
+        const nextPage = reset ? 1 : (existing?.loadedPage ?? 0) + 1
+        const PER_PAGE = 30
+        const page = await listUserRepos({ perPage: PER_PAGE, page: nextPage })
+        const repos = reset ? page.repos : [...(existing?.repos ?? []), ...page.repos]
+        listCache.filters = {
+          ...listCache.filters,
+          [listFilter]: {
+            title: filterTitle,
+            repos,
+            total: page.total || repos.length,
+            loadedPage: nextPage,
+            hasMore: page.hasMore,
+          },
+        }
       } else if (listFilter.startsWith('org:')) {
         const org = listFilter.slice(4)
         filterTitle = `${org} 的仓库`
-        filterRepos = await listOrgRepos(org, { perPage: 100 })
+        const existing = listCache.filters[listFilter]
+        const nextPage = reset ? 1 : (existing?.loadedPage ?? 0) + 1
+        const PER_PAGE = 30
+        const page = await listOrgRepos(org, { perPage: PER_PAGE, page: nextPage })
+        const repos = reset ? page.repos : [...(existing?.repos ?? []), ...page.repos]
+        listCache.filters = {
+          ...listCache.filters,
+          [listFilter]: {
+            title: filterTitle,
+            repos,
+            total: page.total || repos.length,
+            loadedPage: nextPage,
+            hasMore: page.hasMore,
+          },
+        }
       }
     } catch (e) {
-      filterError = e instanceof Error ? e.message : '加载列表失败'
+      if (reset) filterError = e instanceof Error ? e.message : '加载列表失败'
     } finally {
+      listCache.filterInFlight.delete(listFilter)
       filterLoading = false
+      filterLoadingMore = false
     }
   }
 
-  // 登录状态变化时重新加载个人数据（仅聚合首页模式）
+  // 登录状态变化时重新加载个人数据（仅聚合首页模式 + 缓存过期时）
   $effect(() => {
     const currentLogin = login
-    if (currentLogin && !listFilter) {
+    if (currentLogin && !listFilter && listCache.homeStale()) {
       void loadMyData()
     }
   })
 
   async function loadMyData() {
     if (!login) return
+    if (listCache.homeInFlight) return
+    listCache.homeInFlight = true
     myReposLoading = true
     myReposError = null
     orgsLoading = true
     try {
+      const PER_PAGE = 30
       // 用 allSettled 隔离失败：orgs 加载失败不拖垮个人仓库展示（反之亦然）
       const [reposResult, orgsResult] = await Promise.allSettled([
-        listUserRepos({ perPage: 30 }),
+        listUserRepos({ perPage: PER_PAGE }),
         listUserOrgs(),
       ])
 
-      // 个人仓库
+      let newMyRepos: RepoSummary[] = []
+      let myReposTotal = 0
       if (reposResult.status === 'fulfilled') {
-        myRepos = reposResult.value
+        newMyRepos = reposResult.value.repos
+        // total 是 GitHub Link 头推算的下界；无 Link 头时用当前页数量
+        myReposTotal = reposResult.value.total || newMyRepos.length
       } else {
         myReposError = reposResult.reason instanceof Error ? reposResult.reason.message : '加载仓库列表失败'
       }
 
-      // orgs + 各 org 仓库
+      let newOrgs: OrgSummary[] = []
+      let newOrgRepos: Record<string, RepoSummary[]> = {}
+      let newOrgReposTotal: Record<string, number> = {}
       if (orgsResult.status === 'fulfilled') {
-        orgs = orgsResult.value
-        // 并发拉每个 org 的仓库（独立 catch，单个失败不影响其它）
+        newOrgs = orgsResult.value
         const entries = await Promise.all(
-          orgsResult.value.map(async (org) => [
-            org.login,
-            await listOrgRepos(org.login, { perPage: 30 }).catch(() => []),
-          ] as const),
+          orgsResult.value.map(async (org): Promise<[string, RepoSummary[], number]> => {
+            const page = await listOrgRepos(org.login, { perPage: PER_PAGE }).catch(() => null)
+            const repos = page?.repos ?? []
+            const total = page?.total || repos.length
+            return [org.login, repos, total]
+          }),
         )
-        orgRepos = Object.fromEntries(entries)
+        for (const [login, repos, total] of entries) {
+          newOrgRepos[login] = repos
+          newOrgReposTotal[login] = total
+        }
       }
-      // orgs 失败时静默（orgs 保持空数组，不阻塞个人仓库）
+
+      // 写入缓存（响应式，触发组件重渲染）
+      listCache.home = {
+        myRepos: newMyRepos,
+        myReposTotal,
+        orgs: newOrgs,
+        orgRepos: newOrgRepos,
+        orgReposTotal: newOrgReposTotal,
+        loadedAt: Date.now(),
+      }
     } finally {
+      listCache.homeInFlight = false
       myReposLoading = false
       orgsLoading = false
     }
@@ -175,6 +252,7 @@
     const q = searchInput.trim()
     if (!q) {
       searchResults = null
+      searchTotal = 0
       return
     }
     searchLoading = true
@@ -182,11 +260,13 @@
     try {
       // 登录时默认限定到当前用户的仓库，否则全局搜索
       const query = login ? `${q} user:${login}` : q
-      const { items } = await searchRepos(query, { perPage: 30 })
+      const { items, total } = await searchRepos(query, { perPage: 30 })
       searchResults = items
+      searchTotal = total
     } catch (e) {
       searchError = e instanceof Error ? e.message : '搜索失败'
       searchResults = []
+      searchTotal = 0
     } finally {
       searchLoading = false
     }
@@ -245,17 +325,31 @@
       <Button variant="ghost" size="icon-sm" onclick={() => navController.navigateMain('/app/github')} aria-label="返回">
         <ArrowLeftIcon class="size-4" />
       </Button>
-      <h1 class="text-lg font-semibold">{filterTitle}</h1>
-      <Badge variant="secondary" class="text-xs">{filterRepos.length}</Badge>
+      <h1 class="text-lg font-semibold">{filterCache?.title ?? filterTitle}</h1>
+      {#if filterCache}
+        <Badge variant="secondary" class="text-xs">{filterCache.total}</Badge>
+      {/if}
     </div>
-    {#if filterLoading}
+    {#if filterLoading && !filterCache}
       {#each Array(6) as _}<Skeleton class="h-16" />{/each}
-    {:else if filterError}
+    {:else if filterError && !filterCache}
       <p class="text-destructive text-sm">{filterError}</p>
-    {:else if filterRepos.length === 0}
+    {:else if (filterCache?.repos ?? []).length === 0}
       <p class="text-muted-foreground py-4 text-center text-sm">暂无仓库</p>
-    {:else}
-      {@render repoGrid(filterRepos)}
+    {:else if filterCache}
+      {@render repoGrid(filterCache.repos)}
+      {#if filterCache.hasMore}
+        <button
+          class="hover:bg-accent flex w-full items-center justify-center gap-1.5 rounded-md py-2 text-xs"
+          onclick={() => loadFilterList(false)}
+          disabled={filterLoadingMore}
+        >
+          <ChevronDownIcon class="size-3.5 {filterLoadingMore ? 'animate-bounce' : ''}" />
+          {filterLoadingMore ? '加载中…' : '加载更多'}
+        </button>
+      {:else if filterCache.repos.length > 10}
+        <p class="text-muted-foreground py-2 text-center text-xs">已加载全部 {filterCache.repos.length} 个</p>
+      {/if}
     {/if}
   {:else}
   <!-- 标题 + 搜索 -->
@@ -290,7 +384,7 @@
   {#if searchResults !== null}
     <div class="space-y-2">
       <div class="text-muted-foreground flex items-center gap-2 text-sm">
-        <span>搜索结果（{searchResults.length}）</span>
+        <span>搜索结果（{searchTotal > 0 ? searchTotal : searchResults.length}）</span>
         <button
           class="text-primary hover:underline"
           onclick={() => {
@@ -344,7 +438,7 @@
         <div class="flex items-center gap-2">
           <UserIcon class="size-4 text-muted-foreground" />
           <h2 class="text-base font-medium">{login} 的仓库</h2>
-          <Badge variant="secondary" class="text-xs">{myRepos.length}</Badge>
+          <Badge variant="secondary" class="text-xs">{myReposTotal}</Badge>
         </div>
         {#if myReposLoading}
           {#each Array(PREVIEW_COUNT) as _}<Skeleton class="h-16" />{/each}
@@ -354,12 +448,12 @@
           <p class="text-muted-foreground text-sm">暂无仓库</p>
         {:else}
           {@render repoGrid(myRepos.slice(0, PREVIEW_COUNT))}
-          {#if myRepos.length > PREVIEW_COUNT}
+          {#if myReposTotal > PREVIEW_COUNT}
             <button
               class="text-primary hover:bg-accent w-full rounded-md py-1.5 text-center text-xs"
               onclick={() => navController.navigateMain(`/app/github/list/user:${login}`)}
             >
-              查看全部 {myRepos.length} 个 →
+              查看全部 {myReposTotal} 个 →
             </button>
           {/if}
         {/if}
@@ -371,6 +465,7 @@
       {:else}
         {#each orgs as org (org.login)}
           {@const repos = orgRepos[org.login] ?? []}
+          {@const total = orgReposTotal[org.login] ?? repos.length}
           <section class="space-y-2">
             <div class="flex items-center gap-2">
               {#if org.avatar_url}
@@ -379,18 +474,18 @@
                 <BuildingIcon class="size-4 text-muted-foreground" />
               {/if}
               <h2 class="text-base font-medium">{org.login} 的仓库</h2>
-              <Badge variant="secondary" class="text-xs">{repos.length}</Badge>
+              <Badge variant="secondary" class="text-xs">{total}</Badge>
             </div>
             {#if repos.length === 0}
               <p class="text-muted-foreground text-sm">暂无仓库</p>
             {:else}
               {@render repoGrid(repos.slice(0, PREVIEW_COUNT))}
-              {#if repos.length > PREVIEW_COUNT}
+              {#if total > PREVIEW_COUNT}
                 <button
                   class="text-primary hover:bg-accent w-full rounded-md py-1.5 text-center text-xs"
                   onclick={() => navController.navigateMain(`/app/github/list/org:${org.login}`)}
                 >
-                  查看全部 {repos.length} 个 →
+                  查看全部 {total} 个 →
                 </button>
               {/if}
             {/if}
