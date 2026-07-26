@@ -108,7 +108,12 @@ app.get("/auth/github", (c) => {
   const params = new URLSearchParams({
     client_id: c.env.GITHUB_CLIENT_ID,
     redirect_uri: `${workerOrigin}/auth/github/callback`,
-    scope: "repo user",
+    // scope 说明：
+    // - repo：读写用户有权限的仓库（含 org 仓库，GithubApp 浏览/提交）
+    // - user：读写用户资料（头像/昵称等）
+    // - read:org：读取用户的组织成员关系（GithubApp 列表页 user/orgs 需要，
+    //   缺失时 GitHub 静默返回空数组而非 403）
+    scope: "repo user read:org",
     state,
   });
   // state 存 cookie，回调时校验防 CSRF
