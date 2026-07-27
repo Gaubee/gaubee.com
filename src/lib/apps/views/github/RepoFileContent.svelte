@@ -40,6 +40,7 @@
     branch = '',
     commitSha = '',
     onopenfiletree = () => {},
+    onopenfile = () => {},
   }: {
     path: string
     owner: string
@@ -50,6 +51,9 @@
     commitSha?: string
     /** 移动端：打开文件树浮层（桌面端不显示触发按钮）。 */
     onopenfiletree?: () => void
+    /** markdown 内相对链接点击：打开应用内文件（SPA 导航到 ?file=path）。
+     *  由 renderRepoMarkdown 生成的 <a data-repo-file="path"> 触发。 */
+    onopenfile?: (filePath: string) => void
   } = $props()
 
   const kind = $derived(getFileKind(path))
@@ -138,6 +142,24 @@
 
   /** 下载文件（用 raw URL）。 */
   const downloadHref = $derived(rawUrl)
+
+  /** markdown 容器引用（bind:this，用于 click 委托）。 */
+  let markdownEl: HTMLDivElement | undefined = $state()
+
+  /** markdown 内链接点击委托：
+   *  - a[data-repo-file]：相对路径链接 → 应用内导航（onopenfile 回调），阻止默认跳转 GitHub
+   *  - 其它 a（绝对 URL、锚点）：保持浏览器默认行为
+   *  中键/ctrl/meta/shift 点击不拦截（让用户在新标签打开 fallback href）。 */
+  function handleMarkdownClick(e: MouseEvent) {
+    if (!(e.currentTarget instanceof HTMLElement)) return
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+    const anchor = (e.target as HTMLElement | null)?.closest('a[data-repo-file]')
+    if (!anchor) return
+    const filePath = anchor.getAttribute('data-repo-file')
+    if (!filePath) return
+    e.preventDefault()
+    onopenfile(filePath)
+  }
 </script>
 
 <div class="border-border flex min-w-0 flex-col rounded border">
@@ -216,7 +238,14 @@
         <audio src={rawUrl} controls>您的浏览器不支持音频播放。</audio>
       </div>
     {:else if kind === 'markdown' && mode === 'preview' && renderedHtml}
-      <div class="prose prose-sm dark:prose-invert max-w-none break-words">
+      <!-- role=presentation：容器本身非交互元素，click 仅做事件委托（捕获内部 a[data-repo-file]）。
+           交互语义由内部的 <a> 承担（键盘可访问）。 -->
+      <div
+        bind:this={markdownEl}
+        onclick={handleMarkdownClick}
+        role="presentation"
+        class="prose prose-sm dark:prose-invert max-w-none break-words"
+      >
         {@html renderedHtml}
       </div>
     {:else if kind === 'text' && highlightedHtml}

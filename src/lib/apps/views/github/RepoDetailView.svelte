@@ -600,6 +600,7 @@
               branch={repoInfo?.default_branch ?? 'main'}
               commitSha={fileRef ?? ''}
               onopenfiletree={() => (fileTreeSheetOpen = true)}
+              onopenfile={(p) => selectFile(p)}
             />
           {:else}
             <div class="border-border text-muted-foreground flex min-w-0 items-center justify-center rounded border py-8 text-sm">

@@ -167,7 +167,12 @@ export function renderRepoMarkdown(
     } loading="lazy" style="max-width:100%;height:auto;border-radius:8px" />`;
   };
 
-  // 重写链接相对路径 → browse URL（网页浏览，而非 raw）
+  // 重写链接相对路径 → 应用内导航（SPA 跳到 ?file=path），而非 GitHub browse。
+  // 设计：相对链接（./docs/x.md、api.md）在应用内有意义，应跳到文件面板查看；
+  // 绝对 URL（http(s)://）和锚点（#section）保持原样由浏览器处理。
+  // 实现：生成 <a data-repo-file="path">，由 RepoFileContent 的 click 委托拦截，
+  // 调用 navigateSelect('files', 'file', path) 切换文件面板。
+  // href 仍保留为 GitHub browse URL（作为 fallback：中键新窗、SEO、无 JS 环境）。
   renderer.link = ({
     href,
     title,
@@ -177,15 +182,15 @@ export function renderRepoMarkdown(
     title?: string | null;
     tokens: unknown[];
   }) => {
-    let url = href;
-    if (info && isRelative(href)) {
-      // 链接到 .md 等文档时用 browse（GitHub 网页），否则也用 browse
-      const resolved = resolveRelative(baseDir, href);
-      url = info.browse(resolved);
-    }
     const text = marked.Parser.parseInline(tokens as never);
     const t = title ?? "";
-    return `<a href="${escapeHtml(url)}"${t ? ` title="${escapeHtml(t)}"` : ""}>${text}</a>`;
+    if (info && isRelative(href)) {
+      const resolved = resolveRelative(baseDir, href);
+      const browseUrl = info.browse(resolved);
+      // data-repo-file 标记应用内导航目标；href 作 fallback
+      return `<a href="${escapeHtml(browseUrl)}" data-repo-file="${escapeHtml(resolved)}"${t ? ` title="${escapeHtml(t)}"` : ""}>${text}</a>`;
+    }
+    return `<a href="${escapeHtml(href)}"${t ? ` title="${escapeHtml(t)}"` : ""}>${text}</a>`;
   };
 
   marked.use({ renderer });
