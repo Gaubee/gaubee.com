@@ -1,7 +1,12 @@
 <!--
 	IssueContentPanel：Issue 详情面板（右侧）。
 
-	展示 issue 完整信息（标题/状态/作者/标签/reactions/正文）+ 评论列表 + 底部评论编辑器。
+	GitHub 风格 timeline 设计（2026-07-27 升级）：
+	- 标题区：大标题 + 醒目状态 Badge（绿色 Open / 紫色 Closed）+ meta + 彩色 labels
+	- Timeline 列表：issue 正文（首条）+ 每条评论都是 timeline 节点
+	  左侧头像 + 右侧卡片（header: author + role badge + timestamp + actions；body: markdown；footer: reactions）
+	- 底部评论编辑器（含 Close/Reopen 按钮）
+
 	issueNumber 变化时自动重新加载。
 -->
 <script lang="ts">
@@ -20,7 +25,9 @@
   import { authStore } from '$lib/auth/session.svelte'
   import { Button } from '$lib/components/ui/button'
   import { Skeleton } from '$lib/components/ui/skeleton'
-  import { Badge } from '$lib/components/ui/badge'
+  import { labelStyleString } from '$lib/utils/label-color'
+  import CircleDotIcon from '@lucide/svelte/icons/circle-dot'
+  import CheckIcon from '@lucide/svelte/icons/check'
   import BugIcon from '@lucide/svelte/icons/bug'
   import MessageCircleIcon from '@lucide/svelte/icons/message-circle'
   import ExternalLinkIcon from '@lucide/svelte/icons/external-link'
@@ -124,8 +131,6 @@
 
   /** 处理评论编辑：调用 API 更新，本地替换评论对象 */
   async function handleEditComment(commentId: number, newBody: string) {
-    // IssueCommentItem 的 onedit 由父级负责实际 API 调用
-    // 这里通过动态 import 避免顶部 import 列表过重（保持与 issue-api 一致）
     const { updateIssueComment } = await import('$lib/apps/installable/github/issue-api')
     const updated = await updateIssueComment(owner, repo, commentId, newBody)
     comments = comments.map((c) => (c.id === commentId ? updated : c))
@@ -159,48 +164,71 @@
   function reactionOf(r: Reactions | undefined, key: keyof typeof reactionFields): number {
     return r ? (r[key] ?? 0) : 0
   }
+
+  /** 相对时间格式化（与 issue 列表一致）。 */
+  function formatTimeAgo(iso: string): string {
+    try {
+      const diff = Date.now() - new Date(iso).getTime()
+      const day = 24 * 60 * 60 * 1000
+      if (diff < 60 * 1000) return '刚刚'
+      if (diff < 60 * 60 * 1000) return `${Math.floor(diff / (60 * 1000))} 分钟前`
+      if (diff < day) return `${Math.floor(diff / (60 * 60 * 1000))} 小时前`
+      if (diff < 30 * day) return `${Math.floor(diff / day)} 天前`
+      return new Date(iso).toLocaleDateString('zh-CN', { dateStyle: 'short' })
+    } catch {
+      return iso
+    }
+  }
 </script>
 
 <div class="flex h-full flex-col overflow-hidden">
-  <!-- 顶部 issue 元数据栏 -->
+  <!-- 顶部 issue 标题区（GitHub 风格：大标题 + 醒目状态 Badge + meta + labels） -->
   <header class="border-b border-border px-4 py-3">
     {#if issueLoading}
-      <Skeleton class="mb-2 h-5 w-2/3" />
-      <Skeleton class="h-3 w-1/3" />
+      <Skeleton class="mb-2 h-6 w-3/4" />
+      <Skeleton class="h-3 w-1/2" />
     {:else if issueError}
       <p class="text-destructive text-sm">{issueError}</p>
     {:else if issue}
-      <!-- 标题 + 状态 -->
+      <!-- 标题行：大标题 + 状态 Badge + GitHub 外链 -->
       <div class="mb-2 flex items-start gap-2">
         <!-- 移动端：issue 列表触发按钮（桌面端隐藏）-->
         <Button size="sm" variant="default" class="md:hidden" onclick={onopenissuelist} aria-label="打开 Issue 列表">
           <BugIcon class="size-4" />
         </Button>
-        <BugIcon class="text-muted-foreground mt-0.5 size-4 shrink-0 max-md:hidden" />
-        <h2 class="min-w-0 flex-1 break-words text-sm font-semibold">
-          <span class="text-muted-foreground">#{issue.number}</span>
+        <h2 class="min-w-0 flex-1 break-words text-base font-semibold leading-tight">
           {issue.title}
+          <span class="text-muted-foreground ml-1 font-normal">#{issue.number}</span>
         </h2>
-        <Badge
-          variant={issue.state === 'open' ? 'default' : 'secondary'}
-          class="shrink-0 text-[10px]"
+        <!-- 醒目状态 Badge（GitHub 风格：带图标 + 彩色背景） -->
+        <span
+          class="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium {issue.state === 'open'
+            ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+            : 'bg-purple-500/15 text-purple-700 dark:text-purple-400'}"
         >
-          {issue.state === 'open' ? '开启' : '关闭'}
-        </Badge>
+          {#if issue.state === 'open'}
+            <CircleDotIcon class="size-3.5" />
+            Open
+          {:else}
+            <CheckIcon class="size-3.5" />
+            Closed
+          {/if}
+        </span>
         <!-- GitHub 外链 -->
         <a
           href={issue.html_url}
           target="_blank"
           rel="noopener noreferrer"
-          class="text-muted-foreground hover:text-foreground shrink-0"
+          class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex shrink-0 size-6 items-center justify-center rounded transition-colors"
           aria-label="在 GitHub 查看"
+          title="在 GitHub 查看"
         >
           <ExternalLinkIcon class="size-3.5" />
         </a>
       </div>
 
-      <!-- 作者 + 时间 + 评论数 + state_reason -->
-      <div class="text-muted-foreground mb-2 flex flex-wrap items-center gap-2 text-xs">
+      <!-- meta 行：opened X ago by user · N comments · state_reason -->
+      <div class="text-muted-foreground mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
         <img
           src={issue.user.avatar_url}
           alt={issue.user.login}
@@ -208,36 +236,27 @@
           loading="lazy"
         />
         <span class="font-medium text-foreground">{issue.user.login}</span>
-        <span>· {new Date(issue.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })} 创建</span>
-        <span>· {new Date(issue.updated_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })} 更新</span>
+        <span>opened {formatTimeAgo(issue.created_at)}</span>
+        <span class="opacity-50">·</span>
         <span class="inline-flex items-center gap-0.5">
           <MessageCircleIcon class="size-3" />
-          {issue.comments} 评论
+          {issue.comments}
         </span>
         {#if issue.state_reason && issue.state === 'closed'}
-          <span>· {issue.state_reason === 'completed' ? '已完成' : issue.state_reason === 'not_planned' ? '未计划' : issue.state_reason === 'duplicate' ? '重复' : issue.state_reason}</span>
+          <span class="opacity-50">·</span>
+          <span>{issue.state_reason === 'completed' ? '已完成' : issue.state_reason === 'not_planned' ? '未计划' : issue.state_reason === 'duplicate' ? '重复' : issue.state_reason}</span>
         {/if}
       </div>
 
-      <!-- 标签 -->
+      <!-- labels（GitHub 彩色 label） -->
       {#if issue.labels.length > 0}
-        <div class="mb-2 flex flex-wrap gap-1">
+        <div class="flex flex-wrap gap-1.5">
           {#each issue.labels as label}
-            <Badge variant="outline" class="text-[10px]">{label.name}</Badge>
-          {/each}
-        </div>
-      {/if}
-
-      <!-- reactions 统计 -->
-      {#if activeReactions.length > 0}
-        <div class="flex flex-wrap items-center gap-1.5">
-          {#each activeReactions as r}
             <span
-              class="bg-muted text-muted-foreground inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px]"
-              title={r.key}
+              class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium"
+              style={labelStyleString(label.color)}
             >
-              <span>{r.emoji}</span>
-              <span>{reactionOf(issue.reactions, r.key)}</span>
+              {label.name}
             </span>
           {/each}
         </div>
@@ -247,40 +266,81 @@
     {/if}
   </header>
 
-  <!-- 中间：issue 正文 + 评论列表（可滚动） -->
-  <div class="min-h-0 flex-1 overflow-auto px-4 py-3">
-    <!-- issue 正文 -->
+  <!-- 中间：Timeline 列表（issue 正文 + 评论，统一 timeline 卡片风格） -->
+  <div class="min-h-0 flex-1 overflow-auto px-4 py-4">
     {#if issueLoading}
-      <Skeleton class="mb-2 h-3 w-full" />
-      <Skeleton class="mb-2 h-3 w-5/6" />
-      <Skeleton class="h-32 w-full" />
+      <!-- skeleton: 首条 issue body -->
+      <div class="mb-6">
+        <div class="mb-2 flex items-center gap-2">
+          <Skeleton class="size-7 rounded-full" />
+          <Skeleton class="h-3 w-32" />
+        </div>
+        <Skeleton class="mb-2 h-3 w-full" />
+        <Skeleton class="mb-2 h-3 w-5/6" />
+        <Skeleton class="h-20 w-full" />
+      </div>
     {:else if issue}
-      {#if issue.body}
-        <MarkdownViewer markdown={issue.body} />
-      {:else}
-        <p class="text-muted-foreground text-sm italic">无描述</p>
-      {/if}
-    {/if}
+      <!-- 首条 timeline：issue 正文（作者卡片风格，与评论统一） -->
+      <div class="border-border mb-6 border-b pb-6 last:border-b-0 last:pb-0">
+        <div class="flex gap-3">
+          <!-- 左侧头像 -->
+          <img
+            src={issue.user.avatar_url}
+            alt={issue.user.login}
+            class="mt-0.5 size-7 shrink-0 rounded-full"
+            loading="lazy"
+          />
+          <!-- 右侧卡片 -->
+          <div class="min-w-0 flex-1">
+            <!-- 卡片 header: author + opened time -->
+            <div class="text-muted-foreground mb-1.5 flex flex-wrap items-center gap-x-1.5 text-xs">
+              <span class="font-semibold text-foreground">{issue.user.login}</span>
+              <span>opened {formatTimeAgo(issue.created_at)}</span>
+            </div>
+            <!-- 卡片 body: markdown 正文 -->
+            {#if issue.body}
+              <MarkdownViewer markdown={issue.body} />
+            {:else}
+              <p class="text-muted-foreground text-sm italic">无描述</p>
+            {/if}
+            <!-- 卡片 footer: reactions -->
+            {#if activeReactions.length > 0}
+              <div class="mt-3 flex flex-wrap items-center gap-1.5">
+                {#each activeReactions as r}
+                  <span
+                    class="bg-muted text-muted-foreground hover:bg-accent inline-flex cursor-default items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition-colors"
+                    title={r.key}
+                  >
+                    <span>{r.emoji}</span>
+                    <span class="tabular-nums">{reactionOf(issue.reactions, r.key)}</span>
+                  </span>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        </div>
+      </div>
 
-    <!-- 评论列表 -->
-    <section class="mt-4">
-      <h3 class="text-muted-foreground mb-2 flex items-center gap-1 text-xs font-medium uppercase tracking-wide">
-        <MessageCircleIcon class="size-3.5" />
-        评论 ({comments.length})
-      </h3>
-
+      <!-- 评论 timeline 列表 -->
       {#if commentsLoading}
-        <div class="space-y-2">
+        <div class="space-y-4">
           {#each Array(3) as _}
-            <Skeleton class="h-16 w-full" />
+            <div class="flex gap-3">
+              <Skeleton class="size-7 shrink-0 rounded-full" />
+              <div class="flex-1">
+                <Skeleton class="mb-2 h-3 w-32" />
+                <Skeleton class="mb-2 h-3 w-full" />
+                <Skeleton class="h-16 w-full" />
+              </div>
+            </div>
           {/each}
         </div>
       {:else if commentsError}
         <p class="text-destructive text-sm">{commentsError}</p>
       {:else if comments.length === 0}
-        <p class="text-muted-foreground py-4 text-center text-sm">暂无评论，快来抢沙发~</p>
+        <p class="text-muted-foreground py-4 text-center text-sm">暂无评论</p>
       {:else}
-        <div>
+        <div class="space-y-6">
           {#each comments as comment (comment.id)}
             <IssueCommentItem
               {comment}
@@ -293,7 +353,7 @@
           {/each}
         </div>
       {/if}
-    </section>
+    {/if}
   </div>
 
   <!-- 底部评论编辑器 -->
