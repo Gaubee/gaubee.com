@@ -983,3 +983,51 @@ src/lib/apps/installable/github/state/
 - 类型检查 0 错误 0 警告。
 - state 抽象层单测 29/29 全过（status 派生 13 + resource runes 行为 16）。
 - 前端走查（agent-browser）：列表页/详情页/历史 Tab/commit 详情/Issues Tab/issue 详情/搜索/ref 选择器全部正常渲染，无白屏无错误。
+
+## Markdown 正文链接样式统一（2026-07-28）
+
+文章（articles）/说说（events）正文里的 `<a>` 链接之前走 marked 默认渲染（裸 `<a href>`），无外链标识、无内链拦截。统一为外链/内链两套行为。
+
+### 决策
+
+| 维度       | 决策                                                                        |
+| ---------- | --------------------------------------------------------------------------- |
+| 外链视觉   | 尾部 external-link 图标（CSS `::after` + mask，DOM 零增节点，SSG 同步生效） |
+| 外链行为   | `target=_blank` + `rel="noopener noreferrer"`                               |
+| 内链判定   | 仅站内绝对路径（`/` 开头，排除 `//host`）                                   |
+| 内链行为   | click 委托拦截 → SPA 应用内导航（修饰键/中键放过走原生）                    |
+| SSG 一致性 | `render.ts` 同步处理，SEO 产物与客户端一致                                  |
+
+### 改动
+
+- 新建 `src/lib/markdown/link.ts`：`classifyLink`（external/internal/anchor/other）+ `renderLinkTag`（共享纯函数，客户端 + SSG 复用，XSS 转义）。
+- `MarkdownViewer.svelte`：加 `renderer.link` + 容器 click 委托（`a[data-internal-link]` → `navigateMain`，`role=presentation`）。
+- `render.ts`：SSG 加 `renderer.link`。
+- `app.css`：`.md-link-external::after` 用 mask + currentColor 渲染图标（自动跟随暗色/hover），`.shout-markdown a` 补基础链接样式。
+- 单测 12/12 全过（分类边界 + XSS 转义）。
+
+## 渲染 bug 修复：应用市场 + 文件编辑器空白（2026-07-28）
+
+修复两个「页面不渲染内容」的 bug，均为类型安全路由系统重构遗留问题。
+
+### Bug 1：`/app/store` 应用市场空白
+
+**根因**：`app-store` 是 `hiddenFromNav:true` 且唯一 activity 是 entry activity，AreaOutlet 三层渲染全部排除它（entry 浮层过滤 hiddenFromNav；deep-link 层要求 `!isEntry`；desktop/notfound 不满足）。
+
+**修复**（`AreaOutlet.svelte`）：放宽 `nonEntryActive` 判定，hiddenFromNav 应用的 entry activity 也走 deep-link 层。一并修复同类应用（account/notifications/search）。
+
+### Bug 2：`/app/github-edit/...` 与 `/app/editor/...` 编辑器空白
+
+**根因**：`leafRoute`（index route，pattern `""` 无 children）无法匹配多段深路径。剥前缀后剩余段非空 → `matchChain` no-match → 渲染空 div。路由库不支持 splat。
+
+**修复**（迁移到 search query，与 `github.repo.detail` 既定模式一致）：
+
+- `leaf-route.ts`：增强 `leafRoute` 支持可选 search schema。
+- `writer.ts`：`/app/editor`（collection/stem）和 `/app/github-edit`（owner/repo/file）都加 search schema。
+- `EditorView.svelte`：`target` 从正则解析 pathname 改为 `useSearch()` 取参。
+- 调用方更新：`FilesView`（3 处）、`WriterView`、`RepoFileContent`、SSG `+page.svelte`。
+
+### 验证
+
+- 类型检查 0 错误 0 警告；单元测试仅预存 `shell.test.ts` 环境噪声失败（无关）。
+- agent-browser 走查：`/app/store` 渲染完整应用列表；`/app/github-edit?...&file=README.md` CodeMirror 加载 README.md 完整内容。

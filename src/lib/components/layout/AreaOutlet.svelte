@@ -185,9 +185,13 @@
   // 桌面作为 shell 级背景层（main 区独有）：无应用浮层、无非 entry activity 时显现。
   const isDesktop = $derived(area === "main" && location.pathname === "/");
   const isNotFound = $derived(area === "main" && !isDesktop && mainResolution === null);
-  // 非 entry activity 激活时，tab 浮层让位（隐藏但保活）
+  // 非 entry activity 激活时，tab 浮层让位（隐藏但保活）。
+  // 例外：hiddenFromNav 应用的 entry activity（如 app-store/account）无常驻 tab，
+  // 通过菜单 deep-link 访问时也走这一层渲染（不进 allMainTabs）。
   const nonEntryActive = $derived(
-    area === "main" && mainResolution !== null && !mainResolution.isEntry,
+    area === "main" &&
+      mainResolution !== null &&
+      (!mainResolution.isEntry || mainResolution.manifest.hiddenFromNav),
   );
   const desktopVisible = $derived(
     area === "main" && (isDesktop || (activeTabId === null && !isNotFound)),

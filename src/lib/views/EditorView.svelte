@@ -1,6 +1,8 @@
 <!--
 	EditorView：编辑器主页。
-	- 从 main location 路径解析要编辑的文章（/app/editor/{collection}/{stem}）
+	- 从 search query 解析编辑目标：
+	  - content：/app/editor?collection=articles&stem=xxx（内容管线，frontmatter + 发表）
+	  - raw：/app/github-edit?owner=X&repo=Y&file=Z（GithubApp 任意文件，纯文本，仅主仓库可写）
 	- 加载文章内容（VFS 三层读取：本地修改 > 远程缓存 > 在线拉取）
 	- 三视图：编辑 / 分屏 / 预览
 	- 自动保存到 VFS（dirty 标记），debounce 1s
@@ -18,6 +20,7 @@
   import { gaubeeos } from '$lib/os/services'
   import { handlePublishError } from '$lib/os/services/publish-helper'
   import { notifySuccess } from '$lib/apps/builtin/notifications/service.svelte'
+  import { useSearch } from '$lib/router'
   import { targetById } from '$lib/router'
   import { parseMarkdown, serializeMarkdown, type ArticleMetadata } from '$lib/data/frontmatter'
   import { OWNER, REPO } from '$lib/github/client'
@@ -37,6 +40,9 @@
   type View = 'edit' | 'split' | 'preview'
 
   const navState = $derived(navStore.current)
+  // EditorView 同时作为 writer.editor 与 writer.github-edit 两个 activity 的组件，
+  // 二者都通过 search query 传参。useSearch 拿到当前 activity 的 parsed search。
+  const getSearch = useSearch()
   let view = $state<View>('edit')
   let metadataOpen = $state(false)
   let loading = $state(false)
@@ -56,32 +62,27 @@
   let publishing = $state(false)
 
   /**
-   * 从路径解析编辑目标，支持两种模式：
-   * - content：/app/editor/{articles|events|draft}/{stem}（内容管线，frontmatter + 发表）
-   * - raw：/app/github-edit/{owner}/{repo}/{...path}（GithubApp 任意文件，纯文本，仅主仓库可写）
+   * 从 search query 解析编辑目标，支持两种模式（按当前 activity 的 pathname 区分）：
+   * - content：/app/editor?collection=articles&stem=xxx（内容管线，frontmatter + 发表）
+   * - raw：/app/github-edit?owner=X&repo=Y&file=Z（GithubApp 任意文件，纯文本，仅主仓库可写）
    */
   const target = $derived.by(() => {
     const path = navState.mainLocation.pathname
-    // GithubApp 任意文件编辑（raw 模式）
-    const gitMatch = path.match(/^\/app\/github-edit\/([^/]+)\/([^/]+)\/(.+)$/)
-    if (gitMatch) {
-      const [_, owner, repo, filePath] = gitMatch
+    const search = getSearch?.()
+    if (!search) return null
+    if (path === '/app/github-edit') {
+      const { owner, repo, file } = search as { owner: string; repo: string; file: string }
       return {
         kind: 'raw' as const,
         owner,
         repo,
-        filePath,
+        filePath: file,
         writable: owner === OWNER && repo === REPO,
       }
     }
-    // 内容管线编辑
-    const contentMatch = path.match(/^\/app\/editor\/(articles|events|draft)\/(.+)$/)
-    if (contentMatch) {
-      return {
-        kind: 'content' as const,
-        collection: contentMatch[1] as 'articles' | 'events' | 'draft',
-        stem: contentMatch[2],
-      }
+    if (path === '/app/editor') {
+      const { collection, stem } = search as { collection: 'articles' | 'events' | 'draft'; stem: string }
+      return { kind: 'content' as const, collection, stem }
     }
     return null
   })

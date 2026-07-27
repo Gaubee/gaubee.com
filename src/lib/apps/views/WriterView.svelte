@@ -58,7 +58,9 @@
     if (match) {
       const collection = match[2]
       const stem = match[3]
-      navController.navigateMain(`/app/editor/${collection}/${stem}`)
+      navController.navigateMain(
+        `/app/editor?collection=${encodeURIComponent(collection)}&stem=${encodeURIComponent(stem)}`,
+      )
     }
   }
 

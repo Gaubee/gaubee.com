@@ -177,6 +177,64 @@ src/lib/router/                  ← 路由系统核心
 vite-plugins/gaubee-routes/      ← codegen 插件（骨架，阶段 3 完善）
 ```
 
+## Markdown 链接规范（2026-07-28）
+
+### 心智模型
+
+文章（articles）/说说（events）正文里的 `<a>` 链接按 href 分类，统一走两套行为：
+
+```
+href 形态                分类          渲染输出                          点击行为
+─────────────────────────────────────────────────────────────────────────────────
+http(s):// mailto: tel:  external     <a class=md-link-external          新窗口打开
+                                      target=_blank rel=noopener>        （浏览器原生）
+//host 协议相对          external     同上                               同上
+
+/articles/x /events/x    internal     <a data-internal-link>             SPA 应用内导航
+/#路径                                                                    （click 委托拦截）
+
+#section                 anchor       <a href=#section>                  页内锚点（原生）
+./x.md x.md 相对路径     other        <a href=...>                       原生（README 场景
+                                                                         由 readme.ts 改写）
+```
+
+### 核心 API
+
+```ts
+// src/lib/markdown/link.ts（客户端 + SSG 共享纯函数）
+import { classifyLink, renderLinkTag } from "./link";
+
+classifyLink("/articles/x"); // → "internal"
+classifyLink("https://github.com"); // → "external"
+classifyLink("#section"); // → "anchor"
+
+// marked renderer.link 直接委托
+renderer.link = ({ href, title, tokens }) => {
+  const text = marked.Parser.parseInline(tokens as never);
+  return renderLinkTag({ href, text, title });
+};
+```
+
+### 关键约定
+
+- **图标实现**：CSS `::after` + `mask`（DOM 零增节点，SSG 同步生效），`background: currentColor` 自动跟随链接色/悬停态/暗色模式。**不用** Svelte 组件渲染（SSG 同步函数拿不到组件上下文）。
+- **内链拦截**：`MarkdownViewer` 容器 click 委托命中 `a[data-internal-link]` → `navController.navigateMain(href)`。修饰键（ctrl/meta/shift/alt）与中键放过走原生新窗。容器加 `role="presentation"`（交互语义由内部 `<a>` 承担，模式同 `RepoFileContent.svelte` 的 `data-repo-file`）。
+- **不引入路径→RouteId 反向匹配**：markdown 内链走裸字符串 `navigateMain(path)`，与 `ArticleDetailView.svelte:78` 现有写法一致。反向匹配是新基建，成本不匹配。
+- **readme.ts 保持独立**：GitHub README 的 `data-repo-file`（指向文件面板）是仓库专属语义，不接入本规范。
+- **双层 prose 问题**（`ArticleDetailView` 外层 article + MarkdownViewer 内层都套 prose）不在本规范范围，记为 TODO。
+
+### 文件结构
+
+```
+src/lib/markdown/
+├── link.ts                   classifyLink + renderLinkTag（共享纯函数）
+├── link.test.ts              分类边界 + XSS 转义测试（server project）
+├── MarkdownViewer.svelte     客户端：renderer.link + click 委托
+└── render.ts                 SSG：renderer.link（同步函数）
+
+src/app.css                   .md-link-external::after 图标 + .shout-markdown 链接基础样式
+```
+
 ## 加载状态机抽象（2026-07-28）
 
 ### 心智模型
