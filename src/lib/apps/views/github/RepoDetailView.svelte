@@ -49,6 +49,7 @@
   import RepoFileContent from './RepoFileContent.svelte'
   import IssueContentPanel from './IssueContentPanel.svelte'
   import CommitDetailPanel from './CommitDetailPanel.svelte'
+  import RepoRefSelector from './RepoRefSelector.svelte'
   import { diffLines } from '$lib/utils/diff'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
@@ -79,6 +80,9 @@
   import CheckCircle2Icon from '@lucide/svelte/icons/check-circle-2'
   import MessageCircleIcon from '@lucide/svelte/icons/message-circle'
   import XIcon from '@lucide/svelte/icons/x'
+  import FilterIcon from '@lucide/svelte/icons/filter'
+  import GitBranchIcon from '@lucide/svelte/icons/git-branch'
+  import * as Popover from '$lib/components/ui/popover'
   import { labelStyleString } from '$lib/utils/label-color'
 
   // ---- 路由参数（2026-07-27 重构：useParams/useSearch 返回 getter，需 $derived 包装）----
@@ -148,6 +152,16 @@
   let commits = $state<CommitInfo[]>([])
   let commitsLoading = $state(false)
   let commitsError = $state<string | null>(null)
+  /** commit 过滤器（内存 state，不进 URL；branch 用 RepoRefSelector 切换）。
+   *  - commitBranch: branch/tag 名（空=默认分支）
+   *  - commitAuthor: GitHub login
+   *  - commitSince/commitUntil: ISO 日期（YYYY-MM-DD） */
+  let commitBranch = $state<string>('')
+  let commitAuthor = $state<string>('')
+  let commitSince = $state<string>('')
+  let commitUntil = $state<string>('')
+  /** 高级过滤器是否激活（branch 不算，因为 branch 有独立的 selector）。 */
+  const hasCommitFilters = $derived(!!commitAuthor || !!commitSince || !!commitUntil)
   /** 移动端 commit 列表浮层。 */
   let commitListSheetOpen = $state(false)
 
@@ -362,13 +376,47 @@
     commitsLoading = true
     commitsError = null
     try {
-      commits = await listCommits({ owner: o, repo: r, perPage: 30 })
+      commits = await listCommits({
+        owner: o,
+        repo: r,
+        perPage: 30,
+        sha: commitBranch || undefined,
+        author: commitAuthor || undefined,
+        // GitHub since/until 接受 ISO 8601；input[type=date] 返回 YYYY-MM-DD，补全为当天起止
+        since: commitSince ? `${commitSince}T00:00:00Z` : undefined,
+        until: commitUntil ? `${commitUntil}T23:59:59Z` : undefined,
+      })
     } catch (e) {
       commitsError = e instanceof Error ? e.message : '加载历史失败'
       commits = []
     } finally {
       commitsLoading = false
     }
+  }
+
+  /** 切换 commit 列表的 branch/tag（RepoRefSelector 回调）。 */
+  function setCommitBranch(ref: string) {
+    // 选默认分支时清空（让 selector 显示 default，而不是重复存 branch 名）
+    commitBranch = ref === (repoInfo?.default_branch ?? 'main') ? '' : ref
+    // 切换 branch 时清除选中 commit（不同 branch 的 SHA 不通用）
+    if (selectedCommitSha) {
+      const sp = new URLSearchParams({ tab: 'history' })
+      navController.navigateMain(`${basePath}?${sp.toString()}`, 'REPLACE')
+    }
+    void loadCommits(owner, repo)
+  }
+
+  /** SHA 直跳：直接跳到 CommitDetail（不走列表过滤）。 */
+  function jumpToCommitSha(sha: string) {
+    navigateSelect('history', 'sha', sha)
+  }
+
+  /** 清除高级过滤器（author/since/until），保留 branch。 */
+  function clearCommitFilters() {
+    commitAuthor = ''
+    commitSince = ''
+    commitUntil = ''
+    void loadCommits(owner, repo)
   }
 
   // ---- 变更（仅主仓库）----
@@ -657,26 +705,35 @@
 
       <!-- 文件 + README -->
       <Tabs.Content value="files" class="p-4">
-        <!-- ref 状态条：当 fileRef 存在（按 commit/tag 查看历史版本）时显示。
-             轻量 inline 风格，提示用户当前不在默认分支，提供「返回默认分支」按钮。
-             参考 GitHub "You are viewing at commit xxx" 提示条。 -->
-        {#if fileRef}
-          {@const isSha = /^[0-9a-f]{40}$/i.test(fileRef) || /^[0-9a-f]{7,}$/i.test(fileRef)}
-          {@const refLabel = isSha && fileRef.length > 12 ? fileRef.slice(0, 7) : fileRef}
-          <div class="bg-primary/5 border-primary/20 text-primary mb-3 flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs">
-            <GitCommitHorizontalIcon class="size-3.5 shrink-0" />
-            <span>历史版本</span>
-            <code class="font-mono font-semibold">{refLabel}</code>
-            <button
-              type="button"
-              onclick={clearFileRef}
-              class="text-primary/70 hover:text-primary hover:bg-primary/10 ml-auto inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] transition-colors"
-            >
-              <ArrowLeftIcon class="size-3" />
-              返回默认分支
-            </button>
-          </div>
-        {/if}
+        <!-- ref 选择器（常驻）：切换 branch/tag/SHA 浏览不同版本的文件树。
+             - ref = 默认分支：selector 显示分支名，无 badge
+             - ref = commit SHA / 非默认 branch：显示「历史版本」badge
+             切换 ref → navigateSelect('files', 'ref', newRef)，触发 fileRef $effect 重载文件树。 -->
+        <div class="mb-3 flex items-center gap-2">
+          <RepoRefSelector
+            {owner}
+            {repo}
+            currentRef={fileRef ?? ''}
+            defaultBranch={repoInfo?.default_branch ?? 'main'}
+            onSelect={(ref) => {
+              // 选默认分支时清除 ref（让 URL 干净）；否则设置 ref
+              if (ref === (repoInfo?.default_branch ?? 'main')) {
+                clearFileRef()
+              } else {
+                const sp = new URLSearchParams({ tab: 'files' })
+                if (selectedFile) sp.set('file', selectedFile)
+                sp.set('ref', ref)
+                navController.navigateMain(`${basePath}?${sp.toString()}`)
+              }
+            }}
+          />
+          {#if fileRef && fileRef !== (repoInfo?.default_branch ?? 'main')}
+            <span class="bg-primary/10 text-primary inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium">
+              <GitCommitHorizontalIcon class="size-3" />
+              历史版本
+            </span>
+          {/if}
+        </div>
         <!-- 桌面端（md+）：双栏 grid（不固定高度，内容自然撑开）。
              fileTree 左栏 sticky + 独立滚动，fileContent 右栏直接展开（由 app 内容区滚动）。
              移动端（<md）：fileTree 收进 Sheet 浮动浮层。 -->
@@ -750,41 +807,114 @@
         <div class="grid min-w-0 gap-4 md:grid-cols-[minmax(260px,360px)_1fr]">
           {#snippet commitList()}
             {#if commitsLoading && commits.length === 0}
-              {#each Array(4) as _}<Skeleton class="mb-2 h-12" />{/each}
+              <div class="space-y-2 p-2">
+                {#each Array(5) as _}<Skeleton class="h-14 w-full" />{/each}
+              </div>
             {:else if commitsError}
-              <p class="text-destructive p-2 text-sm">{commitsError}</p>
+              <p class="text-destructive px-3 py-4 text-sm">{commitsError}</p>
             {:else if commits.length === 0}
-              <p class="text-muted-foreground py-4 text-center text-sm">暂无提交</p>
+              <p class="text-muted-foreground py-8 text-center text-sm">暂无提交</p>
             {:else}
-              {#each commits as c (c.sha)}
-                <button
-                  class="hover:bg-accent flex w-full items-start gap-2 rounded-md p-2 text-left transition-colors {selectedCommitSha === c.sha ? 'bg-accent' : ''}"
-                  onclick={() => { navigateSelect('history', 'sha', c.sha); commitListSheetOpen = false }}
-                >
-                  <div class="bg-muted text-muted-foreground flex size-6 shrink-0 items-center justify-center rounded-full font-mono text-[10px]">
-                    {c.sha.slice(0, 7)}
-                  </div>
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-xs font-medium">{c.message}</p>
-                    <p class="text-muted-foreground text-[11px]">
-                      {c.login ?? c.author?.name ?? 'unknown'}
-                      {#if c.author?.date} · {formatCommitDate(c.author.date)}{/if}
-                    </p>
-                  </div>
-                </button>
-              {/each}
+              <!-- GitHub 风格 commit 列表：avatar + 标题 + body 摘要 + author · 相对时间 + 右侧 SHA -->
+              <div class="divide-border divide-y">
+                {#each commits as c (c.sha)}
+                  <button
+                    class="hover:bg-accent/50 flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors {selectedCommitSha === c.sha ? 'bg-accent/70' : ''}"
+                    onclick={() => { navigateSelect('history', 'sha', c.sha); commitListSheetOpen = false }}
+                  >
+                    <!-- avatar（无 avatar 用 initials 占位） -->
+                    {#if c.avatarUrl}
+                      <img src={c.avatarUrl} alt={c.login ?? ''} class="mt-0.5 size-6 shrink-0 rounded-full" loading="lazy" />
+                    {:else}
+                      <div class="bg-muted text-muted-foreground mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-medium">
+                        {(c.login ?? c.author?.name ?? '?').slice(0, 2).toUpperCase()}
+                      </div>
+                    {/if}
+                    <!-- 主信息区 -->
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-xs font-medium">{c.message}</p>
+                      {#if c.body}
+                        <p class="text-muted-foreground truncate text-[11px]">{c.body.split('\n').find((l) => l.trim()) ?? ''}</p>
+                      {/if}
+                      <p class="text-muted-foreground mt-0.5 text-[11px]">
+                        <span class="font-medium text-foreground">{c.login ?? c.author?.name ?? 'unknown'}</span>
+                        {#if c.author?.date} · {formatTimeAgo(c.author.date)}{/if}
+                      </p>
+                    </div>
+                    <!-- 右侧 SHA 短码 -->
+                    <code class="text-muted-foreground mt-0.5 shrink-0 font-mono text-[11px]">{c.sha.slice(0, 7)}</code>
+                  </button>
+                {/each}
+              </div>
             {/if}
           {/snippet}
           <!-- commit 列表左栏 -->
           <div class="max-md:hidden">
-            <div class="border-border max-h-[calc(100dvh-12rem)] min-w-0 overflow-auto overscroll-contain rounded border md:sticky md:top-2">
-              <div class="border-border sticky top-0 z-[1] bg-background flex items-center justify-between p-2">
-                <span class="text-xs font-medium">提交历史</span>
-                <Button variant="ghost" size="icon-sm" onclick={() => loadCommits(owner, repo)} disabled={commitsLoading}>
+            <div class="border-border flex max-h-[calc(100dvh-12rem)] min-w-0 flex-col overflow-hidden rounded border md:sticky md:top-2">
+              <!-- 工具栏：RepoRefSelector（branch/tag 切换）+ 过滤按钮 + 刷新 -->
+              <div class="border-border bg-muted/30 sticky top-0 z-[1] flex items-center gap-1.5 border-b px-2 py-1.5">
+                <RepoRefSelector
+                  {owner}
+                  {repo}
+                  currentRef={commitBranch}
+                  defaultBranch={repoInfo?.default_branch ?? 'main'}
+                  onSelect={(ref) => /^[0-9a-f]{7,40}$/i.test(ref) ? jumpToCommitSha(ref) : setCommitBranch(ref)}
+                />
+                <!-- 高级过滤器按钮（author/since/until），带激活计数 badge -->
+                <Popover.Root>
+                  <Popover.Trigger
+                    class="border-border bg-background hover:bg-accent relative inline-flex size-7 items-center justify-center rounded-md border transition-colors"
+                    aria-label="高级过滤"
+                    title="高级过滤（作者 / 时间范围）"
+                  >
+                    <FilterIcon class="size-3.5 {hasCommitFilters ? 'text-primary' : 'text-muted-foreground'}" />
+                    {#if hasCommitFilters}
+                      <span class="bg-primary text-primary-foreground absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-0.5 text-[9px] font-medium">
+                        {[!!commitAuthor, !!commitSince, !!commitUntil].filter(Boolean).length}
+                      </span>
+                    {/if}
+                  </Popover.Trigger>
+                  <Popover.Content class="w-64 p-3" align="start">
+                    <div class="space-y-3">
+                      <div>
+                        <label for="commit-filter-author" class="text-muted-foreground mb-1 block text-[11px] font-medium">作者（GitHub login）</label>
+                        <Input id="commit-filter-author" bind:value={commitAuthor} placeholder="如 gaubee" class="h-8 text-xs" />
+                      </div>
+                      <div class="grid grid-cols-2 gap-2">
+                        <div>
+                          <label for="commit-filter-since" class="text-muted-foreground mb-1 block text-[11px] font-medium">起始</label>
+                          <Input id="commit-filter-since" type="date" bind:value={commitSince} class="h-8 text-xs" />
+                        </div>
+                        <div>
+                          <label for="commit-filter-until" class="text-muted-foreground mb-1 block text-[11px] font-medium">截止</label>
+                          <Input id="commit-filter-until" type="date" bind:value={commitUntil} class="h-8 text-xs" />
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <Button size="sm" class="h-7 flex-1 text-xs" onclick={() => loadCommits(owner, repo)}>应用</Button>
+                        {#if hasCommitFilters}
+                          <Button size="sm" variant="ghost" class="h-7 text-xs" onclick={clearCommitFilters}>清除</Button>
+                        {/if}
+                      </div>
+                    </div>
+                  </Popover.Content>
+                </Popover.Root>
+                <!-- 刷新 -->
+                <Button variant="ghost" size="icon-sm" class="ml-auto" onclick={() => loadCommits(owner, repo)} disabled={commitsLoading} aria-label="刷新">
                   <RefreshCwIcon class="size-3 {commitsLoading ? 'animate-spin' : ''}" />
                 </Button>
               </div>
-              <div class="p-1">
+              <!-- 过滤摘要条（激活时显示） -->
+              {#if hasCommitFilters}
+                <div class="bg-primary/5 border-primary/20 flex flex-wrap items-center gap-1.5 border-b px-2 py-1 text-[11px]">
+                  {#if commitAuthor}<span class="text-primary">author: {commitAuthor}</span>{/if}
+                  {#if commitSince}<span class="text-primary">since: {commitSince}</span>{/if}
+                  {#if commitUntil}<span class="text-primary">until: {commitUntil}</span>{/if}
+                  <button type="button" onclick={clearCommitFilters} class="text-muted-foreground hover:text-foreground ml-auto underline">清除</button>
+                </div>
+              {/if}
+              <!-- commit 列表（可滚动） -->
+              <div class="min-h-0 flex-1 overflow-auto">
                 {@render commitList()}
               </div>
             </div>
@@ -806,7 +936,7 @@
 
           <!-- 移动端 commit 列表浮层 -->
           <Sheet.Root bind:open={commitListSheetOpen}>
-            <Sheet.Content side="bottom" class="max-h-[75dvh] rounded-t-lg p-0 md:hidden" showCloseButton={false}>
+            <Sheet.Content side="bottom" class="flex max-h-[75dvh] flex-col rounded-t-lg p-0 md:hidden" showCloseButton={false}>
               <Sheet.Header class="flex-row items-center justify-between border-b px-4 py-3">
                 <Sheet.Title class="flex items-center gap-2 text-sm font-medium">
                   <HistoryIcon class="size-4" />
@@ -814,7 +944,54 @@
                 </Sheet.Title>
                 <Sheet.Description class="sr-only">浏览提交列表</Sheet.Description>
               </Sheet.Header>
-              <div class="max-h-[calc(75dvh-4rem)] overflow-auto overscroll-contain p-2">
+              <!-- 移动端也加 branch selector + 过滤 -->
+              <div class="border-border flex items-center gap-1.5 border-b px-2 py-1.5">
+                <RepoRefSelector
+                  {owner}
+                  {repo}
+                  currentRef={commitBranch}
+                  defaultBranch={repoInfo?.default_branch ?? 'main'}
+                  onSelect={(ref) => /^[0-9a-f]{7,40}$/i.test(ref) ? jumpToCommitSha(ref) : setCommitBranch(ref)}
+                />
+                <Popover.Root>
+                  <Popover.Trigger
+                    class="border-border bg-background hover:bg-accent relative inline-flex size-7 items-center justify-center rounded-md border transition-colors"
+                    aria-label="高级过滤"
+                  >
+                    <FilterIcon class="size-3.5 {hasCommitFilters ? 'text-primary' : 'text-muted-foreground'}" />
+                    {#if hasCommitFilters}
+                      <span class="bg-primary text-primary-foreground absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-0.5 text-[9px] font-medium">
+                        {[!!commitAuthor, !!commitSince, !!commitUntil].filter(Boolean).length}
+                      </span>
+                    {/if}
+                  </Popover.Trigger>
+                  <Popover.Content class="w-64 p-3" align="start">
+                    <div class="space-y-3">
+                      <div>
+                        <label for="commit-m-filter-author" class="text-muted-foreground mb-1 block text-[11px] font-medium">作者</label>
+                        <Input id="commit-m-filter-author" bind:value={commitAuthor} placeholder="GitHub login" class="h-8 text-xs" />
+                      </div>
+                      <div class="grid grid-cols-2 gap-2">
+                        <div>
+                          <label for="commit-m-filter-since" class="text-muted-foreground mb-1 block text-[11px] font-medium">起始</label>
+                          <Input id="commit-m-filter-since" type="date" bind:value={commitSince} class="h-8 text-xs" />
+                        </div>
+                        <div>
+                          <label for="commit-m-filter-until" class="text-muted-foreground mb-1 block text-[11px] font-medium">截止</label>
+                          <Input id="commit-m-filter-until" type="date" bind:value={commitUntil} class="h-8 text-xs" />
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <Button size="sm" class="h-7 flex-1 text-xs" onclick={() => loadCommits(owner, repo)}>应用</Button>
+                        {#if hasCommitFilters}
+                          <Button size="sm" variant="ghost" class="h-7 text-xs" onclick={clearCommitFilters}>清除</Button>
+                        {/if}
+                      </div>
+                    </div>
+                  </Popover.Content>
+                </Popover.Root>
+              </div>
+              <div class="min-h-0 flex-1 overflow-auto overscroll-contain">
                 {@render commitList()}
               </div>
             </Sheet.Content>

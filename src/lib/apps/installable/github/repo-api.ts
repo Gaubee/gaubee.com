@@ -263,3 +263,68 @@ export {
   type IssueSummary,
   type IssueDetail,
 } from "./issue-api";
+
+// ---------------------------------------------------------------------------
+// Branch / Tag 列表（ref selector 用）
+// ---------------------------------------------------------------------------
+
+/** 分支摘要。 */
+export interface BranchSummary {
+  name: string;
+  /** 分支顶端 commit SHA。 */
+  commit: { sha: string };
+  /** 是否受保护分支。 */
+  protected: boolean;
+}
+
+/** Tag 摘要。 */
+export interface TagSummary {
+  name: string;
+  /** tag 指向的 commit SHA。 */
+  commit: { sha: string };
+}
+
+/** 列出仓库分支。
+ *  GET /repos/{owner}/{repo}/branches?per_page=N
+ *  用于 ref selector 下拉（history/files tab 切换 branch）。 */
+export async function listBranches(
+  owner: string,
+  repo: string,
+  opts?: { perPage?: number; page?: number },
+): Promise<BranchSummary[]> {
+  const params = new URLSearchParams({
+    per_page: String(opts?.perPage ?? 100),
+    page: String(opts?.page ?? 1),
+  });
+  const resp = await fetchGithub(`repos/${owner}/${repo}/branches?${params.toString()}`);
+  if (resp.status === 404) return [];
+  await assertOk(resp, `listBranches(${owner}/${repo})`);
+  const data = (await resp.json()) as Array<{
+    name: string;
+    commit: { sha: string };
+    protected: boolean;
+  }>;
+  return data.map((b) => ({ name: b.name, commit: { sha: b.commit.sha }, protected: b.protected }));
+}
+
+/** 列出仓库 tag。
+ *  GET /repos/{owner}/{repo}/tags?per_page=N
+ *  用于 ref selector 下拉（history/files tab 切换 tag）。 */
+export async function listTags(
+  owner: string,
+  repo: string,
+  opts?: { perPage?: number; page?: number },
+): Promise<TagSummary[]> {
+  const params = new URLSearchParams({
+    per_page: String(opts?.perPage ?? 100),
+    page: String(opts?.page ?? 1),
+  });
+  const resp = await fetchGithub(`repos/${owner}/${repo}/tags?${params.toString()}`);
+  if (resp.status === 404) return [];
+  await assertOk(resp, `listTags(${owner}/${repo})`);
+  const data = (await resp.json()) as Array<{
+    name: string;
+    commit: { sha: string };
+  }>;
+  return data.map((t) => ({ name: t.name, commit: { sha: t.commit.sha } }));
+}

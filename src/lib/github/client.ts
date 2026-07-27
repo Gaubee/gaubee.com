@@ -146,6 +146,10 @@ export async function listCommits(
     path?: string;
     /** 按 GitHub login 过滤作者。 */
     author?: string;
+    /** 仅返回此时间之后的提交（ISO 8601，如 2026-06-01T00:00:00Z）。 */
+    since?: string;
+    /** 仅返回此时间之前的提交（ISO 8601）。 */
+    until?: string;
   } = {},
 ): Promise<CommitInfo[]> {
   const { owner, repo } = resolveRepo(opts);
@@ -155,6 +159,8 @@ export async function listCommits(
   params.set("page", String(opts.page ?? 1));
   if (opts.path) params.set("path", opts.path);
   if (opts.author) params.set("author", opts.author);
+  if (opts.since) params.set("since", opts.since);
+  if (opts.until) params.set("until", opts.until);
   const resp = await fetchGithub(`repos/${owner}/${repo}/commits?${params.toString()}`);
   if (!resp.ok) {
     if (resp.status === 404) return [];
