@@ -1048,7 +1048,9 @@
             {:else}
               {#snippet changeList()}
             {#if changesResource.status === 'loading'}
-              {#each Array(3) as _}<Skeleton class="mb-2 h-12" />{/each}
+              <div class="space-y-2 p-1">
+                {#each Array(3) as _}<Skeleton class="h-12 w-full" />{/each}
+              </div>
             {:else if changes.length === 0}
               <p class="text-muted-foreground py-4 text-center text-sm">工作区干净</p>
             {:else}
@@ -1239,7 +1241,9 @@
           <!-- issue 列表 snippet（桌面端左栏和移动端 Sheet 共用渲染逻辑）-->
           {#snippet issueList()}
             {#if issuesResource.status === 'loading'}
-              {#each Array(4) as _}<Skeleton class="h-14 w-full" />{/each}
+              <div class="space-y-2 p-2">
+                {#each Array(4) as _}<Skeleton class="h-14 w-full" />{/each}
+              </div>
             {:else if issuesResource.status === 'error'}
               <p class="text-destructive px-3 py-4 text-sm">{issuesResource.error}</p>
             {:else if issuesResource.status === 'empty'}

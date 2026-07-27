@@ -396,7 +396,9 @@
       </div>
     {/if}
     {#if filterLoading && !filterCache}
-      {#each Array(6) as _}<Skeleton class="h-16" />{/each}
+      <div class="space-y-2">
+        {#each Array(6) as _}<Skeleton class="h-16 w-full" />{/each}
+      </div>
     {:else if filterError && !filterCache}
       <p class="text-destructive text-sm">{filterError}</p>
     {:else if filteredRepos.length === 0 && filterCache}
