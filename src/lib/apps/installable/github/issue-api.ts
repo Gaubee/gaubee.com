@@ -81,6 +81,45 @@ export interface IssueComment {
   reactions?: Reactions;
 }
 
+/** Issue timeline 事件类型（GitHub Issues Events API 返回的 event 字段）。 */
+export type IssueEventType =
+  | "closed"
+  | "reopened"
+  | "labeled"
+  | "unlabeled"
+  | "assigned"
+  | "unassigned"
+  | "referenced"
+  | "renamed"
+  | "milestoned"
+  | "demilestoned"
+  | "locked"
+  | "unlocked"
+  | "pinned"
+  | "unpinned";
+
+/** Issue timeline action 事件（紧凑单行，区别于 IssueComment 的卡片）。
+ *  如「X closed this」「Y added the bug label」。 */
+export interface IssueEvent {
+  id: number;
+  /** 事件类型。 */
+  event: IssueEventType;
+  /** 触发者。 */
+  actor: { login: string; avatar_url: string };
+  /** 发生时间。 */
+  created_at: string;
+  /** labeled/unlabeled 时的 label。 */
+  label?: { name: string; color: string };
+  /** assigned/unassigned 时的对象。 */
+  assignee?: { login: string; avatar_url: string };
+  /** referenced 时的关联 commit SHA。 */
+  commit_id?: string;
+  /** renamed 时的旧/新标题。 */
+  rename?: { from: string; to: string };
+  /** milestoned/demilestoned 时的里程碑标题。 */
+  milestone?: { title: string };
+}
+
 /** 用户摘要（@mention 搜索用）。 */
 export interface UserSummary {
   login: string;
@@ -272,6 +311,54 @@ export async function listIssueComments(
   await assertOk(resp, `listIssueComments(${owner}/${repo}#${number})`);
   const data = (await resp.json()) as GhCommentResponse[];
   return data.map(toComment);
+}
+
+/** GitHub Events API 响应（内部，仅取需要的字段）。 */
+interface GhEventResponse {
+  id: number;
+  event: string;
+  actor: { login: string; avatar_url: string };
+  created_at: string;
+  label?: { name: string; color: string };
+  assignee?: { login: string; avatar_url: string };
+  commit_id?: string;
+  commit_url?: string;
+  rename?: { from: string; to: string };
+  milestone?: { title: string };
+}
+
+/**
+ * 列出 issue 的 timeline 事件（closed/reopened/labeled/assigned 等紧凑 action 行）。
+ * GET /repos/{owner}/{repo}/issues/{number}/events
+ *
+ * 与 listIssueComments 区别：events 是「动作」（无 body，单行渲染），
+ * comments 是「评论」（有 body，卡片渲染）。IssueContentPanel 把两者按时间
+ * 合并为统一的 timeline。
+ */
+export async function listIssueEvents(
+  owner: string,
+  repo: string,
+  number: number,
+): Promise<IssueEvent[]> {
+  const resp = await fetchGithub(`repos/${owner}/${repo}/issues/${number}/events?per_page=100`);
+  if (resp.status === 404) return [];
+  await assertOk(resp, `listIssueEvents(${owner}/${repo}#${number})`);
+  const data = (await resp.json()) as GhEventResponse[];
+  return data
+    .filter((e) => e.event && e.actor)
+    .map((e) => ({
+      id: e.id,
+      event: e.event as IssueEventType,
+      actor: { login: e.actor.login, avatar_url: e.actor.avatar_url },
+      created_at: e.created_at,
+      label: e.label,
+      assignee: e.assignee
+        ? { login: e.assignee.login, avatar_url: e.assignee.avatar_url }
+        : undefined,
+      commit_id: e.commit_id,
+      rename: e.rename,
+      milestone: e.milestone ? { title: e.milestone.title } : undefined,
+    }));
 }
 
 /**
