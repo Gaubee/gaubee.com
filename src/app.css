@@ -241,6 +241,43 @@
   font-size: 0.875em;
 }
 
+/* -------------------------------------------------------------------------
+ * Markdown 正文链接统一规范（2026-07-28）
+ *
+ * 规范：
+ * - 外链（http/https/mailto 绝对 URL）：尾部 external-link 图标 + 新窗口打开
+ * - 内链（/站内绝对路径）：SPA 应用内导航，视觉与普通链接统一（无图标）
+ *
+ * 图标实现：CSS ::after + mask（DOM 零增节点，SSG 同步生效），
+ * background: currentColor → 自动跟随链接色/悬停态/暗色模式。
+ * 作用域：.prose（文章详情 MarkdownViewer）与 .shout-markdown（说说列表 inline）。
+ * ------------------------------------------------------------------------- */
+
+/* shout-markdown 不走 prose，链接需补充基础样式以与正文统一 */
+.shout-markdown a {
+  color: var(--primary);
+  font-weight: 500;
+  text-decoration-line: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-underline-offset: 2px;
+}
+
+/* 外链尾部图标（lucide external-link path，mask 内 stroke=black 产生 alpha） */
+.prose a.md-link-external::after,
+.shout-markdown a.md-link-external::after {
+  content: "";
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-left: 0.15em;
+  vertical-align: -0.05em;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/></svg>")
+    no-repeat center / contain;
+  mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/></svg>")
+    no-repeat center / contain;
+}
+
 /* ---------------------------------------------------------------------------
  * App layout - 响应式四区布局（容器查询，移植自 openspecui index.css）
  *

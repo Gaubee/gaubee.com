@@ -15,6 +15,7 @@
 import { marked } from "marked";
 import { gfmHeadingId } from "marked-gfm-heading-id";
 
+import { renderLinkTag } from "./link";
 import { highlightCode, primeHighlighter } from "./shiki-highlighter";
 
 let configured = false;
@@ -61,6 +62,11 @@ export function renderMarkdown(src: string): string {
   renderer.image = ({ href, title, text }) => {
     const t = title ?? "";
     return `<img src="${escapeHtml(href)}" alt="${escapeHtml(text ?? "")}"${t ? ` title="${escapeHtml(t)}"` : ""} loading="lazy" style="max-width:100%;height:auto;border-radius:8px" />`;
+  };
+  // 链接：外链加图标 + 新窗口；内链加 data-internal-link（SSG 无 JS 时走原生跳转）
+  renderer.link = ({ href, title, tokens }) => {
+    const text = marked.Parser.parseInline(tokens as never);
+    return renderLinkTag({ href, text, title });
   };
   marked.use({ renderer });
 
