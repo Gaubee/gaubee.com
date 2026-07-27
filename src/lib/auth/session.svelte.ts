@@ -11,9 +11,11 @@
  *
  * token 生命周期：
  * - OAuth 回调后，Worker 重定向到 /#auth_token=xxx（hash fragment，不发服务器）。
- * - 前端启动时从 fragment 读取 token，存 $state（内存），立即清除地址栏 fragment。
- * - 刷新页面 → 内存丢失 → 需重新登录（token 不持久化，安全优先）。
- * - 登出 → 清内存 token + 状态重置。
+ * - 前端启动时从 fragment 读取 token，存 $state（内存）+ localStorage（刷新恢复），
+ *   立即清除地址栏 fragment。
+ * - 刷新页面 → 从 localStorage 恢复 token，无需重新登录。
+ * - token 失效（401/403）→ 清内存 + localStorage。
+ * - 登出 → 清内存 + localStorage + 状态重置。
  */
 import { browser } from "$app/environment";
 
@@ -65,6 +67,8 @@ class AuthStore {
     const match = hash.match(/auth_token=([^&]+)/);
     if (match) {
       this.token = match[1];
+      // 持久化到 localStorage（刷新时恢复，避免每次刷新都要重新登录）
+      localStorage.setItem("gh_token", this.token);
       // 清除地址栏 fragment（history.replaceState，不触发导航）
       history.replaceState(null, "", window.location.pathname + window.location.search);
     }
@@ -83,9 +87,14 @@ class AuthStore {
 
   private async doRefresh(): Promise<void> {
     if (!browser) return;
-    // 首次启动：从 fragment 消费 token
+    // 首次启动：从 fragment 消费 token（OAuth 回调），或从 localStorage 恢复（刷新）
     if (!this.token) {
       this.consumeTokenFromFragment();
+    }
+    if (!this.token && browser) {
+      // fragment 无 token，尝试从 localStorage 恢复（页面刷新场景）
+      const stored = localStorage.getItem("gh_token");
+      if (stored) this.token = stored;
     }
     if (!this.token) {
       // 无 token：未登录
@@ -100,8 +109,9 @@ class AuthStore {
         headers: this.authHeaders(),
       });
       if (!resp.ok) {
-        // token 失效（401/403），清空
+        // token 失效（401/403），清空 token + localStorage
         this.token = null;
+        localStorage.removeItem("gh_token");
         this.state.loaded = true;
         this.state.authenticated = false;
         this.state.user = null;
@@ -126,9 +136,10 @@ class AuthStore {
     window.location.href = `${AUTH_BASE}/auth/github`;
   }
 
-  /** 登出（清内存 token + 状态）。 */
+  /** 登出（清内存 + localStorage token + 状态）。 */
   async logout(): Promise<void> {
     this.token = null;
+    if (browser) localStorage.removeItem("gh_token");
     this.state.authenticated = false;
     this.state.user = null;
   }
