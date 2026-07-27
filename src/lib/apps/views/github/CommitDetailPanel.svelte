@@ -257,8 +257,10 @@
               </Card.Header>
               <Card.Content class="!px-0 !pb-0">
                 {#if file.patch === null}
-                  <!-- patch 为 null：文件过大，GitHub 未返回 diff -->
-                  <p class="text-muted-foreground px-4 py-3 text-xs italic">文件过大，无法显示 diff</p>
+                  <!-- patch 为 null：文件变更超 300 行，GitHub API 不返回 patch -->
+                  <p class="text-muted-foreground px-4 py-3 text-xs italic">
+                    变更行数较多（{file.additions + file.deletions} 行），GitHub API 未返回 diff
+                  </p>
                 {:else if lines.length === 0}
                   <p class="text-muted-foreground px-4 py-3 text-xs italic">无 diff 内容</p>
                 {:else}
