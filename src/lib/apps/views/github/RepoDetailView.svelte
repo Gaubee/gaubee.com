@@ -19,6 +19,7 @@
   import { gaubeeos } from '$lib/os/services'
   import { handlePublishError } from '$lib/os/services/publish-helper'
   import { navController } from '$lib/nav/nav-controller-instance'
+  import { navStore } from '$lib/nav/nav.svelte'
   import { notifySuccess, notifyWarning } from '$lib/apps/builtin/notifications/service.svelte'
   import { accountService } from '$lib/apps/builtin/account/service'
   import {
@@ -78,6 +79,32 @@
 
   const isMainRepo = $derived(owner === OWNER && repo === REPO)
 
+  // ---- Tab 路由化（URL query 参数驱动）----
+  // ?tab=files|history|changes|issues|log
+  // &file=路径 &sha=commitSHA &issue=编号 &change=路径 &activity=ID
+  const navState = $derived(navStore.current)
+  const searchParams = $derived(new URLSearchParams(navState.mainLocation.search))
+  /** 当前 Tab（URL ?tab=，默认 files）。 */
+  const activeTab = $derived((searchParams.get('tab') ?? 'files') as 'files' | 'history' | 'changes' | 'issues' | 'log')
+  /** 各选中项从 URL 读取（刷新/前进后退保持）。 */
+  const selectedFile = $derived(searchParams.get('file') ?? '')
+  const selectedCommitSha = $derived(searchParams.get('sha'))
+  const selectedIssue = $derived(searchParams.get('issue') ? Number(searchParams.get('issue')) : null)
+  const selectedChangePath = $derived(searchParams.get('change'))
+  const selectedActivityId = $derived(searchParams.get('activity'))
+
+  /** 详情页 base path（owner/repo，不含 query）。 */
+  const basePath = $derived(navState.mainLocation.pathname)
+
+  /** 切 Tab（REPLACE 不入历史栈）。 */
+  function switchTab(tab: string) {
+    navController.navigateMain(`${basePath}?tab=${tab}`, 'REPLACE')
+  }
+  /** 选中项（PUSH 入历史栈，可后退）。更新 query 时保留 tab。 */
+  function navigateSelect(tab: string, key: string, value: string) {
+    navController.navigateMain(`${basePath}?tab=${tab}&${key}=${encodeURIComponent(value)}`)
+  }
+
   // ---- 仓库元数据 ----
   let repoInfo = $state<RepoSummary | null>(null)
   let repoInfoLoading = $state(false)
@@ -86,8 +113,6 @@
   let tree = $state<Map<string, TreeNode>>(new Map())
   let expanded = $state<Set<string>>(new Set(['']))
   let loadingDirs = $state<Set<string>>(new Set())
-  /** 当前选中的文件路径（进详情页自动选中 README）。 */
-  let selectedFile = $state('')
   /** 移动端文件树浮层开关（桌面端用双栏 grid，不用此浮层）。 */
   let fileTreeSheetOpen = $state(false)
 
@@ -95,8 +120,6 @@
   let commits = $state<CommitInfo[]>([])
   let commitsLoading = $state(false)
   let commitsError = $state<string | null>(null)
-  /** 选中的 commit SHA（右栏 CommitDetailPanel 用）。 */
-  let selectedCommitSha = $state<string | null>(null)
   /** 移动端 commit 列表浮层。 */
   let commitListSheetOpen = $state(false)
 
@@ -105,8 +128,6 @@
   let changesLoading = $state(false)
   let commitMessage = $state('')
   let committing = $state(false)
-  /** 选中的变更文件路径（右栏 diff 用）。 */
-  let selectedChangePath = $state<string | null>(null)
   /** 移动端变更列表浮层。 */
   let changeListSheetOpen = $state(false)
 
@@ -148,8 +169,6 @@
   let issuesLoading = $state(false)
   let issuesError = $state<string | null>(null)
   let issueSearchInput = $state('')
-  /** 当前选中的 issue 编号（null 时右侧显示提示）。 */
-  let selectedIssue = $state<number | null>(null)
   /** 移动端 issue 列表浮层开关。 */
   let issueListSheetOpen = $state(false)
 
@@ -157,8 +176,6 @@
   const activities = $derived(
     activityLog.activities.filter((a) => a.repo === `${owner}/${repo}`),
   )
-  /** 选中的活动 ID（右栏详情用）。 */
-  let selectedActivityId = $state<string | null>(null)
   /** 移动端活动列表浮层。 */
   let activityListSheetOpen = $state(false)
   /** 派生：选中的活动对象。 */
@@ -222,7 +239,10 @@
     try {
       const result = await fetchReadme(o, r)
       if (result.path) {
-        selectedFile = result.path
+        // 仅在 files Tab 且未选中文件时自动选中 README（避免覆盖用户已选的文件）
+        if (activeTab === 'files' && !selectedFile) {
+          navigateSelect('files', 'file', result.path)
+        }
       }
     } catch {
       // 无 README 或加载失败，静默（selectedFile 保持空，显示提示）
@@ -260,10 +280,8 @@
   }
 
   function selectFile(path: string) {
-    selectedFile = path
+    navigateSelect('files', 'file', path)
     // 移动端：选中文件后关闭文件树浮层。
-    // 用微任务延迟关闭，避免与 Sheet/Dialog 内部的 click 处理冲突（同步设 false
-    // 会被 bits-ui 的 pointerdown/click 交互判定覆盖）。
     queueMicrotask(() => {
       fileTreeSheetOpen = false
     })
@@ -359,8 +377,7 @@
   }
 
   function openIssue(num: number) {
-    selectedIssue = num
-    // 移动端：选中 issue 后关闭列表浮层
+    navigateSelect('issues', 'issue', String(num))
     issueListSheetOpen = false
   }
 
@@ -497,7 +514,7 @@
 
   <!-- Tab 区。滚动容器命名 scroll-timeline，供 .repo-tabs 的 scroll-driven 动画引用。 -->
   <div class="repo-tab-scroll min-h-0 flex-1 overflow-auto">
-    <Tabs.Root value="files" class="w-full">
+    <Tabs.Root value={activeTab} onValueChange={(v) => switchTab(v)} class="w-full">
       <Tabs.List class="repo-tabs grid w-full grid-cols-5">
         <Tabs.Trigger value="files" class="gap-1.5"><FolderIcon class="size-4" /><span class="tab-label">文件</span></Tabs.Trigger>
         <Tabs.Trigger value="history" class="gap-1.5"><HistoryIcon class="size-4" /><span class="tab-label">历史</span></Tabs.Trigger>
@@ -588,7 +605,7 @@
               {#each commits as c (c.sha)}
                 <button
                   class="hover:bg-accent flex w-full items-start gap-2 rounded-md p-2 text-left transition-colors {selectedCommitSha === c.sha ? 'bg-accent' : ''}"
-                  onclick={() => { selectedCommitSha = c.sha; commitListSheetOpen = false }}
+                  onclick={() => { navigateSelect('history', 'sha', c.sha); commitListSheetOpen = false }}
                 >
                   <div class="bg-muted text-muted-foreground flex size-6 shrink-0 items-center justify-center rounded-full font-mono text-[10px]">
                     {c.sha.slice(0, 7)}
@@ -668,7 +685,7 @@
                 {@const kind = changeKind(change)}
                 <button
                   class="hover:bg-accent flex w-full items-center gap-2 rounded-md p-2 text-left transition-colors {selectedChangePath === change.path ? 'bg-accent' : ''}"
-                  onclick={() => { selectedChangePath = change.path; changeListSheetOpen = false }}
+                  onclick={() => { navigateSelect('changes', 'change', change.path); changeListSheetOpen = false }}
                 >
                   {#if kind === 'add'}
                     <FilePlusIcon class="size-4 shrink-0 text-emerald-500" />
@@ -902,7 +919,7 @@
               {#each activities as a (a.id)}
                 <button
                   class="hover:bg-accent flex w-full items-start gap-2 rounded-md p-2 text-left transition-colors {selectedActivityId === a.id ? 'bg-accent' : ''}"
-                  onclick={() => { selectedActivityId = a.id; activityListSheetOpen = false }}
+                  onclick={() => { navigateSelect('log', 'activity', a.id); activityListSheetOpen = false }}
                 >
                   <div class="flex size-6 shrink-0 items-center justify-center">
                     {#if a.action === 'commit'}
