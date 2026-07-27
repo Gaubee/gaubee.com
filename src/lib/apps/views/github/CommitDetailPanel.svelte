@@ -11,6 +11,7 @@
   import { Badge } from '$lib/components/ui/badge'
   import { Button } from '$lib/components/ui/button'
   import * as Card from '$lib/components/ui/card'
+  import * as Tooltip from '$lib/components/ui/tooltip'
   // 图标
   import GitCommitHorizontalIcon from '@lucide/svelte/icons/git-commit-horizontal'
   import ExternalLinkIcon from '@lucide/svelte/icons/external-link'
@@ -128,9 +129,12 @@
   }
 </script>
 
-<div class="flex h-full flex-col overflow-hidden">
-  <!-- 顶部 commit 元数据栏 -->
-  <header class="border-b border-border px-4 py-3">
+<!-- Tooltip.Provider 包裹整个面板：顶部 commit 外链 + 文件列表按钮共享 delay 配置。
+     delayDuration=200ms（默认 700ms），让 tooltip 响应更及时。 -->
+<Tooltip.Provider delayDuration={200}>
+  <div class="flex h-full flex-col overflow-hidden">
+    <!-- 顶部 commit 元数据栏 -->
+    <header class="border-b border-border px-4 py-3">
     {#if loading}
       <Skeleton class="mb-2 h-5 w-2/3" />
       <Skeleton class="mb-2 h-3 w-1/2" />
@@ -158,8 +162,9 @@
           href={commit.html_url}
           target="_blank"
           rel="noopener noreferrer"
-          class="text-muted-foreground hover:text-foreground shrink-0"
+          class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex size-6 items-center justify-center rounded transition-colors"
           aria-label="在 GitHub 查看"
+          title="在 GitHub 查看 commit"
         >
           <ExternalLinkIcon class="size-3.5" />
         </a>
@@ -264,26 +269,28 @@
                        变更后：当前 commit 版本。
                        icon-only ghost 按钮，hover 高亮，title 提供完整说明。 -->
                   {#if canBefore}
-                    <button
-                      type="button"
-                      onclick={() => commit && openFileAtCommit(commit.parents[0], file.previous_filename ?? file.filename)}
-                      class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex size-5 items-center justify-center rounded transition-colors"
-                      title="查看变更前（parent commit 的版本）"
-                      aria-label="查看变更前"
-                    >
-                      <ArrowLeftIcon class="size-3" />
-                    </button>
+                    <Tooltip.Root>
+                      <Tooltip.Trigger
+                        onclick={() => commit && openFileAtCommit(commit.parents[0], file.previous_filename ?? file.filename)}
+                        class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex size-5 items-center justify-center rounded transition-colors"
+                        aria-label="查看变更前"
+                      >
+                        <ArrowLeftIcon class="size-3" />
+                      </Tooltip.Trigger>
+                      <Tooltip.Content>查看变更前（parent 版本）</Tooltip.Content>
+                    </Tooltip.Root>
                   {/if}
                   {#if canAfter}
-                    <button
-                      type="button"
-                      onclick={() => commit && openFileAtCommit(commit.sha, file.filename)}
-                      class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex size-5 items-center justify-center rounded transition-colors"
-                      title="查看变更后（当前 commit 的版本）"
-                      aria-label="查看变更后"
-                    >
-                      <FileTextIcon class="size-3" />
-                    </button>
+                    <Tooltip.Root>
+                      <Tooltip.Trigger
+                        onclick={() => commit && openFileAtCommit(commit.sha, file.filename)}
+                        class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex size-5 items-center justify-center rounded transition-colors"
+                        aria-label="查看变更后"
+                      >
+                        <FileTextIcon class="size-3" />
+                      </Tooltip.Trigger>
+                      <Tooltip.Content>查看变更后（当前版本）</Tooltip.Content>
+                    </Tooltip.Root>
                   {/if}
                   <span class="bg-border h-3 w-px"></span>
                   <!-- GitHub 外链 -->
@@ -291,9 +298,9 @@
                     href={file.blob_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="text-muted-foreground hover:text-foreground inline-flex size-5 items-center justify-center rounded transition-colors hover:bg-accent"
-                    title="在 GitHub 查看文件"
+                    class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex size-5 items-center justify-center rounded transition-colors"
                     aria-label="在 GitHub 查看文件"
+                    title="在 GitHub 查看"
                   >
                     <ExternalLinkIcon class="size-3" />
                   </a>
@@ -357,5 +364,6 @@
         </div>
       {/if}
     {/if}
+    </div>
   </div>
-</div>
+</Tooltip.Provider>
