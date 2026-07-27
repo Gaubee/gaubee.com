@@ -1031,3 +1031,12 @@ src/lib/apps/installable/github/state/
 
 - 类型检查 0 错误 0 警告；单元测试仅预存 `shell.test.ts` 环境噪声失败（无关）。
 - agent-browser 走查：`/app/store` 渲染完整应用列表；`/app/github-edit?...&file=README.md` CodeMirror 加载 README.md 完整内容。
+
+### Bug 3：`/app/store/writer` 应用详情页空白（2026-07-28）
+
+**根因**：与前两个 bug 同源（路由重构遗留）。`AppStoreView` 用组件内 pathname 正则（`/^\/app\/store\/(.+)$/`）二级分发列表/详情，但 `app-store` 的 activity root 是 `leafRoute`（index route），`/app/store/writer` 剥前缀后剩余段非空 → no-match → 组件根本没加载。
+
+**修复**（迁移到嵌套子路由，与 `github.repo.detail` 范式一致）：
+- `app-store.ts`：`leafRoute` → `defineRoute`，root index（列表）+ child `:appId`（详情）。
+- `AppStoreView`：去掉正则分发，只保留列表渲染。
+- `AppStoreDetailView`：从 prop `appId` 改为 `useParams<{ appId: string }>()` 取参。
