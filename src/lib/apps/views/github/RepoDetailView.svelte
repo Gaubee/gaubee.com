@@ -46,6 +46,8 @@
   import RepoFileTree, { type TreeNode } from './RepoFileTree.svelte'
   import RepoFileContent from './RepoFileContent.svelte'
   import IssueContentPanel from './IssueContentPanel.svelte'
+  import CommitDetailPanel from './CommitDetailPanel.svelte'
+  import { diffLines } from '$lib/utils/diff'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import { Badge } from '$lib/components/ui/badge'
@@ -93,12 +95,20 @@
   let commits = $state<CommitInfo[]>([])
   let commitsLoading = $state(false)
   let commitsError = $state<string | null>(null)
+  /** 选中的 commit SHA（右栏 CommitDetailPanel 用）。 */
+  let selectedCommitSha = $state<string | null>(null)
+  /** 移动端 commit 列表浮层。 */
+  let commitListSheetOpen = $state(false)
 
   // ---- 变更（仅主仓库）----
   let changes = $state<VfsNode[]>([])
   let changesLoading = $state(false)
   let commitMessage = $state('')
   let committing = $state(false)
+  /** 选中的变更文件路径（右栏 diff 用）。 */
+  let selectedChangePath = $state<string | null>(null)
+  /** 移动端变更列表浮层。 */
+  let changeListSheetOpen = $state(false)
 
   // ---- 仓库快速搜索（元数据栏，默认限定仓库类型）----
   let repoSearchInput = $state('')
@@ -146,6 +156,25 @@
   // ---- 日志 ----
   const activities = $derived(
     activityLog.activities.filter((a) => a.repo === `${owner}/${repo}`),
+  )
+  /** 选中的活动 ID（右栏详情用）。 */
+  let selectedActivityId = $state<string | null>(null)
+  /** 移动端活动列表浮层。 */
+  let activityListSheetOpen = $state(false)
+  /** 派生：选中的活动对象。 */
+  const selectedActivity = $derived(
+    selectedActivityId ? activities.find((a) => a.id === selectedActivityId) ?? null : null,
+  )
+
+  /** 派生：选中变更文件的 diff 行（变更 Tab 右栏用）。 */
+  const selectedChangeNode = $derived(
+    selectedChangePath ? changes.find((c) => c.path === selectedChangePath) ?? null : null,
+  )
+  const selectedChangeDiff = $derived(
+    selectedChangeNode ? diffLines(
+      typeof selectedChangeNode.baseContent === 'string' ? selectedChangeNode.baseContent : '',
+      selectedChangeNode.content ?? '',
+    ) : [],
   )
 
   // ---- 收藏 ----
@@ -538,113 +567,217 @@
         </Sheet.Root>
       </Tabs.Content>
 
-      <!-- 历史 -->
+      <!-- 历史（双栏：commit 列表左 sticky + CommitDetailPanel 右展开）-->
       <Tabs.Content value="history" class="p-4">
-        <Card.Root>
-          <Card.Header class="flex-row items-center justify-between space-y-0">
-            <Card.Title class="flex items-center gap-2 text-base">
-              <HistoryIcon class="size-4" />
-              提交历史
-            </Card.Title>
-            <Button variant="outline" size="sm" onclick={() => loadCommits(owner, repo)} disabled={commitsLoading} class="gap-1">
-              <RefreshCwIcon class="size-3 {commitsLoading ? 'animate-spin' : ''}" />
-              刷新
-            </Button>
-          </Card.Header>
-          <Card.Content>
+        <div class="flex items-center gap-2 pb-2 md:hidden">
+          <Button size="sm" variant="default" onclick={() => (commitListSheetOpen = true)}>
+            <HistoryIcon class="size-4" />
+            提交列表
+          </Button>
+        </div>
+
+        <div class="grid min-w-0 gap-4 md:grid-cols-[minmax(260px,360px)_1fr]">
+          {#snippet commitList()}
             {#if commitsLoading && commits.length === 0}
               {#each Array(4) as _}<Skeleton class="mb-2 h-12" />{/each}
             {:else if commitsError}
-              <p class="text-destructive text-sm">{commitsError}</p>
+              <p class="text-destructive p-2 text-sm">{commitsError}</p>
             {:else if commits.length === 0}
               <p class="text-muted-foreground py-4 text-center text-sm">暂无提交</p>
             {:else}
-              <div class="space-y-1">
-                {#each commits as c (c.sha)}
-                  <div class="hover:bg-accent flex items-start gap-3 rounded-md p-2 transition-colors">
-                    <div class="bg-muted text-muted-foreground flex size-7 shrink-0 items-center justify-center rounded-full font-mono text-[10px]">
-                      {c.sha.slice(0, 7)}
-                    </div>
-                    <div class="min-w-0 flex-1">
-                      <p class="truncate text-sm font-medium">{c.message}</p>
-                      <p class="text-muted-foreground text-xs">
-                        {c.login ?? c.author?.name ?? 'unknown'}
-                        {#if c.author?.date}· {formatCommitDate(c.author.date)}{/if}
-                      </p>
-                      {#if c.body}
-                        <p class="text-muted-foreground mt-0.5 line-clamp-2 text-xs whitespace-pre-wrap">{c.body}</p>
-                      {/if}
-                    </div>
+              {#each commits as c (c.sha)}
+                <button
+                  class="hover:bg-accent flex w-full items-start gap-2 rounded-md p-2 text-left transition-colors {selectedCommitSha === c.sha ? 'bg-accent' : ''}"
+                  onclick={() => { selectedCommitSha = c.sha; commitListSheetOpen = false }}
+                >
+                  <div class="bg-muted text-muted-foreground flex size-6 shrink-0 items-center justify-center rounded-full font-mono text-[10px]">
+                    {c.sha.slice(0, 7)}
                   </div>
-                {/each}
-              </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-xs font-medium">{c.message}</p>
+                    <p class="text-muted-foreground text-[11px]">
+                      {c.login ?? c.author?.name ?? 'unknown'}
+                      {#if c.author?.date} · {formatCommitDate(c.author.date)}{/if}
+                    </p>
+                  </div>
+                </button>
+              {/each}
             {/if}
-          </Card.Content>
-        </Card.Root>
-      </Tabs.Content>
-
-      <!-- 变更（仅主仓库）-->
-      <Tabs.Content value="changes" class="p-4">
-        <Card.Root>
-          <Card.Header class="flex-row items-center justify-between space-y-0">
-            <Card.Title class="flex items-center gap-2 text-base">
-              <FilePenIcon class="size-4" />
-              未提交变更
-            </Card.Title>
-            <Button variant="outline" size="sm" onclick={loadChanges} disabled={changesLoading} class="gap-1">
-              <RefreshCwIcon class="size-3 {changesLoading ? 'animate-spin' : ''}" />
-              刷新
-            </Button>
-          </Card.Header>
-          <Card.Content>
-            {#if !isMainRepo}
-              <p class="text-muted-foreground py-4 text-center text-sm">
-                变更提交仅支持主仓库 {OWNER}/{REPO}。
-              </p>
-            {:else if changesLoading}
-              <Skeleton class="h-16" />
-            {:else if changes.length === 0}
-              <p class="text-muted-foreground py-4 text-center text-sm">工作区干净，没有未提交的修改。</p>
-            {:else}
-              <div class="space-y-2">
-                {#each changes as change (change.path)}
-                  {@const kind = changeKind(change)}
-                  <div class="flex items-center gap-2 rounded border border-border p-2">
-                    {#if kind === 'add'}
-                      <FilePlusIcon class="size-4 text-emerald-500" />
-                    {:else if kind === 'del'}
-                      <FileMinusIcon class="size-4 text-destructive" />
-                    {:else}
-                      <FilePenIcon class="size-4 text-amber-500" />
-                    {/if}
-                    <code class="bg-muted rounded px-1.5 py-0.5 text-xs">{change.path}</code>
-                    <span class="text-muted-foreground text-xs">
-                      {kind === 'add' ? '新建' : kind === 'del' ? '删除' : '修改'}
-                    </span>
-                    <Button size="icon-sm" variant="ghost" class="ml-auto" onclick={() => handleRevert(change.path)} aria-label="撤销修改">
-                      <Undo2Icon />
-                    </Button>
-                  </div>
-                {/each}
-              </div>
-              <div class="border-border mt-4 border-t pt-3">
-                <label for="gh-commit-msg" class="mb-1.5 block text-sm font-medium">提交信息</label>
-                <Input
-                  id="gh-commit-msg"
-                  type="text"
-                  value={commitMessage}
-                  oninput={(e) => (commitMessage = e.currentTarget.value)}
-                  placeholder="描述本次变更（可选）"
-                  class="mb-2"
-                />
-                <Button onclick={handleCommit} disabled={committing} class="gap-1">
-                  <GitCommitHorizontalIcon class="size-4" />
-                  {committing ? '提交中…' : `提交 ${changes.length} 个变更到 GitHub`}
+          {/snippet}
+          <!-- commit 列表左栏 -->
+          <div class="max-md:hidden">
+            <div class="border-border max-h-[calc(100dvh-12rem)] min-w-0 overflow-auto overscroll-contain rounded border md:sticky md:top-2">
+              <div class="border-border sticky top-0 z-[1] bg-background flex items-center justify-between p-2">
+                <span class="text-xs font-medium">提交历史</span>
+                <Button variant="ghost" size="icon-sm" onclick={() => loadCommits(owner, repo)} disabled={commitsLoading}>
+                  <RefreshCwIcon class="size-3 {commitsLoading ? 'animate-spin' : ''}" />
                 </Button>
               </div>
+              <div class="p-1">
+                {@render commitList()}
+              </div>
+            </div>
+          </div>
+
+          <!-- commit 详情右栏 -->
+          {#if selectedCommitSha}
+            <CommitDetailPanel
+              sha={selectedCommitSha}
+              {owner}
+              {repo}
+              onopenhistorylist={() => (commitListSheetOpen = true)}
+            />
+          {:else}
+            <div class="border-border text-muted-foreground flex min-w-0 items-center justify-center rounded border py-12 text-sm">
+              选择左侧 commit 查看详情
+            </div>
+          {/if}
+
+          <!-- 移动端 commit 列表浮层 -->
+          <Sheet.Root bind:open={commitListSheetOpen}>
+            <Sheet.Content side="bottom" class="max-h-[75dvh] rounded-t-lg p-0 md:hidden" showCloseButton={false}>
+              <Sheet.Header class="flex-row items-center justify-between border-b px-4 py-3">
+                <Sheet.Title class="flex items-center gap-2 text-sm font-medium">
+                  <HistoryIcon class="size-4" />
+                  提交历史
+                </Sheet.Title>
+                <Sheet.Description class="sr-only">浏览提交列表</Sheet.Description>
+              </Sheet.Header>
+              <div class="max-h-[calc(75dvh-4rem)] overflow-auto overscroll-contain p-2">
+                {@render commitList()}
+              </div>
+            </Sheet.Content>
+          </Sheet.Root>
+        </div>
+      </Tabs.Content>
+
+      <!-- 变更（双栏：dirty 文件列表左 sticky + diff 右展开，仅主仓库）-->
+      <Tabs.Content value="changes" class="p-4">
+        {#if !isMainRepo}
+          <div class="text-muted-foreground py-8 text-center text-sm">
+            变更提交仅支持主仓库 {OWNER}/{REPO}。
+          </div>
+        {:else}
+          {#snippet changeList()}
+            {#if changesLoading}
+              {#each Array(3) as _}<Skeleton class="mb-2 h-12" />{/each}
+            {:else if changes.length === 0}
+              <p class="text-muted-foreground py-4 text-center text-sm">工作区干净</p>
+            {:else}
+              {#each changes as change (change.path)}
+                {@const kind = changeKind(change)}
+                <button
+                  class="hover:bg-accent flex w-full items-center gap-2 rounded-md p-2 text-left transition-colors {selectedChangePath === change.path ? 'bg-accent' : ''}"
+                  onclick={() => { selectedChangePath = change.path; changeListSheetOpen = false }}
+                >
+                  {#if kind === 'add'}
+                    <FilePlusIcon class="size-4 shrink-0 text-emerald-500" />
+                  {:else if kind === 'del'}
+                    <FileMinusIcon class="size-4 shrink-0 text-destructive" />
+                  {:else}
+                    <FilePenIcon class="size-4 shrink-0 text-amber-500" />
+                  {/if}
+                  <span class="truncate text-xs font-medium">{change.path}</span>
+                  <span class="text-muted-foreground text-[10px]">
+                    {kind === 'add' ? '新' : kind === 'del' ? '删' : '改'}
+                  </span>
+                </button>
+              {/each}
             {/if}
-          </Card.Content>
-        </Card.Root>
+          {/snippet}
+
+          <div class="flex items-center gap-2 pb-2 md:hidden">
+            <Button size="sm" variant="default" onclick={() => (changeListSheetOpen = true)}>
+              <FilePenIcon class="size-4" />
+              变更列表 ({changes.length})
+            </Button>
+          </div>
+
+          <div class="grid min-w-0 gap-4 md:grid-cols-[minmax(260px,360px)_1fr]">
+            <!-- 变更文件列表左栏 -->
+            <div class="max-md:hidden">
+              <div class="border-border max-h-[calc(100dvh-12rem)] min-w-0 overflow-auto overscroll-contain rounded border md:sticky md:top-2">
+                <div class="border-border sticky top-0 z-[1] bg-background flex items-center justify-between p-2">
+                  <span class="text-xs font-medium">变更 ({changes.length})</span>
+                  <Button variant="ghost" size="icon-sm" onclick={loadChanges} disabled={changesLoading}>
+                    <RefreshCwIcon class="size-3 {changesLoading ? 'animate-spin' : ''}" />
+                  </Button>
+                </div>
+                <div class="p-1">
+                  {@render changeList()}
+                </div>
+                <!-- commit 提交区（左栏底部固定）-->
+                {#if changes.length > 0}
+                  <div class="border-border border-t p-2">
+                    <Input
+                      type="text"
+                      value={commitMessage}
+                      oninput={(e) => (commitMessage = e.currentTarget.value)}
+                      placeholder="提交信息"
+                      class="mb-2 h-8 text-xs"
+                    />
+                    <Button size="sm" class="w-full gap-1" onclick={handleCommit} disabled={committing}>
+                      <GitCommitHorizontalIcon class="size-3.5" />
+                      {committing ? '提交中…' : `提交 ${changes.length} 个变更`}
+                    </Button>
+                  </div>
+                {/if}
+              </div>
+            </div>
+
+            <!-- 变更 diff 右栏 -->
+            {#if selectedChangePath && selectedChangeNode}
+              <div class="border-border min-w-0 rounded border">
+                <!-- 工具栏：文件路径 + 撤销 -->
+                <div class="border-border flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
+                  <FilePenIcon class="text-muted-foreground size-3.5 shrink-0" />
+                  <span class="text-muted-foreground truncate font-mono text-xs" title={selectedChangePath}>{selectedChangePath}</span>
+                  <Button size="icon-sm" variant="ghost" class="ml-auto" onclick={() => selectedChangePath && handleRevert(selectedChangePath)} aria-label="撤销修改">
+                    <Undo2Icon class="size-3.5" />
+                  </Button>
+                </div>
+                <!-- diff 渲染 -->
+                <div class="max-h-[60vh] overflow-auto p-2">
+                  {#if selectedChangeDiff.length > 0}
+                    <div class="font-mono text-xs">
+                      {#each selectedChangeDiff.slice(0, 100) as line}
+                        <div class="flex {line.type === 'add' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : line.type === 'del' ? 'bg-destructive/10 text-destructive' : ''}">
+                          <span class="w-4 shrink-0 select-none opacity-50">{line.type === 'add' ? '+' : line.type === 'del' ? '-' : ' '}</span>
+                          <span class="whitespace-pre-wrap break-all">{line.text}</span>
+                        </div>
+                      {/each}
+                      {#if selectedChangeDiff.length > 100}
+                        <p class="text-muted-foreground py-1 text-center">…还有 {selectedChangeDiff.length - 100} 行</p>
+                      {/if}
+                    </div>
+                  {:else}
+                    <p class="text-muted-foreground py-4 text-center text-xs">无 diff 内容</p>
+                  {/if}
+                </div>
+              </div>
+            {:else}
+              <div class="border-border text-muted-foreground flex min-w-0 items-center justify-center rounded border py-12 text-sm">
+                选择左侧文件查看 diff
+              </div>
+            {/if}
+
+            <!-- 移动端变更列表浮层 -->
+            <Sheet.Root bind:open={changeListSheetOpen}>
+              <Sheet.Content side="bottom" class="max-h-[75dvh] rounded-t-lg p-0 md:hidden" showCloseButton={false}>
+                <Sheet.Header class="flex-row items-center justify-between border-b px-4 py-3">
+                  <Sheet.Title class="flex items-center gap-2 text-sm font-medium">
+                    <FilePenIcon class="size-4" />
+                    变更列表
+                  </Sheet.Title>
+                  <Sheet.Description class="sr-only">浏览变更文件</Sheet.Description>
+                </Sheet.Header>
+                <div class="max-h-[calc(75dvh-4rem)] overflow-auto overscroll-contain p-2">
+                  {@render changeList()}
+                </div>
+              </Sheet.Content>
+            </Sheet.Root>
+          </div>
+        {/if}
       </Tabs.Content>
 
       <!-- Issues（双栏：列表左 sticky + 内容右展开，移动端列表收进 Sheet）-->
@@ -752,56 +885,121 @@
         </div>
       </Tabs.Content>
 
-      <!-- 日志 -->
+      <!-- 日志（双栏：活动列表左 sticky + 活动详情右展开）-->
       <Tabs.Content value="log" class="p-4">
-        <Card.Root>
-          <Card.Header>
-            <Card.Title class="flex items-center gap-2 text-base">
-              <ScrollTextIcon class="size-4" />
-              活动日志
-              <span class="text-muted-foreground text-sm font-normal">（{activities.length}）</span>
-            </Card.Title>
-          </Card.Header>
-          <Card.Content>
+        <div class="flex items-center gap-2 pb-2 md:hidden">
+          <Button size="sm" variant="default" onclick={() => (activityListSheetOpen = true)}>
+            <ScrollTextIcon class="size-4" />
+            活动日志 ({activities.length})
+          </Button>
+        </div>
+
+        <div class="grid min-w-0 gap-4 md:grid-cols-[minmax(260px,360px)_1fr]">
+          {#snippet activityList()}
             {#if activities.length === 0}
               <p class="text-muted-foreground py-4 text-center text-sm">暂无活动记录</p>
             {:else}
-              <div class="space-y-1">
-                {#each activities as a (a.id)}
-                  <div class="hover:bg-accent flex items-start gap-3 rounded-md p-2 transition-colors">
-                    <div class="flex size-7 shrink-0 items-center justify-center rounded-full">
-                      {#if a.action === 'commit'}
-                        <GitCommitHorizontalIcon class="text-muted-foreground size-4" />
-                      {:else if a.action === 'sync'}
-                        <RefreshCwIcon class="text-muted-foreground size-4" />
-                      {:else}
-                        <Undo2Icon class="text-muted-foreground size-4" />
-                      {/if}
+              {#each activities as a (a.id)}
+                <button
+                  class="hover:bg-accent flex w-full items-start gap-2 rounded-md p-2 text-left transition-colors {selectedActivityId === a.id ? 'bg-accent' : ''}"
+                  onclick={() => { selectedActivityId = a.id; activityListSheetOpen = false }}
+                >
+                  <div class="flex size-6 shrink-0 items-center justify-center">
+                    {#if a.action === 'commit'}
+                      <GitCommitHorizontalIcon class="text-muted-foreground size-3.5" />
+                    {:else if a.action === 'sync'}
+                      <RefreshCwIcon class="text-muted-foreground size-3.5" />
+                    {:else}
+                      <Undo2Icon class="text-muted-foreground size-3.5" />
+                    {/if}
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-1.5">
+                      <Badge variant={actionTone(a.action)} class="text-[9px]">{actionLabel(a.action)}</Badge>
+                      <span class="truncate text-xs font-medium">{a.actor}</span>
                     </div>
-                    <div class="min-w-0 flex-1">
-                      <div class="flex items-center gap-2">
-                        <Badge variant={actionTone(a.action)} class="text-[10px]">{actionLabel(a.action)}</Badge>
-                        <span class="text-sm font-medium">{a.actor}</span>
-                        <span class="text-muted-foreground ml-auto text-xs">{formatActivityTime(a.timestamp)}</span>
-                      </div>
-                      {#if a.details.message}
-                        <p class="text-foreground mt-0.5 truncate text-xs">{a.details.message}</p>
-                      {/if}
-                      {#if a.details.sha}
-                        <p class="text-muted-foreground mt-0.5 font-mono text-xs">sha: {a.details.sha.slice(0, 7)}</p>
-                      {/if}
-                      {#if a.details.files && a.details.files.length > 0}
-                        <p class="text-muted-foreground mt-0.5 truncate text-xs">
-                          {a.details.files.length} 个文件：{a.details.files.slice(0, 3).join(', ')}{a.details.files.length > 3 ? '…' : ''}
-                        </p>
-                      {/if}
+                    {#if a.details.message}
+                      <p class="text-muted-foreground truncate text-[11px]">{a.details.message}</p>
+                    {/if}
+                  </div>
+                </button>
+              {/each}
+            {/if}
+          {/snippet}
+          <!-- 活动列表左栏 -->
+          <div class="max-md:hidden">
+            <div class="border-border max-h-[calc(100dvh-12rem)] min-w-0 overflow-auto overscroll-contain rounded border md:sticky md:top-2">
+              <div class="border-border bg-background sticky top-0 z-[1] p-2">
+                <span class="text-xs font-medium">活动日志 ({activities.length})</span>
+              </div>
+              <div class="p-1">
+                {@render activityList()}
+              </div>
+            </div>
+          </div>
+
+          <!-- 活动详情右栏 -->
+          {#if selectedActivity}
+            <div class="border-border min-w-0 rounded border">
+              <div class="border-border flex items-center gap-2 border-b px-3 py-2">
+                {#if selectedActivity.action === 'commit'}
+                  <GitCommitHorizontalIcon class="text-muted-foreground size-4" />
+                {:else if selectedActivity.action === 'sync'}
+                  <RefreshCwIcon class="text-muted-foreground size-4" />
+                {:else}
+                  <Undo2Icon class="text-muted-foreground size-4" />
+                {/if}
+                <Badge variant={actionTone(selectedActivity.action)} class="text-[10px]">{actionLabel(selectedActivity.action)}</Badge>
+                <span class="text-sm font-medium">{selectedActivity.actor}</span>
+                <span class="text-muted-foreground ml-auto text-xs">{formatActivityTime(selectedActivity.timestamp)}</span>
+              </div>
+              <div class="space-y-3 p-4 text-sm">
+                {#if selectedActivity.details.message}
+                  <div>
+                    <p class="text-muted-foreground mb-0.5 text-xs">提交信息</p>
+                    <p class="font-medium">{selectedActivity.details.message}</p>
+                  </div>
+                {/if}
+                {#if selectedActivity.details.sha}
+                  <div>
+                    <p class="text-muted-foreground mb-0.5 text-xs">Commit SHA</p>
+                    <code class="bg-muted rounded px-1.5 py-0.5 font-mono text-xs">{selectedActivity.details.sha.slice(0, 7)}</code>
+                  </div>
+                {/if}
+                {#if selectedActivity.details.files && selectedActivity.details.files.length > 0}
+                  <div>
+                    <p class="text-muted-foreground mb-1 text-xs">影响文件 ({selectedActivity.details.files.length})</p>
+                    <div class="space-y-0.5">
+                      {#each selectedActivity.details.files as filePath}
+                        <code class="bg-muted block truncate rounded px-1.5 py-0.5 font-mono text-xs">{filePath}</code>
+                      {/each}
                     </div>
                   </div>
-                {/each}
+                {/if}
               </div>
-            {/if}
-          </Card.Content>
-        </Card.Root>
+            </div>
+          {:else}
+            <div class="border-border text-muted-foreground flex min-w-0 items-center justify-center rounded border py-12 text-sm">
+              选择左侧活动查看详情
+            </div>
+          {/if}
+
+          <!-- 移动端活动列表浮层 -->
+          <Sheet.Root bind:open={activityListSheetOpen}>
+            <Sheet.Content side="bottom" class="max-h-[75dvh] rounded-t-lg p-0 md:hidden" showCloseButton={false}>
+              <Sheet.Header class="flex-row items-center justify-between border-b px-4 py-3">
+                <Sheet.Title class="flex items-center gap-2 text-sm font-medium">
+                  <ScrollTextIcon class="size-4" />
+                  活动日志
+                </Sheet.Title>
+                <Sheet.Description class="sr-only">浏览活动列表</Sheet.Description>
+              </Sheet.Header>
+              <div class="max-h-[calc(75dvh-4rem)] overflow-auto overscroll-contain p-2">
+                {@render activityList()}
+              </div>
+            </Sheet.Content>
+          </Sheet.Root>
+        </div>
       </Tabs.Content>
     </Tabs.Root>
   </div>
