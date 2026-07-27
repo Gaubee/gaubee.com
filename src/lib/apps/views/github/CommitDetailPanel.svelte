@@ -257,10 +257,44 @@
               </Card.Header>
               <Card.Content class="!px-0 !pb-0">
                 {#if file.patch === null}
-                  <!-- patch 为 null：文件变更超 300 行，GitHub API 不返回 patch -->
-                  <p class="text-muted-foreground px-4 py-3 text-xs italic">
-                    变更行数较多（{file.additions + file.deletions} 行），GitHub API 未返回 diff
-                  </p>
+                  {#if file.status === 'renamed' || file.status === 'copied'}
+                    <!-- 纯移动/复制：patch 为 null 是正常的（无内容变更） -->
+                    <p class="text-muted-foreground px-4 py-3 text-xs italic">
+                      文件{file.status === 'renamed' ? '移动' : '复制'}（无内容变更）
+                    </p>
+                  {:else}
+                    <!-- patch 为 null：文件变更超 300 行，GitHub API 不返回 patch -->
+                    <div class="flex items-center gap-2 px-4 py-3">
+                      <p class="text-muted-foreground text-xs italic">
+                        变更行数较多（{file.additions + file.deletions} 行），GitHub API 未返回 diff
+                      </p>
+                      <!-- 跳转按钮：变更前 + 变更后 -->
+                      <div class="ml-auto flex items-center gap-1">
+                        {#if commit.parents.length > 0 && file.status !== 'added'}
+                          <a
+                            href={`https://github.com/${owner}/${repo}/blob/${commit.parents[0]}/${file.previous_filename ?? file.filename}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 text-[11px] underline-offset-2 hover:underline"
+                          >
+                            变更前
+                            <ExternalLinkIcon class="size-3" />
+                          </a>
+                        {/if}
+                        {#if file.status !== 'removed'}
+                          <a
+                            href={`https://github.com/${owner}/${repo}/blob/${commit.sha}/${file.filename}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 text-[11px] underline-offset-2 hover:underline"
+                          >
+                            变更后
+                            <ExternalLinkIcon class="size-3" />
+                          </a>
+                        {/if}
+                      </div>
+                    </div>
+                  {/if}
                 {:else if lines.length === 0}
                   <p class="text-muted-foreground px-4 py-3 text-xs italic">无 diff 内容</p>
                 {:else}
