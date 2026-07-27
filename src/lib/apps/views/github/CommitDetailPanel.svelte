@@ -229,66 +229,73 @@
             {@const lines = parsePatch(file.patch ?? '')}
             {@const visible = visiblePatchLines(file)}
             {@const meta = statusMeta[file.status] ?? statusMeta.modified}
+            {@const canBefore = !!(commit && commit.parents.length > 0 && file.status !== 'added')}
+            {@const canAfter = file.status !== 'removed'}
             <Card.Root class="overflow-hidden">
-              <Card.Header>
-                <div class="flex items-start gap-2">
-                  <div class="min-w-0 flex-1">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" class="shrink-0 text-[10px] {meta.class}">
-                        {meta.label}
-                      </Badge>
-                      <code class="min-w-0 break-all font-mono text-xs font-medium">
-                        {file.filename}
-                      </code>
-                      {#if file.status === 'renamed' && file.previous_filename}
-                        <span class="text-muted-foreground text-[11px]">
-                          ← <code class="font-mono">{file.previous_filename}</code>
-                        </span>
-                      {/if}
-                    </div>
-                    <!-- 单文件 +additions -deletions 统计 -->
-                    <div class="mt-1 flex items-center gap-2 text-[11px]">
-                      <span class="font-medium text-emerald-600 dark:text-emerald-400">+{file.additions}</span>
-                      <span class="font-medium text-destructive">-{file.deletions}</span>
-                    </div>
-                    <!-- 应用内文件跳转按钮：在文件面板按 commit ref 查看历史版本。
-                         - 变更前：跳到 parent commit 的文件版本（renamed 用 previous_filename）
-                         - 变更后：跳到当前 commit 的文件版本
-                         仅在有意义时显示（added 无变更前，removed 无变更后，初始 commit 无 parent）。 -->
-                    <div class="mt-2 flex flex-wrap items-center gap-1.5">
-                      {#if commit && commit.parents.length > 0 && file.status !== 'added'}
-                        <button
-                          type="button"
-                          onclick={() => commit && openFileAtCommit(commit.parents[0], file.previous_filename ?? file.filename)}
-                          class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] transition-colors hover:bg-accent"
-                          title="在文件面板查看变更前的版本（parent commit）"
-                        >
-                          <ArrowLeftIcon class="size-3" />
-                          变更前
-                        </button>
-                      {/if}
-                      {#if file.status !== 'removed'}
-                        <button
-                          type="button"
-                          onclick={() => commit && openFileAtCommit(commit.sha, file.filename)}
-                          class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] transition-colors hover:bg-accent"
-                          title="在文件面板查看变更后的版本（当前 commit）"
-                        >
-                          <FileTextIcon class="size-3" />
-                          变更后
-                        </button>
-                      {/if}
-                    </div>
-                  </div>
-                  <!-- 文件 GitHub 外链 -->
+              <!-- 文件行：单行紧凑布局（参考 GitHub PR diff 文件行）。
+                   左：状态 Badge + 文件路径（renamed 附带旧路径）
+                   右：+/- 统计 + 操作组（变更前/变更后/GitHub 外链） -->
+              <Card.Header class="flex flex-row items-center gap-2 !py-2">
+                <Badge variant="outline" class="shrink-0 text-[10px] {meta.class}">
+                  {meta.label}
+                </Badge>
+                <code class="min-w-0 flex-1 truncate font-mono text-xs font-medium" title={file.filename}>
+                  {file.filename}
+                </code>
+                {#if file.status === 'renamed' && file.previous_filename}
+                  <span class="text-muted-foreground hidden shrink-0 text-[11px] sm:inline" title={file.previous_filename}>
+                    ← <code class="font-mono">{file.previous_filename}</code>
+                  </span>
+                {/if}
+
+                <!-- 右侧操作组：统计 + 分隔 + 跳转按钮 + 外链 -->
+                <div class="text-muted-foreground flex shrink-0 items-center gap-2 text-[11px]">
+                  <!-- +/- 统计 -->
+                  <span class="font-mono tabular-nums">
+                    <span class="font-medium text-emerald-600 dark:text-emerald-400">+{file.additions}</span>
+                    <span class="ml-0.5 font-medium text-destructive">-{file.deletions}</span>
+                  </span>
+                  <!-- 分隔线 -->
+                  {#if canBefore || canAfter}
+                    <span class="bg-border h-3 w-px"></span>
+                  {/if}
+                  <!-- 应用内文件跳转：在文件面板按 commit ref 查看历史版本。
+                       变更前：parent commit 版本（renamed 用 previous_filename）
+                       变更后：当前 commit 版本。
+                       icon-only ghost 按钮，hover 高亮，title 提供完整说明。 -->
+                  {#if canBefore}
+                    <button
+                      type="button"
+                      onclick={() => commit && openFileAtCommit(commit.parents[0], file.previous_filename ?? file.filename)}
+                      class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex size-5 items-center justify-center rounded transition-colors"
+                      title="查看变更前（parent commit 的版本）"
+                      aria-label="查看变更前"
+                    >
+                      <ArrowLeftIcon class="size-3" />
+                    </button>
+                  {/if}
+                  {#if canAfter}
+                    <button
+                      type="button"
+                      onclick={() => commit && openFileAtCommit(commit.sha, file.filename)}
+                      class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex size-5 items-center justify-center rounded transition-colors"
+                      title="查看变更后（当前 commit 的版本）"
+                      aria-label="查看变更后"
+                    >
+                      <FileTextIcon class="size-3" />
+                    </button>
+                  {/if}
+                  <span class="bg-border h-3 w-px"></span>
+                  <!-- GitHub 外链 -->
                   <a
                     href={file.blob_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="text-muted-foreground hover:text-foreground shrink-0"
+                    class="text-muted-foreground hover:text-foreground inline-flex size-5 items-center justify-center rounded transition-colors hover:bg-accent"
+                    title="在 GitHub 查看文件"
                     aria-label="在 GitHub 查看文件"
                   >
-                    <ExternalLinkIcon class="size-3.5" />
+                    <ExternalLinkIcon class="size-3" />
                   </a>
                 </div>
               </Card.Header>

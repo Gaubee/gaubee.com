@@ -582,23 +582,23 @@
       <!-- 文件 + README -->
       <Tabs.Content value="files" class="p-4">
         <!-- ref 状态条：当 fileRef 存在（按 commit/tag 查看历史版本）时显示。
-             提示用户当前不在默认分支，并提供「返回默认分支」按钮清除 ref。 -->
+             轻量 inline 风格，提示用户当前不在默认分支，提供「返回默认分支」按钮。
+             参考 GitHub "You are viewing at commit xxx" 提示条。 -->
         {#if fileRef}
-          {@const refLabel = fileRef.length > 16 ? fileRef.slice(0, 7) : fileRef}
-          <div class="bg-muted/50 mb-3 flex flex-wrap items-center gap-2 rounded-md border px-3 py-1.5 text-xs">
-            <GitCommitHorizontalIcon class="text-muted-foreground size-3.5 shrink-0" />
-            <span class="text-muted-foreground">正在查看历史版本：</span>
-            <code class="font-mono font-medium">{refLabel}</code>
-            <span class="text-muted-foreground opacity-70">（非默认分支）</span>
-            <Button
-              size="sm"
-              variant="ghost"
-              class="ml-auto h-6 gap-1 px-2 text-[11px]"
+          {@const isSha = /^[0-9a-f]{40}$/i.test(fileRef) || /^[0-9a-f]{7,}$/i.test(fileRef)}
+          {@const refLabel = isSha && fileRef.length > 12 ? fileRef.slice(0, 7) : fileRef}
+          <div class="bg-primary/5 border-primary/20 text-primary mb-3 flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs">
+            <GitCommitHorizontalIcon class="size-3.5 shrink-0" />
+            <span>历史版本</span>
+            <code class="font-mono font-semibold">{refLabel}</code>
+            <button
+              type="button"
               onclick={clearFileRef}
+              class="text-primary/70 hover:text-primary hover:bg-primary/10 ml-auto inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] transition-colors"
             >
               <ArrowLeftIcon class="size-3" />
               返回默认分支
-            </Button>
+            </button>
           </div>
         {/if}
         <!-- 桌面端（md+）：双栏 grid（不固定高度，内容自然撑开）。
