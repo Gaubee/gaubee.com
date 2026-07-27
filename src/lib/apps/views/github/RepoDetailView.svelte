@@ -75,6 +75,10 @@
   import FilePlusIcon from '@lucide/svelte/icons/file-plus'
   import FileMinusIcon from '@lucide/svelte/icons/file-minus'
   import SearchIcon from '@lucide/svelte/icons/search'
+  import CircleDotIcon from '@lucide/svelte/icons/circle-dot'
+  import CheckCircle2Icon from '@lucide/svelte/icons/check-circle-2'
+  import MessageCircleIcon from '@lucide/svelte/icons/message-circle'
+  import { labelStyleString } from '$lib/utils/label-color'
 
   // ---- 路由参数（2026-07-27 重构：useParams/useSearch 返回 getter，需 $derived 包装）----
   type RepoDetailParams = { owner: string; repo: string };
@@ -467,6 +471,28 @@
 
   function formatActivityTime(ts: number): string {
     return new Date(ts).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })
+  }
+
+  /** 相对时间格式化（GitHub 风格："3 天前" / "2 小时前" / "刚刚"）。
+   *  超过 30 天回退到绝对日期（"2026/6/15"）。 */
+  function formatTimeAgo(iso: string | null | undefined): string {
+    if (!iso) return ''
+    try {
+      const then = new Date(iso).getTime()
+      const now = Date.now()
+      const diff = now - then
+      const min = 60 * 1000
+      const hour = 60 * min
+      const day = 24 * hour
+      const month = 30 * day
+      if (diff < min) return '刚刚'
+      if (diff < hour) return `${Math.floor(diff / min)} 分钟前`
+      if (diff < day) return `${Math.floor(diff / hour)} 小时前`
+      if (diff < month) return `${Math.floor(diff / day)} 天前`
+      return new Date(iso).toLocaleDateString('zh-CN', { dateStyle: 'short' })
+    } catch {
+      return iso
+    }
   }
 
   function actionLabel(a: GitActivity['action']): string {
@@ -881,33 +907,57 @@
           <!-- issue 列表 snippet（桌面端左栏和移动端 Sheet 共用渲染逻辑）-->
           {#snippet issueList()}
             {#if issuesLoading && issues.length === 0}
-              {#each Array(4) as _}<Skeleton class="mb-2 h-12" />{/each}
+              {#each Array(4) as _}<Skeleton class="h-14 w-full" />{/each}
             {:else if issuesError}
-              <p class="text-destructive p-2 text-sm">{issuesError}</p>
+              <p class="text-destructive px-3 py-4 text-sm">{issuesError}</p>
             {:else if issues.length === 0}
-              <p class="text-muted-foreground py-4 text-center text-sm">暂无 Issues</p>
+              <p class="text-muted-foreground py-8 text-center text-sm">暂无 Issues</p>
             {:else}
-              {#each issues as it (it.id)}
-                <button
-                  class="hover:bg-accent flex w-full items-start gap-2 rounded-md p-2 text-left transition-colors {selectedIssue === it.number ? 'bg-accent' : ''}"
-                  onclick={() => openIssue(it.number)}
-                >
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm font-medium">{it.title}</p>
-                    <p class="text-muted-foreground text-xs">
-                      #{it.number} · {it.user.login}
-                      {#if it.comments > 0} · {it.comments} 评论{/if}
-                    </p>
-                    {#if it.labels.length > 0}
-                      <div class="mt-1 flex flex-wrap gap-1">
-                        {#each it.labels.slice(0, 3) as label}
-                          <Badge variant="outline" class="text-[10px]">{label.name}</Badge>
+              <!-- GitHub 风格 issue 列表：每行 border-b 分隔，状态图标 + 标题 + 彩色 labels + 元信息 + 评论数 -->
+              <div class="divide-border -mt-px divide-y border-b">
+                {#each issues as it (it.id)}
+                  <button
+                    class="hover:bg-accent/50 flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors {selectedIssue === it.number ? 'bg-accent/70' : ''}"
+                    onclick={() => openIssue(it.number)}
+                  >
+                    <!-- 状态图标：open=绿色 CircleDot，closed=紫色 CheckCircle -->
+                    {#if it.state === 'open'}
+                      <CircleDotIcon class="mt-0.5 size-4 shrink-0 text-emerald-500" />
+                    {:else}
+                      <CheckCircle2Icon class="mt-0.5 size-4 shrink-0 text-purple-500" />
+                    {/if}
+                    <!-- 主信息区 -->
+                    <div class="min-w-0 flex-1">
+                      <!-- 标题 + labels（同一行 flex-wrap，GitHub 风格）-->
+                      <div class="flex flex-wrap items-center gap-1.5">
+                        <span class="hover:text-primary truncate text-sm font-medium text-foreground underline-offset-2 group-hover:underline">
+                          {it.title}
+                        </span>
+                        {#each it.labels.slice(0, 4) as label}
+                          <span
+                            class="inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-medium leading-[1.4]"
+                            style={labelStyleString(label.color)}
+                            title={label.name}
+                          >
+                            {label.name}
+                          </span>
                         {/each}
                       </div>
+                      <!-- 元信息：#N opened X ago by user -->
+                      <p class="text-muted-foreground mt-0.5 truncate text-xs">
+                        #{it.number} {it.state === 'open' ? 'opened' : 'closed'} {formatTimeAgo(it.created_at)} by {it.user.login}
+                      </p>
+                    </div>
+                    <!-- 右侧评论数（GitHub 风格，带气泡图标）-->
+                    {#if it.comments > 0}
+                      <div class="text-muted-foreground flex shrink-0 items-center gap-1 text-xs">
+                        <MessageCircleIcon class="size-3.5" />
+                        <span class="tabular-nums">{it.comments}</span>
+                      </div>
                     {/if}
-                  </div>
-                </button>
-              {/each}
+                  </button>
+                {/each}
+              </div>
             {/if}
           {/snippet}
           <!-- issue 列表：桌面端 sticky 左栏（独立滚动），移动端隐藏（用 Sheet 触发）-->
