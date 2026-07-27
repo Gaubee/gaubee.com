@@ -78,6 +78,7 @@
   import CircleDotIcon from '@lucide/svelte/icons/circle-dot'
   import CheckCircle2Icon from '@lucide/svelte/icons/check-circle-2'
   import MessageCircleIcon from '@lucide/svelte/icons/message-circle'
+  import XIcon from '@lucide/svelte/icons/x'
   import { labelStyleString } from '$lib/utils/label-color'
 
   // ---- 路由参数（2026-07-27 重构：useParams/useSearch 返回 getter，需 $derived 包装）----
@@ -192,9 +193,17 @@
   }
 
   // ---- Issues ----
+  /** 三种列表模式：open（默认）/ closed / search（关键词搜索结果）。 */
+  type IssueListMode = 'open' | 'closed' | 'search'
   let issues = $state<IssueSummary[]>([])
   let issuesLoading = $state(false)
   let issuesError = $state<string | null>(null)
+  /** 当前列表模式（控制 tab 高亮 + 数据源）。 */
+  let issueMode = $state<IssueListMode>('open')
+  /** open/closed 计数（进入页面时并行加载一次，用 search API 拿准确总数）。 */
+  let openCount = $state<number | null>(null)
+  let closedCount = $state<number | null>(null)
+  let countsLoading = $state(false)
   let issueSearchInput = $state('')
   /** 移动端 issue 列表浮层开关。 */
   let issueListSheetOpen = $state(false)
@@ -271,6 +280,7 @@
     void loadDir('', o, r)
     if (o === OWNER && r === REPO) void loadChanges()
     void loadIssues(o, r)
+    void loadIssueCounts(o, r)
   }
 
   // ---- 仓库元数据 ----
@@ -405,11 +415,15 @@
   }
 
   // ---- Issues ----
+  /** 加载 open/closed 列表（按 mode 决定 state 参数）。
+   *  search 模式走 handleIssueSearch，不经过这里。 */
   async function loadIssues(o: string, r: string) {
+    if (issueMode === 'search') return // search 模式由 handleIssueSearch 负责
     issuesLoading = true
     issuesError = null
     try {
-      issues = await listIssues(o, r, { state: 'open', perPage: 30 })
+      const state = issueMode === 'closed' ? 'closed' : 'open'
+      issues = await listIssues(o, r, { state, perPage: 30 })
     } catch (e) {
       issuesError = e instanceof Error ? e.message : '加载 Issues 失败'
       issues = []
@@ -418,12 +432,48 @@
     }
   }
 
+  /** 并行加载 open/closed 计数（用 search API 拿准确 total_count）。
+   *  进入页面或 owner/repo 变化时调用一次。 */
+  async function loadIssueCounts(o: string, r: string) {
+    countsLoading = true
+    try {
+      const [open, closed] = await Promise.all([
+        searchIssues(o, r, 'is:open', { perPage: 1 }),
+        searchIssues(o, r, 'is:closed', { perPage: 1 }),
+      ])
+      openCount = open.total
+      closedCount = closed.total
+    } catch {
+      // 计数加载失败静默（tab 仍可用，只是不显示数字）
+      openCount = null
+      closedCount = null
+    } finally {
+      countsLoading = false
+    }
+  }
+
+  /** 切换列表模式（open/closed/search）。 */
+  function setIssueMode(mode: IssueListMode) {
+    issueMode = mode
+    if (mode !== 'search') {
+      void loadIssues(owner, repo)
+    }
+  }
+
+  /** 清除搜索，回到之前的 tab（open 或 closed）。 */
+  function clearIssueSearch() {
+    issueSearchInput = ''
+    issueMode = issueMode === 'search' ? 'open' : issueMode
+    void loadIssues(owner, repo)
+  }
+
   async function handleIssueSearch() {
     const q = issueSearchInput.trim()
     if (!q) {
-      void loadIssues(owner, repo)
+      clearIssueSearch()
       return
     }
+    issueMode = 'search'
     issuesLoading = true
     issuesError = null
     try {
@@ -904,6 +954,69 @@
       <!-- Issues（双栏：列表左 sticky + 内容右展开，移动端列表收进 Sheet）-->
       <Tabs.Content value="issues" class="p-4">
         <div class="grid min-w-0 gap-4 md:grid-cols-[minmax(260px,360px)_1fr]">
+          <!-- issue 工具栏 snippet（桌面端左栏 + 移动端 Sheet 共用）：
+               Open/Closed tab（带计数）+ 搜索框，或 search 模式下的结果标题 + 清除按钮。 -->
+          {#snippet issueToolbar()}
+            <div class="bg-muted/30 flex items-center gap-1 border-b px-2 py-1.5">
+              {#if issueMode === 'search'}
+                <div class="text-muted-foreground flex min-w-0 flex-1 items-center gap-1.5 text-xs">
+                  <SearchIcon class="size-3.5 shrink-0" />
+                  <span class="truncate">搜索「{issueSearchInput}」</span>
+                  {#if !issuesLoading}
+                    <span class="opacity-70">· {issues.length} 个结果</span>
+                  {/if}
+                </div>
+                <button
+                  type="button"
+                  onclick={clearIssueSearch}
+                  class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex size-5 items-center justify-center rounded transition-colors"
+                  aria-label="清除搜索"
+                  title="清除搜索"
+                >
+                  <XIcon class="size-3.5" />
+                </button>
+              {:else}
+                <button
+                  type="button"
+                  onclick={() => setIssueMode('open')}
+                  class="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors {issueMode === 'open' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
+                >
+                  <CircleDotIcon class="size-3.5 {issueMode === 'open' ? 'text-emerald-500' : ''}" />
+                  Open
+                  {#if openCount !== null}
+                    <span class="text-muted-foreground tabular-nums opacity-80">{openCount}</span>
+                  {/if}
+                </button>
+                <button
+                  type="button"
+                  onclick={() => setIssueMode('closed')}
+                  class="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors {issueMode === 'closed' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
+                >
+                  <CheckCircle2Icon class="size-3.5 {issueMode === 'closed' ? 'text-purple-500' : ''}" />
+                  Closed
+                  {#if closedCount !== null}
+                    <span class="text-muted-foreground tabular-nums opacity-80">{closedCount}</span>
+                  {/if}
+                </button>
+                <form
+                  class="ml-auto flex items-center"
+                  onsubmit={(e) => {
+                    e.preventDefault()
+                    void handleIssueSearch()
+                  }}
+                >
+                  <div class="relative">
+                    <SearchIcon class="text-muted-foreground absolute left-2 top-1/2 size-3 -translate-y-1/2" />
+                    <Input
+                      bind:value={issueSearchInput}
+                      placeholder="搜索"
+                      class="h-7 w-28 pl-6 pr-1 text-xs"
+                    />
+                  </div>
+                </form>
+              {/if}
+            </div>
+          {/snippet}
           <!-- issue 列表 snippet（桌面端左栏和移动端 Sheet 共用渲染逻辑）-->
           {#snippet issueList()}
             {#if issuesLoading && issues.length === 0}
@@ -962,31 +1075,10 @@
           {/snippet}
           <!-- issue 列表：桌面端 sticky 左栏（独立滚动），移动端隐藏（用 Sheet 触发）-->
           <div class="max-md:hidden">
-            <div class="border-border max-h-[calc(100dvh-12rem)] min-w-0 overflow-auto overscroll-contain rounded border md:sticky md:top-2">
-              <!-- 搜索框 -->
-              <div class="border-border sticky top-0 z-[1] bg-background p-2">
-                <form
-                  class="flex items-center gap-1.5"
-                  onsubmit={(e) => {
-                    e.preventDefault()
-                    void handleIssueSearch()
-                  }}
-                >
-                  <div class="relative flex-1">
-                    <SearchIcon class="text-muted-foreground absolute left-2.5 top-1/2 size-4 -translate-y-1/2" />
-                    <Input
-                      bind:value={issueSearchInput}
-                      placeholder="搜索 issues"
-                      class="h-8 pl-8 text-sm"
-                    />
-                  </div>
-                  <Button type="submit" size="sm" disabled={issuesLoading}>
-                    {issuesLoading ? '...' : '搜索'}
-                  </Button>
-                </form>
-              </div>
-              <!-- issue 列表项 -->
-              <div class="p-1">
+            <div class="border-border flex max-h-[calc(100dvh-12rem)] min-w-0 flex-col overflow-hidden rounded border md:sticky md:top-2">
+              {@render issueToolbar()}
+              <!-- issue 列表项（可滚动区） -->
+              <div class="min-h-0 flex-1 overflow-auto">
                 {@render issueList()}
               </div>
             </div>
@@ -1014,7 +1106,7 @@
 
           <!-- 移动端 issue 列表浮层（桌面端隐藏）。Sheet 是 portal 浮层，放 grid 内不影响布局。-->
           <Sheet.Root bind:open={issueListSheetOpen}>
-            <Sheet.Content side="bottom" class="max-h-[75dvh] rounded-t-lg p-0 md:hidden" showCloseButton={false}>
+            <Sheet.Content side="bottom" class="flex max-h-[75dvh] flex-col rounded-t-lg p-0 md:hidden" showCloseButton={false}>
               <Sheet.Header class="flex-row items-center justify-between border-b px-4 py-3">
                 <Sheet.Title class="flex items-center gap-2 text-sm font-medium">
                   <BugIcon class="size-4" />
@@ -1022,7 +1114,8 @@
                 </Sheet.Title>
                 <Sheet.Description class="sr-only">浏览 issue 列表，选择查看详情</Sheet.Description>
               </Sheet.Header>
-              <div class="max-h-[calc(75dvh-4rem)] overflow-auto overscroll-contain p-2">
+              {@render issueToolbar()}
+              <div class="min-h-0 flex-1 overflow-auto overscroll-contain">
                 {@render issueList()}
               </div>
             </Sheet.Content>
