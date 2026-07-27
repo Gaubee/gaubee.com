@@ -212,24 +212,30 @@ function toComment(c: GhCommentResponse): IssueComment {
 // =========================================================================
 
 /**
- * 列出仓库的 issues（排除 PR）。
- * GET /repos/{owner}/{repo}/issues?state=open&per_page=N
+ * 列出仓库 issues（自动过滤 PR）。
+ * 用 search API（is:issue）而非 /issues 端点，确保与 loadIssueCounts 的计数数据源一致
+ * （/issues 端点会混入 PR，filter 后可能与 search 计数不符，导致「有 N 条但列表空」的 bug）。
+ *
+ * GET /search/issues?q=repo:{owner}/{repo}+is:issue+is:{state}
  */
 export async function listIssues(
   owner: string,
   repo: string,
   opts?: { state?: "open" | "closed" | "all"; perPage?: number; page?: number },
 ): Promise<IssueSummary[]> {
+  const state = opts?.state ?? "open";
+  // search API 用 is:issue 过滤 PR，与计数（loadIssueCounts）数据源统一
+  const query = state === "all" ? `is:issue` : `is:${state}`;
   const params = new URLSearchParams({
-    state: opts?.state ?? "open",
+    q: `${query} repo:${owner}/${repo} is:issue`,
     per_page: String(opts?.perPage ?? 30),
     page: String(opts?.page ?? 1),
   });
-  const resp = await fetchGithub(`repos/${owner}/${repo}/issues?${params.toString()}`);
+  const resp = await fetchGithub(`search/issues?${params.toString()}`);
   if (resp.status === 404) return [];
   await assertOk(resp, `listIssues(${owner}/${repo})`);
-  const data = (await resp.json()) as GhIssueResponse[];
-  return data.filter((i) => !i.pull_request).map(toIssueSummary);
+  const data = (await resp.json()) as { total_count: number; items: GhIssueResponse[] };
+  return data.items.map(toIssueSummary);
 }
 
 /**

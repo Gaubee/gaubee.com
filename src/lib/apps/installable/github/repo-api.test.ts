@@ -118,16 +118,23 @@ describe("repo-api", () => {
     expect(result.items[0].name).toBe("kit");
   });
 
-  it("listIssues 过滤掉 PR", async () => {
-    mockFetch.mockResolvedValue(
-      jsonResponse([sampleIssue, { ...sampleIssue, id: 11, number: 43, pull_request: {} }]),
-    );
+  it("listIssues 走 search API（is:issue 自动过滤 PR）", async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ total_count: 1, items: [sampleIssue] }));
     const issues = await listIssues("sveltejs", "kit");
     const [path] = mockFetch.mock.calls[0];
-    expect(path).toContain("repos/sveltejs/kit/issues");
-    // PR 被过滤
+    // 现在走 search API（与计数数据源统一），不再走 /issues 端点
+    expect(path).toContain("search/issues");
+    expect(path).toContain("is%3Aopen");
+    expect(path).toContain("repo%3Asveltejs%2Fkit");
     expect(issues).toHaveLength(1);
     expect(issues[0].number).toBe(42);
+  });
+
+  it("listIssues state=closed 构造 is:closed 查询", async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ total_count: 0, items: [] }));
+    await listIssues("sveltejs", "kit", { state: "closed" });
+    const [path] = mockFetch.mock.calls[0];
+    expect(path).toContain("is%3Aclosed");
   });
 
   it("searchIssues 构造 repo 限定符", async () => {
@@ -160,7 +167,7 @@ describe("repo-api", () => {
     mockFetch.mockResolvedValue({
       ok: false,
       status: 404,
-      json: async () => [],
+      json: async () => ({ total_count: 0, items: [] }),
       text: async () => "",
     } as Response);
     const issues = await listIssues("no", "exist");
