@@ -84,6 +84,7 @@
   import GitBranchIcon from '@lucide/svelte/icons/git-branch'
   import * as Popover from '$lib/components/ui/popover'
   import { labelStyleString } from '$lib/utils/label-color'
+  import { createResource } from '$lib/apps/installable/github/state'
 
   // ---- 路由参数（2026-07-27 重构：useParams/useSearch 返回 getter，需 $derived 包装）----
   type RepoDetailParams = { owner: string; repo: string };
@@ -137,9 +138,13 @@
     navController.navigateMain(`${basePath}?${sp.toString()}`)
   }
 
-  // ---- 仓库元数据 ----
-  let repoInfo = $state<RepoSummary | null>(null)
-  let repoInfoLoading = $state(false)
+  // ---- 仓库元数据（silent：辅助数据，失败不清空统计栏）----
+  const repoInfoResource = createResource(
+    () => getRepo(owner, repo),
+    { silent: true, errorMessage: '加载仓库信息失败' },
+  )
+  /** repoInfo 便捷别名。 */
+  const repoInfo = $derived(repoInfoResource.data)
 
   // ---- 文件树 + 内容 ----
   let tree = $state<Map<string, TreeNode>>(new Map())
@@ -148,10 +153,7 @@
   /** 移动端文件树浮层开关（桌面端用双栏 grid，不用此浮层）。 */
   let fileTreeSheetOpen = $state(false)
 
-  // ---- 历史 ----
-  let commits = $state<CommitInfo[]>([])
-  let commitsLoading = $state(false)
-  let commitsError = $state<string | null>(null)
+  // ---- 历史（commit 列表，列表空态判定）----
   /** commit 过滤器（内存 state，不进 URL；branch 用 RepoRefSelector 切换）。
    *  - commitBranch: branch/tag 名（空=默认分支）
    *  - commitAuthor: GitHub login
@@ -165,24 +167,54 @@
   /** 移动端 commit 列表浮层。 */
   let commitListSheetOpen = $state(false)
 
-  // ---- 变更（仅主仓库）----
-  let changes = $state<VfsNode[]>([])
-  let changesLoading = $state(false)
+  const commitsResource = createResource(
+    () => listCommits({
+      owner,
+      repo,
+      perPage: 30,
+      sha: commitBranch || undefined,
+      author: commitAuthor || undefined,
+      // GitHub since/until 接受 ISO 8601；input[type=date] 返回 YYYY-MM-DD，补全为当天起止
+      since: commitSince ? `${commitSince}T00:00:00Z` : undefined,
+      until: commitUntil ? `${commitUntil}T23:59:59Z` : undefined,
+    }),
+    { errorMessage: '加载历史失败', isEmpty: (a) => a.length === 0 },
+  )
+  /** commits 便捷别名（派生，模板用）。 */
+  const commits = $derived(commitsResource.data ?? [])
+
+  // ---- 变更（仅主仓库，silent 辅助数据）----
   let commitMessage = $state('')
   let committing = $state(false)
   /** 移动端变更列表浮层。 */
   let changeListSheetOpen = $state(false)
+  const changesResource = createResource(
+    () => vfs.dirtyFiles(),
+    { silent: true, errorMessage: '加载变更失败', isEmpty: (a) => a.length === 0 },
+  )
+  /** changes 便捷别名（派生）。 */
+  const changes = $derived(changesResource.data ?? [])
 
-  // ---- 仓库快速搜索（元数据栏，默认限定仓库类型）----
+  // ---- 仓库快速搜索（元数据栏，内置 seq 竞态防护）----
   let repoSearchInput = $state('')
-  let repoSearchResults = $state<RepoSummary[] | null>(null)
-  let repoSearchLoading = $state(false)
+  const repoSearchResource = createResource(
+    async () => {
+      const { searchRepos } = await import('$lib/apps/installable/github/repo-api')
+      const { items } = await searchRepos(repoSearchInput.trim(), { perPage: 10 })
+      return items
+    },
+    { errorMessage: '搜索仓库失败', isEmpty: (a) => a.length === 0 },
+  )
+  /** 搜索结果（null 表示未搜索，[] 表示搜索了但空）。 */
+  const repoSearchResults = $derived(
+    repoSearchResource.status === 'idle' ? null : (repoSearchResource.data ?? []),
+  )
 
   /** 仓库快速搜索：支持 owner/repo 直跳 或 关键词搜索。 */
   async function handleRepoSearch() {
     const q = repoSearchInput.trim()
     if (!q) {
-      repoSearchResults = null
+      repoSearchResource.reset()
       return
     }
     // owner/repo 格式直接跳转
@@ -190,37 +222,49 @@
     if (directMatch) {
       navController.navigateMain(`/app/github/repo/${directMatch[1]}/${directMatch[2]}`)
       repoSearchInput = ''
-      repoSearchResults = null
+      repoSearchResource.reset()
       return
     }
-    // 关键词搜索仓库（默认限定仓库类型，非 issues/code）
-    repoSearchLoading = true
-    try {
-      const { searchRepos } = await import('$lib/apps/installable/github/repo-api')
-      const { items } = await searchRepos(q, { perPage: 10 })
-      repoSearchResults = items
-    } catch {
-      repoSearchResults = []
-    } finally {
-      repoSearchLoading = false
-    }
+    // 关键词搜索仓库（createResource 内置 seq 竞态防护，替代手写 try/catch）
+    void repoSearchResource.run()
   }
 
   // ---- Issues ----
   /** 三种列表模式：open（默认）/ closed / search（关键词搜索结果）。 */
   type IssueListMode = 'open' | 'closed' | 'search'
-  let issues = $state<IssueSummary[]>([])
-  let issuesLoading = $state(false)
-  let issuesError = $state<string | null>(null)
   /** 当前列表模式（控制 tab 高亮 + 数据源）。 */
   let issueMode = $state<IssueListMode>('open')
-  /** open/closed 计数（进入页面时并行加载一次，用 search API 拿准确总数）。 */
-  let openCount = $state<number | null>(null)
-  let closedCount = $state<number | null>(null)
-  let countsLoading = $state(false)
   let issueSearchInput = $state('')
   /** 移动端 issue 列表浮层开关。 */
   let issueListSheetOpen = $state(false)
+
+  const issuesResource = createResource<IssueSummary[]>(
+    // 仅处理 open/closed 模式；search 模式由 handleIssueSearch 单独 setData
+    async () => {
+      const state = issueMode === 'closed' ? 'closed' : 'open'
+      return listIssues(owner, repo, { state, perPage: 30 })
+    },
+    { errorMessage: '加载 Issues 失败', isEmpty: (a) => a.length === 0 },
+  )
+  /** issues 便捷别名。 */
+  const issues = $derived(issuesResource.data ?? [])
+
+  /** open/closed 计数（包成单一资源，替代 openCount/closedCount/countsLoading 三态）。 */
+  interface IssueCounts { open: number; closed: number }
+  const issueCountsResource = createResource<IssueCounts>(
+    async () => {
+      const [open, closed] = await Promise.all([
+        searchIssues(owner, repo, 'is:open', { perPage: 1 }),
+        searchIssues(owner, repo, 'is:closed', { perPage: 1 }),
+      ])
+      return { open: open.total, closed: closed.total }
+    },
+    { silent: true, errorMessage: '加载计数失败' },
+  )
+  /** open 计数（null 表示未加载）。 */
+  const openCount = $derived(issueCountsResource.data?.open ?? null)
+  /** closed 计数（null 表示未加载）。 */
+  const closedCount = $derived(issueCountsResource.data?.closed ?? null)
 
   // ---- 日志 ----
   const activities = $derived(
@@ -287,26 +331,17 @@
     })
   })
 
+  /** owner/repo 变化时重新加载所有数据。
+   *  各 resource 的 fetcher 闭包读取响应式 owner/repo，run 时取最新值。
+   *  o/r 参数仅用于 isMainRepo 判断和 README/文件树等手写加载。 */
   async function loadAll(o: string, r: string) {
-    void loadRepoInfo(o, r)
+    void repoInfoResource.run()
     void autoSelectReadme(o, r)
-    void loadCommits(o, r)
+    void commitsResource.run()
     void loadDir('', o, r)
-    if (o === OWNER && r === REPO) void loadChanges()
-    void loadIssues(o, r)
-    void loadIssueCounts(o, r)
-  }
-
-  // ---- 仓库元数据 ----
-  async function loadRepoInfo(o: string, r: string) {
-    repoInfoLoading = true
-    try {
-      repoInfo = await getRepo(o, r)
-    } catch {
-      repoInfo = null
-    } finally {
-      repoInfoLoading = false
-    }
+    if (o === OWNER && r === REPO) void changesResource.run()
+    void issuesResource.run()
+    void issueCountsResource.run()
   }
 
   // ---- 自动选中 README（进详情页默认展示 README 内容）----
@@ -372,28 +407,7 @@
   }
 
   // ---- 历史 ----
-  async function loadCommits(o: string, r: string) {
-    commitsLoading = true
-    commitsError = null
-    try {
-      commits = await listCommits({
-        owner: o,
-        repo: r,
-        perPage: 30,
-        sha: commitBranch || undefined,
-        author: commitAuthor || undefined,
-        // GitHub since/until 接受 ISO 8601；input[type=date] 返回 YYYY-MM-DD，补全为当天起止
-        since: commitSince ? `${commitSince}T00:00:00Z` : undefined,
-        until: commitUntil ? `${commitUntil}T23:59:59Z` : undefined,
-      })
-    } catch (e) {
-      commitsError = e instanceof Error ? e.message : '加载历史失败'
-      commits = []
-    } finally {
-      commitsLoading = false
-    }
-  }
-
+  // commits 数据由 commitsResource 管理（fetcher 闭包读 commitBranch/commitAuthor 等过滤器）
   /** 切换 commit 列表的 branch/tag（RepoRefSelector 回调）。 */
   function setCommitBranch(ref: string) {
     // 选默认分支时清空（让 selector 显示 default，而不是重复存 branch 名）
@@ -403,7 +417,7 @@
       const sp = new URLSearchParams({ tab: 'history' })
       navController.navigateMain(`${basePath}?${sp.toString()}`, 'REPLACE')
     }
-    void loadCommits(owner, repo)
+    void commitsResource.run()
   }
 
   /** SHA 直跳：直接跳到 CommitDetail（不走列表过滤）。 */
@@ -416,21 +430,11 @@
     commitAuthor = ''
     commitSince = ''
     commitUntil = ''
-    void loadCommits(owner, repo)
+    void commitsResource.run()
   }
 
   // ---- 变更（仅主仓库）----
-  async function loadChanges() {
-    changesLoading = true
-    try {
-      changes = await vfs.dirtyFiles()
-    } catch {
-      changes = []
-    } finally {
-      changesLoading = false
-    }
-  }
-
+  // changes 数据由 changesResource 管理（silent 辅助数据）
   function changeKind(change: VfsNode): 'add' | 'del' | 'mod' {
     if (change.origin === 'local') return 'add'
     if (change.content === null) return 'del'
@@ -449,7 +453,7 @@
       const sha = await git.commit(msg, 'github')
       notifySuccess(`已提交（${sha.slice(0, 7)}）`)
       commitMessage = ''
-      await loadChanges()
+      await changesResource.run()
     } catch (e) {
       handlePublishError(e, navController)
     } finally {
@@ -459,52 +463,17 @@
 
   async function handleRevert(path: string) {
     await vfsStore.revert(path)
-    await loadChanges()
+    await changesResource.run()
   }
 
   // ---- Issues ----
-  /** 加载 open/closed 列表（按 mode 决定 state 参数）。
-   *  search 模式走 handleIssueSearch，不经过这里。 */
-  async function loadIssues(o: string, r: string) {
-    if (issueMode === 'search') return // search 模式由 handleIssueSearch 负责
-    issuesLoading = true
-    issuesError = null
-    try {
-      const state = issueMode === 'closed' ? 'closed' : 'open'
-      issues = await listIssues(o, r, { state, perPage: 30 })
-    } catch (e) {
-      issuesError = e instanceof Error ? e.message : '加载 Issues 失败'
-      issues = []
-    } finally {
-      issuesLoading = false
-    }
-  }
-
-  /** 并行加载 open/closed 计数（用 search API 拿准确 total_count）。
-   *  进入页面或 owner/repo 变化时调用一次。 */
-  async function loadIssueCounts(o: string, r: string) {
-    countsLoading = true
-    try {
-      const [open, closed] = await Promise.all([
-        searchIssues(o, r, 'is:open', { perPage: 1 }),
-        searchIssues(o, r, 'is:closed', { perPage: 1 }),
-      ])
-      openCount = open.total
-      closedCount = closed.total
-    } catch {
-      // 计数加载失败静默（tab 仍可用，只是不显示数字）
-      openCount = null
-      closedCount = null
-    } finally {
-      countsLoading = false
-    }
-  }
-
+  // issues 数据由 issuesResource 管理（open/closed 模式）；search 模式单独 setData。
+  // issueCounts 由 issueCountsResource 管理（silent）。
   /** 切换列表模式（open/closed/search）。 */
   function setIssueMode(mode: IssueListMode) {
     issueMode = mode
     if (mode !== 'search') {
-      void loadIssues(owner, repo)
+      void issuesResource.run()
     }
   }
 
@@ -512,7 +481,7 @@
   function clearIssueSearch() {
     issueSearchInput = ''
     issueMode = issueMode === 'search' ? 'open' : issueMode
-    void loadIssues(owner, repo)
+    void issuesResource.run()
   }
 
   async function handleIssueSearch() {
@@ -522,15 +491,14 @@
       return
     }
     issueMode = 'search'
-    issuesLoading = true
-    issuesError = null
+    // search 模式：手动加载并 setData（不走 issuesResource.run，因 fetcher 只处理 open/closed）
     try {
       const { items } = await searchIssues(owner, repo, q, { perPage: 30 })
-      issues = items
+      issuesResource.setData(items)
     } catch (e) {
-      issuesError = e instanceof Error ? e.message : '搜索 Issues 失败'
-    } finally {
-      issuesLoading = false
+      // search 失败：回退到空结果 + toast 提示（search 是即时操作，不阻塞列表）
+      issuesResource.setData([])
+      notifyWarning(e instanceof Error ? e.message : '搜索 Issues 失败')
     }
   }
 
@@ -644,7 +612,7 @@
                 onclick={() => {
                   navController.navigateMain(`/app/github/repo/${r.owner.login}/${r.name}`)
                   repoSearchInput = ''
-                  repoSearchResults = null
+                  repoSearchResource.reset()
                 }}
               >
                 <span class="font-medium">{r.full_name}</span>
@@ -669,7 +637,7 @@
   </div>
 
   <!-- 仓库统计 -->
-  {#if repoInfoLoading}
+  {#if repoInfoResource.isLoading}
     <div class="border-border border-b px-4 py-2"><Skeleton class="h-6 w-full" /></div>
   {:else if repoInfo}
     <div class="text-muted-foreground flex flex-wrap items-center gap-4 border-b border-border px-4 py-2 text-xs">
@@ -831,13 +799,13 @@
 
         <div class="grid min-w-0 gap-4 md:grid-cols-[minmax(260px,360px)_1fr]">
           {#snippet commitList()}
-            {#if commitsLoading && commits.length === 0}
+            {#if commitsResource.status === 'loading'}
               <div class="space-y-2 p-2">
                 {#each Array(5) as _}<Skeleton class="h-14 w-full" />{/each}
               </div>
-            {:else if commitsError}
-              <p class="text-destructive px-3 py-4 text-sm">{commitsError}</p>
-            {:else if commits.length === 0}
+            {:else if commitsResource.status === 'error'}
+              <p class="text-destructive px-3 py-4 text-sm">{commitsResource.error}</p>
+            {:else if commitsResource.status === 'empty'}
               <p class="text-muted-foreground py-8 text-center text-sm">暂无提交</p>
             {:else}
               <!-- GitHub 风格 commit 列表：avatar + 标题 + body 摘要 + author · 相对时间 + 右侧 SHA -->
@@ -916,7 +884,7 @@
                         </div>
                       </div>
                       <div class="flex items-center gap-2">
-                        <Button size="sm" class="h-7 flex-1 text-xs" onclick={() => loadCommits(owner, repo)}>应用</Button>
+                        <Button size="sm" class="h-7 flex-1 text-xs" onclick={() => commitsResource.run()}>应用</Button>
                         {#if hasCommitFilters}
                           <Button size="sm" variant="ghost" class="h-7 text-xs" onclick={clearCommitFilters}>清除</Button>
                         {/if}
@@ -925,8 +893,8 @@
                   </Popover.Content>
                 </Popover.Root>
                 <!-- 刷新 -->
-                <Button variant="ghost" size="icon-sm" class="ml-auto" onclick={() => loadCommits(owner, repo)} disabled={commitsLoading} aria-label="刷新">
-                  <RefreshCwIcon class="size-3 {commitsLoading ? 'animate-spin' : ''}" />
+                <Button variant="ghost" size="icon-sm" class="ml-auto" onclick={() => commitsResource.run()} disabled={commitsResource.isLoading} aria-label="刷新">
+                  <RefreshCwIcon class="size-3 {commitsResource.isLoading ? 'animate-spin' : ''}" />
                 </Button>
               </div>
               <!-- 过滤摘要条（激活时显示） -->
@@ -1007,7 +975,7 @@
                         </div>
                       </div>
                       <div class="flex items-center gap-2">
-                        <Button size="sm" class="h-7 flex-1 text-xs" onclick={() => loadCommits(owner, repo)}>应用</Button>
+                        <Button size="sm" class="h-7 flex-1 text-xs" onclick={() => commitsResource.run()}>应用</Button>
                         {#if hasCommitFilters}
                           <Button size="sm" variant="ghost" class="h-7 text-xs" onclick={clearCommitFilters}>清除</Button>
                         {/if}
@@ -1032,7 +1000,7 @@
           </div>
         {:else}
           {#snippet changeList()}
-            {#if changesLoading}
+            {#if changesResource.status === 'loading'}
               {#each Array(3) as _}<Skeleton class="mb-2 h-12" />{/each}
             {:else if changes.length === 0}
               <p class="text-muted-foreground py-4 text-center text-sm">工作区干净</p>
@@ -1072,8 +1040,8 @@
               <div class="border-border max-h-[calc(100dvh-12rem)] min-w-0 overflow-auto overscroll-contain rounded border md:sticky md:top-2">
                 <div class="border-border sticky top-0 z-[1] bg-background flex items-center justify-between p-2">
                   <span class="text-xs font-medium">变更 ({changes.length})</span>
-                  <Button variant="ghost" size="icon-sm" onclick={loadChanges} disabled={changesLoading}>
-                    <RefreshCwIcon class="size-3 {changesLoading ? 'animate-spin' : ''}" />
+                  <Button variant="ghost" size="icon-sm" onclick={() => changesResource.run()} disabled={changesResource.isLoading}>
+                    <RefreshCwIcon class="size-3 {changesResource.isLoading ? 'animate-spin' : ''}" />
                   </Button>
                 </div>
                 <div class="p-1">
@@ -1164,7 +1132,7 @@
                 <div class="text-muted-foreground flex min-w-0 flex-1 items-center gap-1.5 text-xs">
                   <SearchIcon class="size-3.5 shrink-0" />
                   <span class="truncate">搜索「{issueSearchInput}」</span>
-                  {#if !issuesLoading}
+                  {#if !issuesResource.isLoading}
                     <span class="opacity-70">· {issues.length} 个结果</span>
                   {/if}
                 </div>
@@ -1221,11 +1189,11 @@
           {/snippet}
           <!-- issue 列表 snippet（桌面端左栏和移动端 Sheet 共用渲染逻辑）-->
           {#snippet issueList()}
-            {#if issuesLoading && issues.length === 0}
+            {#if issuesResource.status === 'loading'}
               {#each Array(4) as _}<Skeleton class="h-14 w-full" />{/each}
-            {:else if issuesError}
-              <p class="text-destructive px-3 py-4 text-sm">{issuesError}</p>
-            {:else if issues.length === 0}
+            {:else if issuesResource.status === 'error'}
+              <p class="text-destructive px-3 py-4 text-sm">{issuesResource.error}</p>
+            {:else if issuesResource.status === 'empty'}
               <p class="text-muted-foreground py-8 text-center text-sm">暂无 Issues</p>
             {:else}
               <!-- GitHub 风格 issue 列表：每行 border-b 分隔，状态图标 + 标题 + 彩色 labels + 元信息 + 评论数 -->

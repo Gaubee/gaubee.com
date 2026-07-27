@@ -939,3 +939,47 @@ URL ─► NavController(黑盒) ─► AreaOutlet ─► <AppShell activity>
   - 标题 text-xl(20px) ✅、卡片 count=6 ✅、header bg-muted/50 ✅、左侧轴线渲染 ✅、event 圆形彩色图标 ✅、底部编辑器头像 ✅
   - IssueMetaBar 触发文本正确：空 meta = `opened 28 天前 · 5 详情`，有 labels = `opened 2 天前 · 3 · 2 labels 详情`
   - Dialog 6 区块全过（Assignees/Labels/Milestone/Participants/时间/GitHub 链接）
+
+## GithubApp：加载状态机抽象（2026-07-28）
+
+### 问题
+
+GithubApp 所有视图各自手写 `loading + error + data` 三元组（15+ 处重复），仅覆盖 3 种状态，缺失全部中间态：
+
+- 切换 issue/commit SHA 时清空旧数据闪烁（无 refreshing 态）。
+- 网络抖动失败时 `data = []` 清空已加载数据（无 stale-error 态）。
+- 静默失败的资源（repoInfo/changes/events）异常不可观测。
+- 竞态防护（searchSeq）、去重（inFlight）散落各处无统一收口。
+- 错误/空态视觉不一致（padding、图标、role=alert 各异）。
+
+### 新架构：createResource + AsyncBoundary（8 态拓扑）
+
+升级到 8 种拓扑状态：idle/loading/refreshing/success/empty/error/stale-error。核心是 `refreshing`（背景刷新保留旧数据）和 `stale-error`（刷新失败保留旧数据 + 错误条）。
+
+```
+src/lib/apps/installable/github/state/
+├── status.ts                  状态机派生纯函数（server project 可测）
+├── resource.svelte.ts         createResource runes 工厂（内置 seq 竞态/silent/isEmpty/setData）
+├── AsyncBoundary.svelte       状态机渲染边界（ReadonlyResource<out T> 协变接口）
+├── EmptyState / ErrorState / RefreshIndicator   统一占位组件
+└── index.ts
+```
+
+### 迁移的视图（6 个）
+
+- `CommitDetailPanel`：commit 单值资源，切换 SHA 时 refreshing 保留旧内容。
+- `RepoFileContent`：文件内容资源，媒体短路（reset 跳过 loading）。
+- `RepoRefSelector`：branches/tags 懒加载（silent 静默失败）。
+- `IssueContentPanel`：issue/comments/events 三路并发，评论 CRUD 用 setData。
+- `RepoDetailView`：repoInfo(commits/issues/issueCounts/repoSearch/changes) 6 路并发。
+- `RepoListView`：search 用 createResource（替代手写 searchSeq 竞态）。
+
+### 不迁移（形态不匹配）
+
+- 文件树 `loadingDirs`（多路增量加载）、listCache 缓存层（分页/增量渲染）、activities（本地派生无网络）。
+
+### 验证
+
+- 类型检查 0 错误 0 警告。
+- state 抽象层单测 29/29 全过（status 派生 13 + resource runes 行为 16）。
+- 前端走查（agent-browser）：列表页/详情页/历史 Tab/commit 详情/Issues Tab/issue 详情/搜索/ref 选择器全部正常渲染，无白屏无错误。

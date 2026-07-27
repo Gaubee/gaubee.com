@@ -10,6 +10,10 @@
 	内容获取：text/markdown 走 getFileText；媒体走 fileRawUrl（不下载内容，直接用 raw URL）。
 	raw URL 用仓库 default_branch（如 main），GitHub raw 端点只认分支名。
 
+	状态机升级（2026-07-28）：content 用 createResource 收口 loading/error。
+	媒体短路：image/video/audio 不发请求，直接 setData(null) 跳过 loading（用 rawUrl 渲染）。
+	Shiki 二次异步高亮：content 就绪后 primeHighlighter，用 setData 更新（保持 resource 单源）。
+
 	响应式：
 	- 桌面端（md+）：h-full（grid cell 撑满）+ 内容区 overflow-auto 独立滚动
 	- 移动端（<md）：无固定高度，内容自然撑开，让 app 内容区滚动；
@@ -26,6 +30,7 @@
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { Button, buttonVariants } from '$lib/components/ui/button'
   import * as ToggleGroup from '$lib/components/ui/toggle-group'
+  import { createResource } from '$lib/apps/installable/github/state'
   import FileTextIcon from '@lucide/svelte/icons/file-text'
   import FolderTreeIcon from '@lucide/svelte/icons/folder-tree'
   import CodeIcon from '@lucide/svelte/icons/code'
@@ -65,11 +70,16 @@
   /** 渲染模式：可预览文件默认 preview，纯文本固定 raw。 */
   let mode = $state<'raw' | 'preview'>('preview')
 
-  // 文件内容（text/markdown 才加载；媒体用 rawUrl 不加载内容）
-  let content = $state('')
-  let loading = $state(false)
-  let error = $state<string | null>(null)
-  /** markdown Preview 模式的渲染 HTML。 */
+  /** 是否需要加载文件内容（text/markdown 走 getFileText；媒体用 rawUrl 不加载）。 */
+  const needsFetch = $derived(kind === 'text' || kind === 'markdown')
+
+  // 文件内容资源（text/markdown）；媒体文件不使用此 resource（用 rawUrl 渲染）
+  const contentResource = createResource(
+    () => getFileText(path, { owner, repo, ref: commitSha || undefined }),
+    { errorMessage: '加载失败' },
+  )
+
+  /** markdown Preview 模式的渲染 HTML（派生自 contentResource.data）。 */
   let renderedHtml = $state('')
   /** text 类的高亮 HTML（Shiki）。 */
   let highlightedHtml = $state('')
@@ -79,25 +89,25 @@
   /** 媒体/下载用的 raw URL（commitSha 优先）。 */
   const rawUrl = $derived(fileRawUrl(owner, repo, path, effectiveRef))
 
-  // path 变化时重置 + 加载
+  // path 变化时重置 + 加载（媒体短路不发请求）
   $effect(() => {
     const p = path
     // 可预览文件默认 preview 模式，纯文本固定 raw
     mode = previewable ? 'preview' : 'raw'
     renderedHtml = ''
     highlightedHtml = ''
-    content = ''
-    error = null
-    if (kind === 'image' || kind === 'video' || kind === 'audio') {
-      // 媒体文件不加载内容，直接用 rawUrl（由模板渲染）
-      loading = false
-      return
+    if (needsFetch) {
+      void contentResource.run()
+    } else {
+      // 媒体文件：不发请求，重置 resource（避免残留旧 text 内容）
+      contentResource.reset()
     }
-    void loadContent(p)
+    void p
   })
 
-  // mode 变化或 content 就绪时计算渲染 HTML
+  // markdown 渲染（contentResource.data 就绪 + preview 模式时计算）
   $effect(() => {
+    const content = contentResource.data
     if (kind === 'markdown' && mode === 'preview' && content) {
       renderedHtml = renderRepoMarkdown(content, path, owner, repo, { branch: effectiveRef })
     } else {
@@ -107,6 +117,7 @@
 
   // text 类代码高亮：content 就绪 + Shiki 加载后计算
   $effect(() => {
+    const content = contentResource.data
     if (kind === 'text' && content) {
       const lang = path.split('.').pop() ?? ''
       const html = highlightCode(content, lang)
@@ -115,24 +126,6 @@
       highlightedHtml = ''
     }
   })
-
-  async function loadContent(p: string) {
-    loading = true
-    try {
-      content = await getFileText(p, { owner, repo, ref: commitSha || undefined })
-      // text 类需要 Shiki 加载完后才能高亮（首帧 highlightCode 返回 null，加载后重试）
-      if (kind === 'text') {
-        void primeHighlighter().then(() => {
-          const lang = p.split('.').pop() ?? ''
-          highlightedHtml = highlightCode(content, lang) ?? ''
-        })
-      }
-    } catch (e) {
-      error = e instanceof Error ? e.message : '加载失败'
-    } finally {
-      loading = false
-    }
-  }
 
   /** 跳转到 WriterApp 编辑器（仅主仓库可写）。 */
   function handleEdit() {
@@ -218,11 +211,7 @@
 
   <!-- 内容区：直接展开，由 app 内容区滚动（桌面端和移动端统一）-->
   <div class="p-4">
-    {#if loading}
-      <Skeleton class="h-40" />
-    {:else if error}
-      <p class="text-destructive text-sm">{error}</p>
-    {:else if kind === 'image'}
+    {#if kind === 'image'}
       <div class="flex items-center justify-center" use:photoswipe>
         <img src={rawUrl} alt={path} class="max-h-[70vh] max-w-full rounded" loading="lazy" />
       </div>
@@ -237,6 +226,10 @@
       <div class="flex items-center justify-center py-8">
         <audio src={rawUrl} controls>您的浏览器不支持音频播放。</audio>
       </div>
+    {:else if contentResource.status === 'loading'}
+      <Skeleton class="h-40" />
+    {:else if contentResource.status === 'error' || contentResource.status === 'stale-error'}
+      <p class="text-destructive text-sm">{contentResource.error}</p>
     {:else if kind === 'markdown' && mode === 'preview' && renderedHtml}
       <!-- role=presentation：容器本身非交互元素，click 仅做事件委托（捕获内部 a[data-repo-file]）。
            交互语义由内部的 <a> 承担（键盘可访问）。 -->
@@ -253,9 +246,9 @@
       <div class="dark:prose-invert prose prose-sm max-w-none">
         {@html highlightedHtml}
       </div>
-    {:else}
+    {:else if contentResource.data}
       <!-- text 无高亮（Shiki 未加载或不支持的语言）或 markdown raw 模式：纯源码 -->
-      <pre class="bg-muted/50 text-xs leading-relaxed whitespace-pre-wrap">{content}</pre>
+      <pre class="bg-muted/50 text-xs leading-relaxed whitespace-pre-wrap">{contentResource.data}</pre>
     {/if}
   </div>
 </div>

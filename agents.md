@@ -177,6 +177,74 @@ src/lib/router/                  ← 路由系统核心
 vite-plugins/gaubee-routes/      ← codegen 插件（骨架，阶段 3 完善）
 ```
 
+## 加载状态机抽象（2026-07-28）
+
+### 心智模型
+
+网络数据加载从 3 态（loading/error/success）升级到 8 态拓扑，核心是中间态：`refreshing`（有旧数据时背景刷新，不闪骨架）和 `stale-error`（刷新失败保留旧数据 + 错误条）。
+
+```
+  无数据区                         有数据区
+┌──────────────┐               ┌──────────────┐
+│ idle         │               │ success      │ 已加载
+│ loading      │ 首屏骨架      │ refreshing ★ │ 背景刷新，保留旧数据
+│ empty        │ 列表空态      │ stale-error ★│ 刷新失败，保留旧数据 + 错误条
+│ error        │ 首屏失败      │              │
+└──────────────┘               └──────────────┘
+```
+
+### 核心 API
+
+```ts
+// 声明资源（runes 工厂）
+const commits = createResource(
+  () => listCommits({ owner, repo, perPage: 30 }),
+  { isEmpty: (a) => a.length === 0, errorMessage: "加载历史失败" },
+);
+
+// 触发（监听参数变化，fetcher 闭包读响应式值）
+$effect(() => { if (owner && repo) void commits.run(); });
+
+// 渲染（AsyncBoundary 按 status 自动分支）
+<AsyncBoundary resource={commits} skeleton={SkeletonSnippet} emptyMessage="暂无提交">
+  {#snippet children()}
+    {@const data = commits.data!}
+    {#each data as c}<CommitRow {c} />{/each}
+  {/snippet}
+</AsyncBoundary>
+```
+
+### 内置能力
+
+- **seq 竞态防护**：内置序号丢弃过期请求结果（替代手写 `searchSeq`/`loadSeq`）。
+- **refreshing 保留旧 data**：有数据时重新 run，status=refreshing，data 不清空。
+- **stale-error 保留旧 data**：刷新失败不清空 data，显示错误条 + 重试。
+- **silent 选项**：辅助数据（repoInfo/counts/events）静默失败，不设 error。
+- **isEmpty 列表空态**：列表资源配置后，空数据显示 empty 态而非 success。
+- **setData mutation**：评论 CRUD 等本地更新（`setData(prev => [...prev, created])`）。
+
+### 关键约定
+
+- **位置**：`src/lib/apps/installable/github/state/`（GithubApp 内部，非全局 lib）。
+- **协变接口**：AsyncBoundary 接收 `ReadonlyResource<out T>`（协变于 T），解决 `Resource<T>` 因 setData 逆变导致的类型不兼容。调用方在 children snippet 内用 `{@const data = resource.data!}` 取值（success 分支内非空安全）。
+- **纯逻辑分层**：状态派生逻辑在 `status.ts`（server project 可测，纯函数），runes 集成在 `resource.svelte.ts`（client project `.svelte.test.ts` 测）。
+- **不适用场景**：分页/增量加载（listCache、文件树 loadingDirs）形态不匹配，保持手写。
+
+### 文件结构
+
+```
+src/lib/apps/installable/github/state/
+├── status.ts                  状态机派生纯函数（idle/loading/refreshing/...）
+├── status.test.ts             纯逻辑单测（server project）
+├── resource.svelte.ts         createResource runes 工厂（Resource<T> + ReadonlyResource）
+├── resource.svelte.test.ts    runes 行为测试（client project）
+├── AsyncBoundary.svelte       状态机渲染边界（泛型，snippet 传 data）
+├── EmptyState.svelte          空态（图标 + 文案）
+├── ErrorState.svelte          错误态（图标 + 文案 + 重试，role=alert）
+├── RefreshIndicator.svelte    refreshing/stale-error 顶部指示条
+└── index.ts                   统一导出
+```
+
 ## 提交规范
 
 1. git-commit-message 的提交规范的格式为：

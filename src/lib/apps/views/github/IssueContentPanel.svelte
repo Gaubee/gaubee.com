@@ -11,6 +11,10 @@
 	  · event（closed/labeled/…）→ 紧凑 action 行（圆形图标 + actor + action + 时间）
 	- 底部：当前用户头像 + CommentEditor（与 timeline 对齐）
 
+	状态机升级（2026-07-28）：issue/comments/events 各自用 createResource 收口。
+	events 静默失败（辅助数据）。评论 CRUD / 状态切换用 setData 本地更新。
+	切换 issue 时若已有数据，进入 refreshing 保留旧内容（不再清空闪烁）。
+
 	issueNumber 变化时自动重新加载。
 -->
 <script lang="ts">
@@ -32,6 +36,7 @@
   import { authStore } from '$lib/auth/session.svelte'
   import { Button } from '$lib/components/ui/button'
   import { Skeleton } from '$lib/components/ui/skeleton'
+  import { createResource } from '$lib/apps/installable/github/state'
   import { labelStyleString } from '$lib/utils/label-color'
   import CircleDotIcon from '@lucide/svelte/icons/circle-dot'
   import CheckIcon from '@lucide/svelte/icons/check'
@@ -40,6 +45,7 @@
   import TagIcon from '@lucide/svelte/icons/tag'
   import UserPlusIcon from '@lucide/svelte/icons/user-plus'
   import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw'
+  import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw'
   import GitCommitHorizontalIcon from '@lucide/svelte/icons/git-commit-horizontal'
   import PencilLineIcon from '@lucide/svelte/icons/pencil-line'
   import MilestoneIcon from '@lucide/svelte/icons/milestone'
@@ -63,19 +69,26 @@
   const currentUser = $derived(authStore.state.user?.login ?? null)
   const currentUserAvatar = $derived(authStore.state.user?.avatar_url ?? null)
 
-  // issue 详情状态
-  let issue = $state<IssueDetail | null>(null)
-  let issueLoading = $state(false)
-  let issueError = $state<string | null>(null)
+  // 三个独立资源：issue 详情（单值）/ 评论列表 / timeline 事件（silent 辅助数据）
+  const issueResource = createResource(
+    () => getIssue(owner, repo, issueNumber),
+    { errorMessage: '加载 issue 失败' },
+  )
+  const commentsResource = createResource(
+    () => listIssueComments(owner, repo, issueNumber),
+    { errorMessage: '加载评论失败', isEmpty: (c) => c.length === 0 },
+  )
+  const eventsResource = createResource(
+    () => listIssueEvents(owner, repo, issueNumber),
+    { silent: true, errorMessage: '加载事件失败', isEmpty: (e) => e.length === 0 },
+  )
 
-  // 评论列表状态
-  let comments = $state<IssueComment[]>([])
-  let commentsLoading = $state(false)
-  let commentsError = $state<string | null>(null)
-
-  // timeline 事件状态（closed/reopened/labeled 等紧凑 action 行）
-  let events = $state<IssueEvent[]>([])
-  let eventsLoading = $state(false)
+  /** issue 详情（便捷别名，模板用）。 */
+  const issue = $derived(issueResource.data)
+  /** comments 列表（未加载时为空数组）。 */
+  const comments = $derived(commentsResource.data ?? [])
+  /** events 列表（未加载或 silent 失败时为空数组）。 */
+  const events = $derived(eventsResource.data ?? [])
 
   /** 合并后的 timeline 项（评论 + 事件按时间排序），用于渲染。
    *  discriminated union：kind=issue/comment 是卡片，kind=event 是紧凑行。 */
@@ -123,77 +136,33 @@
       : [],
   )
 
-  // issueNumber/owner/repo 变化时重新加载（读取一次，避免 effect 内引用响应式值触发循环）
+  // issueNumber 变化时重新加载三个资源（fetcher 闭包读响应式 owner/repo/issueNumber，run 时取最新值）
   $effect(() => {
     const n = issueNumber
-    const o = owner
-    const r = repo
     if (!n) return
-    void loadAll(o, r, n)
+    void issueResource.run()
+    void commentsResource.run()
+    void eventsResource.run()
   })
 
-  /** 加载 issue 详情 + 评论列表 + 事件列表 */
-  async function loadAll(o: string, r: string, n: number) {
-    await Promise.all([loadIssue(o, r, n), loadComments(o, r, n), loadEvents(o, r, n)])
-  }
-
-  async function loadIssue(o: string, r: string, n: number) {
-    issueLoading = true
-    issueError = null
-    issue = null
-    try {
-      issue = await getIssue(o, r, n)
-    } catch (e) {
-      issueError = e instanceof Error ? e.message : '加载 issue 失败'
-    } finally {
-      issueLoading = false
-    }
-  }
-
-  async function loadComments(o: string, r: string, n: number) {
-    commentsLoading = true
-    commentsError = null
-    comments = []
-    try {
-      comments = await listIssueComments(o, r, n)
-    } catch (e) {
-      commentsError = e instanceof Error ? e.message : '加载评论失败'
-    } finally {
-      commentsLoading = false
-    }
-  }
-
-  /** 加载 timeline 事件（closed/reopened/labeled 等紧凑 action 行）。
-   *  失败静默（事件是辅助信息，不影响主流程）。 */
-  async function loadEvents(o: string, r: string, n: number) {
-    eventsLoading = true
-    try {
-      events = await listIssueEvents(o, r, n)
-    } catch {
-      events = []
-    } finally {
-      eventsLoading = false
-    }
-  }
-
-  /** 处理评论编辑：调用 API 更新，本地替换评论对象 */
+  /** 处理评论编辑：调用 API 更新，本地替换评论对象（setData 保持 resource 单源） */
   async function handleEditComment(commentId: number, newBody: string) {
     const { updateIssueComment } = await import('$lib/apps/installable/github/issue-api')
     const updated = await updateIssueComment(owner, repo, commentId, newBody)
-    comments = comments.map((c) => (c.id === commentId ? updated : c))
+    commentsResource.setData((prev) => (prev ?? []).map((c) => (c.id === commentId ? updated : c)))
   }
 
   /** 处理评论删除：调用 API 删除，本地移除 */
   async function handleDeleteComment(commentId: number) {
     const { deleteIssueComment } = await import('$lib/apps/installable/github/issue-api')
     await deleteIssueComment(owner, repo, commentId)
-    comments = comments.filter((c) => c.id !== commentId)
+    commentsResource.setData((prev) => (prev ?? []).filter((c) => c.id !== commentId))
   }
 
   /** 处理新评论提交：调用 API 创建，追加到列表 */
   async function handleCreateComment(body: string) {
     const created = await createIssueComment(owner, repo, issueNumber, body)
-    comments = [...comments, created]
+    commentsResource.setData((prev) => [...(prev ?? []), created])
   }
 
   /** 切换 issue 状态（Close/Reopen） */
@@ -204,7 +173,7 @@
       state: newState,
       state_reason: newState === 'closed' ? 'completed' : 'reopened',
     })
-    issue = updated
+    issueResource.setData(updated)
   }
 
   // reactions 类型守卫辅助（仅用于模板类型收窄）
@@ -322,7 +291,7 @@
 <div class="flex h-full flex-col overflow-hidden">
   <!-- 可滚动区：title + timeline（issue 正文 + events + comments 统一渲染）。 -->
   <div class="min-h-0 flex-1 overflow-auto px-4 py-4">
-    {#if issueLoading}
+    {#if issueResource.status === 'loading'}
       <Skeleton class="mb-2 h-7 w-3/4" />
       <Skeleton class="mb-4 h-3 w-1/2" />
       <div class="mb-6 space-y-4">
@@ -335,8 +304,8 @@
           </div>
         </div>
       </div>
-    {:else if issueError}
-      <p class="text-destructive text-sm">{issueError}</p>
+    {:else if issueResource.status === 'error'}
+      <p class="text-destructive text-sm">{issueResource.error}</p>
     {:else if issue}
       <!-- 标题区：大标题 + 状态 Badge + meta + labels -->
       <div class="mb-6">
@@ -386,8 +355,15 @@
         </div>
       </div>
 
-      <!-- Timeline 列表（带左侧轴线）：issue 正文卡片 + events + comments 按时间合并 -->
-      {#if commentsLoading}
+      <!-- Timeline 列表（带左侧轴线）：issue 正文卡片 + events + comments 按时间合并。
+           refreshing（切换 issue 时）保留旧内容 + 顶部指示条。 -->
+      {#if commentsResource.status === 'refreshing'}
+        <div class="bg-primary/5 text-muted-foreground mb-3 flex items-center justify-center gap-1.5 rounded px-3 py-1 text-[11px]">
+          <RefreshCwIcon class="size-3 animate-spin" />
+          <span>同步评论…</span>
+        </div>
+      {/if}
+      {#if commentsResource.status === 'loading'}
         <div class="space-y-4">
           {#each Array(3) as _}
             <div class="flex gap-3">
@@ -400,8 +376,8 @@
             </div>
           {/each}
         </div>
-      {:else if commentsError}
-        <p class="text-destructive text-sm">{commentsError}</p>
+      {:else if commentsResource.status === 'error'}
+        <p class="text-destructive text-sm">{commentsResource.error}</p>
       {:else}
         <!-- timeline 容器：左侧 2px 轴线（absolute）穿过所有节点的头像/图标中心 -->
         <div class="relative">

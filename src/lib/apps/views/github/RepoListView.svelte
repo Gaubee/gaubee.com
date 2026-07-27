@@ -31,6 +31,7 @@
   import { Input } from '$lib/components/ui/input'
   import { Badge } from '$lib/components/ui/badge'
   import { Skeleton } from '$lib/components/ui/skeleton'
+  import { createResource } from '$lib/apps/installable/github/state'
   import GitHubMark from '$lib/components/icons/GitHubMark.svelte'
   import SearchIcon from '@lucide/svelte/icons/search'
   import StarIcon from '@lucide/svelte/icons/star'
@@ -77,12 +78,23 @@
   const accountState = $derived(accountService.state)
   const login = $derived(accountState.user?.login ?? null)
 
-  // ---- 搜索 ----
+  // ---- 搜索（createResource 内置 seq 竞态，替代手写 searchSeq）----
   let searchInput = $state('')
-  let searchResults = $state<RepoSummary[] | null>(null)
-  let searchTotal = $state(0)
-  let searchLoading = $state(false)
-  let searchError = $state<string | null>(null)
+  interface SearchResult { results: RepoSummary[]; total: number }
+  const searchResource = createResource<SearchResult>(
+    async () => {
+      // 全局搜索 GitHub 仓库（不限定 user，覆盖 orgs + 全站）
+      const { items, total } = await searchRepos(searchInput.trim(), { perPage: 30 })
+      return { results: items, total }
+    },
+    { errorMessage: '搜索失败' },
+  )
+  /** 搜索结果（null=未搜索，[]=空结果）。 */
+  const searchResults = $derived(
+    searchResource.status === 'idle' ? null : (searchResource.data?.results ?? []),
+  )
+  /** 搜索总数。 */
+  const searchTotal = $derived(searchResource.data?.total ?? 0)
 
   // ---- 聚合首页：从缓存读取（保活），首次/过期时后台刷新 ----
   const homeCache = $derived(listCache.home)
@@ -293,8 +305,6 @@
 
   /** 搜索 debounce timer（300ms，实时搜索）。 */
   let searchTimer: ReturnType<typeof setTimeout> | null = null
-  /** 搜索请求序号（竞态防护：只应用最新一次结果）。 */
-  let searchSeq = 0
 
   /** 实时搜索：输入时 debounce 300ms 自动触发。 */
   function scheduleSearch() {
@@ -308,27 +318,12 @@
   async function handleSearch() {
     const q = searchInput.trim()
     if (!q) {
-      searchResults = null
-      searchTotal = 0
+      // 清空搜索：reset 回 idle（searchResults 派生为 null）
+      searchResource.reset()
       return
     }
-    const mySeq = ++searchSeq
-    searchLoading = true
-    searchError = null
-    try {
-      // 全局搜索 GitHub 仓库（不限定 user，覆盖 orgs + 全站）
-      const { items, total } = await searchRepos(q, { perPage: 30 })
-      if (mySeq !== searchSeq) return // 竞态：已有更新的搜索请求
-      searchResults = items
-      searchTotal = total
-    } catch (e) {
-      if (mySeq !== searchSeq) return
-      searchError = e instanceof Error ? e.message : '搜索失败'
-      searchResults = []
-      searchTotal = 0
-    } finally {
-      if (mySeq === searchSeq) searchLoading = false
-    }
+    // createResource 内置 seq 竞态防护（替代手写 searchSeq），丢弃过期结果
+    void searchResource.run()
   }
 
   function openRepo(owner: string, repo: string) {
@@ -436,7 +431,7 @@
         class="pl-8"
         oninput={scheduleSearch}
       />
-      {#if searchLoading}
+      {#if searchResource.isLoading}
         <LoaderIcon class="text-muted-foreground absolute right-2.5 top-1/2 size-4 -translate-y-1/2 animate-spin" />
       {/if}
     </div>
@@ -450,15 +445,15 @@
         <button
           class="text-primary hover:underline"
           onclick={() => {
-            searchResults = null
+            searchResource.reset()
             searchInput = ''
           }}
         >清除</button>
       </div>
-      {#if searchLoading}
+      {#if searchResource.status === 'loading' || searchResource.status === 'refreshing'}
         {#each Array(3) as _}<Skeleton class="h-16" />{/each}
-      {:else if searchError}
-        <p class="text-destructive text-sm">{searchError}</p>
+      {:else if searchResource.status === 'error'}
+        <p class="text-destructive text-sm">{searchResource.error}</p>
       {:else if searchResults.length === 0}
         <p class="text-muted-foreground py-4 text-center text-sm">未找到匹配的仓库</p>
       {:else}

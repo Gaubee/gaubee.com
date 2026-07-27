@@ -10,12 +10,16 @@
 	数据懒加载：首次打开 Popover 时才请求 listBranches/listTags，
 	避免进页面就发请求（很多用户不切换 ref）。
 
+	状态机升级（2026-07-28）：branches/tags 合并为单一 resource（silent 失败，
+	辅助数据用户可手输 SHA）。loaded 布尔由 status==='success' 替代。
+
 	复用场景：
 	- history tab：切换 branch 重新加载 commit 列表
 	- files tab：切换 ref 重新加载文件树
 -->
 <script lang="ts">
   import { listBranches, listTags, type BranchSummary, type TagSummary } from '$lib/apps/installable/github/repo-api'
+  import { createResource } from '$lib/apps/installable/github/state'
   import * as Popover from '$lib/components/ui/popover'
   import { Input } from '$lib/components/ui/input'
   import { Skeleton } from '$lib/components/ui/skeleton'
@@ -24,6 +28,8 @@
   import SearchIcon from '@lucide/svelte/icons/search'
   import CheckIcon from '@lucide/svelte/icons/check'
   import ChevronDownIcon from '@lucide/svelte/icons/chevron-down'
+
+  type RefsData = { branches: BranchSummary[]; tags: TagSummary[] }
 
   let {
     owner,
@@ -45,17 +51,31 @@
   // Popover 开关
   let open = $state(false)
 
-  // branch/tag 数据（懒加载）
-  let branches = $state<BranchSummary[]>([])
-  let tags = $state<TagSummary[]>([])
-  let loading = $state(false)
-  let loaded = $state(false)
+  // branch/tag 数据（懒加载，silent 失败：辅助数据，用户可手输 SHA）
+  const refsResource = createResource(
+    async (): Promise<RefsData> => {
+      const [branches, tags] = await Promise.all([
+        listBranches(owner, repo, { perPage: 100 }),
+        listTags(owner, repo, { perPage: 100 }),
+      ])
+      return { branches, tags }
+    },
+    { silent: true, errorMessage: '加载分支失败' },
+  )
+
+  /** 是否已加载成功（替代原 loaded 布尔）。 */
+  const loaded = $derived(refsResource.status === 'success')
 
   // 搜索词
   let search = $state('')
 
   /** 是否是 commit SHA（≥7 位 hex）。 */
   const isShaInput = $derived(/^[0-9a-f]{7,40}$/i.test(search.trim()))
+
+  /** 当前已加载的 branches（未加载时为空数组）。 */
+  const branches = $derived(refsResource.data?.branches ?? [])
+  /** 当前已加载的 tags（未加载时为空数组）。 */
+  const tags = $derived(refsResource.data?.tags ?? [])
 
   /** 过滤后的 branch 列表（默认分支置顶）。 */
   const filteredBranches = $derived(
@@ -89,7 +109,7 @@
   // 首次打开时懒加载 branch/tag
   $effect(() => {
     if (open && !loaded) {
-      void loadRefs()
+      void refsResource.run()
     }
   })
 
@@ -97,25 +117,6 @@
   $effect(() => {
     if (!open) search = ''
   })
-
-  async function loadRefs() {
-    loading = true
-    try {
-      const [b, t] = await Promise.all([
-        listBranches(owner, repo, { perPage: 100 }),
-        listTags(owner, repo, { perPage: 100 }),
-      ])
-      branches = b
-      tags = t
-      loaded = true
-    } catch {
-      // 加载失败静默（用户可手动输入 SHA）
-      branches = []
-      tags = []
-    } finally {
-      loading = false
-    }
-  }
 
   /** 选中某个 ref（branch/tag/SHA）。 */
   function handleSelect(ref: string) {
@@ -174,7 +175,7 @@
 
       <!-- 列表区（可滚动） -->
       <div class="max-h-72 overflow-auto">
-        {#if loading}
+        {#if refsResource.isLoading && !loaded}
           <div class="space-y-1 p-2">
             {#each Array(4) as _}
               <Skeleton class="h-6 w-full" />
