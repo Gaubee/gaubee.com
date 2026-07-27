@@ -705,51 +705,51 @@
 
       <!-- 文件 + README -->
       <Tabs.Content value="files" class="p-4">
-        <!-- ref 选择器（常驻）：切换 branch/tag/SHA 浏览不同版本的文件树。
-             - ref = 默认分支：selector 显示分支名，无 badge
-             - ref = commit SHA / 非默认 branch：显示「历史版本」badge
-             切换 ref → navigateSelect('files', 'ref', newRef)，触发 fileRef $effect 重载文件树。 -->
-        <div class="mb-3 flex items-center gap-2">
-          <RepoRefSelector
-            {owner}
-            {repo}
-            currentRef={fileRef ?? ''}
-            defaultBranch={repoInfo?.default_branch ?? 'main'}
-            onSelect={(ref) => {
-              // 选默认分支时清除 ref（让 URL 干净）；否则设置 ref
-              if (ref === (repoInfo?.default_branch ?? 'main')) {
-                clearFileRef()
-              } else {
-                const sp = new URLSearchParams({ tab: 'files' })
-                if (selectedFile) sp.set('file', selectedFile)
-                sp.set('ref', ref)
-                navController.navigateMain(`${basePath}?${sp.toString()}`)
-              }
-            }}
-          />
-          {#if fileRef && fileRef !== (repoInfo?.default_branch ?? 'main')}
-            <span class="bg-primary/10 text-primary inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium">
-              <GitCommitHorizontalIcon class="size-3" />
-              历史版本
-            </span>
-          {/if}
-        </div>
         <!-- 桌面端（md+）：双栏 grid（不固定高度，内容自然撑开）。
              fileTree 左栏 sticky + 独立滚动，fileContent 右栏直接展开（由 app 内容区滚动）。
              移动端（<md）：fileTree 收进 Sheet 浮动浮层。 -->
         <div class="grid min-w-0 gap-4 md:grid-cols-[minmax(200px,280px)_1fr]">
-          <!-- 文件树：桌面端 sticky 左栏（独立滚动），移动端隐藏（用 Sheet 触发）-->
-          <div class="border-border max-h-[calc(100dvh-12rem)] min-w-0 overflow-auto overscroll-contain rounded border p-2 text-sm md:sticky md:top-2 md:block max-md:hidden">
-            <RepoFileTree
-              dir=""
-              label="根目录"
-              {tree}
-              {expanded}
-              {loadingDirs}
-              selectedFile={selectedFile}
-              ontoggledir={toggleDir}
-              onselectfile={selectFile}
-            />
+          <!-- 文件树：桌面端 sticky 左栏（含 ref 选择器工具栏 + 独立滚动），移动端隐藏（用 Sheet 触发）。
+               与 history tab 左栏结构一致：工具栏（ref selector）+ 列表区（文件树）。 -->
+          <div class="border-border flex max-h-[calc(100dvh-12rem)] min-w-0 flex-col overflow-hidden rounded border md:sticky md:top-2 md:block max-md:hidden">
+            <!-- ref 选择器工具栏（与 history tab 一致：常驻在左栏顶部） -->
+            <div class="border-border bg-muted/30 flex items-center gap-1.5 border-b px-2 py-1.5">
+              <RepoRefSelector
+                {owner}
+                {repo}
+                currentRef={fileRef ?? ''}
+                defaultBranch={repoInfo?.default_branch ?? 'main'}
+                onSelect={(ref) => {
+                  if (ref === (repoInfo?.default_branch ?? 'main')) {
+                    clearFileRef()
+                  } else {
+                    const sp = new URLSearchParams({ tab: 'files' })
+                    if (selectedFile) sp.set('file', selectedFile)
+                    sp.set('ref', ref)
+                    navController.navigateMain(`${basePath}?${sp.toString()}`)
+                  }
+                }}
+              />
+              {#if fileRef && fileRef !== (repoInfo?.default_branch ?? 'main')}
+                <span class="bg-primary/10 text-primary inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium">
+                  <GitCommitHorizontalIcon class="size-3" />
+                  历史
+                </span>
+              {/if}
+            </div>
+            <!-- 文件树（可滚动区） -->
+            <div class="min-h-0 flex-1 overflow-auto p-2 text-sm">
+              <RepoFileTree
+                dir=""
+                label="根目录"
+                {tree}
+                {expanded}
+                {loadingDirs}
+                selectedFile={selectedFile}
+                ontoggledir={toggleDir}
+                onselectfile={selectFile}
+              />
+            </div>
           </div>
           <!-- 文件内容（右）：直接展开内容，由 app 内容区滚动 -->
           {#if selectedFile}
@@ -771,7 +771,7 @@
 
         <!-- 移动端文件树浮层（桌面端隐藏）：点击文件列表按钮触发，选中文件后自动关闭 -->
         <Sheet.Root bind:open={fileTreeSheetOpen}>
-          <Sheet.Content side="bottom" class="max-h-[75dvh] rounded-t-lg p-0 md:hidden" showCloseButton={false}>
+          <Sheet.Content side="bottom" class="flex max-h-[75dvh] flex-col rounded-t-lg p-0 md:hidden" showCloseButton={false}>
             <Sheet.Header class="flex-row items-center justify-between border-b px-4 py-3">
               <Sheet.Title class="flex items-center gap-2 text-sm font-medium">
                 <FolderTreeIcon class="size-4" />
@@ -779,7 +779,32 @@
               </Sheet.Title>
               <Sheet.Description class="sr-only">浏览仓库文件树，选择文件查看内容</Sheet.Description>
             </Sheet.Header>
-            <div class="max-h-[calc(75dvh-4rem)] overflow-auto overscroll-contain p-2 text-sm">
+            <!-- ref 选择器工具栏（与桌面端左栏一致） -->
+            <div class="border-border bg-muted/30 flex items-center gap-1.5 border-b px-2 py-1.5">
+              <RepoRefSelector
+                {owner}
+                {repo}
+                currentRef={fileRef ?? ''}
+                defaultBranch={repoInfo?.default_branch ?? 'main'}
+                onSelect={(ref) => {
+                  if (ref === (repoInfo?.default_branch ?? 'main')) {
+                    clearFileRef()
+                  } else {
+                    const sp = new URLSearchParams({ tab: 'files' })
+                    if (selectedFile) sp.set('file', selectedFile)
+                    sp.set('ref', ref)
+                    navController.navigateMain(`${basePath}?${sp.toString()}`)
+                  }
+                }}
+              />
+              {#if fileRef && fileRef !== (repoInfo?.default_branch ?? 'main')}
+                <span class="bg-primary/10 text-primary inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium">
+                  <GitCommitHorizontalIcon class="size-3" />
+                  历史
+                </span>
+              {/if}
+            </div>
+            <div class="min-h-0 flex-1 overflow-auto overscroll-contain p-2 text-sm">
               <RepoFileTree
                 dir=""
                 label="根目录"
