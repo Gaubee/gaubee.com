@@ -131,10 +131,14 @@
     }
   })
 
-  /** 跳转到 WriterApp 编辑器（由 RepoEditPermission 守卫，按钮 disabled 时不会触发）。 */
+  /** 跳转到 WriterApp 编辑器（由 RepoEditPermission 守卫，按钮 disabled 时不会触发）。
+   *  带 ref 参数传递当前 git ref（commitSha 优先，否则默认分支），让编辑器准确判定权限。
+   *  注意：RepoEditPermission 已守卫「非默认分支不可编辑」，所以这里即便带了 ref，
+   *  编辑器仍会基于 ref === default_branch 判定。 */
   function handleEdit() {
+    const refParam = commitSha ? `&ref=${encodeURIComponent(commitSha)}` : ''
     navController.navigateMain(
-      `/app/github-edit?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&file=${encodeURIComponent(path)}`,
+      `/app/github-edit?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&file=${encodeURIComponent(path)}${refParam}`,
     )
   }
 
