@@ -23,6 +23,7 @@
   import { getFileText } from '$lib/github/client'
   import { getFileKind, canPreview, type FileKind } from '$lib/github/file-kind'
   import { renderRepoMarkdown, fileRawUrl } from '$lib/apps/installable/github/readme'
+  import { type RepoPermissions } from '$lib/apps/installable/github/repo-api'
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
   import { highlightCode, primeHighlighter } from '$lib/markdown/shiki-highlighter'
   import { photoswipe } from '$lib/photoswipe/action'
@@ -46,6 +47,7 @@
     repo,
     branch = '',
     commitSha = '',
+    permissions,
     onopenfiletree = () => {},
     onopenfile = () => {},
   }: {
@@ -56,6 +58,8 @@
     branch?: string
     /** commit SHA（按历史版本访问时传入，优先于 branch）。 */
     commitSha?: string
+    /** 当前 token 对该仓库的权限（来自 repoInfo.permissions，由父组件下传）。 */
+    permissions?: RepoPermissions
     /** 移动端：打开文件树浮层（桌面端不显示触发按钮）。 */
     onopenfiletree?: () => void
     /** markdown 内相对链接点击：打开应用内文件（SPA 导航到 ?file=path）。
@@ -129,7 +133,9 @@
 
   /** 跳转到 WriterApp 编辑器（由 RepoEditPermission 守卫，按钮 disabled 时不会触发）。 */
   function handleEdit() {
-    navController.navigateMain(`/app/github-edit/${owner}/${repo}/${path}`)
+    navController.navigateMain(
+      `/app/github-edit?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&file=${encodeURIComponent(path)}`,
+    )
   }
 
   /** 下载文件（用 raw URL）。 */
@@ -154,9 +160,12 @@
   }
 </script>
 
-<div class="border-border flex min-w-0 flex-col rounded border">
-  <!-- 工具栏：文件路径 + 操作按钮 + Raw|Preview toggle -->
-  <div class="border-border flex shrink-0 items-center gap-1.5 border-b px-2 py-1.5">
+<!-- Tooltip.Provider 包裹整个文件面板：编辑按钮的 disabled tooltip 共享 delay 配置。
+     bits-ui 要求 Tooltip.Root 必须在 Provider 内部，否则抛 Context not found。 -->
+<Tooltip.Provider delayDuration={200}>
+  <div class="border-border flex min-w-0 flex-col rounded border">
+    <!-- 工具栏：文件路径 + 操作按钮 + Raw|Preview toggle -->
+    <div class="border-border flex shrink-0 items-center gap-1.5 border-b px-2 py-1.5">
     <!-- 移动端：文件列表触发按钮（primary 样式，桌面端隐藏）-->
     <Button
       size="sm"
@@ -184,24 +193,28 @@
         <DownloadIcon class="size-3.5" />
       </a>
       <!-- 编辑：基于仓库/分支/保护状态三层判定（RepoEditPermission 守卫）。
-           可编辑 → 普通按钮；不可编辑 → Tooltip 包 disabled button（外层 span 接收 pointer events）。 -->
-      <RepoEditPermission {owner} {repo} {branch} commitSha={commitSha}>
-        {#snippet children({ canEdit, disabledReason })}
+           可编辑 → 普通按钮；不可编辑 → Tooltip 包 disabled button（外层 span 接收 pointer events）。
+           注意：snippet 接收 canEdit/disabledReason 两个独立参数（非对象）保证响应性，
+           snippet 内部用 {$derived} 重新读取以建立依赖追踪。 -->
+      <RepoEditPermission {owner} {repo} {permissions} {branch} commitSha={commitSha}>
+        {#snippet children(canEdit, disabledReason)}
           {#if canEdit}
             <Button size="icon-sm" variant="ghost" onclick={handleEdit} aria-label="编辑">
               <PencilIcon class="size-3.5" />
             </Button>
           {:else}
             <Tooltip.Root>
-              <span class="inline-flex">
-                <Tooltip.Trigger
-                  disabled
-                  class="text-muted-foreground/50 inline-flex size-7 items-center justify-center rounded"
-                  aria-label="编辑（不可用）"
-                >
-                  <PencilIcon class="size-3.5" />
-                </Tooltip.Trigger>
-              </span>
+              <!-- 不用 disabled 属性（会让 pointer-events:none，tooltip 无法触发）。
+                   改用 aria-disabled + tabindex=-1 + cursor-not-allowed 模拟禁用形态，
+                   保留 hover 能力让 Tooltip 正常显示原因。 -->
+              <Tooltip.Trigger
+                aria-disabled="true"
+                tabindex={-1}
+                class="text-muted-foreground/50 inline-flex size-7 cursor-not-allowed items-center justify-center rounded"
+                aria-label="编辑（不可用）"
+              >
+                <PencilIcon class="size-3.5" />
+              </Tooltip.Trigger>
               <Tooltip.Content>{disabledReason}</Tooltip.Content>
             </Tooltip.Root>
           {/if}
@@ -268,4 +281,5 @@
       <pre class="bg-muted/50 text-xs leading-relaxed whitespace-pre-wrap">{contentResource.data}</pre>
     {/if}
   </div>
-</div>
+  </div>
+</Tooltip.Provider>

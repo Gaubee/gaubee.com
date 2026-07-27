@@ -765,6 +765,7 @@
               {repo}
               branch={repoInfo?.default_branch ?? 'main'}
               commitSha={fileRef ?? ''}
+              permissions={repoInfo?.permissions}
               onopenfiletree={() => (fileTreeSheetOpen = true)}
               onopenfile={(p) => selectFile(p)}
             />
@@ -1037,10 +1038,11 @@
         <RepoEditPermission
           {owner}
           {repo}
+          permissions={repoInfo?.permissions}
           branch={repoInfo?.default_branch ?? 'main'}
           commitSha={fileRef ?? ''}
         >
-          {#snippet children({ canEdit, disabledReason })}
+          {#snippet children(canEdit, disabledReason)}
             {#if !canEdit}
               <div class="text-muted-foreground py-8 text-center text-sm">
                 {disabledReason}

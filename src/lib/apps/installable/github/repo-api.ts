@@ -96,6 +96,20 @@ export interface RepoSummary {
   /** 最近推送时间（ISO 字符串）。 */
   pushed_at: string;
   html_url: string;
+  /** 当前 token 对该仓库的权限（仅 GET /repos/{o}/{r} 详情返回，列表/搜索不返回）。
+   *  用于编辑权限判定：permissions.push === true 才允许写操作。 */
+  permissions?: RepoPermissions;
+}
+
+/** 仓库权限（GitHub API 返回的 permissions 对象）。
+ *  注意：仅在 GET /repos/{owner}/{repo} 单仓库详情时由 API 返回；
+ *  /search/repositories 和列表端点不返回此字段。 */
+export interface RepoPermissions {
+  admin: boolean;
+  maintain: boolean;
+  push: boolean;
+  triage: boolean;
+  pull: boolean;
 }
 
 interface GhRepoResponse {
@@ -111,6 +125,7 @@ interface GhRepoResponse {
   default_branch: string;
   pushed_at: string;
   html_url: string;
+  permissions?: RepoPermissions;
 }
 
 function toRepoSummary(r: GhRepoResponse): RepoSummary {
@@ -127,6 +142,8 @@ function toRepoSummary(r: GhRepoResponse): RepoSummary {
     default_branch: r.default_branch,
     pushed_at: r.pushed_at,
     html_url: r.html_url,
+    // permissions 仅 GET /repos/{o}/{r} 详情返回；列表/搜索端点为 undefined
+    permissions: r.permissions,
   };
 }
 
@@ -305,6 +322,26 @@ export async function listBranches(
     protected: boolean;
   }>;
   return data.map((b) => ({ name: b.name, commit: { sha: b.commit.sha }, protected: b.protected }));
+}
+
+/** 获取单个分支详情（含保护状态）。
+ *  GET /repos/{owner}/{repo}/branches/{branch}
+ *  用于编辑权限判定（protected branch 不可直接 push）。
+ *  404 返回 null（分支不存在）；其它错误抛异常。 */
+export async function getBranch(
+  owner: string,
+  repo: string,
+  branch: string,
+): Promise<BranchSummary | null> {
+  const resp = await fetchGithub(`repos/${owner}/${repo}/branches/${encodeURIComponent(branch)}`);
+  if (resp.status === 404) return null;
+  await assertOk(resp, `getBranch(${owner}/${repo}/${branch})`);
+  const data = (await resp.json()) as {
+    name: string;
+    commit: { sha: string };
+    protected: boolean;
+  };
+  return { name: data.name, commit: { sha: data.commit.sha }, protected: data.protected };
 }
 
 /** 列出仓库 tag。

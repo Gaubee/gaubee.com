@@ -21,6 +21,7 @@ import {
   searchIssues,
   getIssue,
   getRepo,
+  getBranch,
 } from "./repo-api";
 
 const sampleRepo = {
@@ -184,6 +185,24 @@ describe("repo-api", () => {
     expect(repo.default_branch).toBe("main");
   });
 
+  it("getRepo 透传 permissions（详情端点才返回，列表/搜索不返回）", async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        ...sampleRepo,
+        permissions: { admin: true, maintain: true, push: true, triage: true, pull: true },
+      }),
+    );
+    const repo = await getRepo("sveltejs", "kit");
+    expect(repo.permissions?.push).toBe(true);
+    expect(repo.permissions?.admin).toBe(true);
+  });
+
+  it("getRepo permissions 缺省时为 undefined（列表端点不返回）", async () => {
+    mockFetch.mockResolvedValue(jsonResponse(sampleRepo));
+    const repo = await getRepo("sveltejs", "kit");
+    expect(repo.permissions).toBeUndefined();
+  });
+
   it("404 时 listIssues 返回空数组", async () => {
     mockFetch.mockResolvedValue({
       ok: false,
@@ -193,5 +212,39 @@ describe("repo-api", () => {
     } as Response);
     const issues = await listIssues("no", "exist");
     expect(issues).toEqual([]);
+  });
+
+  it("getBranch 走 branches/{branch} 路径并返回 protected 字段", async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        name: "main",
+        commit: { sha: "abc123" },
+        protected: true,
+      }),
+    );
+    const branch = await getBranch("sveltejs", "kit", "main");
+    const [path] = mockFetch.mock.calls[0];
+    expect(path).toBe("repos/sveltejs/kit/branches/main");
+    expect(branch).toEqual({ name: "main", commit: { sha: "abc123" }, protected: true });
+  });
+
+  it("getBranch 对带斜线的分支名做 encodeURIComponent", async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({ name: "feat/x", commit: { sha: "abc" }, protected: false }),
+    );
+    await getBranch("o", "r", "feat/x");
+    const [path] = mockFetch.mock.calls[0];
+    expect(path).toBe("repos/o/r/branches/feat%2Fx");
+  });
+
+  it("getBranch 404 返回 null（分支不存在）", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({}),
+      text: async () => "",
+    } as Response);
+    const branch = await getBranch("o", "r", "nope");
+    expect(branch).toBeNull();
   });
 });
