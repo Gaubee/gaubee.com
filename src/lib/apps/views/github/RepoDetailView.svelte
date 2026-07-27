@@ -92,6 +92,8 @@
   const selectedIssue = $derived(searchParams.get('issue') ? Number(searchParams.get('issue')) : null)
   const selectedChangePath = $derived(searchParams.get('change'))
   const selectedActivityId = $derived(searchParams.get('activity'))
+  /** 文件 Tab 的 git ref（commit SHA/分支名），用于按历史版本浏览文件树和文件内容。 */
+  const fileRef = $derived(searchParams.get('ref'))
 
   /** 详情页 base path（owner/repo，不含 query）。 */
   const basePath = $derived(navState.mainLocation.pathname)
@@ -100,9 +102,12 @@
   function switchTab(tab: string) {
     navController.navigateMain(`${basePath}?tab=${tab}`, 'REPLACE')
   }
-  /** 选中项（PUSH 入历史栈，可后退）。更新 query 时保留 tab。 */
+  /** 选中项（PUSH 入历史栈，可后退）。更新 query 时保留 tab + ref（文件按 commit 访问上下文）。 */
   function navigateSelect(tab: string, key: string, value: string) {
-    navController.navigateMain(`${basePath}?tab=${tab}&${key}=${encodeURIComponent(value)}`)
+    const params = new URLSearchParams({ tab, [key]: value })
+    // 文件 Tab 的 ref 参数需要跨选中项保留（同一个 commit 下浏览不同文件）
+    if (tab === 'files' && fileRef) params.set('ref', fileRef)
+    navController.navigateMain(`${basePath}?${params.toString()}`)
   }
 
   // ---- 仓库元数据 ----
@@ -211,6 +216,17 @@
     untrack(() => void loadAll(o, r))
   })
 
+  // fileRef（commit SHA）变化时清空文件树重新加载（不同 commit 的目录结构不同）。
+  $effect(() => {
+    const ref = fileRef
+    untrack(() => {
+      tree = new Map()
+      expanded = new Set([''])
+      loadingDirs = new Set()
+      void loadDir('', owner, repo)
+    })
+  })
+
   async function loadAll(o: string, r: string) {
     void loadRepoInfo(o, r)
     void autoSelectReadme(o, r)
@@ -239,8 +255,8 @@
     try {
       const result = await fetchReadme(o, r)
       if (result.path) {
-        // 仅在 files Tab 且未选中文件时自动选中 README（避免覆盖用户已选的文件）
-        if (activeTab === 'files' && !selectedFile) {
+        // 仅在 files Tab 且未选中文件且无 fileRef（默认分支）时自动选中 README
+        if (activeTab === 'files' && !selectedFile && !fileRef) {
           navigateSelect('files', 'file', result.path)
         }
       }
@@ -253,7 +269,7 @@
   async function loadDir(dir: string, o: string, r: string) {
     loadingDirs = new Set(loadingDirs).add(dir)
     try {
-      const entries = await listContents(dir, { owner: o, repo: r })
+      const entries = await listContents(dir, { owner: o, repo: r, ref: fileRef ?? undefined })
       const node: TreeNode = {
         dirs: entries.filter((e) => e.type === 'dir').sort((a, b) => a.name.localeCompare(b.name)),
         files: entries.filter((e) => e.type === 'file').sort((a, b) => a.name.localeCompare(b.name)),
@@ -549,6 +565,7 @@
               {owner}
               {repo}
               branch={repoInfo?.default_branch ?? 'main'}
+              commitSha={fileRef ?? ''}
               onopenfiletree={() => (fileTreeSheetOpen = true)}
             />
           {:else}

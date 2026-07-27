@@ -15,6 +15,7 @@
   import GitCommitHorizontalIcon from '@lucide/svelte/icons/git-commit-horizontal'
   import ExternalLinkIcon from '@lucide/svelte/icons/external-link'
   import HistoryIcon from '@lucide/svelte/icons/history'
+  import { navController } from '$lib/nav/nav-controller-instance'
 
   let {
     sha,
@@ -28,6 +29,12 @@
     /** 移动端：打开历史 commit 列表浮层（桌面端不显示触发按钮）。 */
     onopenhistorylist?: () => void
   } = $props()
+
+  /** 跳转到文件面板，按 commit ref 查看某文件的历史版本。 */
+  function openFileAtCommit(fileSha: string, filePath: string) {
+    const base = `/app/github/repo/${owner}/${repo}`
+    navController.navigateMain(`${base}?tab=files&file=${encodeURIComponent(filePath)}&ref=${fileSha}`)
+  }
 
   // commit 详情状态：loading / error / loaded 三态
   let commit = $state<CommitDetail | null>(null)
@@ -268,29 +275,25 @@
                       <p class="text-muted-foreground text-xs italic">
                         变更行数较多（{file.additions + file.deletions} 行），GitHub API 未返回 diff
                       </p>
-                      <!-- 跳转按钮：变更前 + 变更后 -->
+                      <!-- 内部跳转按钮：在文件面板按 commit ref 查看历史版本 -->
                       <div class="ml-auto flex items-center gap-1">
                         {#if commit.parents.length > 0 && file.status !== 'added'}
-                          <a
-                            href={`https://github.com/${owner}/${repo}/blob/${commit.parents[0]}/${file.previous_filename ?? file.filename}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            type="button"
+                            onclick={() => commit && openFileAtCommit(commit.parents[0], file.previous_filename ?? file.filename)}
                             class="text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 text-[11px] underline-offset-2 hover:underline"
                           >
                             变更前
-                            <ExternalLinkIcon class="size-3" />
-                          </a>
+                          </button>
                         {/if}
                         {#if file.status !== 'removed'}
-                          <a
-                            href={`https://github.com/${owner}/${repo}/blob/${commit.sha}/${file.filename}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            type="button"
+                            onclick={() => commit && openFileAtCommit(commit.sha, file.filename)}
                             class="text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 text-[11px] underline-offset-2 hover:underline"
                           >
                             变更后
-                            <ExternalLinkIcon class="size-3" />
-                          </a>
+                          </button>
                         {/if}
                       </div>
                     </div>

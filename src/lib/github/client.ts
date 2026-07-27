@@ -55,10 +55,12 @@ export interface GhContentEntry {
 export interface RepoRef {
   owner?: string;
   repo?: string;
+  /** Git ref（分支名/commit SHA/tag）。默认 BRANCH（"main"）。传 commit SHA 可查看历史版本。 */
+  ref?: string;
 }
 
-function resolveRepo(ref?: RepoRef): { owner: string; repo: string } {
-  return { owner: ref?.owner ?? OWNER, repo: ref?.repo ?? REPO };
+function resolveRepo(ref?: RepoRef): { owner: string; repo: string; ref: string } {
+  return { owner: ref?.owner ?? OWNER, repo: ref?.repo ?? REPO, ref: ref?.ref ?? BRANCH };
 }
 
 /** GitHub Commits API 返回的 commit 摘要（listCommits 用）。 */
@@ -185,8 +187,10 @@ function b64decode(b64: string): string {
  * @param ref 可选仓库定位（默认 gaubee/gaubee.com，向后兼容）。
  */
 export async function listContents(path: string, ref?: RepoRef): Promise<GhContentEntry[]> {
-  const { owner, repo } = resolveRepo(ref);
-  const resp = await fetchGithub(`repos/${owner}/${repo}/contents/${path}?ref=${BRANCH}`);
+  const resolved = resolveRepo(ref);
+  const resp = await fetchGithub(
+    `repos/${resolved.owner}/${resolved.repo}/contents/${path}?ref=${resolved.ref}`,
+  );
   if (!resp.ok) {
     if (resp.status === 404) return [];
     await assertOk(resp, `listContents(${path})`);
@@ -196,10 +200,12 @@ export async function listContents(path: string, ref?: RepoRef): Promise<GhConte
   return [];
 }
 
-/** 读取文件文本内容。@param ref 可选仓库定位（默认 gaubee/gaubee.com）。 */
+/** 读取文件文本内容。@param ref 可选仓库定位（含 ref 字段可按 commit SHA 访问历史版本）。 */
 export async function getFileText(path: string, ref?: RepoRef): Promise<string> {
-  const { owner, repo } = resolveRepo(ref);
-  const resp = await fetchGithub(`repos/${owner}/${repo}/contents/${path}?ref=${BRANCH}`);
+  const resolved = resolveRepo(ref);
+  const resp = await fetchGithub(
+    `repos/${resolved.owner}/${resolved.repo}/contents/${path}?ref=${resolved.ref}`,
+  );
   await assertOk(resp, `getFileText(${path})`);
   const data = (await resp.json()) as GhFileContent;
   if (data.type !== "file" || data.encoding !== "base64") {
@@ -252,10 +258,10 @@ export async function fetchTree(
   subtree?: string,
   ref?: RepoRef,
 ): Promise<{ tree: GhTreeEntry[]; sha: string; truncated: boolean }> {
-  const subtreeParam = subtree ? `?recursive=1` : `?recursive=1`;
-  void subtreeParam;
-  const { owner, repo } = resolveRepo(ref);
-  const resp = await fetchGithub(`repos/${owner}/${repo}/git/trees/${BRANCH}?recursive=1`);
+  const resolved = resolveRepo(ref);
+  const resp = await fetchGithub(
+    `repos/${resolved.owner}/${resolved.repo}/git/trees/${resolved.ref}?recursive=1`,
+  );
   await assertOk(resp, "fetchTree");
   const data = (await resp.json()) as {
     tree: GhTreeEntry[];

@@ -38,6 +38,7 @@
     owner,
     repo,
     branch = '',
+    commitSha = '',
     onopenfiletree = () => {},
   }: {
     path: string
@@ -45,6 +46,8 @@
     repo: string
     /** 仓库默认分支（用于 raw URL + markdown 相对路径重写）。 */
     branch?: string
+    /** commit SHA（按历史版本访问时传入，优先于 branch）。 */
+    commitSha?: string
     /** 移动端：打开文件树浮层（桌面端不显示触发按钮）。 */
     onopenfiletree?: () => void
   } = $props()
@@ -66,8 +69,11 @@
   let renderedHtml = $state('')
   /** text 类的高亮 HTML（Shiki）。 */
   let highlightedHtml = $state('')
-  /** 媒体/下载用的 raw URL（含分支名）。 */
-  const rawUrl = $derived(fileRawUrl(owner, repo, path, branch))
+  /** 实际 ref：commitSha 优先（历史版本），否则用 branch（默认分支）。 */
+  const effectiveRef = $derived(commitSha || branch)
+
+  /** 媒体/下载用的 raw URL（commitSha 优先）。 */
+  const rawUrl = $derived(fileRawUrl(owner, repo, path, effectiveRef))
 
   // path 变化时重置 + 加载
   $effect(() => {
@@ -89,7 +95,7 @@
   // mode 变化或 content 就绪时计算渲染 HTML
   $effect(() => {
     if (kind === 'markdown' && mode === 'preview' && content) {
-      renderedHtml = renderRepoMarkdown(content, path, owner, repo, { branch })
+      renderedHtml = renderRepoMarkdown(content, path, owner, repo, { branch: effectiveRef })
     } else {
       renderedHtml = ''
     }
@@ -109,7 +115,7 @@
   async function loadContent(p: string) {
     loading = true
     try {
-      content = await getFileText(p, { owner, repo })
+      content = await getFileText(p, { owner, repo, ref: commitSha || undefined })
       // text 类需要 Shiki 加载完后才能高亮（首帧 highlightCode 返回 null，加载后重试）
       if (kind === 'text') {
         void primeHighlighter().then(() => {
