@@ -37,6 +37,23 @@ const articleDetailRoute = defineRoute({
   component: () => import("$lib/apps/views/ArticleDetailView.svelte"),
 });
 
+/** 标签 Route：/tags（标签云）+ /tags/{tag}（筛选）。
+ *  root index 渲染标签云，child :tag 渲染带指定标签的文章列表。
+ *  替代旧 TagsView 内部的 pathname 正则分发（2026-07-28 路由系统迁移）。 */
+const tagsRoute = defineRoute({
+  id: "articles.tags",
+  pattern: "",
+  component: () => import("$lib/views/TagsView.svelte"),
+  children: [
+    defineRoute({
+      id: "articles.tags.detail",
+      pattern: ":tag",
+      params: z.object({ tag: z.string().min(1) }),
+      component: () => import("$lib/views/TagsView.svelte"),
+    }),
+  ],
+});
+
 export const articlesApp = defineApp({
   id: "articles",
   name: "文章",
@@ -58,7 +75,7 @@ export const articlesApp = defineApp({
     },
     {
       pattern: "/tags",
-      root: leafRoute("articles.tags", () => import("$lib/views/TagsView.svelte")),
+      root: tagsRoute,
     },
   ],
   vfsOwnership: ["src/content/articles/"],

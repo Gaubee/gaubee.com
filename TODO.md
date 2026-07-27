@@ -1037,6 +1037,22 @@ src/lib/apps/installable/github/state/
 **根因**：与前两个 bug 同源（路由重构遗留）。`AppStoreView` 用组件内 pathname 正则（`/^\/app\/store\/(.+)$/`）二级分发列表/详情，但 `app-store` 的 activity root 是 `leafRoute`（index route），`/app/store/writer` 剥前缀后剩余段非空 → no-match → 组件根本没加载。
 
 **修复**（迁移到嵌套子路由，与 `github.repo.detail` 范式一致）：
+
 - `app-store.ts`：`leafRoute` → `defineRoute`，root index（列表）+ child `:appId`（详情）。
 - `AppStoreView`：去掉正则分发，只保留列表渲染。
 - `AppStoreDetailView`：从 prop `appId` 改为 `useParams<{ appId: string }>()` 取参。
+
+### Bug 4：`/tags/{tag}` 标签筛选页空白（2026-07-28，全面走查发现）
+
+**根因**：与前三个 bug 同源。`TagsView` 用组件内 pathname 正则（`/^\/tags\/(.+)$/`）分发标签云/筛选，但 `/tags` 的 activity root 是 `leafRoute`（index route），`/tags/javascript` 剥前缀后剩余段非空 → no-match → 空白。影响面比前三个更广：TagsWidget（桌面默认 widget）、标签云自身点击、markdown 内链均可触发。
+
+**修复**（与 app-store 范式一致）：
+- `articles.ts`：`/tags` 的 `leafRoute` → `defineRoute`，root index（标签云）+ child `:tag`（筛选）。
+- `TagsView`：去掉 pathname 正则，用 `useParams<{ tag }>()` 区分两种视图（index 返回 undefined，child 返回 tag）。
+
+### 全面走查结论（2026-07-28）
+
+对全部 13 个应用逐一排查「`leafRoute` + 组件内 pathname 正则分发」的系统性 bug 模式：
+- **已修复**：app-store、writer(editor/github-edit)、tags 共 4 处。
+- **安全确认**：articles（详情走 defineRoute）、shout、settings、theme、files、search、notifications、account、desktop、terminal、github（defineRoute + children）——均不做 pathname 子路径正则分发。
+- **风险（有兜底，非渲染 bug）**：deepLinks 死字段（未落地，建议清理）；NotificationsView 消费 localStorage 持久化 routeId（失效时跳桌面兜底）；markdown 内链 href 无白名单（错误路径走 NotFound 兜底）。
