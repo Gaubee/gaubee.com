@@ -1,5 +1,6 @@
 import { routeDomainRegistry } from "$lib/apps/route-domain";
 import type { AppManifest } from "$lib/apps/types";
+import { leafRoute } from "$lib/router";
 import { registerTabView, registerDeepLinkView } from "$lib/views/registry";
 import { resolveMainView } from "$lib/views/resolver";
 /**
@@ -7,6 +8,10 @@ import { resolveMainView } from "$lib/views/resolver";
  *
  * resolveMainView 是 URL-first 视图解析的核心：路由域反查 → tabView / deepLink / not-found。
  * 测试用唯一前缀 /__resolver_test__/ 隔离，避免与真实 placeholders.ts 注册冲突。
+ *
+ * 注意（2026-07-27 路由重构后）：resolveMainView 已被 AreaOutlet 内联的 resolveActivityForPath
+ * 取代，本测试保留以验证旧 resolver.ts 仍可用于 deep link 视图解析（pop 浮层等）。
+ * 阶段 5 删除 resolver.ts 时一并删除。
  */
 import { describe, expect, it, beforeEach } from "vitest";
 
@@ -15,7 +20,7 @@ const Loader = () => Promise.resolve({ default: (() => {}) as never });
 
 function makeManifest(
   id: string,
-  activities: Array<{ route: string; entry?: boolean }>,
+  activities: Array<{ pattern: string; entry?: boolean }>,
 ): AppManifest {
   return {
     id,
@@ -23,7 +28,11 @@ function makeManifest(
     icon: (() => {}) as never,
     category: "default",
     defaultArea: "main",
-    activities: activities.map((a) => ({ route: a.route, entry: a.entry, view: Loader })),
+    activities: activities.map((a) => ({
+      pattern: a.pattern,
+      entry: a.entry,
+      root: leafRoute(id, Loader),
+    })),
   };
 }
 
@@ -33,7 +42,7 @@ beforeEach(() => {
 
 describe("resolveMainView", () => {
   it("路由域命中 entry route → tabView", () => {
-    const m = makeManifest("test-tab", [{ route: `${PREFIX}/app`, entry: true }]);
+    const m = makeManifest("test-tab", [{ pattern: `${PREFIX}/app`, entry: true }]);
     routeDomainRegistry.registerApp(m);
     registerTabView(`${PREFIX}/app`, Loader);
 
@@ -43,7 +52,7 @@ describe("resolveMainView", () => {
   });
 
   it("路由域命中 entry route 子路径 → tabView（最长前缀）", () => {
-    const m = makeManifest("test-tab-sub", [{ route: `${PREFIX}/app2`, entry: true }]);
+    const m = makeManifest("test-tab-sub", [{ pattern: `${PREFIX}/app2`, entry: true }]);
     routeDomainRegistry.registerApp(m);
     registerTabView(`${PREFIX}/app2`, Loader);
 
@@ -53,7 +62,7 @@ describe("resolveMainView", () => {
   });
 
   it("entry route 命中但无 tabLoader（hiddenFromNav 应用）→ 走 deepLink 分支", () => {
-    const m = makeManifest("test-hidden", [{ route: `${PREFIX}/hidden`, entry: true }]);
+    const m = makeManifest("test-hidden", [{ pattern: `${PREFIX}/hidden`, entry: true }]);
     routeDomainRegistry.registerApp(m);
     // 不注册 tabView，注册 deepLinkView
     registerDeepLinkView(`${PREFIX}/hidden`, Loader);

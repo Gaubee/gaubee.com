@@ -1,5 +1,6 @@
 import { routeDomainRegistry } from "$lib/apps/route-domain";
 import type { AppManifest } from "$lib/apps/types";
+import { leafRoute } from "$lib/router";
 import {
   registerNotFoundHandler,
   unregisterNotFoundHandler,
@@ -23,7 +24,7 @@ function makeManifest(id: string, route: string): AppManifest {
     icon: (() => {}) as never,
     category: "default",
     defaultArea: "main",
-    activities: [{ route, entry: true, view: Loader }],
+    activities: [{ pattern: route, entry: true, root: leafRoute(id, Loader) }],
   };
 }
 

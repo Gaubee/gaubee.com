@@ -20,6 +20,7 @@
   import { handlePublishError } from '$lib/os/services/publish-helper'
   import { navController } from '$lib/nav/nav-controller-instance'
   import { navStore } from '$lib/nav/nav.svelte'
+  import { useParams, useSearch } from '$lib/router'
   import { notifySuccess, notifyWarning } from '$lib/apps/builtin/notifications/service.svelte'
   import { accountService } from '$lib/apps/builtin/account/service'
   import {
@@ -75,25 +76,37 @@
   import FileMinusIcon from '@lucide/svelte/icons/file-minus'
   import SearchIcon from '@lucide/svelte/icons/search'
 
-  let { owner, repo }: { owner: string; repo: string } = $props()
+  // ---- 路由参数（2026-07-27 重构：从 props 改为 useParams/useSearch）----
+  type RepoDetailParams = { owner: string; repo: string };
+  type RepoDetailSearch = {
+    tab: 'files' | 'history' | 'changes' | 'issues' | 'log';
+    sha?: string;
+    file?: string;
+    issue?: number;
+    change?: string;
+    activity?: string;
+    ref?: string;
+  };
+  const params = useParams<RepoDetailParams>()!;
+  const search = useSearch<RepoDetailSearch>()!;
+
+  const owner = $derived(params.owner);
+  const repo = $derived(params.repo);
 
   const isMainRepo = $derived(owner === OWNER && repo === REPO)
 
-  // ---- Tab 路由化（URL query 参数驱动）----
-  // ?tab=files|history|changes|issues|log
-  // &file=路径 &sha=commitSHA &issue=编号 &change=路径 &activity=ID
+  // ---- Tab 路由化（URL query 参数驱动，已通过 search schema parse）----
   const navState = $derived(navStore.current)
-  const searchParams = $derived(new URLSearchParams(navState.mainLocation.search))
-  /** 当前 Tab（URL ?tab=，默认 files）。 */
-  const activeTab = $derived((searchParams.get('tab') ?? 'files') as 'files' | 'history' | 'changes' | 'issues' | 'log')
-  /** 各选中项从 URL 读取（刷新/前进后退保持）。 */
-  const selectedFile = $derived(searchParams.get('file') ?? '')
-  const selectedCommitSha = $derived(searchParams.get('sha'))
-  const selectedIssue = $derived(searchParams.get('issue') ? Number(searchParams.get('issue')) : null)
-  const selectedChangePath = $derived(searchParams.get('change'))
-  const selectedActivityId = $derived(searchParams.get('activity'))
+  /** 当前 Tab（已 parse，默认 files 由 schema 保证）。 */
+  const activeTab = $derived(search.tab)
+  /** 各选中项从已 parse 的 search 读取（刷新/前进后退保持）。 */
+  const selectedFile = $derived(search.file ?? '')
+  const selectedCommitSha = $derived(search.sha)
+  const selectedIssue = $derived(search.issue ?? null)
+  const selectedChangePath = $derived(search.change)
+  const selectedActivityId = $derived(search.activity)
   /** 文件 Tab 的 git ref（commit SHA/分支名），用于按历史版本浏览文件树和文件内容。 */
-  const fileRef = $derived(searchParams.get('ref'))
+  const fileRef = $derived(search.ref)
 
   /** 详情页 base path（owner/repo，不含 query）。 */
   const basePath = $derived(navState.mainLocation.pathname)
@@ -104,10 +117,10 @@
   }
   /** 选中项（PUSH 入历史栈，可后退）。更新 query 时保留 tab + ref（文件按 commit 访问上下文）。 */
   function navigateSelect(tab: string, key: string, value: string) {
-    const params = new URLSearchParams({ tab, [key]: value })
+    const sp = new URLSearchParams({ tab, [key]: value })
     // 文件 Tab 的 ref 参数需要跨选中项保留（同一个 commit 下浏览不同文件）
-    if (tab === 'files' && fileRef) params.set('ref', fileRef)
-    navController.navigateMain(`${basePath}?${params.toString()}`)
+    if (tab === 'files' && fileRef) sp.set('ref', fileRef)
+    navController.navigateMain(`${basePath}?${sp.toString()}`)
   }
 
   // ---- 仓库元数据 ----

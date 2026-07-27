@@ -1,3 +1,4 @@
+import { leafRoute } from "$lib/router";
 /**
  * 写作应用（可选安装，手动安装）。
  *
@@ -23,23 +24,23 @@ export const writerApp: AppEntry = {
     defaultArea: "main",
     activities: [
       {
-        route: "/app/writer",
+        pattern: "/app/writer",
         entry: true,
-        view: () => import("$lib/apps/views/WriterView.svelte"),
+        root: leafRoute("writer", () => import("$lib/apps/views/WriterView.svelte")),
       },
       {
-        route: "/app/editor",
-        view: () => import("$lib/views/EditorView.svelte"),
+        pattern: "/app/editor",
+        root: leafRoute("writer.editor", () => import("$lib/views/EditorView.svelte")),
       },
       {
         // GithubApp 跳转的任意文件编辑（raw 模式），复用 EditorView。
         // 路由域归属 writer，使 Dock 高亮写作应用。
-        route: "/app/github-edit",
-        view: () => import("$lib/views/EditorView.svelte"),
+        pattern: "/app/github-edit",
+        root: leafRoute("writer.github-edit", () => import("$lib/views/EditorView.svelte")),
       },
       {
-        route: "/app/changes",
-        view: () => import("$lib/views/ChangesView.svelte"),
+        pattern: "/app/changes",
+        root: leafRoute("writer.changes", () => import("$lib/views/ChangesView.svelte")),
       },
     ],
     cliCommands: [],

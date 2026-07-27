@@ -13,6 +13,7 @@ import GitHubMark from "$lib/components/icons/GitHubMark.svelte";
 
 import type { AppEntry } from "../../types";
 import { gitCommands } from "./commands";
+import { githubHomeRoute } from "./routes";
 import { gitService } from "./service";
 
 export const githubApp: AppEntry = {
@@ -25,9 +26,9 @@ export const githubApp: AppEntry = {
     defaultArea: "main",
     activities: [
       {
-        route: "/app/github",
+        pattern: "/app/github",
         entry: true,
-        view: () => import("$lib/apps/views/GithubView.svelte"),
+        root: githubHomeRoute,
       },
     ],
     vfsOwnership: [".git/"],

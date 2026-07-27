@@ -89,6 +89,94 @@ gaubeeos.getAppService('notification')→ NotificationService（通知应用，�
 
 `contentStore`（`src/lib/data/content.svelte.ts`）是纯派生只读视图层（无鉴权、无写操作），允许视图直接 import，未 service 化。
 
+## 类型安全路由系统（2026-07-27）
+
+### 心智模型
+
+```
+URL (string)
+  │
+  ▼
+NavController            ← 黑盒状态机（三 area 单 URL 编码），不修改
+  │  输出 location.pathname / search
+  ▼
+AreaOutlet               ← 找到归属 manifest + Activity
+  │  按 tabId 常驻 DOM（跨应用保活）
+  ▼
+<AppShell activity>      ← 内置 ActivityRouter
+  │  通过 setRouterContext 下发 useRoute/useParams/useSearch
+  ▼
+<ActivityRouter>         ← matchRouteTree 解析 RouteContract 树
+  │  按 RouteId 缓存组件（应用内保活）
+  ▼
+<View params search />   ← 类型安全 props（来自 zod schema）
+```
+
+### RouteContract：声明式路由节点
+
+```ts
+defineRoute({
+  id: "github.repo.detail",       // 全局唯一 id
+  pattern: "repo/:owner/:repo",   // 相对段，与父级拼接
+  params: z.object({...}),        // pathname 参数 schema（zod）
+  search: z.object({...}),        // query 参数 schema（zod）
+  component: () => import("..."), // 视图懒加载
+  children: [...],                // 嵌套子路由（无限层）
+})
+```
+
+### 声明一个新 Route（三步）
+
+1. **定义 Route**：在应用目录建 `routes.ts`，用 `defineRoute`（多页面）或 `leafRoute`（单页面）声明。
+2. **挂到 Activity**：在 manifest 里 `defineActivity({ pattern, root })`，或直接 `{ pattern, entry, root }`。
+3. **视图消费**：组件内 `useParams<T>()` / `useSearch<T>()` 拿到类型安全的参数。
+
+### 导航 API（替代 navigateMain 字符串）
+
+```ts
+import { go, goById, targetById, buildHrefById } from "$lib/router";
+
+// 同应用内：直接传 Route 单例（最强类型）
+go(repoDetailRoute, "/app/github", { owner: "a", repo: "b" });
+
+// 跨应用：字符串 RouteId（解耦，类型由 codegen 提供）
+goById("github.repo.detail", { owner: "a", repo: "b" });
+
+// 构造 target（用于 NotificationAction.to 等延迟跳转）
+notifySuccess("成功", "查看", { to: targetById("github.repo.detail", { owner, repo }) });
+```
+
+### 关键约定
+
+- **route id**：点号分隔小写，如 `github.repo.detail`（推荐 `app.scene.sub` 格式）。
+- **Activity 内部多页面**：用 `root.children` 嵌套声明，**不再用组件内 path.match 正则分发**。
+- **保活模型**：
+  - 跨应用保活：AreaOutlet 按 tabId 常驻 AppShell DOM
+  - 应用内保活：ActivityRouter 按 RouteId 缓存组件实例
+- **SearchParams 不支持数组**：扁平 key-value，zod 做 coerce。
+- **NavController 当黑盒**：navigate API 通过 NavControllerAdapter 注入，应用层不直接调 `navigateMain(string)`。
+- **pop/bottom 区过渡**：search/notifications（pop）和 terminal（bottom）暂走 AreaOutlet 旧机制，root 字段仅供类型一致性，未来统一。
+
+### 文件结构
+
+```
+src/lib/router/                  ← 路由系统核心
+├── contract.ts                  RouteContract 类型
+├── define-route.ts              defineRoute 工厂（含自注册）
+├── define-activity.ts           defineActivity 工厂
+├── leaf-route.ts                单页面快捷工厂
+├── match.ts                     matchRouteTree 纯函数
+├── path-pattern.ts              path-to-regexp 风格编译器
+├── search.ts                    search 序列化
+├── navigate.ts                  go/buildHref/targetById
+├── registry.ts                  routeRegistry 单例
+├── hooks.svelte.ts              useRoute/useParams/useSearch
+├── ActivityRouter.svelte        Activity 内部渲染组件
+└── __tests__/                   79 个单测
+
+vite-plugins/gaubee-routes/      ← codegen 插件（骨架，阶段 3 完善）
+```
+
 ## 提交规范
 
 1. git-commit-message 的提交规范的格式为：

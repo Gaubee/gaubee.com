@@ -1,3 +1,4 @@
+import { leafRoute } from "$lib/router";
 /**
  * 应用市场（系统内置，不可卸载）。
  *
@@ -17,9 +18,9 @@ export const appStoreApp: AppEntry = {
     defaultArea: "main",
     activities: [
       {
-        route: "/app/store",
+        pattern: "/app/store",
         entry: true,
-        view: () => import("$lib/apps/views/AppStoreView.svelte"),
+        root: leafRoute("app-store", () => import("$lib/apps/views/AppStoreView.svelte")),
       },
     ],
     hiddenFromNav: true,

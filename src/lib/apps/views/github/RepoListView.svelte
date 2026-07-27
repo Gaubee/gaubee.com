@@ -14,6 +14,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
+  import { useParams } from '$lib/router'
   import { accountService } from '$lib/apps/builtin/account/service'
   import { repoFavorites } from '$lib/apps/installable/github/favorites.svelte'
   import { listCache } from '$lib/apps/installable/github/list-cache.svelte'
@@ -42,12 +43,13 @@
   import LoaderIcon from '@lucide/svelte/icons/loader-circle'
   import ChevronDownIcon from '@lucide/svelte/icons/chevron-down'
 
-  // ---- props ----
-  /**
-   * 分页列表模式筛选条件。非 null 时进入分页列表模式（只渲染单一列表，不限 3 个）。
-   * 格式：'favorites' | 'user:{login}' | 'org:{org}'
-   */
-  let { listFilter = null }: { listFilter?: string | null } = $props()
+  // ---- 路由参数（2026-07-27 重构：从 props 改为 useParams）----
+  // 旧 props listFilter 已删除；现在通过 useParams 拿到 'github.list.type' 的 {type}。
+  // 首页（github root index）时 params 为 undefined → listFilter = null。
+  // 分页列表（list/:type）时 params.type 作为 listFilter。
+  type ListTypeParams = { type: string };
+  const listTypeParams = useParams<ListTypeParams>();
+  const listFilter = $derived(listTypeParams?.type ?? null);
 
   // ---- 分页列表模式状态（从缓存读取，保持保活）----
   const filterCache = $derived(listFilter ? listCache.filters[listFilter] : undefined)

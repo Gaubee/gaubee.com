@@ -1,3 +1,4 @@
+import { leafRoute } from "$lib/router";
 /**
  * 通知应用（系统内置，不可卸载）。
  *
@@ -23,9 +24,11 @@ export const notificationsApp: AppEntry = {
     defaultArea: "pop",
     activities: [
       {
-        route: "/app/notifications",
+        pattern: "/app/notifications",
         entry: true,
-        view: () => import("$lib/apps/views/NotificationsView.svelte"),
+        // 注意：pop 浮层应用走 AreaOutlet 的 popLoader 路径（旧机制），
+        // 不经 ActivityRouter，root 字段仅供类型一致性 + 未来统一渲染用。
+        root: leafRoute("notifications", () => import("$lib/apps/views/NotificationsView.svelte")),
       },
     ],
     // 浮层应用：不占 main/bottom tab，只通过 pop 入口进入

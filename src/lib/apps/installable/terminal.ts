@@ -1,3 +1,4 @@
+import { leafRoute } from "$lib/router";
 /**
  * Terminal 应用（默认安装，可卸载）。
  *
@@ -17,9 +18,11 @@ export const terminalApp: AppEntry = {
     defaultArea: "bottom",
     activities: [
       {
-        route: "/app/terminal",
+        pattern: "/app/terminal",
         entry: true,
-        view: () => import("$lib/views/TerminalView.svelte"),
+        // bottom 区应用暂走 AreaOutlet 的 bottom 旧机制（loadedBottomSlots），
+        // 不经 ActivityRouter，root 字段仅供类型一致性 + 未来统一渲染用。
+        root: leafRoute("terminal", () => import("$lib/views/TerminalView.svelte")),
       },
     ],
     // bottom 区 + 不在桌面默认网格（DEFAULT_HIDDEN），通过 Dock / 全部应用打开。

@@ -774,3 +774,84 @@ agent-browser 双端走查（手机 390x844 / 平板 834x1194 / 桌面 1280）�
 - `worker/src/index.ts`：OAuth 回调不再设 httpOnly cookie，改为重定向带 fragment；/api/proxy、/auth/me、/auth/logout 标记废弃
 - `src/lib/auth/session.svelte.ts`：token 存内存 $state；fetchGithub 直连 api.github.com；refresh 用 token 直调 /user；consumeTokenFromFragment 消费回调 token
 - `scripts/dev-login.sh`：改为构造 `#auth_token=xxx` URL 让浏览器消费（取代 cookie 注入）
+
+## 类型安全路由系统重构（2026-07-27）
+
+### 问题
+
+旧路由方案的类型安全缺口：
+
+- `navController.navigateMain('/app/github/repo/...')` 是裸字符串，改路径所有调用点编译期不报错
+- pathname 段靠 `path.match(/.../)` 裸正则 + `match[1]`，无 schema
+- query 全是 `string|null`，靠 `as` + `Number()`，`NaN` 风险
+- `asView()` 用 `as unknown as` 绕开 Svelte Component 逆变
+- `NotificationAction.href` 是任意 string，拼错只渲染 NotFound
+- GithubView.svelte 手工正则分发列表/详情，散落在每个应用内
+
+### 新架构（RouteContract + zod + ActivityRouter）
+
+```
+URL ─► NavController(黑盒) ─► AreaOutlet ─► <AppShell activity>
+                                            └► <ActivityRouter>
+                                                 └► matchRouteTree 解析 RouteContract 树
+                                                      └► <View params search/>  类型安全
+```
+
+核心数据结构：
+
+- `RouteContract`：声明式路由节点，携带 id + pattern + zod schema + component + children（无限嵌套）
+- `defineRoute` / `defineActivity` / `leafRoute`：类型安全工厂
+- `matchRouteTree`：纯函数解析（段数组模型 + zod parse）
+- `routeRegistry`：运行时自描述（defineRoute 时自动注册 + defineActivity 时回填 absolutePattern）
+- `nav.go` / `nav.goById` / `targetById` / `buildHrefById`：替代 `navigateMain(string)`
+- `useParams` / `useSearch` / `useRoute`：Svelte 5 runes 风格 hooks
+
+### 改动
+
+**新增**（`src/lib/router/`）：
+
+- contract.ts / define-route.ts / define-activity.ts / leaf-route.ts：类型安全工厂
+- match.ts / path-pattern.ts / search.ts：纯函数解析（段数组模型）
+- navigate.ts / registry.ts：导航 API + 全局注册表
+- hooks.svelte.ts：useRoute/useParams/useSearch（context getter 模式保证响应式）
+- ActivityRouter.svelte：Activity 内部渲染组件（按 RouteId 缓存保活）
+- `__tests__/`：49 个单测（path-pattern 13 + match 12 + search 11 + navigate 9 + define-route 4）
+
+**升级**：
+
+- `types.ts`：AppActivity 从 `{route, view}` 改为 `{pattern, root}`；删除 asView；ViewLoader 标 @deprecated
+- `AppShell.svelte`：内置 ActivityRouter，从隔离容器升级为通用范式承载者（5 个正交意图，达上限警告）
+- `AreaOutlet.svelte`：resolveActivityForPath 替代 resolveMainView；按 tabId 常驻 AppShell DOM
+- `nav-controller-instance.ts`：注入 NavControllerAdapter，让 nav.go/goById 委托 NavController
+- `notifications/service.svelte.ts`：NotificationAction.href 改为 `to: IdTarget`（类型安全）
+- `publish-helper.ts`：用 targetById 替代裸字符串 href
+- 13 个应用 manifest 全部迁移到 `{pattern, root}` 结构
+
+**删除**：
+
+- GithubView.svelte（手工正则分发器，被 RouteContract 嵌套树取代）
+- GithubView.svelte.spec.ts（被 match.test.ts 单测覆盖）
+- placeholders.ts 简化为只保留 pop 浮层注册
+
+**关键迁移范例**：
+
+- GithubApp：root index（RepoListView）+ `repo/:owner/:repo`（RepoDetailView，带 5 字段 search schema）+ `list/:type`
+- ArticlesApp：`/article/:collection/:stem` 用 zod enum 校验 collection
+- RepoDetailView：props（owner/repo）→ useParams；searchParams.get('tab') as ... → useSearch（zod 已校验）
+
+**待办（阶段 3/5，未完成）**：
+
+- `vite-plugin-gaubee-routes`：codegen 生成 RouteId 联合类型 + RouteParamsMap（骨架已建，扫描逻辑待补）
+- pop/bottom 区应用（search/notifications/terminal）统一到 ActivityRouter（当前走 AreaOutlet 旧机制）
+- 删除 `ViewLoader` / `placeholders.ts` / `resolver.ts`（阶段 5 清理）
+
+### 验证
+
+- 类型检查 0 错误 0 警告（`pnpm check`）
+- 路由单测 79/79 全过（`pnpm test:unit src/lib/router src/lib/views`）
+- 8 页 dogfood 全绿（home/github-list/github-detail/articles/settings/shout/files/theme）：
+  - URL-first 渲染正确（直接访问深链接可渲染）
+  - 嵌套路由 params/search 解析正确
+  - 跨应用跳转类型安全（NotificationAction.to）
+  - 应用内/跨应用保活模型正常
+- `mobile.e2e.ts` 失败 2 项为预存问题（重构前已失败，与本改动无关）

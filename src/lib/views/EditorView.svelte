@@ -18,6 +18,7 @@
   import { gaubeeos } from '$lib/os/services'
   import { handlePublishError } from '$lib/os/services/publish-helper'
   import { notifySuccess } from '$lib/apps/builtin/notifications/service.svelte'
+  import { targetById } from '$lib/router'
   import { parseMarkdown, serializeMarkdown, type ArticleMetadata } from '$lib/data/frontmatter'
   import { OWNER, REPO } from '$lib/github/client'
   import { Button } from '$lib/components/ui/button'
@@ -230,7 +231,7 @@
       const sha = await git.commit(`发表：${title}`)
       notifySuccess(`已发表（${sha.slice(0, 7)}）`, undefined, {
         label: '查看变更',
-        href: '/app/changes',
+        to: targetById('writer.changes'),
       })
     } catch (e) {
       handlePublishError(e, navController)
