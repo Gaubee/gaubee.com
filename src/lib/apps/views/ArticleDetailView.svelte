@@ -27,14 +27,16 @@
   /** 正文容器（bind:this，传给 TocTree 作为 ScrollSpy 的 container）。 */
   let articleContentEl: HTMLElement | undefined = $state();
 
-  /** 从 router context 拿到 parse 后的 collection/stem（类型安全，zod 已校验）。 */
+  /** 从 router context 拿到 parse 后的 collection/stem（类型安全，zod 已校验）。
+   *  useParams 返回 getter，需 $derived 包装才能响应 URL 变化。 */
   type ArticleDetailParams = { collection: 'articles' | 'events'; stem: string };
-  const params = useParams<ArticleDetailParams>();
+  const getParams = useParams<ArticleDetailParams>();
 
   /** 解析路径参数。 */
   const target = $derived.by(() => {
-    if (!params) return null
-    return { collection: params.collection, stem: params.stem }
+    const p = getParams?.()
+    if (!p) return null
+    return { collection: p.collection, stem: p.stem }
   })
 
   /** 当前文章。 */

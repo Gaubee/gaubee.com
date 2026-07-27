@@ -2,17 +2,19 @@
  * Router hooks：Svelte 5 runes 风格的上下文消费 API。
  *
  * 设计意图（2026-07-27）：
- * AppShell 在 mount 时通过 setRouterContext 下发：
- * - 当前 Activity
- * - 当前 location
- * - 匹配链 chain（RouteMatchResult）
- * - 已 parse 的 params/search（来自叶子节点）
+ * AppShell 在 mount 时通过 setRouterContext 下发 context getter，
+ * 视图组件通过 useRoute/useParams/useSearch 拿到响应式数据。
  *
- * 视图组件通过 useRoute/useParams/useSearch 拿到强类型数据。
+ * 响应式模型（关键修复 2026-07-27）：
+ * useParams/useSearch 返回 **getter 函数**，调用方需用 $derived 包装读取。
  *
- * 类型约定：
- * useRoute<T> / useParams<T> / useSearch<T> 接受泛型参数，
- * 调用方应从 codegen 类型（RouteParamsMap 等）传入。
+ * 为什么用 getter 而非直接返回值：
+ * $derived 只能在组件 setup 的编译期作用域被识别，无法跨函数边界传递。
+ * 返回 getter 让调用方在组件里写 `const owner = $derived(getParams()?.owner)`，
+ * 显式建立响应式追踪（访问 getParams() 时读取 ActivityRouter 的 ctxValue $derived）。
+ *
+ * 旧 bug：useParams 直接返回 ctx.params 快照，导致 URL 变化时组件不响应
+ * （如 RepoDetailView 切换 ?sha=xxx 不重新加载 commit detail，刷新才行）。
  *
  * 注意：hooks 必须在 Svelte 组件 setup 阶段调用（context API 限制）。
  */
@@ -49,14 +51,9 @@ export interface RouterContextValue {
   readonly chain: readonly MatchedRouteNode[];
 }
 
-/**
- * 上下文存储形式：getter 函数。
- *
- * 为什么用 getter 而非直接存值：
- * Svelte 5 的 context API 在 setContext 时只接受一次值。
- * 但 router 上下文的数据（match/params/search）随 location 变化而变化，
- * 用 getter 让消费方每次访问都拿到最新值（响应式追踪在 getter 调用点发生）。
- */
+/** 上下文存储形式：getter 函数。
+ *  Svelte 5 context 只能 setContext 一次，但数据随 location 变化，
+ *  用 getter 让消费方每次调用都拿到最新值（响应式追踪在调用点发生）。 */
 interface RouterContextEntry {
   readonly get: () => RouterContextValue;
 }
@@ -69,54 +66,67 @@ export function setRouterContext(getValue: () => RouterContextValue): void {
   setContext<RouterContextEntry>(ROUTER_CONTEXT_KEY, { get: getValue });
 }
 
-/** 检测是否在 AppShell 上下文内（用于防御性编程）。 */
+/** 检测是否在 AppShell 上下文内（用于防御性编程）。
+ *  返回当时的快照值——若需响应式，用 useParams/useSearch 的 getter 形式。 */
 export function useRouterContext(): RouterContextValue | null {
   if (!hasContext(ROUTER_CONTEXT_KEY)) return null;
   const entry = getContext<RouterContextEntry>(ROUTER_CONTEXT_KEY);
   return entry.get();
 }
 
-/** 获取当前 Router 上下文（必须存在，否则抛错）。
- *  适用于 AppShell 直接渲染的视图组件。 */
-function requireContext(): RouterContextValue {
-  const ctx = useRouterContext();
-  if (!ctx) {
+/** 内部工具：获取 context getter。 */
+function requireContextGetter(): () => RouterContextValue {
+  if (!hasContext(ROUTER_CONTEXT_KEY)) {
     throw new Error("[router] useRoute/useParams/useSearch 必须在 <AppShell> 内调用");
   }
-  return ctx;
+  return getContext<RouterContextEntry>(ROUTER_CONTEXT_KEY).get;
 }
 
-/** 获取当前匹配的叶子 Route 节点。 */
-export function useRoute(): Readonly<MatchedRouteNode> | undefined {
-  const ctx = requireContext();
-  if (ctx.match.kind !== "matched") return undefined;
-  const chain = ctx.chain;
-  return chain[chain.length - 1];
-}
-
-/** 获取当前叶子节点的 params（调用方可传泛型约束形状）。
+/** 获取当前匹配的叶子 Route 节点的 getter。
+ *  调用方在 $derived / $effect / 模板中调用 getter，自动响应 location 变化。
  *
  * @example
- * const params = useParams<RouteParamsMap["github.repo.detail"]>();
- * // params.owner / params.repo 类型安全
+ * const getRoute = useRoute();
+ * const leaf = $derived(getRoute?.());  // 响应式
  */
-export function useParams<T = Record<string, unknown>>(): T | undefined {
-  const ctx = requireContext();
-  return ctx.params as T | undefined;
+export function useRoute(): (() => Readonly<MatchedRouteNode> | undefined) | undefined {
+  if (!hasContext(ROUTER_CONTEXT_KEY)) return undefined;
+  const get = requireContextGetter();
+  return () => {
+    const ctx = get();
+    if (ctx.match.kind !== "matched") return undefined;
+    return ctx.chain[ctx.chain.length - 1];
+  };
 }
 
-/** 获取当前叶子节点的 search。
+/** 获取当前叶子节点 params 的 getter。
+ *  调用方需用 $derived 包装读取，才能响应 URL 变化。
  *
  * @example
- * const search = useSearch<RouteSearchMap["github.repo.detail"]>();
- * // search.tab 类型安全
+ * const getParams = useParams<RouteParamsMap["github.repo.detail"]>();
+ * const owner = $derived(getParams?.()?.owner);  // 响应式
  */
-export function useSearch<T = Record<string, unknown>>(): T | undefined {
-  const ctx = requireContext();
-  return ctx.search as T | undefined;
+export function useParams<T = Record<string, unknown>>(): (() => T | undefined) | undefined {
+  if (!hasContext(ROUTER_CONTEXT_KEY)) return undefined;
+  const get = requireContextGetter();
+  return () => get().params as T | undefined;
 }
 
-/** 获取当前激活的 Activity。 */
-export function useActivity(): RouterActivity {
-  return requireContext().activity;
+/** 获取当前叶子节点 search 的 getter。
+ *  调用方需用 $derived 包装读取，才能响应 URL search 变化。
+ *
+ * @example
+ * const getSearch = useSearch<RouteSearchMap["github.repo.detail"]>();
+ * const tab = $derived(getSearch?.()?.tab ?? "files");  // 响应式
+ */
+export function useSearch<T = Record<string, unknown>>(): (() => T | undefined) | undefined {
+  if (!hasContext(ROUTER_CONTEXT_KEY)) return undefined;
+  const get = requireContextGetter();
+  return () => get().search as T | undefined;
+}
+
+/** 获取当前激活的 Activity 的 getter。 */
+export function useActivity(): () => RouterActivity {
+  const get = requireContextGetter();
+  return () => get().activity;
 }

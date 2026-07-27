@@ -39,8 +39,9 @@
 
   // root 在 AppActivity 类型层带泛型 P/S，运行时擦除后是 ErasedRouteContract。
   // matchRouteTree 接受 ErasedRouteContract，这里显式擦除。
-  // untrack：root 是静态树，只在挂载时读一次（activity 切换时整个组件重新挂载）
-  const erasedRoot: ErasedRouteContract = untrack(() => activity.root);
+  // activity prop 由 AreaOutlet 传入，每个 overlay 对应一个固定的 activity（保活模型）。
+  // $derived 保证 location 变化时 matchResult 重新计算（追踪 activity.root + location）。
+  const erasedRoot: ErasedRouteContract = $derived(activity.root);
 
   // 1. 路由匹配（纯函数派生）
   const matchResult: RouteMatchResult = $derived(

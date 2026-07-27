@@ -76,7 +76,7 @@
   import FileMinusIcon from '@lucide/svelte/icons/file-minus'
   import SearchIcon from '@lucide/svelte/icons/search'
 
-  // ---- 路由参数（2026-07-27 重构：从 props 改为 useParams/useSearch）----
+  // ---- 路由参数（2026-07-27 重构：useParams/useSearch 返回 getter，需 $derived 包装）----
   type RepoDetailParams = { owner: string; repo: string };
   type RepoDetailSearch = {
     tab: 'files' | 'history' | 'changes' | 'issues' | 'log';
@@ -87,26 +87,31 @@
     activity?: string;
     ref?: string;
   };
-  const params = useParams<RepoDetailParams>()!;
-  const search = useSearch<RepoDetailSearch>()!;
+  // 关键：useParams/useSearch 返回 getter，用 $derived 包成响应式快照，
+  // 后续读取 .tab/.sha 等字段自动响应 URL 变化。
+  // 旧 bug：直接拿快照值，导致 ?sha=xxx 切换 commit 不重新加载（需刷新才行）。
+  const getParams = useParams<RepoDetailParams>();
+  const getSearch = useSearch<RepoDetailSearch>();
+  const params = $derived(getParams?.());
+  const search = $derived(getSearch?.());
 
-  const owner = $derived(params.owner);
-  const repo = $derived(params.repo);
+  const owner = $derived(params?.owner ?? '');
+  const repo = $derived(params?.repo ?? '');
 
   const isMainRepo = $derived(owner === OWNER && repo === REPO)
 
   // ---- Tab 路由化（URL query 参数驱动，已通过 search schema parse）----
   const navState = $derived(navStore.current)
   /** 当前 Tab（已 parse，默认 files 由 schema 保证）。 */
-  const activeTab = $derived(search.tab)
+  const activeTab = $derived(search?.tab ?? 'files')
   /** 各选中项从已 parse 的 search 读取（刷新/前进后退保持）。 */
-  const selectedFile = $derived(search.file ?? '')
-  const selectedCommitSha = $derived(search.sha)
-  const selectedIssue = $derived(search.issue ?? null)
-  const selectedChangePath = $derived(search.change)
-  const selectedActivityId = $derived(search.activity)
+  const selectedFile = $derived(search?.file ?? '')
+  const selectedCommitSha = $derived(search?.sha)
+  const selectedIssue = $derived(search?.issue ?? null)
+  const selectedChangePath = $derived(search?.change)
+  const selectedActivityId = $derived(search?.activity)
   /** 文件 Tab 的 git ref（commit SHA/分支名），用于按历史版本浏览文件树和文件内容。 */
-  const fileRef = $derived(search.ref)
+  const fileRef = $derived(search?.ref)
 
   /** 详情页 base path（owner/repo，不含 query）。 */
   const basePath = $derived(navState.mainLocation.pathname)

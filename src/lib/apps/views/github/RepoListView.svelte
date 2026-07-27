@@ -43,13 +43,13 @@
   import LoaderIcon from '@lucide/svelte/icons/loader-circle'
   import ChevronDownIcon from '@lucide/svelte/icons/chevron-down'
 
-  // ---- 路由参数（2026-07-27 重构：从 props 改为 useParams）----
-  // 旧 props listFilter 已删除；现在通过 useParams 拿到 'github.list.type' 的 {type}。
+  // ---- 路由参数（2026-07-27 重构：useParams 返回 getter，需 $derived 包装）----
+  // 旧 props listFilter 已删除；通过 useParams 拿到 'github.list.type' 的 {type}。
   // 首页（github root index）时 params 为 undefined → listFilter = null。
   // 分页列表（list/:type）时 params.type 作为 listFilter。
   type ListTypeParams = { type: string };
-  const listTypeParams = useParams<ListTypeParams>();
-  const listFilter = $derived(listTypeParams?.type ?? null);
+  const getParams = useParams<ListTypeParams>();
+  const listFilter = $derived(getParams?.()?.type ?? null);
 
   // ---- 分页列表模式状态（从缓存读取，保持保活）----
   const filterCache = $derived(listFilter ? listCache.filters[listFilter] : undefined)
