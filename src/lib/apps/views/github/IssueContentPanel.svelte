@@ -137,9 +137,13 @@
   )
 
   // issueNumber 变化时重新加载三个资源（fetcher 闭包读响应式 owner/repo/issueNumber，run 时取最新值）
+  // reset 清空旧数据：切换 issue 时标题/状态/作者/timeline 完全不同，保留旧内容会显示错误信息，走骨架。
   $effect(() => {
     const n = issueNumber
     if (!n) return
+    issueResource.reset()
+    commentsResource.reset()
+    eventsResource.reset()
     void issueResource.run()
     void commentsResource.run()
     void eventsResource.run()

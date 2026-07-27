@@ -20,7 +20,7 @@
 	  工具栏含"文件列表"按钮（primary 样式）触发文件树 Sheet
 -->
 <script lang="ts">
-  import { getFileText, OWNER, REPO } from '$lib/github/client'
+  import { getFileText } from '$lib/github/client'
   import { getFileKind, canPreview, type FileKind } from '$lib/github/file-kind'
   import { renderRepoMarkdown, fileRawUrl } from '$lib/apps/installable/github/readme'
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
@@ -30,7 +30,9 @@
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { Button, buttonVariants } from '$lib/components/ui/button'
   import * as ToggleGroup from '$lib/components/ui/toggle-group'
+  import * as Tooltip from '$lib/components/ui/tooltip'
   import { createResource } from '$lib/apps/installable/github/state'
+  import RepoEditPermission from './RepoEditPermission.svelte'
   import FileTextIcon from '@lucide/svelte/icons/file-text'
   import FolderTreeIcon from '@lucide/svelte/icons/folder-tree'
   import CodeIcon from '@lucide/svelte/icons/code'
@@ -63,10 +65,6 @@
 
   const kind = $derived(getFileKind(path))
   const previewable = $derived(canPreview(kind))
-  /** 是否主仓库（可编辑）。GitHub owner/repo 不区分大小写。 */
-  const isMainRepo = $derived(
-    owner.toLowerCase() === OWNER.toLowerCase() && repo.toLowerCase() === REPO.toLowerCase(),
-  )
   /** 渲染模式：可预览文件默认 preview，纯文本固定 raw。 */
   let mode = $state<'raw' | 'preview'>('preview')
 
@@ -90,6 +88,7 @@
   const rawUrl = $derived(fileRawUrl(owner, repo, path, effectiveRef))
 
   // path 变化时重置 + 加载（媒体短路不发请求）
+  // reset 清空旧内容：不同文件内容完全不同，走骨架而非 refreshing。
   $effect(() => {
     const p = path
     // 可预览文件默认 preview 模式，纯文本固定 raw
@@ -97,6 +96,7 @@
     renderedHtml = ''
     highlightedHtml = ''
     if (needsFetch) {
+      contentResource.reset()
       void contentResource.run()
     } else {
       // 媒体文件：不发请求，重置 resource（避免残留旧 text 内容）
@@ -127,9 +127,8 @@
     }
   })
 
-  /** 跳转到 WriterApp 编辑器（仅主仓库可写）。 */
+  /** 跳转到 WriterApp 编辑器（由 RepoEditPermission 守卫，按钮 disabled 时不会触发）。 */
   function handleEdit() {
-    if (!isMainRepo) return
     navController.navigateMain(`/app/github-edit/${owner}/${repo}/${path}`)
   }
 
@@ -184,12 +183,30 @@
       >
         <DownloadIcon class="size-3.5" />
       </a>
-      <!-- 编辑（仅主仓库）-->
-      {#if isMainRepo}
-        <Button size="icon-sm" variant="ghost" onclick={handleEdit} aria-label="编辑">
-          <PencilIcon class="size-3.5" />
-        </Button>
-      {/if}
+      <!-- 编辑：基于仓库/分支/保护状态三层判定（RepoEditPermission 守卫）。
+           可编辑 → 普通按钮；不可编辑 → Tooltip 包 disabled button（外层 span 接收 pointer events）。 -->
+      <RepoEditPermission {owner} {repo} {branch} commitSha={commitSha}>
+        {#snippet children({ canEdit, disabledReason })}
+          {#if canEdit}
+            <Button size="icon-sm" variant="ghost" onclick={handleEdit} aria-label="编辑">
+              <PencilIcon class="size-3.5" />
+            </Button>
+          {:else}
+            <Tooltip.Root>
+              <span class="inline-flex">
+                <Tooltip.Trigger
+                  disabled
+                  class="text-muted-foreground/50 inline-flex size-7 items-center justify-center rounded"
+                  aria-label="编辑（不可用）"
+                >
+                  <PencilIcon class="size-3.5" />
+                </Tooltip.Trigger>
+              </span>
+              <Tooltip.Content>{disabledReason}</Tooltip.Content>
+            </Tooltip.Root>
+          {/if}
+        {/snippet}
+      </RepoEditPermission>
       <!-- Raw|Preview toggle（仅可预览文件）-->
       {#if previewable}
         <ToggleGroup.Root

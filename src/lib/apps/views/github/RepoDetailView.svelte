@@ -47,6 +47,7 @@
   import { fetchReadme } from '$lib/apps/installable/github/readme'
   import RepoFileTree, { type TreeNode } from './RepoFileTree.svelte'
   import RepoFileContent from './RepoFileContent.svelte'
+  import RepoEditPermission from './RepoEditPermission.svelte'
   import IssueContentPanel from './IssueContentPanel.svelte'
   import CommitDetailPanel from './CommitDetailPanel.svelte'
   import RepoRefSelector from './RepoRefSelector.svelte'
@@ -108,7 +109,11 @@
   const owner = $derived(params?.owner ?? '');
   const repo = $derived(params?.repo ?? '');
 
-  const isMainRepo = $derived(owner === OWNER && repo === REPO)
+  /** 是否主仓库（结构性控制：变更 tab 是否显示/加载）。
+   *  大小写不敏感（与 GitHub owner/repo 行为一致；编辑权限的细粒度判定见 RepoEditPermission）。 */
+  const isMainRepo = $derived(
+    owner.toLowerCase() === OWNER.toLowerCase() && repo.toLowerCase() === REPO.toLowerCase(),
+  )
 
   // ---- Tab 路由化（URL query 参数驱动，已通过 search schema parse）----
   const navState = $derived(navStore.current)
@@ -239,8 +244,16 @@
   let issueListSheetOpen = $state(false)
 
   const issuesResource = createResource<IssueSummary[]>(
-    // 仅处理 open/closed 模式；search 模式由 handleIssueSearch 单独 setData
+    // 统一处理三种 mode：open/closed 走 listIssues，search 走 searchIssues。
+    // 切换 mode 时由 setIssueMode/handleIssueSearch 先 reset 清空旧数据，
+    // 让 status 回 loading（骨架），避免 refreshing 保留上一模式的列表。
     async () => {
+      if (issueMode === 'search') {
+        const q = issueSearchInput.trim()
+        if (!q) return []
+        const { items } = await searchIssues(owner, repo, q, { perPage: 30 })
+        return items
+      }
       const state = issueMode === 'closed' ? 'closed' : 'open'
       return listIssues(owner, repo, { state, perPage: 30 })
     },
@@ -333,13 +346,30 @@
 
   /** owner/repo 变化时重新加载所有数据。
    *  各 resource 的 fetcher 闭包读取响应式 owner/repo，run 时取最新值。
-   *  o/r 参数仅用于 isMainRepo 判断和 README/文件树等手写加载。 */
+   *  o/r 参数仅用于 isMainRepo 判断和 README/文件树等手写加载。
+   *  reset 清空所有旧数据：切换仓库时标题/统计/列表完全不同，走骨架而非 refreshing。
+   *  同时重置 issue 模式/搜索词：避免新仓库沿用上一个仓库的 search 状态。 */
   async function loadAll(o: string, r: string) {
+    // 重置所有 mode/过滤器状态：切换仓库时不沿用上一个仓库的过滤条件
+    issueMode = 'open'
+    issueSearchInput = ''
+    commitBranch = ''
+    commitAuthor = ''
+    commitSince = ''
+    commitUntil = ''
+    repoInfoResource.reset()
+    commitsResource.reset()
+    issuesResource.reset()
+    // 主仓库判定（大小写不敏感，与 isMainRepo 一致）
+    const mainRepo =
+      o.toLowerCase() === OWNER.toLowerCase() && r.toLowerCase() === REPO.toLowerCase()
+    issueCountsResource.reset()
+    if (mainRepo) changesResource.reset()
     void repoInfoResource.run()
     void autoSelectReadme(o, r)
     void commitsResource.run()
     void loadDir('', o, r)
-    if (o === OWNER && r === REPO) void changesResource.run()
+    if (mainRepo) void changesResource.run()
     void issuesResource.run()
     void issueCountsResource.run()
   }
@@ -407,8 +437,9 @@
   }
 
   // ---- 历史 ----
-  // commits 数据由 commitsResource 管理（fetcher 闭包读 commitBranch/commitAuthor 等过滤器）
-  /** 切换 commit 列表的 branch/tag（RepoRefSelector 回调）。 */
+  // commits 数据由 commitsResource 管理（fetcher 闘包读 commitBranch/commitAuthor 等过滤器）
+  /** 切换 commit 列表的 branch/tag（RepoRefSelector 回调）。
+   *  reset 清空旧列表：不同 branch 的 commit 完全不同，走骨架而非 refreshing。 */
   function setCommitBranch(ref: string) {
     // 选默认分支时清空（让 selector 显示 default，而不是重复存 branch 名）
     commitBranch = ref === (repoInfo?.default_branch ?? 'main') ? '' : ref
@@ -417,6 +448,7 @@
       const sp = new URLSearchParams({ tab: 'history' })
       navController.navigateMain(`${basePath}?${sp.toString()}`, 'REPLACE')
     }
+    commitsResource.reset()
     void commitsResource.run()
   }
 
@@ -425,11 +457,20 @@
     navigateSelect('history', 'sha', sha)
   }
 
-  /** 清除高级过滤器（author/since/until），保留 branch。 */
+  /** 清除高级过滤器（author/since/until），保留 branch。
+   *  reset 清空旧列表：过滤条件变化导致结果集不同，走骨架。 */
   function clearCommitFilters() {
     commitAuthor = ''
     commitSince = ''
     commitUntil = ''
+    commitsResource.reset()
+    void commitsResource.run()
+  }
+
+  /** 应用高级过滤器（author/since/until/branch 变化后触发）。
+   *  reset 清空旧列表：过滤条件变化导致结果集不同，走骨架而非 refreshing。 */
+  function applyCommitFilters() {
+    commitsResource.reset()
     void commitsResource.run()
   }
 
@@ -467,39 +508,36 @@
   }
 
   // ---- Issues ----
-  // issues 数据由 issuesResource 管理（open/closed 模式）；search 模式单独 setData。
+  // issues 数据由 issuesResource 统一管理（open/closed/search 三种 mode 都走 fetcher）。
+  // 切换 mode 时 reset 清空旧数据 → run 触发 loading（骨架），避免 refreshing 保留上一模式列表。
   // issueCounts 由 issueCountsResource 管理（silent）。
-  /** 切换列表模式（open/closed/search）。 */
+  /** 切换列表模式（open/closed/search）。
+   *  reset 清空旧数据：不同 mode 的列表语义不同，切换时应走骨架而非 refreshing。 */
   function setIssueMode(mode: IssueListMode) {
     issueMode = mode
-    if (mode !== 'search') {
-      void issuesResource.run()
-    }
+    issuesResource.reset()
+    void issuesResource.run()
   }
 
   /** 清除搜索，回到之前的 tab（open 或 closed）。 */
   function clearIssueSearch() {
     issueSearchInput = ''
     issueMode = issueMode === 'search' ? 'open' : issueMode
+    issuesResource.reset()
     void issuesResource.run()
   }
 
-  async function handleIssueSearch() {
+  /** 搜索 Issues：切换到 search mode 并加载（fetcher 内根据 issueMode==='search' 走 searchIssues）。
+   *  reset 清空旧列表 → loading 骨架，提供明确的搜索反馈。 */
+  function handleIssueSearch() {
     const q = issueSearchInput.trim()
     if (!q) {
       clearIssueSearch()
       return
     }
     issueMode = 'search'
-    // search 模式：手动加载并 setData（不走 issuesResource.run，因 fetcher 只处理 open/closed）
-    try {
-      const { items } = await searchIssues(owner, repo, q, { perPage: 30 })
-      issuesResource.setData(items)
-    } catch (e) {
-      // search 失败：回退到空结果 + toast 提示（search 是即时操作，不阻塞列表）
-      issuesResource.setData([])
-      notifyWarning(e instanceof Error ? e.message : '搜索 Issues 失败')
-    }
+    issuesResource.reset()
+    void issuesResource.run()
   }
 
   function openIssue(num: number) {
@@ -884,7 +922,7 @@
                         </div>
                       </div>
                       <div class="flex items-center gap-2">
-                        <Button size="sm" class="h-7 flex-1 text-xs" onclick={() => commitsResource.run()}>应用</Button>
+                        <Button size="sm" class="h-7 flex-1 text-xs" onclick={applyCommitFilters}>应用</Button>
                         {#if hasCommitFilters}
                           <Button size="sm" variant="ghost" class="h-7 text-xs" onclick={clearCommitFilters}>清除</Button>
                         {/if}
@@ -975,7 +1013,7 @@
                         </div>
                       </div>
                       <div class="flex items-center gap-2">
-                        <Button size="sm" class="h-7 flex-1 text-xs" onclick={() => commitsResource.run()}>应用</Button>
+                        <Button size="sm" class="h-7 flex-1 text-xs" onclick={applyCommitFilters}>应用</Button>
                         {#if hasCommitFilters}
                           <Button size="sm" variant="ghost" class="h-7 text-xs" onclick={clearCommitFilters}>清除</Button>
                         {/if}
@@ -992,14 +1030,23 @@
         </div>
       </Tabs.Content>
 
-      <!-- 变更（双栏：dirty 文件列表左 sticky + diff 右展开，仅主仓库）-->
+      <!-- 变更（双栏：dirty 文件列表左 sticky + diff 右展开）。
+           RepoEditPermission 守卫：仓库归属/分支/保护状态三层判定，
+           不可编辑时显示精确原因（替代旧的「仅主仓库」静态提示）。 -->
       <Tabs.Content value="changes" class="p-4">
-        {#if !isMainRepo}
-          <div class="text-muted-foreground py-8 text-center text-sm">
-            变更提交仅支持主仓库 {OWNER}/{REPO}。
-          </div>
-        {:else}
-          {#snippet changeList()}
+        <RepoEditPermission
+          {owner}
+          {repo}
+          branch={repoInfo?.default_branch ?? 'main'}
+          commitSha={fileRef ?? ''}
+        >
+          {#snippet children({ canEdit, disabledReason })}
+            {#if !canEdit}
+              <div class="text-muted-foreground py-8 text-center text-sm">
+                {disabledReason}
+              </div>
+            {:else}
+              {#snippet changeList()}
             {#if changesResource.status === 'loading'}
               {#each Array(3) as _}<Skeleton class="mb-2 h-12" />{/each}
             {:else if changes.length === 0}
@@ -1118,7 +1165,9 @@
               </Sheet.Content>
             </Sheet.Root>
           </div>
-        {/if}
+            {/if}
+          {/snippet}
+        </RepoEditPermission>
       </Tabs.Content>
 
       <!-- Issues（双栏：列表左 sticky + 内容右展开，移动端列表收进 Sheet）-->

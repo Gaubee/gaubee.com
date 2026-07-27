@@ -65,11 +65,14 @@
   // sha 变化时重新加载。
   // createResource 的 fetcher 闭包内读取响应式 owner/repo/sha，run 时取最新值。
   // effect 内只依赖 sha（主键），owner/repo 在详情页内不变，无需触发重载。
+  // reset 清空旧 commit：切换 SHA 时头部元数据（SHA/作者/时间）强相关当前 commit，
+  // 保留旧数据会显示错误信息，应走骨架而非 refreshing。
   $effect(() => {
     const s = sha
     if (!s) return
     // 重置展开状态（新 commit 默认全部折叠）
     expandedFiles = new Set()
+    commitResource.reset()
     void commitResource.run()
   })
 
