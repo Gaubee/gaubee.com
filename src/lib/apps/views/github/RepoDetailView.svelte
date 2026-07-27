@@ -231,7 +231,22 @@
   $effect(() => {
     const o = owner
     const r = repo
+    if (!o || !r) return  // owner/repo 未就绪时跳过（避免空字符串触发无效加载）
     untrack(() => void loadAll(o, r))
+  })
+
+  // auth 就绪后重试 README 自动选中（修复整页刷新时序 bug）。
+  // 场景：整页刷新时 authStore.refresh() 是 async，组件挂载时 isAuthenticated=false，
+  // fetchReadme 走匿名分支受 60/h 限速失败；auth 就绪后需重新尝试。
+  // 仅在 files Tab + 未选中文件 + 无 fileRef 时重试（与 autoSelectReadme 条件一致）。
+  $effect(() => {
+    const authed = accountService.state.authenticated
+    const loaded = accountService.state.loaded
+    const o = owner
+    const r = repo
+    if (!authed || !loaded || !o || !r) return
+    if (activeTab !== 'files' || selectedFile || fileRef) return
+    untrack(() => void autoSelectReadme(o, r))
   })
 
   // fileRef（commit SHA）变化时清空文件树重新加载（不同 commit 的目录结构不同）。
