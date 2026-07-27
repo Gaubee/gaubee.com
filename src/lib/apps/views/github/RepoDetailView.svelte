@@ -336,6 +336,13 @@
     })
   }
 
+  /** 清除 fileRef，回到默认分支（清掉 URL 的 ref 参数，保留当前 tab + file）。 */
+  function clearFileRef() {
+    const sp = new URLSearchParams({ tab: 'files' })
+    if (selectedFile) sp.set('file', selectedFile)
+    navController.navigateMain(`${basePath}?${sp.toString()}`)
+  }
+
   // ---- 历史 ----
   async function loadCommits(o: string, r: string) {
     commitsLoading = true
@@ -574,6 +581,26 @@
 
       <!-- 文件 + README -->
       <Tabs.Content value="files" class="p-4">
+        <!-- ref 状态条：当 fileRef 存在（按 commit/tag 查看历史版本）时显示。
+             提示用户当前不在默认分支，并提供「返回默认分支」按钮清除 ref。 -->
+        {#if fileRef}
+          {@const refLabel = fileRef.length > 16 ? fileRef.slice(0, 7) : fileRef}
+          <div class="bg-muted/50 mb-3 flex flex-wrap items-center gap-2 rounded-md border px-3 py-1.5 text-xs">
+            <GitCommitHorizontalIcon class="text-muted-foreground size-3.5 shrink-0" />
+            <span class="text-muted-foreground">正在查看历史版本：</span>
+            <code class="font-mono font-medium">{refLabel}</code>
+            <span class="text-muted-foreground opacity-70">（非默认分支）</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              class="ml-auto h-6 gap-1 px-2 text-[11px]"
+              onclick={clearFileRef}
+            >
+              <ArrowLeftIcon class="size-3" />
+              返回默认分支
+            </Button>
+          </div>
+        {/if}
         <!-- 桌面端（md+）：双栏 grid（不固定高度，内容自然撑开）。
              fileTree 左栏 sticky + 独立滚动，fileContent 右栏直接展开（由 app 内容区滚动）。
              移动端（<md）：fileTree 收进 Sheet 浮动浮层。 -->

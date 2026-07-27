@@ -15,6 +15,8 @@
   import GitCommitHorizontalIcon from '@lucide/svelte/icons/git-commit-horizontal'
   import ExternalLinkIcon from '@lucide/svelte/icons/external-link'
   import HistoryIcon from '@lucide/svelte/icons/history'
+  import FileTextIcon from '@lucide/svelte/icons/file-text'
+  import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left'
   import { navController } from '$lib/nav/nav-controller-instance'
 
   let {
@@ -249,6 +251,34 @@
                       <span class="font-medium text-emerald-600 dark:text-emerald-400">+{file.additions}</span>
                       <span class="font-medium text-destructive">-{file.deletions}</span>
                     </div>
+                    <!-- 应用内文件跳转按钮：在文件面板按 commit ref 查看历史版本。
+                         - 变更前：跳到 parent commit 的文件版本（renamed 用 previous_filename）
+                         - 变更后：跳到当前 commit 的文件版本
+                         仅在有意义时显示（added 无变更前，removed 无变更后，初始 commit 无 parent）。 -->
+                    <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                      {#if commit && commit.parents.length > 0 && file.status !== 'added'}
+                        <button
+                          type="button"
+                          onclick={() => commit && openFileAtCommit(commit.parents[0], file.previous_filename ?? file.filename)}
+                          class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] transition-colors hover:bg-accent"
+                          title="在文件面板查看变更前的版本（parent commit）"
+                        >
+                          <ArrowLeftIcon class="size-3" />
+                          变更前
+                        </button>
+                      {/if}
+                      {#if file.status !== 'removed'}
+                        <button
+                          type="button"
+                          onclick={() => commit && openFileAtCommit(commit.sha, file.filename)}
+                          class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] transition-colors hover:bg-accent"
+                          title="在文件面板查看变更后的版本（当前 commit）"
+                        >
+                          <FileTextIcon class="size-3" />
+                          变更后
+                        </button>
+                      {/if}
+                    </div>
                   </div>
                   <!-- 文件 GitHub 外链 -->
                   <a
@@ -270,32 +300,11 @@
                       文件{file.status === 'renamed' ? '移动' : '复制'}（无内容变更）
                     </p>
                   {:else}
-                    <!-- patch 为 null：文件变更超 300 行，GitHub API 不返回 patch -->
-                    <div class="flex items-center gap-2 px-4 py-3">
+                    <!-- patch 为 null：文件变更超 300 行，GitHub API 不返回 diff -->
+                    <div class="px-4 py-3">
                       <p class="text-muted-foreground text-xs italic">
                         变更行数较多（{file.additions + file.deletions} 行），GitHub API 未返回 diff
                       </p>
-                      <!-- 内部跳转按钮：在文件面板按 commit ref 查看历史版本 -->
-                      <div class="ml-auto flex items-center gap-1">
-                        {#if commit.parents.length > 0 && file.status !== 'added'}
-                          <button
-                            type="button"
-                            onclick={() => commit && openFileAtCommit(commit.parents[0], file.previous_filename ?? file.filename)}
-                            class="text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 text-[11px] underline-offset-2 hover:underline"
-                          >
-                            变更前
-                          </button>
-                        {/if}
-                        {#if file.status !== 'removed'}
-                          <button
-                            type="button"
-                            onclick={() => commit && openFileAtCommit(commit.sha, file.filename)}
-                            class="text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 text-[11px] underline-offset-2 hover:underline"
-                          >
-                            变更后
-                          </button>
-                        {/if}
-                      </div>
                     </div>
                   {/if}
                 {:else if lines.length === 0}
