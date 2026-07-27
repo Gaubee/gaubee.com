@@ -51,6 +51,10 @@ export interface IssueDetail extends IssueSummary {
   body: string | null;
   /** 关闭原因（state=closed 时）。 */
   state_reason?: "completed" | "not_planned" | "reopened" | "duplicate" | null;
+  /** 指派人（GitHub 字段 assignees，可能为空数组）。 */
+  assignees: Array<{ login: string; avatar_url: string }>;
+  /** 里程碑（未设置时为 null）。 */
+  milestone: { title: string; html_url?: string } | null;
 }
 
 /** 表情反应统计。 */
@@ -152,6 +156,10 @@ interface GhIssueResponse {
   reactions?: Reactions;
   body?: string | null;
   state_reason?: string | null;
+  /** 指派人（GitHub 默认在 issue 详情返回）。 */
+  assignees?: Array<{ login: string; avatar_url: string }>;
+  /** 里程碑（未设置时 GitHub 返回 null）。 */
+  milestone?: { title: string; html_url?: string } | null;
 }
 
 interface GhCommentResponse {
@@ -191,6 +199,8 @@ function toIssueDetail(i: GhIssueResponse): IssueDetail {
     ...toIssueSummary(i),
     body: i.body ?? null,
     state_reason: (i.state_reason as IssueDetail["state_reason"]) ?? null,
+    assignees: i.assignees ?? [],
+    milestone: i.milestone ?? null,
   };
 }
 

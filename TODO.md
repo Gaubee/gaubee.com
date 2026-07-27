@@ -855,3 +855,87 @@ URL ─► NavController(黑盒) ─► AreaOutlet ─► <AppShell activity>
   - 跨应用跳转类型安全（NotificationAction.to）
   - 应用内/跨应用保活模型正常
 - `mobile.e2e.ts` 失败 2 项为预存问题（重构前已失败，与本改动无关）
+
+## GithubApp：history/files ref 切换 + IssueDetail 视觉精修（2026-07-27）
+
+继路由系统重构后，集中提升 GithubApp 仓库详情页的两个核心体验。
+
+### 一、history/files tab 的 ref 切换器（2026-07-27）
+
+痛点：history tab 只能看默认分支的 commit 列表，files tab 只在 `?ref=` 存在时被动提示「历史版本」，体验割裂。
+
+#### API 扩展
+
+- `client.ts` 的 `listCommits` 补 `since`/`until` 参数（GitHub ISO 8601 时间过滤）。
+- `repo-api.ts` 新增 `listBranches`/`listTags`（`GET /repos/{owner}/{repo}/{branches,tags}`）+ `BranchSummary`/`TagSummary` 类型。
+
+#### 新组件 `RepoRefSelector.svelte`
+
+封装 branch/tag 列表 + SHA 直跳，history tab 与 files tab 共用：
+
+```
+[main ▾]  ← 触发按钮（当前 ref + 箭头）
+  ┌──────────────────────────┐
+  │ 🔍 [输入 branch/tag/SHA]  │  ← 搜索框（同时过滤列表 + 接受 SHA 直跳）
+  │ ── Branches ──            │
+  │   main（默认分支置顶）     │
+  │   dev                     │
+  │ ── Tags ──                │
+  │   v1.0.0                  │
+  └──────────────────────────┘
+```
+
+- 数据懒加载：首次打开 Popover 时才请求 branches/tags。
+- 输入 ≥7 位 hex（SHA 格式）→ 回车直接 `onSelect(sha)`（直跳 CommitDetail）。
+- 否则按输入过滤 branch/tag 列表。
+
+#### history tab 改造
+
+- RepoRefSelector 常驻（切换 branch 触发 loadCommits）。
+- 「过滤」按钮带 badge 显示激活数量，点开 Popover（author input + since/until 原生 `<input type="date">`）。
+- commit 列表项重构为 GitHub 风格：横向布局，左 avatar + 中标题（粗）+ body 摘要 + author · 相对时间，右 SHA 短码。
+
+#### files tab 改造
+
+- 用 RepoRefSelector 替代被动提示条，常驻文件树容器头部。
+- 切换 ref → `navigateSelect('files', 'ref', newRef)`；ref ≠ 默认分支时旁边显示「历史版本」badge。
+
+### 二、IssueDetail 视觉精修（2026-07-27）
+
+对比 GitHub 官方 issue 详情页，timeline 从「漂浮节点」升级为「卡片化 timeline + 元信息 Dialog 化」。
+
+#### Timeline 卡片化
+
+- issue 正文 + 评论统一为 `border rounded-lg` 卡片，header 用 `bg-muted/50` 灰条作视觉锚点，body + footer（reactions）独立分区。
+- 全局左侧 2px 轴线穿过所有节点中心，头像用 `ring-2 ring-background` 遮断轴线 → 视觉上「坐」在轴线上。
+- event 行用圆形彩色背景小图标（closed=紫底 / reopened=绿底 / 其它=灰底）遮断轴线。
+- 标题字号 `text-base`(16px) → `text-xl`(20px) 更醒目。
+
+#### 元信息 Dialog 化（参考用户给的 GitHub sidebar 截图）
+
+痛点：title 下方「作者头像+名字+时间」meta 行与第一条 timeline 卡片 header 重复；labels 占两行。
+
+新组件 `IssueMetaBar.svelte`：
+
+- **缩略行**：title 正下方独立一行，整行可点（trigger 是 button，hover 有背景色反馈）。
+  - 基础信息（永远显示）：opened 时间 · 评论数（无 meta 字段时也兜底展示，避免 title 下方视觉断层）。
+  - meta 字段（有值时叠加）：assignees 叠加头像 · labels 彩色圆点 + 计数 · milestone 图标+标题。
+- **Dialog**：Assignees / Labels / Milestone / Participants（从 events.actor 聚合）/ 创建时间 / 评论数 / GitHub 链接。
+  - 无值字段显示占位（No assignees / No milestone），保持结构完整。
+
+#### API 扩展
+
+`IssueDetail` 补 `assignees: Array<{login, avatar_url}>` + `milestone: {title, html_url?} | null`，`toIssueDetail` 透传。
+
+#### 底部评论编辑器
+
+加左侧当前用户头像（`size-7 ring-2 ring-background`，与 timeline 风格对齐）。
+
+### 验证
+
+- 类型检查 0 错误 0 警告。
+- issue-api 单测 13/13 全过（补 getIssue 的 assignees/milestone 投影测试）。
+- Playwright DOM 验证：
+  - 标题 text-xl(20px) ✅、卡片 count=6 ✅、header bg-muted/50 ✅、左侧轴线渲染 ✅、event 圆形彩色图标 ✅、底部编辑器头像 ✅
+  - IssueMetaBar 触发文本正确：空 meta = `opened 28 天前 · 5 详情`，有 labels = `opened 2 天前 · 3 · 2 labels 详情`
+  - Dialog 6 区块全过（Assignees/Labels/Milestone/Participants/时间/GitHub 链接）

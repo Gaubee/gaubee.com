@@ -155,6 +155,27 @@ describe("repo-api", () => {
     expect(issue.number).toBe(42);
   });
 
+  it("getIssue 透传 assignees 和 milestone（null 时为空）", async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        ...sampleIssue,
+        assignees: [{ login: "gaubee", avatar_url: "https://x/gaubee.png" }],
+        milestone: { title: "v1.0", html_url: "https://github.com/x/milestone/1" },
+      }),
+    );
+    const issue = await getIssue("sveltejs", "kit", 42);
+    expect(issue.assignees).toHaveLength(1);
+    expect(issue.assignees[0].login).toBe("gaubee");
+    expect(issue.milestone?.title).toBe("v1.0");
+  });
+
+  it("getIssue assignees/milestone 缺省时为 []/null", async () => {
+    mockFetch.mockResolvedValue(jsonResponse(sampleIssue));
+    const issue = await getIssue("sveltejs", "kit", 42);
+    expect(issue.assignees).toEqual([]);
+    expect(issue.milestone).toBeNull();
+  });
+
   it("getRepo 返回仓库元数据", async () => {
     mockFetch.mockResolvedValue(jsonResponse(sampleRepo));
     const repo = await getRepo("sveltejs", "kit");
