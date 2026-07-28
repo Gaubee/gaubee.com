@@ -12,6 +12,7 @@ import { themeApp } from "./builtin/theme";
 import { filesApp } from "./installable/files";
 // 可安装应用（动态 import，按需加载）
 import { githubApp } from "./installable/github";
+import { githubEditorApp } from "./installable/github-editor";
 import { terminalApp } from "./installable/terminal";
 import { writerApp } from "./installable/writer";
 /**
@@ -43,6 +44,7 @@ export function registerAllApps(): void {
 
   // 可安装应用（默认不安装，用户手动安装）
   appManager.register(githubApp);
+  appManager.register(githubEditorApp);
   appManager.register(terminalApp);
   appManager.register(filesApp);
   appManager.register(writerApp);
@@ -63,7 +65,7 @@ export {
   appStoreApp,
   themeApp,
 };
-export { githubApp, terminalApp, filesApp, writerApp };
+export { githubApp, githubEditorApp, terminalApp, filesApp, writerApp };
 
 /** 获取所有已注册应用。 */
 export function getAllRegisteredApps(): AppEntry[] {
@@ -78,6 +80,7 @@ export function getAllRegisteredApps(): AppEntry[] {
     appStoreApp,
     themeApp,
     githubApp,
+    githubEditorApp,
     terminalApp,
     filesApp,
     writerApp,

@@ -105,6 +105,69 @@ export interface CommentDraft {
   updatedAt: number;
 }
 
+// =========================================================================
+// GithubEditorApp v6 stores（双文件夹 VFS + 最近打开仓库）
+// =========================================================================
+
+/**
+ * GithubEditor 本地层文件元数据（用户编辑的未提交文件）。
+ * id 格式：`{owner}/{repo}/{path}`（仓库隔离）。
+ * 与旧 meta store 的区别：带 owner/repo 前缀，支持多仓库。
+ */
+export interface EditorFileMeta {
+  /** `{owner}/{repo}/{path}`（全局唯一）。 */
+  id: string;
+  owner: string;
+  repo: string;
+  /** 仓库内相对路径（如 src/lib/x.ts）。 */
+  path: string;
+  /** 远程原始 sha（用于 diff + 提交乐观锁；新建文件为 null）。 */
+  sha: string | null;
+  /** 本地内容（未提交，内存 + IndexedDB 双写）。 */
+  content: string;
+  /** 是否标记删除（软删除，提交时真正删除）。 */
+  deleted: boolean;
+  /** 最后修改时间戳。 */
+  mtime: number;
+}
+
+/**
+ * GithubEditor 远程缓存（fileTree-json + commit-hash 隔离）。
+ * id 格式：`{owner}/{repo}@{commitSha}`。
+ * 用于 diff 计算（local vs remote）+ 文件树数据源 + 刷新检测。
+ */
+export interface EditorRemoteCache {
+  /** `{owner}/{repo}@{commitSha}`。 */
+  id: string;
+  owner: string;
+  repo: string;
+  /** 缓存对应的 commit SHA（刷新时比对分支 HEAD，不一致则失效）。 */
+  commitSha: string;
+  /** 分支名（缓存时记录，用于刷新）。 */
+  branch: string;
+  /** 完整 blob 清单（fetchTree 一次拿到，含所有文件路径 + sha）。 */
+  blobs: Array<{ path: string; sha: string; mode: string; type: string }>;
+  /** 缓存时间戳（LRU 淘汰用）。 */
+  cachedAt: number;
+}
+
+/**
+ * GithubEditor 最近打开仓库（首页底部列表）。
+ * 按 openedAt 倒序，上限 ~20 条。
+ */
+export interface RecentRepo {
+  /** `{owner}/{repo}`。 */
+  id: string;
+  owner: string;
+  repo: string;
+  /** 最后打开时间戳。 */
+  openedAt: number;
+  /** 上次打开的分支（可选，方便恢复）。 */
+  branch?: string;
+  /** 上次打开的文件路径（可选）。 */
+  path?: string;
+}
+
 interface GaubeeMetaDB extends DBSchema {
   meta: {
     key: string;
@@ -126,10 +189,23 @@ interface GaubeeMetaDB extends DBSchema {
     key: string;
     value: CommentDraft;
   };
+  // v6: GithubEditor stores
+  editor_local_meta: {
+    key: string;
+    value: EditorFileMeta;
+  };
+  editor_remote_cache: {
+    key: string;
+    value: EditorRemoteCache;
+  };
+  editor_recent_repos: {
+    key: string;
+    value: RecentRepo;
+  };
 }
 
 const DB_NAME = "gaubee-meta";
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 let dbPromise: Promise<IDBPDatabase<GaubeeMetaDB>> | null = null;
 
@@ -155,6 +231,16 @@ function getDB(): Promise<IDBPDatabase<GaubeeMetaDB>> {
         // v5: 加 comment_drafts store（GithubApp 评论草稿自动保存）
         if (!db.objectStoreNames.contains("comment_drafts")) {
           db.createObjectStore("comment_drafts", { keyPath: "key" });
+        }
+        // v6: GithubEditor stores（双文件夹 VFS + 最近打开）
+        if (!db.objectStoreNames.contains("editor_local_meta")) {
+          db.createObjectStore("editor_local_meta", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("editor_remote_cache")) {
+          db.createObjectStore("editor_remote_cache", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("editor_recent_repos")) {
+          db.createObjectStore("editor_recent_repos", { keyPath: "id" });
         }
       },
     });
@@ -260,6 +346,87 @@ export async function draftPut(draft: CommentDraft): Promise<void> {
 export async function draftDelete(key: string): Promise<void> {
   const db = await getDB();
   await db.delete("comment_drafts", key);
+}
+
+// =========================================================================
+// GithubEditor CRUD（editor_local_meta / editor_remote_cache / editor_recent_repos）
+// =========================================================================
+
+// ---- editor_local_meta：本地层文件元数据 ----
+
+/** 列出某仓库的所有本地文件元数据（含已删除）。 */
+export async function editorLocalAll(owner: string, repo: string): Promise<EditorFileMeta[]> {
+  const db = await getDB();
+  const all = await db.getAll("editor_local_meta");
+  const prefix = `${owner}/${repo}/`;
+  return all.filter((m) => m.id.startsWith(prefix));
+}
+
+export async function editorLocalGet(
+  owner: string,
+  repo: string,
+  path: string,
+): Promise<EditorFileMeta | undefined> {
+  const db = await getDB();
+  return db.get("editor_local_meta", `${owner}/${repo}/${path}`);
+}
+
+export async function editorLocalPut(meta: EditorFileMeta): Promise<void> {
+  const db = await getDB();
+  await db.put("editor_local_meta", meta);
+}
+
+export async function editorLocalDelete(owner: string, repo: string, path: string): Promise<void> {
+  const db = await getDB();
+  await db.delete("editor_local_meta", `${owner}/${repo}/${path}`);
+}
+
+/** 清空某仓库的所有本地文件（提交成功后调用）。 */
+export async function editorLocalClear(owner: string, repo: string): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction("editor_local_meta", "readwrite");
+  const prefix = `${owner}/${repo}/`;
+  let cursor = await tx.store.openCursor();
+  while (cursor) {
+    if (typeof cursor.key === "string" && cursor.key.startsWith(prefix)) {
+      await cursor.delete();
+    }
+    cursor = await cursor.continue();
+  }
+  await tx.done;
+}
+
+// ---- editor_remote_cache：远程 fileTree 缓存 ----
+
+export async function editorRemoteGet(
+  owner: string,
+  repo: string,
+  commitSha: string,
+): Promise<EditorRemoteCache | undefined> {
+  const db = await getDB();
+  return db.get("editor_remote_cache", `${owner}/${repo}@${commitSha}`);
+}
+
+export async function editorRemotePut(cache: EditorRemoteCache): Promise<void> {
+  const db = await getDB();
+  await db.put("editor_remote_cache", cache);
+}
+
+// ---- editor_recent_repos：最近打开仓库 ----
+
+export async function recentRepoAll(): Promise<RecentRepo[]> {
+  const db = await getDB();
+  return db.getAll("editor_recent_repos");
+}
+
+export async function recentRepoPut(repo: RecentRepo): Promise<void> {
+  const db = await getDB();
+  await db.put("editor_recent_repos", repo);
+}
+
+export async function recentRepoDelete(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete("editor_recent_repos", id);
 }
 
 /**

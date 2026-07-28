@@ -355,15 +355,16 @@ export interface StagedChange {
 export async function commitChanges(
   message: string,
   changes: StagedChange[],
-  branch: string = BRANCH,
+  opts: { owner?: string; repo?: string; branch?: string } = {},
 ): Promise<string> {
+  const { owner = OWNER, repo = REPO, branch = BRANCH } = opts;
   // 1. 获取分支最新 commit 与 tree
-  const refResp = await fetchGithub(`repos/${OWNER}/${REPO}/git/refs/heads/${branch}`);
+  const refResp = await fetchGithub(`repos/${owner}/${repo}/git/refs/heads/${branch}`);
   await assertOk(refResp, "获取 ref");
   const refData = (await refResp.json()) as { object: { sha: string } };
   const latestSha = refData.object.sha;
 
-  const commitResp = await fetchGithub(`repos/${OWNER}/${REPO}/git/commits/${latestSha}`);
+  const commitResp = await fetchGithub(`repos/${owner}/${repo}/git/commits/${latestSha}`);
   await assertOk(commitResp, "获取 commit");
   const commitData = (await commitResp.json()) as { tree: { sha: string } };
   const baseTreeSha = commitData.tree.sha;
@@ -400,7 +401,7 @@ export async function commitChanges(
   }
 
   // 3. 创建 tree
-  const treeResp = await fetchGithub(`repos/${OWNER}/${REPO}/git/trees`, {
+  const treeResp = await fetchGithub(`repos/${owner}/${repo}/git/trees`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ base_tree: baseTreeSha, tree: treeItems }),
@@ -409,7 +410,7 @@ export async function commitChanges(
   const treeData = (await treeResp.json()) as { sha: string };
 
   // 4. 创建 commit
-  const newCommitResp = await fetchGithub(`repos/${OWNER}/${REPO}/git/commits`, {
+  const newCommitResp = await fetchGithub(`repos/${owner}/${repo}/git/commits`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -422,7 +423,7 @@ export async function commitChanges(
   const newCommitData = (await newCommitResp.json()) as { sha: string };
 
   // 5. 更新分支引用
-  const updateResp = await fetchGithub(`repos/${OWNER}/${REPO}/git/refs/heads/${branch}`, {
+  const updateResp = await fetchGithub(`repos/${owner}/${repo}/git/refs/heads/${branch}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sha: newCommitData.sha }),

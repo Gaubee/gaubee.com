@@ -18,6 +18,7 @@
   import { syntaxHighlighting, defaultHighlightStyle, HighlightStyle } from '@codemirror/language'
   import { tags as t } from '@lezer/highlight'
   import { markdownPreview } from './markdown-wysiwyg'
+  import { langByPath } from './lang-by-path'
 
   let {
     doc = '',
@@ -25,6 +26,9 @@
     docId = '',
     readonly = false,
     placeholder = '',
+    /** 文件路径（GithubEditor 按扩展名选语言）。
+     *  不传或为 .md 时用 markdown + WYSIWYG；其它扩展名用对应语言包（无 WYSIWYG）。 */
+    filePath = '',
     onInput,
     onSave,
   }: {
@@ -32,6 +36,7 @@
     docId?: string
     readonly?: boolean
     placeholder?: string
+    filePath?: string
     onInput?: (value: string) => void
     onSave?: () => void
   } = $props()
@@ -90,12 +95,23 @@
     ]
     if (placeholder) exts.push(cmPlaceholder(placeholder))
 
-    // Markdown 语言 + WYSIWYG 实时预览
-    exts.push(
-      markdown({ base: markdownLanguage, codeLanguages: languages }),
-      markdownPreview(),
-      syntaxHighlighting(defaultHighlightStyle, { fallback: true })
-    )
+    // 语言选择：filePath 为空或 .md → markdown + WYSIWYG；其它 → 按扩展名选语言包
+    const langExt = filePath ? langByPath(filePath) : null
+    const isMarkdown = !filePath || filePath.endsWith('.md')
+    if (isMarkdown) {
+      // Markdown 模式：WYSIWYG 实时预览 + 代码块多语言高亮
+      exts.push(
+        markdown({ base: markdownLanguage, codeLanguages: languages }),
+        markdownPreview(),
+        syntaxHighlighting(defaultHighlightStyle, { fallback: true })
+      )
+    } else if (langExt) {
+      // 代码文件：按扩展名选语言（ts/js/json/css/html/yaml 等）
+      exts.push(langExt, syntaxHighlighting(defaultHighlightStyle, { fallback: true }))
+    } else {
+      // 未知扩展名：纯文本 + 默认高亮 fallback
+      exts.push(syntaxHighlighting(defaultHighlightStyle, { fallback: true }))
+    }
 
     // 保存快捷键
     if (onSave) {

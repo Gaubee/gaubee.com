@@ -340,7 +340,7 @@ export class Vfs {
       sha: n.sha,
     }));
 
-    const sha = await commitChanges(message, changes, BRANCH);
+    const sha = await commitChanges(message, changes, { branch: BRANCH });
 
     // commit 成功：清除 dirty 状态与 base 快照
     for (const node of dirty) {

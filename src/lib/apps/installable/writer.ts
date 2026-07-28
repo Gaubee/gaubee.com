@@ -42,24 +42,6 @@ export const writerApp: AppEntry = {
         ),
       },
       {
-        // GithubApp 跳转的任意文件编辑（raw 模式），复用 EditorView。
-        // 路由域归属 writer，使 Dock 高亮写作应用。
-        // owner/repo/file 走 search query（与 github.repo.detail 的 file 一致），
-        // 避免多段文件路径（如 src/lib/x.ts）撑爆 leafRoute 的 index route 段匹配。
-        // ref 可选：当前 git ref（commitSha/分支名），编辑器据此判定权限。
-        pattern: "/app/github-edit",
-        root: leafRoute(
-          "writer.github-edit",
-          () => import("$lib/views/EditorView.svelte"),
-          z.object({
-            owner: z.string().min(1),
-            repo: z.string().min(1),
-            file: z.string().min(1),
-            ref: z.string().optional(),
-          }),
-        ),
-      },
-      {
         pattern: "/app/changes",
         root: leafRoute("writer.changes", () => import("$lib/views/ChangesView.svelte")),
       },
