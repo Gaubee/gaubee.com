@@ -28,6 +28,7 @@
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { Button } from '$lib/components/ui/button'
   import * as Tabs from '$lib/components/ui/tabs'
+  import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left'
   import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw'
   import UploadIcon from '@lucide/svelte/icons/upload'
   import FolderIcon from '@lucide/svelte/icons/folder'
@@ -305,6 +306,15 @@
   {:else}
   <!-- 顶部工具栏 -->
   <div class="flex items-center gap-2 border-b border-border px-3 py-1.5">
+    <button
+      type="button"
+      onclick={() => navController.navigateMain('/app/github-editor')}
+      class="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-7 items-center justify-center rounded transition-colors"
+      aria-label="返回首页"
+      title="返回首页"
+    >
+      <ArrowLeftIcon class="size-4" />
+    </button>
     <span class="font-mono text-sm font-semibold">{owner}/{repo}</span>
     {#if repoInfo?.default_branch}
       <span class="text-muted-foreground text-xs">@ {fileRef ?? repoInfo.default_branch}</span>
