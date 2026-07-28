@@ -18,6 +18,7 @@
   import { navController } from '$lib/nav/nav-controller-instance'
   import { createEditorVfs, type EditorVfs, type FileDiff } from '../editor-vfs.svelte'
   import { getRepo, type RepoSummary } from '$lib/apps/installable/github/repo-api'
+  import RepoRefSelector from '$lib/apps/views/github/RepoRefSelector.svelte'
   import { recentRepos } from '../recent-repos.svelte'
   import { notifySuccess, notifyError } from '$lib/apps/builtin/notifications/service.svelte'
   import CodeMirror from '$lib/editor/CodeMirror.svelte'
@@ -115,6 +116,27 @@
     } finally {
       workspaceLoading = false
     }
+  })
+
+  // 监听分支切换（RepoRefSelector onSelect 触发 URL ?ref= 变化）：
+  // 重新加载 remote 缓存（新分支的 fileTree）+ 重建文件树。
+  // 跳过首次（onMount 已加载），仅响应后续 fileRef 变化。
+  let firstRefLoad = true
+  $effect(() => {
+    const ref = fileRef
+    if (firstRefLoad) {
+      firstRefLoad = false
+      return
+    }
+    if (!editorVfs) return
+    void (async () => {
+      treeLoading = true
+      tree = new Map()
+      expanded = new Set([''])
+      await editorVfs!.loadRemote(ref ?? defaultBranch, true)
+      await loadDir('')
+      treeLoading = false
+    })()
   })
 
   // ---- 文件树懒加载（从 remoteCache.blobs 推导）----
@@ -217,7 +239,9 @@
     const params = new URLSearchParams()
     params.set('tab', key === 'tab' ? value : activeTab)
     if (key === 'file' || selectedFile) params.set('file', key === 'file' ? value : selectedFile)
-    if (key === 'ref' || fileRef) params.set('ref', key === 'ref' ? value : fileRef ?? '')
+    // ref：key==='ref' 时用新值（空=切回默认分支，不带 ref 参数）；否则保留现有 fileRef
+    const refValue = key === 'ref' ? value : (fileRef ?? '')
+    if (refValue) params.set('ref', refValue)
     navController.navigateMain(`/app/github-editor/repo/${owner}/${repo}?${params.toString()}`)
   }
 
@@ -317,9 +341,21 @@
       <ArrowLeftIcon class="size-4" />
     </button>
     <span class="font-mono text-sm font-semibold">{owner}/{repo}</span>
-    {#if repoInfo?.default_branch}
-      <span class="text-muted-foreground text-xs">@ {fileRef ?? repoInfo.default_branch}</span>
-    {/if}
+    <!-- 分支切换器（与 GithubApp files tab 一致：RepoRefSelector） -->
+    <RepoRefSelector
+      {owner}
+      {repo}
+      currentRef={fileRef ?? ''}
+      defaultBranch={repoInfo?.default_branch ?? 'main'}
+      onSelect={(ref) => {
+        // 切换分支：更新 URL ?ref=，触发 loadRemote + 文件树重载
+        if (ref === (repoInfo?.default_branch ?? 'main')) {
+          navigateSelect('ref', '')
+        } else {
+          navigateSelect('ref', ref)
+        }
+      }}
+    />
     {#if editorVfs && editorVfs.dirtyCount > 0}
       <span class="bg-amber-500/15 text-amber-700 dark:text-amber-400 rounded-full px-2 py-0.5 text-[10px] font-medium">
         {editorVfs.dirtyCount} 个变更
