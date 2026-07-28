@@ -1,3 +1,4 @@
+import { leafRoute } from "$lib/router";
 import LogInIcon from "@lucide/svelte/icons/log-in";
 import LogOutIcon from "@lucide/svelte/icons/log-out";
 /**
@@ -25,9 +26,9 @@ export const accountApp: AppEntry = {
     defaultArea: "main",
     activities: [
       {
-        route: "/app/account",
+        pattern: "/app/account",
         entry: true,
-        view: () => import("$lib/apps/views/AccountView.svelte"),
+        root: leafRoute("account", () => import("$lib/apps/views/AccountView.svelte")),
       },
     ],
     // 不占主导航 tab，只通过 /app/account 深链接进入（设置页入口跳转过来）

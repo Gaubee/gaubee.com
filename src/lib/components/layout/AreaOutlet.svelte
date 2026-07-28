@@ -1,221 +1,234 @@
 <!--
 	AreaOutlet：区域出口组件。
 	接收 area prop，渲染该 area 当前激活的 view。
-	- main：桌面背景层 + 应用浮层模型（均常驻 DOM 保活，display 切换显隐）。
-	  桌面（/desktop）作底层；激活的非桌面应用以浮层覆盖。深链接（/article/...）
-	  在无 active tab 时渲染。保活确保切换应用不丢组件状态（编辑器/终端会话等）。
+
+	main 区双层模型（2026-07-27 路由重构恢复）：
+	- entry activity 浮层（z:10）：每个 main 应用一个常驻 AppShell，始终用 entryActivity。
+	  应用内多页面通过 entry root 的 children 嵌套表达（如 github 的 list/repo）。
+	  ActivityRouter 按 RouteId 缓存组件，应用内保活。
+	- 非 entry activity 层（z:20）：当 URL 匹配到非 entry activity（如 articles 的 /article、/tags）
+	  时，独立渲染一层 AppShell 覆盖在 tab 浮层之上。tab 浮层隐藏让位但保留 DOM（保活）。
+	- NotFound 层（z:30）：URL 无归属应用时渲染。
+
+	这种双层模型解决了「同 tab 切 activity 破坏保活」的问题：
+	每个 activity 有独立的 AppShell 实例和 Route 缓存，互不干扰。
+
 	- bottom：所有已注册 tab view 常驻 DOM，display 切换（保活）。
 	- pop：不常驻，按需渲染（弹层打开时挂载）。
-
-	异步加载模型（2026-07-23）：
-	- tab view loader 首次触发时异步 import，期间渲染骨架 + 驱动 appLoadStore 进度条。
-	- 加载完成后缓存组件，常驻 DOM 保活（与改造前行为一致，只是首屏不预加载全部视图）。
-	- deep link / pop view 同样按需异步加载。
 -->
 <script lang="ts">
-  import { navStore } from '$lib/nav/nav.svelte'
-  import { navController } from '$lib/nav/nav-controller-instance'
-  import {
-    getAllTabLoaders,
-    activeTabIdForLocation,
-    getPopLoader,
-  } from '$lib/views/registry'
-  import { resolveMainView } from '$lib/views/resolver'
-  import { resolveNotFound, type NotFoundResult } from '$lib/views/not-found-registry'
-  import { appManager } from '$lib/apps/AppManager.svelte'
-  import { appLoadStore } from '$lib/apps/app-load.svelte'
-  import { routeDomainRegistry } from '$lib/apps/route-domain'
-  import { motionBlur } from '$lib/utils/motion'
-  import { blurTransition } from '$lib/utils/motion'
-  import AppShell from '$lib/app-scaffold/AppShell.svelte'
-  import DesktopView from '$lib/apps/views/DesktopView.svelte'
-  import NotFoundView from '$lib/views/NotFoundView.svelte'
-  import type { AppManifest } from '$lib/apps/types'
-  import type { Area, TabId } from '$lib/nav/controller'
-  import type { Component } from 'svelte'
+  import { navStore } from "$lib/nav/nav.svelte";
+  import { navController } from "$lib/nav/nav-controller-instance";
+  import { getPopLoader } from "$lib/views/registry";
+  import { resolveNotFound, type NotFoundResult } from "$lib/views/not-found-registry";
+  import { appManager } from "$lib/apps/AppManager.svelte";
+  import { appLoadStore } from "$lib/apps/app-load.svelte";
+  import { routeDomainRegistry } from "$lib/apps/route-domain";
+  import { matchesRoutePrefix } from "$lib/apps/route-domain";
+  import type { AppActivity, AppManifest } from "$lib/apps/types";
+  import { getEntryRoute } from "$lib/apps/types";
+  import { motionBlur } from "$lib/utils/motion";
+  import { blurTransition } from "$lib/utils/motion";
+  import AppShell from "$lib/app-scaffold/AppShell.svelte";
+  import DesktopView from "$lib/apps/views/DesktopView.svelte";
+  import NotFoundView from "$lib/views/NotFoundView.svelte";
+  import type { Area, HistoryLocation, TabId } from "$lib/nav/controller";
+  import type { Component } from "svelte";
 
-  let { area }: { area: Area } = $props()
+  let { area }: { area: Area } = $props();
 
-  const navState = $derived(navStore.current)
+  const navState = $derived(navStore.current);
 
   const location = $derived(
-    area === 'main'
+    area === "main"
       ? navState.mainLocation
-      : area === 'bottom'
+      : area === "bottom"
         ? navState.bottomLocation
         : navState.popLocation,
-  )
+  );
   const tabIdsInArea = $derived(
-    area === 'main' ? navState.mainTabs : area === 'bottom' ? navState.bottomTabs : [],
-  )
+    area === "main" ? navState.mainTabs : area === "bottom" ? navState.bottomTabs : [],
+  );
   const isActive = $derived(
-    area === 'main' || (area === 'bottom' ? navState.bottomActive : navState.popActive),
-  )
+    area === "main" || (area === "bottom" ? navState.bottomActive : navState.popActive),
+  );
 
-  const allTabLoaders = $derived(getAllTabLoaders())
+  // ---- main 区 Activity 解析（URL-first）----
+  // 给定 pathname，找到归属应用 + 匹配的 Activity。
+  interface ActivityResolution {
+    manifest: AppManifest;
+    /** 命中的 activity（最长前缀匹配）。 */
+    activity: AppActivity;
+    /** 该应用的 entry route（tabId / Dock 身份）。 */
+    entryRoute: string;
+    /** 命中的 activity 是否就是 entry activity 本身。 */
+    isEntry: boolean;
+  }
+  function resolveActivityForPath(pathname: string): ActivityResolution | null {
+    const appId = routeDomainRegistry.appIdForPath(pathname);
+    if (!appId) return null;
+    const manifest = appManager.findById(appId);
+    if (!manifest) return null;
+    const entryRoute = getEntryRoute(manifest);
+    // 在 activities 中找最长前缀匹配
+    let best: AppActivity | undefined;
+    for (const a of manifest.activities) {
+      if (matchesRoutePrefix(pathname, a.pattern)) {
+        if (!best || a.pattern.length > best.pattern.length) best = a;
+      }
+    }
+    // 无精确匹配：让 entry activity 处理（ActivityRouter 会 no-match → 上层 NotFound）
+    const activity = best ?? manifest.activities.find((a) => a.entry) ?? manifest.activities[0];
+    if (!activity) return null;
+    return {
+      manifest,
+      activity,
+      entryRoute,
+      isEntry: activity.pattern === entryRoute,
+    };
+  }
 
-  // ---- URL-first 视图解析（main 区）----
-  // main 区用 resolveMainView（纯 URL 驱动，不查 mainTabs）；
-  // bottom 区仍用 activeTabIdForLocation（bottom 有独立的 tab 激活语义）。
-  const mainResolution = $derived(
-    area === 'main' ? resolveMainView(location.pathname) : null,
-  )
+  const mainResolution = $derived(area === "main" ? resolveActivityForPath(location.pathname) : null);
+
+  // 激活的 tab = 归属应用的 entry route（让 Dock 图标在任意子场景下都正确高亮）
   const activeTabId = $derived(
-    area === 'main'
-      ? mainResolution?.kind === 'tab'
-        ? mainResolution.tabId
-        : null
+    area === "main"
+      ? mainResolution?.entryRoute ?? null
       : activeTabIdForLocation(location, area, tabIdsInArea),
-  )
+  );
 
-  // ---- tab view 异步加载 + 缓存保活 ----
-  // 已加载组件数组（Svelte 5 deep reactivity：push/pop/splice 自动触发响应）。
-  const loadedSlots = $state<Array<{ tabId: TabId; component: Component }>>([])
-  // 加载中守卫（非响应式，纯逻辑去重，避免 effect 重入重复触发 loader）
-  const inFlightTabs = new Set<TabId>()
-
-  function loadedComponentFor(tabId: TabId): Component | undefined {
-    return loadedSlots.find((s) => s.tabId === tabId)?.component
+  // ---- bottom 区 tab 激活（旧逻辑，bottom 暂未迁移到 Activity 模型）----
+  function activeTabIdForLocation(
+    loc: HistoryLocation,
+    a: Area,
+    tabIds: readonly TabId[],
+  ): TabId | null {
+    if (a === "pop") return null;
+    const path = loc.pathname;
+    for (const tabId of tabIds) {
+      if (path === tabId || path.startsWith(tabId + "/")) {
+        return tabId;
+      }
+    }
+    return null;
   }
-  function setLoadedComponent(tabId: TabId, component: Component) {
-    if (loadedSlots.some((s) => s.tabId === tabId)) return
-    loadedSlots.push({ tabId, component })
-  }
 
-  // tab loader 变化时，为每个 loader 触发异步加载
-  // 幂等：inFlightTabs 守卫防重入，loadedSlots 缓存避免重复加载
+  // ---- bottom 区视图加载（从 manifest 派生）----
+  // bottom 区应用（terminal）暂未走 Activity 模型，从 manifest.activities[0].root.component 拿 loader。
+  // TODO 阶段 5：bottom 区也接入 ActivityRouter 后，删除本块。
+  const bottomLoaders = $derived(getAllBottomLoaders());
+  const loadedBottomSlots = $state<Array<{ tabId: TabId; component: Component }>>([]);
+  const bottomInFlight = new Set<TabId>();
+  function loadedBottomFor(tabId: TabId): Component | undefined {
+    return loadedBottomSlots.find((s) => s.tabId === tabId)?.component;
+  }
   $effect(() => {
-    for (const { tabId, loader } of allTabLoaders) {
-      if (loadedComponentFor(tabId) || inFlightTabs.has(tabId)) continue
-      inFlightTabs.add(tabId)
-      appLoadStore.start(tabId)
+    const loaders = bottomLoaders;
+    for (const { tabId, loader } of loaders) {
+      if (loadedBottomFor(tabId) || bottomInFlight.has(tabId)) continue;
+      bottomInFlight.add(tabId);
+      appLoadStore.start(tabId);
       loader()
-        .then((m) => setLoadedComponent(tabId, m.default))
-        .finally(() => {
-          inFlightTabs.delete(tabId)
-          appLoadStore.done(tabId)
+        .then((m) => {
+          if (!loadedBottomSlots.some((s) => s.tabId === tabId)) {
+            loadedBottomSlots.push({ tabId, component: m.default });
+          }
         })
+        .finally(() => {
+          bottomInFlight.delete(tabId);
+          appLoadStore.done(tabId);
+        });
     }
-  })
-
-  // ---- deep link view 异步加载（非常驻）----
-  // URL-first：deepLink loader 从 resolveMainView 派生（mainResolution.kind === 'deeplink'）。
-  // 按路径缓存已加载组件（同一文章二次进入不重复 import）+ inFlight 守卫防 effect 重入死循环。
-  const deepLinkLoader = $derived(
-    area === 'main' && mainResolution?.kind === 'deeplink' ? mainResolution.loader : undefined,
-  )
-  let deepLinkView = $state<Component | undefined>(undefined)
-  const deepLinkCache = new Map<string, Component>()
-  const deepLinkInFlight = new Set<string>()
-  $effect(() => {
-    const loader = deepLinkLoader
-    const path = location.pathname
-    if (!loader) {
-      deepLinkView = undefined
-      return
-    }
-    // 缓存命中：直接用已加载组件，不触发 store/loader
-    const cached = deepLinkCache.get(path)
-    if (cached) {
-      deepLinkView = cached
-      return
-    }
-    // inFlight 守卫：防止 effect 重入重复 start/loader（切断 start/done 死循环）
-    if (deepLinkInFlight.has(path)) return
-    deepLinkInFlight.add(path)
-    appLoadStore.start(`deeplink:${path}`)
-    loader()
-      .then((m) => {
-        deepLinkCache.set(path, m.default)
-        deepLinkView = m.default
-      })
-      .finally(() => {
-        deepLinkInFlight.delete(path)
-        appLoadStore.done(`deeplink:${path}`)
-      })
-  })
+  });
+  function getAllBottomLoaders(): Array<{ tabId: TabId; loader: () => Promise<{ default: Component }> }> {
+    return appManager.allInstalled
+      .filter((app) => app.defaultArea === "bottom" && !app.hiddenFromNav)
+      .map((app) => {
+        const entryActivity = app.activities.find((a) => a.entry) ?? app.activities[0];
+        return { tabId: app.route, loader: entryActivity.root.component };
+      });
+  }
 
   // ---- pop view 异步加载（非常驻）----
-  // 同 deep link：缓存 + inFlight 守卫。
   const popLoader = $derived(
-    area === 'pop' && navState.popActive ? getPopLoader(location.pathname) : undefined,
-  )
-  let popView = $state<Component | undefined>(undefined)
-  const popCache = new Map<string, Component>()
-  const popInFlight = new Set<string>()
+    area === "pop" && navState.popActive ? getPopLoader(location.pathname) : undefined,
+  );
+  let popView = $state<Component | undefined>(undefined);
+  const popCache = new Map<string, Component>();
+  const popInFlight = new Set<string>();
   $effect(() => {
-    const loader = popLoader
-    const path = location.pathname
+    const loader = popLoader;
+    const path = location.pathname;
     if (!loader) {
-      popView = undefined
-      return
+      popView = undefined;
+      return;
     }
-    const cached = popCache.get(path)
+    const cached = popCache.get(path);
     if (cached) {
-      popView = cached
-      return
+      popView = cached;
+      return;
     }
-    if (popInFlight.has(path)) return
-    popInFlight.add(path)
-    appLoadStore.start(`pop:${path}`)
+    if (popInFlight.has(path)) return;
+    popInFlight.add(path);
+    appLoadStore.start(`pop:${path}`);
     loader()
       .then((m) => {
-        popCache.set(path, m.default)
-        popView = m.default
+        popCache.set(path, m.default);
+        popView = m.default;
       })
       .finally(() => {
-        popInFlight.delete(path)
-        appLoadStore.done(`pop:${path}`)
-      })
-  })
+        popInFlight.delete(path);
+        appLoadStore.done(`pop:${path}`);
+      });
+  });
 
-  // 桌面作为 shell 级背景层（main 区独有）：无应用浮层、无 deep-link、非 NotFound 时显现。
-  // mainLocation 为 /（桌面）时桌面是顶层（/ 不走视图解析，直接显示桌面）。
-  const isDesktop = $derived(area === 'main' && location.pathname === '/')
-  const isNotFound = $derived(
-    area === 'main' && !isDesktop && mainResolution?.kind === 'not-found',
-  )
+  // 桌面作为 shell 级背景层（main 区独有）：无应用浮层、无非 entry activity 时显现。
+  const isDesktop = $derived(area === "main" && location.pathname === "/");
+  const isNotFound = $derived(area === "main" && !isDesktop && mainResolution === null);
+  // 非 entry activity 激活时，tab 浮层让位（隐藏但保活）。
+  // 例外：hiddenFromNav 应用的 entry activity（如 app-store/account）无常驻 tab，
+  // 通过菜单 deep-link 访问时也走这一层渲染（不进 allMainTabs）。
+  const nonEntryActive = $derived(
+    area === "main" &&
+      mainResolution !== null &&
+      (!mainResolution.isEntry || mainResolution.manifest.hiddenFromNav),
+  );
   const desktopVisible = $derived(
-    area === 'main' && (isDesktop || (activeTabId === null && !deepLinkLoader && !isNotFound)),
-  )
+    area === "main" && (isDesktop || (activeTabId === null && !isNotFound)),
+  );
 
-  // ---- NotFound 处理（方向二）----
-  // URL 解析为 not-found 时，跑中间件链；redirect 结果触发导航，render 结果由模板渲染 NotFoundView。
-  // 用 lastNotFoundPath 守卫，避免 effect 重入死循环（redirect 后 location 变化重新解析）。
-  let lastNotFoundPath = ''
+  // ---- NotFound 处理 ----
+  let lastNotFoundPath = "";
   $effect(() => {
     if (!isNotFound) {
-      lastNotFoundPath = ''
-      return
+      lastNotFoundPath = "";
+      return;
     }
-    const path = location.pathname
-    if (path === lastNotFoundPath) return // 已处理过此路径，避免重入
-    lastNotFoundPath = path
-    const result: NotFoundResult = resolveNotFound(path)
-    if (result.kind === 'redirect') {
-      // 中间件要求重定向（如 github 把 /app/github/不存在 重定向到列表页）
-      navController.navigateMain(result.path, 'REPLACE')
+    const path = location.pathname;
+    if (path === lastNotFoundPath) return;
+    lastNotFoundPath = path;
+    const result: NotFoundResult = resolveNotFound(path);
+    if (result.kind === "redirect") {
+      navController.navigateMain(result.path, "REPLACE");
     }
-  })
+  });
 
-  // deep-link 详情页激活时，桌面层与 tab 浮层都要让位（隐藏但不卸载，保留 scroll/状态）。
-  // 之前的实现把 deep-link 与 tab 放在互斥 {#if} 链里——切换时 tab DOM 整个卸载，
-  // scrollTop 与组件状态全部丢失。现在改成并存：详情页叠在 tab 之上（z:20），
-  // tab 仍在 DOM 中（visibility:hidden + pointer-events:none），返回时无重挂/无丢状态。
-  const deepLinkActive = $derived(area === 'main' && !activeTabId && !!deepLinkLoader)
-
-  // 按 entry route（tabId）查 manifest，供 AppShell 隔离包裹。
-  function manifestForTab(tabId: TabId): AppManifest | undefined {
-    return appManager.findByRoute(tabId)
-  }
-  // 深链接按 path 查归属应用 id → manifest。
-  function manifestForPath(path: string): AppManifest | undefined {
-    const appId = routeDomainRegistry.appIdForPath(path)
-    return appId ? appManager.findById(appId) : undefined
-  }
+  // main 区所有 main 应用（按 tabId 常驻保活）。
+  const allMainTabs = $derived(
+    area === "main"
+      ? appManager.allInstalled
+          .filter((app) => app.defaultArea === "main" && !app.hiddenFromNav)
+          .map((app) => ({
+            tabId: app.route,
+            manifest: app,
+            entryActivity: app.activities.find((a) => a.entry) ?? app.activities[0],
+          }))
+          .filter((x) => x.entryActivity)
+      : [],
+  );
 </script>
 
-{#if area === 'pop'}
+{#if area === "pop"}
   {#if navState.popActive && popView}
     {@const PopView = popView}
     <div in:motionBlur>
@@ -226,74 +239,42 @@
   {/if}
 {:else}
   <div class="main-area-root">
-    {#if area === 'main'}
-      <!-- 桌面：shell 级背景层（始终常驻 DOM 保活，无应用浮层、无 deep-link 时显现） -->
+    {#if area === "main"}
+      <!-- 桌面：shell 级背景层（始终常驻 DOM 保活，无应用浮层时显现） -->
       <div
         class="desktop-layer"
         class:desktop-layer-hidden={!desktopVisible}
-        use:blurTransition={{ hiddenClass: 'desktop-layer-hidden' }}
+        use:blurTransition={{ hiddenClass: "desktop-layer-hidden" }}
       >
         <DesktopView />
       </div>
-    {/if}
-    {#each allTabLoaders as { tabId } (tabId)}
-      {@const inThisArea = tabIdsInArea.includes(tabId) || activeTabId === tabId}
-      {@const isThisActive = inThisArea && isActive && activeTabId === tabId}
-      {@const View = loadedComponentFor(tabId)}
-      {@const manifest = manifestForTab(tabId)}
-      <!-- 应用浮层：常驻 DOM 保活，激活时覆盖桌面层。显隐用 WAAPI blurIn/blurOut。
-           deep-link 详情页激活时也隐藏（让位给详情页），但 DOM 保留以维持 scroll/状态。 -->
-      <div
-        class="app-overlay-layer"
-        class:app-overlay-hidden={!isThisActive || deepLinkActive}
-        use:blurTransition={{ hiddenClass: 'app-overlay-hidden' }}
-      >
-        {#if View}
-          {#if manifest}
-            <AppShell app={manifest} pathname={location.pathname}>
-              <View {area} {tabId} isActive={isThisActive} />
-            </AppShell>
-          {:else}
-            <View {area} {tabId} isActive={isThisActive} />
-          {/if}
-        {:else if isThisActive}
-          <!-- 仅激活态显示骨架（隐藏态保活层无需渲染骨架，节省资源） -->
-          <div class="app-skeleton h-full" aria-label="加载中"></div>
-        {/if}
-      </div>
-    {/each}
 
-    {#if area === 'main'}
-      <!-- deep-link 详情页层：与桌面/tab 浮层并存（z:20 覆盖其上）。
-           常驻 main-area-root，仅当 deepLinkLoader 激活时可见。
-           tab 浮层在此期间隐藏但保留 DOM——根治列表→详情→返回的 scroll/状态丢失。 -->
-      {@const manifest = manifestForPath(location.pathname)}
-      {@const shellApp = manifest}
-      <div class="deep-link-layer" class:deep-link-layer-hidden={!deepLinkActive}>
-        {#if deepLinkActive}
+      <!-- entry activity 浮层（z:10）：每个 main 区应用一个常驻 AppShell（按 tabId 保活）。
+           始终用 entryActivity（应用内多页面通过 entry root 的 children 嵌套表达）。
+           激活时（activeTabId 命中）显示；非 entry activity 激活时隐藏让位但保留 DOM（保活）。 -->
+      {#each allMainTabs as { tabId, manifest, entryActivity } (tabId)}
+        {@const isThisActive = isActive && activeTabId === tabId && !nonEntryActive}
+        <div
+          class="app-overlay-layer"
+          class:app-overlay-hidden={!isThisActive}
+          use:blurTransition={{ hiddenClass: "app-overlay-hidden" }}
+        >
+          <AppShell app={manifest} activity={entryActivity} {location} />
+        </div>
+      {/each}
+
+      <!-- 非 entry activity 层（z:20）：URL 匹配到非 entry activity 时独立渲染。
+           与 tab 浮层并存，覆盖其上；tab 浮层隐藏但保留 DOM（保活 scroll/state）。
+           常驻 main-area-root，仅当 nonEntryActive 时可见。 -->
+      <div class="deep-link-layer" class:deep-link-layer-hidden={!nonEntryActive}>
+        {#if nonEntryActive && mainResolution}
           <div class="h-full overflow-auto bg-background">
-            {#if deepLinkView}
-              {@const DeepView = deepLinkView}
-              <div in:motionBlur>
-                {#if shellApp}
-                  <AppShell app={shellApp} pathname={location.pathname}>
-                    <DeepView pathname={location.pathname} />
-                  </AppShell>
-                {:else}
-                  <DeepView pathname={location.pathname} />
-                {/if}
-              </div>
-            {:else}
-              <div class="app-skeleton h-full" aria-label="加载中"></div>
-            {/if}
+            <AppShell app={mainResolution.manifest} activity={mainResolution.activity} {location} />
           </div>
         {/if}
       </div>
-    {/if}
 
-    {#if area === 'main'}
-      <!-- NotFound 层（方向二）：URL 解析为 not-found 且中间件未 redirect 时渲染。
-           z:30 覆盖桌面/tab/deep-link 之上。 -->
+      <!-- NotFound 层（z:30）：URL 无归属应用时渲染。 -->
       <div class="not-found-layer" class:not-found-layer-hidden={!isNotFound}>
         {#if isNotFound}
           <div class="h-full overflow-auto bg-background" in:motionBlur>
@@ -301,25 +282,35 @@
           </div>
         {/if}
       </div>
+    {:else if area === "bottom"}
+      <!-- bottom 区：旧 registry 机制（terminal 等暂未迁移）-->
+      {#each tabIdsInArea as tabId (tabId)}
+        {@const isThisActive = isActive && activeTabId === tabId}
+        {@const View = loadedBottomFor(tabId)}
+        <div
+          class="app-overlay-layer"
+          class:app-overlay-hidden={!isThisActive}
+          use:blurTransition={{ hiddenClass: "app-overlay-hidden" }}
+        >
+          {#if View}
+            {@const BottomView = View}
+            <BottomView {area} {tabId} isActive={isThisActive} />
+          {:else if isThisActive}
+            <div class="app-skeleton h-full" aria-label="加载中"></div>
+          {/if}
+        </div>
+      {/each}
     {/if}
   </div>
 {/if}
 
 <style>
-  /* main 区根：桌面底层 + 应用浮层的堆叠上下文。
-   * 桌面与应用都常驻 DOM（保活），靠 visibility/z-index 决定显隐层级。
-   * overflow:hidden 裁剪子层溢出，避免隐藏浮层的内容污染父级 scrollHeight（杜绝滚动嵌套）。
-   * 注意：不使用 isolation:isolate——它会创建合成层边界，阻断 .app-layout 系统背景
-   * 到后代 .app-icon-box/.widget-card backdrop-filter 的透传。堆叠隔离由 .main-content
-   * 的 position:relative + isolation:isolate 提供（见 app.css）。 */
+  /* main 区根：桌面底层 + 应用浮层的堆叠上下文。 */
   .main-area-root {
     position: relative;
     height: 100%;
     overflow: hidden;
   }
-  /* 桌面层：常驻底层背景。无应用浮层时可见可交互；有浮层时隐藏（被遮挡）。
-   * 显隐用 WAAPI blurIn/blurOut 动画（见 use:blurTransition action），visibility 锁交互。
-   * 注意：默认态 filter:none（不是 blur(0px)），避免创建合成层影响子元素 backdrop-filter 绘制。 */
   .desktop-layer {
     position: absolute;
     inset: 0;
@@ -329,15 +320,8 @@
   .desktop-layer-hidden {
     visibility: hidden;
     pointer-events: none;
-    /* 隐藏时不滚动（避免贡献 scrollHeight，虽然被父级 overflow:hidden 裁剪已无害） */
     overflow: hidden;
   }
-  /* 应用浮层：常驻 DOM 保活，激活时显示并覆盖桌面。
-   * 显隐用 WAAPI blurIn/blurOut 动画（见 use:blurTransition action），visibility 锁交互。
-   * 默认态 filter:none，隐藏态 overflow:hidden 避免内容参与父级尺寸计算。
-   * 背景保持非透明 var(--background)：App 区域承载 shadcn-ui 组件，
-   * 这些组件不是为毛玻璃透传设计的，强行半透明会引入海量样式回归。
-   * 透传定制（状态栏/Dock）由 .glass-surface 单独处理（见 app.css）。 */
   .app-overlay-layer {
     position: absolute;
     inset: 0;
@@ -350,9 +334,8 @@
     pointer-events: none;
     overflow: hidden;
   }
-  /* deep-link 详情页层：常驻 main-area-root，激活时（z:20）覆盖桌面+tab 浮层。
-   * 与 tab 浮层并存：tab 不卸载、scrollTop 保留；详情页退出时 DOM 移除。
-   * 隐藏态用 visibility:hidden 锁交互，但保留布局（避免 main-area-root 高度坍缩）。 */
+  /* 非 entry activity 详情页层：常驻 main-area-root，激活时（z:20）覆盖 tab 浮层。
+   * 与 tab 浮层并存：tab 不卸载、scrollTop 保留；详情页退出时 DOM 移除。 */
   .deep-link-layer {
     position: absolute;
     inset: 0;
@@ -362,7 +345,6 @@
     visibility: hidden;
     pointer-events: none;
   }
-  /* NotFound 层：覆盖桌面/tab/deep-link 之上（z:30）。仅 not-found 解析命中时可见。 */
   .not-found-layer {
     position: absolute;
     inset: 0;
@@ -372,7 +354,6 @@
     visibility: hidden;
     pointer-events: none;
   }
-  /* 加载骨架（shadcn skeleton 风格脉冲） */
   .app-skeleton {
     width: 100%;
     min-height: 100%;

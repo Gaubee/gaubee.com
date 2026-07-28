@@ -51,6 +51,10 @@ export interface IssueDetail extends IssueSummary {
   body: string | null;
   /** 关闭原因（state=closed 时）。 */
   state_reason?: "completed" | "not_planned" | "reopened" | "duplicate" | null;
+  /** 指派人（GitHub 字段 assignees，可能为空数组）。 */
+  assignees: Array<{ login: string; avatar_url: string }>;
+  /** 里程碑（未设置时为 null）。 */
+  milestone: { title: string; html_url?: string } | null;
 }
 
 /** 表情反应统计。 */
@@ -79,6 +83,45 @@ export interface IssueComment {
   author_association: string;
   /** 表情反应（可选）。 */
   reactions?: Reactions;
+}
+
+/** Issue timeline 事件类型（GitHub Issues Events API 返回的 event 字段）。 */
+export type IssueEventType =
+  | "closed"
+  | "reopened"
+  | "labeled"
+  | "unlabeled"
+  | "assigned"
+  | "unassigned"
+  | "referenced"
+  | "renamed"
+  | "milestoned"
+  | "demilestoned"
+  | "locked"
+  | "unlocked"
+  | "pinned"
+  | "unpinned";
+
+/** Issue timeline action 事件（紧凑单行，区别于 IssueComment 的卡片）。
+ *  如「X closed this」「Y added the bug label」。 */
+export interface IssueEvent {
+  id: number;
+  /** 事件类型。 */
+  event: IssueEventType;
+  /** 触发者。 */
+  actor: { login: string; avatar_url: string };
+  /** 发生时间。 */
+  created_at: string;
+  /** labeled/unlabeled 时的 label。 */
+  label?: { name: string; color: string };
+  /** assigned/unassigned 时的对象。 */
+  assignee?: { login: string; avatar_url: string };
+  /** referenced 时的关联 commit SHA。 */
+  commit_id?: string;
+  /** renamed 时的旧/新标题。 */
+  rename?: { from: string; to: string };
+  /** milestoned/demilestoned 时的里程碑标题。 */
+  milestone?: { title: string };
 }
 
 /** 用户摘要（@mention 搜索用）。 */
@@ -113,6 +156,10 @@ interface GhIssueResponse {
   reactions?: Reactions;
   body?: string | null;
   state_reason?: string | null;
+  /** 指派人（GitHub 默认在 issue 详情返回）。 */
+  assignees?: Array<{ login: string; avatar_url: string }>;
+  /** 里程碑（未设置时 GitHub 返回 null）。 */
+  milestone?: { title: string; html_url?: string } | null;
 }
 
 interface GhCommentResponse {
@@ -152,6 +199,8 @@ function toIssueDetail(i: GhIssueResponse): IssueDetail {
     ...toIssueSummary(i),
     body: i.body ?? null,
     state_reason: (i.state_reason as IssueDetail["state_reason"]) ?? null,
+    assignees: i.assignees ?? [],
+    milestone: i.milestone ?? null,
   };
 }
 
@@ -173,24 +222,30 @@ function toComment(c: GhCommentResponse): IssueComment {
 // =========================================================================
 
 /**
- * 列出仓库的 issues（排除 PR）。
- * GET /repos/{owner}/{repo}/issues?state=open&per_page=N
+ * 列出仓库 issues（自动过滤 PR）。
+ * 用 search API（is:issue）而非 /issues 端点，确保与 loadIssueCounts 的计数数据源一致
+ * （/issues 端点会混入 PR，filter 后可能与 search 计数不符，导致「有 N 条但列表空」的 bug）。
+ *
+ * GET /search/issues?q=repo:{owner}/{repo}+is:issue+is:{state}
  */
 export async function listIssues(
   owner: string,
   repo: string,
   opts?: { state?: "open" | "closed" | "all"; perPage?: number; page?: number },
 ): Promise<IssueSummary[]> {
+  const state = opts?.state ?? "open";
+  // search API 用 is:issue 过滤 PR，与计数（loadIssueCounts）数据源统一
+  const query = state === "all" ? `is:issue` : `is:${state}`;
   const params = new URLSearchParams({
-    state: opts?.state ?? "open",
+    q: `${query} repo:${owner}/${repo} is:issue`,
     per_page: String(opts?.perPage ?? 30),
     page: String(opts?.page ?? 1),
   });
-  const resp = await fetchGithub(`repos/${owner}/${repo}/issues?${params.toString()}`);
+  const resp = await fetchGithub(`search/issues?${params.toString()}`);
   if (resp.status === 404) return [];
   await assertOk(resp, `listIssues(${owner}/${repo})`);
-  const data = (await resp.json()) as GhIssueResponse[];
-  return data.filter((i) => !i.pull_request).map(toIssueSummary);
+  const data = (await resp.json()) as { total_count: number; items: GhIssueResponse[] };
+  return data.items.map(toIssueSummary);
 }
 
 /**
@@ -272,6 +327,54 @@ export async function listIssueComments(
   await assertOk(resp, `listIssueComments(${owner}/${repo}#${number})`);
   const data = (await resp.json()) as GhCommentResponse[];
   return data.map(toComment);
+}
+
+/** GitHub Events API 响应（内部，仅取需要的字段）。 */
+interface GhEventResponse {
+  id: number;
+  event: string;
+  actor: { login: string; avatar_url: string };
+  created_at: string;
+  label?: { name: string; color: string };
+  assignee?: { login: string; avatar_url: string };
+  commit_id?: string;
+  commit_url?: string;
+  rename?: { from: string; to: string };
+  milestone?: { title: string };
+}
+
+/**
+ * 列出 issue 的 timeline 事件（closed/reopened/labeled/assigned 等紧凑 action 行）。
+ * GET /repos/{owner}/{repo}/issues/{number}/events
+ *
+ * 与 listIssueComments 区别：events 是「动作」（无 body，单行渲染），
+ * comments 是「评论」（有 body，卡片渲染）。IssueContentPanel 把两者按时间
+ * 合并为统一的 timeline。
+ */
+export async function listIssueEvents(
+  owner: string,
+  repo: string,
+  number: number,
+): Promise<IssueEvent[]> {
+  const resp = await fetchGithub(`repos/${owner}/${repo}/issues/${number}/events?per_page=100`);
+  if (resp.status === 404) return [];
+  await assertOk(resp, `listIssueEvents(${owner}/${repo}#${number})`);
+  const data = (await resp.json()) as GhEventResponse[];
+  return data
+    .filter((e) => e.event && e.actor)
+    .map((e) => ({
+      id: e.id,
+      event: e.event as IssueEventType,
+      actor: { login: e.actor.login, avatar_url: e.actor.avatar_url },
+      created_at: e.created_at,
+      label: e.label,
+      assignee: e.assignee
+        ? { login: e.assignee.login, avatar_url: e.assignee.avatar_url }
+        : undefined,
+      commit_id: e.commit_id,
+      rename: e.rename,
+      milestone: e.milestone ? { title: e.milestone.title } : undefined,
+    }));
 }
 
 /**

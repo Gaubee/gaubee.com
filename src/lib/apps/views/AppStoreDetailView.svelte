@@ -6,6 +6,7 @@
 <script lang="ts">
   import { appManager } from '$lib/apps/AppManager.svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
+  import { useParams } from '$lib/router'
   import { Button } from '$lib/components/ui/button'
   import * as Card from '$lib/components/ui/card'
   import { Badge } from '$lib/components/ui/badge'
@@ -16,7 +17,9 @@
   import { notifySuccess, notifyError } from '$lib/apps/builtin/notifications/service.svelte'
   import type { AppManifest } from '$lib/apps/types'
 
-  let { appId }: { appId: string } = $props()
+  // appId 来自 app-store.detail 子路由的 params（:appId 段捕获）
+  const getParams = useParams<{ appId: string }>()
+  const appId = $derived(getParams?.()?.appId ?? '')
 
   const app = $derived(appManager.findById(appId))
   const isInstalled = $derived(app ? appManager.isInstalled(appId) : false)

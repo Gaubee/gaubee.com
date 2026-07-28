@@ -39,10 +39,10 @@ class RouteDomainRegistry {
   registerApp(manifest: AppManifest): void {
     const entryRoute = getEntryRoute(manifest);
     for (const activity of manifest.activities) {
-      this.domains.set(activity.route, {
+      this.domains.set(activity.pattern, {
         appId: manifest.id,
         entryRoute,
-        route: activity.route,
+        route: activity.pattern,
       });
     }
   }

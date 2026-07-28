@@ -1,5 +1,6 @@
 import type { ContentProcessor, ContentSource } from "$lib/content-pipeline/types";
 import type { ServiceDeclaration } from "$lib/os/services";
+import type { RouteContract } from "$lib/router";
 import type { SearchServiceFactory } from "$lib/search/types";
 /**
  * GaubeeOS 应用系统类型定义。
@@ -7,15 +8,22 @@ import type { SearchServiceFactory } from "$lib/search/types";
  * 心智模型：GaubeeOS = iPadOS。
  * - App（GaubeeApp）：一个完整应用身份（如「文章」「写作」）。
  * - Activity（AppActivity）：应用拥有的一个屏幕场景（Android Activity / iPadOS Scene），
- *   每个场景有路由域前缀 + 视图。一个应用可拥有多个场景。
+ *   每个场景有一个绝对 pattern（如 '/app/github'）+ 一棵 RouteContract 树（root）。
+ *   应用内的多页面通过 root 的 children 嵌套表达，类型安全（zod schema）。
  * - DeepLink（AppDeepLink）：应用对外拉起契约（搜索/通知/URL 可直达），公开/私有分离。
  * - Dock/任务栏（main/bottom tab）：OS 层启动器，一个应用一个图标，与场景形态正交。
  *   点击图标 = 聚焦应用 + 恢复最后场景（不重置到入口），同 iPadOS 点 Dock。
  * - area：屏幕分区（main=主区/Split View，bottom=Slide Over，pop=模态 Sheet）。
  *
- * 入口路由（entryRoute）派生自 entry activity，取代旧的单一路由字段：
- *   entryRoute = activities.find(a => a.entry)?.route ?? activities[0].route
+ * 入口路由（entryRoute）派生自 entry activity 的 pattern：
+ *   entryRoute = activities.find(a => a.entry)?.pattern ?? activities[0].pattern
  * 它同时是 Dock 图标身份（tabId）。
+ *
+ * 路由系统（2026-07-27 重构）：
+ * - 旧字段 route/view 已删除，改为 pattern/root（root 是 RouteContract 树）。
+ * - 旧 asView 已删除（被 RouteContract.component 取代）。
+ * - 应用内多页面通过 defineRoute({ children }) 嵌套声明，zod schema 提供类型安全。
+ * - 详见 $lib/router。
  */
 import type { Component } from "svelte";
 
@@ -62,35 +70,32 @@ export interface CliCommand {
 }
 
 // ---------------------------------------------------------------------------
-// 视图加载器（懒加载）
+// 视图加载器（懒加载）—— 过渡期保留，供旧 registry.ts/resolver.ts 使用
 // ---------------------------------------------------------------------------
 
-/** 视图加载器：返回组件的工厂函数。
- *  default 是无 props 的 Component；有 props 的视图（如深链接视图需 pathname）
- *  需用 asView 包裹断言宽放（运行时 props 由 AreaOutlet 保证传入）。 */
+/**
+ * 视图加载器：返回组件的工厂函数。
+ *
+ * @deprecated 2026-07-27 路由重构后，新应用应通过 RouteContract.component 表达视图懒加载。
+ *             此类型仅供 views/registry.ts 等旧模块过渡期使用，阶段 5 清理时删除。
+ */
 export type ViewLoader = () => Promise<{ default: Component }>;
-
-/** 标记一个加载器为「带运行时注入 props 的视图」，断言为通用 ViewLoader。
- *  Svelte Component 逆变使 Component<Props> 无法直接赋给 Component<{}>，
- *  但运行时契约由 AreaOutlet 保证（深链接视图总会收到 pathname），故断言安全。
- *  泛型 L 保持原始加载器形状，避免类型丢失。 */
-export function asView<L>(loader: L): ViewLoader {
-  return loader as unknown as ViewLoader;
-}
 
 // ---------------------------------------------------------------------------
 // 应用场景与深链接（iPadOS Activity / Scene / URL Scheme）
 // ---------------------------------------------------------------------------
 
 /** 应用的一个屏幕场景（Android Activity / iPadOS Scene）。
- * 每个场景拥有一个路由域前缀 + 对应视图。 */
+ * 每个场景有一个绝对 pattern + 一棵 RouteContract 树。 */
 export interface AppActivity {
-  /** 该场景的路由域前缀（如 '/app/articles'、'/article'、'/app/editor'）。 */
-  route: string;
-  /** 场景视图（懒加载）。 */
-  view: ViewLoader;
+  /** 该场景的绝对 pattern（如 '/app/articles'、'/article'、'/app/editor'）。
+   *  作为路由域前缀，ActivityRouter 在此基础上匹配 root 子树。 */
+  pattern: string;
+  /** 场景的根 Route 树（root.pattern 通常为 ''，代表「Activity 入口」）。
+   *  应用内的多页面通过 root.children 嵌套表达。 */
+  root: RouteContract;
   /** 是否为应用入口场景。
-   * - true：Dock 图标身份（entryRoute）= 此 route；聚焦无记忆时落回此。
+   * - true：Dock 图标身份（entryRoute）= 此 pattern；聚焦无记忆时落回此。
    * - 缺省：取 activities 中首个，或唯一标记 entry 的那个。
    * 每个 manifest 应恰好有一个 entry 场景。 */
   entry?: boolean;
@@ -109,7 +114,7 @@ export interface AppActivity {
 export interface AppDeepLink {
   /** 拉起路径前缀。 */
   pattern: string;
-  /** 该 deepLink 实际拉起的场景 route（缺省=匹配同 pattern 的 activity）。 */
+  /** 该 deepLink 实际拉起的场景 pattern（缺省=匹配同 pattern 的 activity）。 */
   activity?: string;
 }
 
@@ -203,10 +208,10 @@ export interface AppEntry {
 // 派生：入口路由（Dock 图标身份）
 // ---------------------------------------------------------------------------
 
-/** 从 manifest 的 activities 派生入口路由（= entry activity 的 route）。
+/** 从 manifest 的 activities 派生入口路由（= entry activity 的 pattern）。
  * 规则：取首个 entry:true 的 activity；若无标记则取 activities[0]。
  * 这是 Dock 图标身份（tabId），也是聚焦无记忆时的落点。 */
 export function getEntryRoute(manifest: AppManifest): string {
   const entry = manifest.activities.find((a) => a.entry);
-  return (entry ?? manifest.activities[0])?.route ?? "";
+  return (entry ?? manifest.activities[0])?.pattern ?? "";
 }

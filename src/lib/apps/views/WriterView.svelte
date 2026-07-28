@@ -25,6 +25,7 @@
   import SendIcon from '@lucide/svelte/icons/send'
   import GitCommitHorizontalIcon from '@lucide/svelte/icons/git-commit-horizontal'
   import { notifySuccess } from '$lib/apps/builtin/notifications/service.svelte'
+  import { targetById } from '$lib/router'
 
   let files = $state<string[]>([])
   let loading = $state(true)
@@ -57,7 +58,9 @@
     if (match) {
       const collection = match[2]
       const stem = match[3]
-      navController.navigateMain(`/app/editor/${collection}/${stem}`)
+      navController.navigateMain(
+        `/app/editor?collection=${encodeURIComponent(collection)}&stem=${encodeURIComponent(stem)}`,
+      )
     }
   }
 
@@ -72,7 +75,7 @@
       const sha = await git.commit(`发表 ${dirtyCount} 个变更`)
       notifySuccess(`已发表 ${dirtyCount} 个变更（${sha.slice(0, 7)}）`, undefined, {
         label: '查看变更',
-        href: '/app/changes',
+        to: targetById('writer.changes'),
       })
       await refresh()
     } catch (e) {

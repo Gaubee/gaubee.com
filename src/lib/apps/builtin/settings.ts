@@ -1,4 +1,5 @@
 import AboutSection from "$lib/apps/views/AboutSection.svelte";
+import { leafRoute } from "$lib/router";
 import Info from "@lucide/svelte/icons/info";
 import MoonIcon from "@lucide/svelte/icons/moon";
 import PaletteIcon from "@lucide/svelte/icons/palette";
@@ -25,9 +26,9 @@ export const settingsApp: AppEntry = {
     defaultArea: "main",
     activities: [
       {
-        route: "/app/settings",
+        pattern: "/app/settings",
         entry: true,
-        view: () => import("$lib/views/SettingsView.svelte"),
+        root: leafRoute("settings", () => import("$lib/views/SettingsView.svelte")),
       },
     ],
     vfsOwnership: [],

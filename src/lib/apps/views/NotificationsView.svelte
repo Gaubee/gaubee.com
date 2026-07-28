@@ -5,6 +5,8 @@
 <script lang="ts">
   import { gaubeeos } from '$lib/os/services'
   import { navController } from '$lib/nav/nav-controller-instance'
+  import { buildHrefById } from '$lib/router'
+  import type { NotificationAction } from '$lib/apps/builtin/notifications/service.svelte'
   import { Button } from '$lib/components/ui/button'
   import * as Card from '$lib/components/ui/card'
   import BellIcon from '@lucide/svelte/icons/bell'
@@ -17,10 +19,11 @@
   const history = $derived(service?.history ?? [])
   const unreadCount = $derived(service?.unreadCount ?? 0)
 
-  /** 点击通知卡片：有 action 则跳转，并标记全部已读。 */
-  function handleClick(action?: { href: string }): void {
+  /** 点击通知卡片：有 action 则按 IdTarget 跳转（类型安全），并标记全部已读。
+   *  2026-07-27 路由重构：action.to 是 IdTarget（替代旧 href: string）。 */
+  function handleClick(action?: NotificationAction): void {
     service?.markAllRead()
-    if (action) navController.navigateMain(action.href)
+    if (action) navController.navigateMain(buildHrefById(action.to.routeId, action.to.params))
   }
 
   function severityColor(sev: string): string {

@@ -20,6 +20,7 @@
   import { handlePublishError } from '$lib/os/services/publish-helper'
   import { navController } from '$lib/nav/nav-controller-instance'
   import { navStore } from '$lib/nav/nav.svelte'
+  import { useParams, useSearch } from '$lib/router'
   import { notifySuccess, notifyWarning } from '$lib/apps/builtin/notifications/service.svelte'
   import { accountService } from '$lib/apps/builtin/account/service'
   import {
@@ -46,8 +47,10 @@
   import { fetchReadme } from '$lib/apps/installable/github/readme'
   import RepoFileTree, { type TreeNode } from './RepoFileTree.svelte'
   import RepoFileContent from './RepoFileContent.svelte'
+  import RepoEditPermission from './RepoEditPermission.svelte'
   import IssueContentPanel from './IssueContentPanel.svelte'
   import CommitDetailPanel from './CommitDetailPanel.svelte'
+  import RepoRefSelector from './RepoRefSelector.svelte'
   import { diffLines } from '$lib/utils/diff'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
@@ -74,26 +77,56 @@
   import FilePlusIcon from '@lucide/svelte/icons/file-plus'
   import FileMinusIcon from '@lucide/svelte/icons/file-minus'
   import SearchIcon from '@lucide/svelte/icons/search'
+  import CircleDotIcon from '@lucide/svelte/icons/circle-dot'
+  import CheckCircle2Icon from '@lucide/svelte/icons/check-circle-2'
+  import MessageCircleIcon from '@lucide/svelte/icons/message-circle'
+  import XIcon from '@lucide/svelte/icons/x'
+  import FilterIcon from '@lucide/svelte/icons/filter'
+  import GitBranchIcon from '@lucide/svelte/icons/git-branch'
+  import * as Popover from '$lib/components/ui/popover'
+  import { labelStyleString } from '$lib/utils/label-color'
+  import { createResource } from '$lib/apps/installable/github/state'
 
-  let { owner, repo }: { owner: string; repo: string } = $props()
+  // ---- 路由参数（2026-07-27 重构：useParams/useSearch 返回 getter，需 $derived 包装）----
+  type RepoDetailParams = { owner: string; repo: string };
+  type RepoDetailSearch = {
+    tab: 'files' | 'history' | 'changes' | 'issues' | 'log';
+    sha?: string;
+    file?: string;
+    issue?: number;
+    change?: string;
+    activity?: string;
+    ref?: string;
+  };
+  // 关键：useParams/useSearch 返回 getter，用 $derived 包成响应式快照，
+  // 后续读取 .tab/.sha 等字段自动响应 URL 变化。
+  // 旧 bug：直接拿快照值，导致 ?sha=xxx 切换 commit 不重新加载（需刷新才行）。
+  const getParams = useParams<RepoDetailParams>();
+  const getSearch = useSearch<RepoDetailSearch>();
+  const params = $derived(getParams?.());
+  const search = $derived(getSearch?.());
 
-  const isMainRepo = $derived(owner === OWNER && repo === REPO)
+  const owner = $derived(params?.owner ?? '');
+  const repo = $derived(params?.repo ?? '');
 
-  // ---- Tab 路由化（URL query 参数驱动）----
-  // ?tab=files|history|changes|issues|log
-  // &file=路径 &sha=commitSHA &issue=编号 &change=路径 &activity=ID
+  /** 是否主仓库（结构性控制：变更 tab 是否显示/加载）。
+   *  大小写不敏感（与 GitHub owner/repo 行为一致；编辑权限的细粒度判定见 RepoEditPermission）。 */
+  const isMainRepo = $derived(
+    owner.toLowerCase() === OWNER.toLowerCase() && repo.toLowerCase() === REPO.toLowerCase(),
+  )
+
+  // ---- Tab 路由化（URL query 参数驱动，已通过 search schema parse）----
   const navState = $derived(navStore.current)
-  const searchParams = $derived(new URLSearchParams(navState.mainLocation.search))
-  /** 当前 Tab（URL ?tab=，默认 files）。 */
-  const activeTab = $derived((searchParams.get('tab') ?? 'files') as 'files' | 'history' | 'changes' | 'issues' | 'log')
-  /** 各选中项从 URL 读取（刷新/前进后退保持）。 */
-  const selectedFile = $derived(searchParams.get('file') ?? '')
-  const selectedCommitSha = $derived(searchParams.get('sha'))
-  const selectedIssue = $derived(searchParams.get('issue') ? Number(searchParams.get('issue')) : null)
-  const selectedChangePath = $derived(searchParams.get('change'))
-  const selectedActivityId = $derived(searchParams.get('activity'))
+  /** 当前 Tab（已 parse，默认 files 由 schema 保证）。 */
+  const activeTab = $derived(search?.tab ?? 'files')
+  /** 各选中项从已 parse 的 search 读取（刷新/前进后退保持）。 */
+  const selectedFile = $derived(search?.file ?? '')
+  const selectedCommitSha = $derived(search?.sha)
+  const selectedIssue = $derived(search?.issue ?? null)
+  const selectedChangePath = $derived(search?.change)
+  const selectedActivityId = $derived(search?.activity)
   /** 文件 Tab 的 git ref（commit SHA/分支名），用于按历史版本浏览文件树和文件内容。 */
-  const fileRef = $derived(searchParams.get('ref'))
+  const fileRef = $derived(search?.ref)
 
   /** 详情页 base path（owner/repo，不含 query）。 */
   const basePath = $derived(navState.mainLocation.pathname)
@@ -104,15 +137,19 @@
   }
   /** 选中项（PUSH 入历史栈，可后退）。更新 query 时保留 tab + ref（文件按 commit 访问上下文）。 */
   function navigateSelect(tab: string, key: string, value: string) {
-    const params = new URLSearchParams({ tab, [key]: value })
+    const sp = new URLSearchParams({ tab, [key]: value })
     // 文件 Tab 的 ref 参数需要跨选中项保留（同一个 commit 下浏览不同文件）
-    if (tab === 'files' && fileRef) params.set('ref', fileRef)
-    navController.navigateMain(`${basePath}?${params.toString()}`)
+    if (tab === 'files' && fileRef) sp.set('ref', fileRef)
+    navController.navigateMain(`${basePath}?${sp.toString()}`)
   }
 
-  // ---- 仓库元数据 ----
-  let repoInfo = $state<RepoSummary | null>(null)
-  let repoInfoLoading = $state(false)
+  // ---- 仓库元数据（silent：辅助数据，失败不清空统计栏）----
+  const repoInfoResource = createResource(
+    () => getRepo(owner, repo),
+    { silent: true, errorMessage: '加载仓库信息失败' },
+  )
+  /** repoInfo 便捷别名。 */
+  const repoInfo = $derived(repoInfoResource.data)
 
   // ---- 文件树 + 内容 ----
   let tree = $state<Map<string, TreeNode>>(new Map())
@@ -121,31 +158,68 @@
   /** 移动端文件树浮层开关（桌面端用双栏 grid，不用此浮层）。 */
   let fileTreeSheetOpen = $state(false)
 
-  // ---- 历史 ----
-  let commits = $state<CommitInfo[]>([])
-  let commitsLoading = $state(false)
-  let commitsError = $state<string | null>(null)
+  // ---- 历史（commit 列表，列表空态判定）----
+  /** commit 过滤器（内存 state，不进 URL；branch 用 RepoRefSelector 切换）。
+   *  - commitBranch: branch/tag 名（空=默认分支）
+   *  - commitAuthor: GitHub login
+   *  - commitSince/commitUntil: ISO 日期（YYYY-MM-DD） */
+  let commitBranch = $state<string>('')
+  let commitAuthor = $state<string>('')
+  let commitSince = $state<string>('')
+  let commitUntil = $state<string>('')
+  /** 高级过滤器是否激活（branch 不算，因为 branch 有独立的 selector）。 */
+  const hasCommitFilters = $derived(!!commitAuthor || !!commitSince || !!commitUntil)
   /** 移动端 commit 列表浮层。 */
   let commitListSheetOpen = $state(false)
 
-  // ---- 变更（仅主仓库）----
-  let changes = $state<VfsNode[]>([])
-  let changesLoading = $state(false)
+  const commitsResource = createResource(
+    () => listCommits({
+      owner,
+      repo,
+      perPage: 30,
+      sha: commitBranch || undefined,
+      author: commitAuthor || undefined,
+      // GitHub since/until 接受 ISO 8601；input[type=date] 返回 YYYY-MM-DD，补全为当天起止
+      since: commitSince ? `${commitSince}T00:00:00Z` : undefined,
+      until: commitUntil ? `${commitUntil}T23:59:59Z` : undefined,
+    }),
+    { errorMessage: '加载历史失败', isEmpty: (a) => a.length === 0 },
+  )
+  /** commits 便捷别名（派生，模板用）。 */
+  const commits = $derived(commitsResource.data ?? [])
+
+  // ---- 变更（仅主仓库，silent 辅助数据）----
   let commitMessage = $state('')
   let committing = $state(false)
   /** 移动端变更列表浮层。 */
   let changeListSheetOpen = $state(false)
+  const changesResource = createResource(
+    () => vfs.dirtyFiles(),
+    { silent: true, errorMessage: '加载变更失败', isEmpty: (a) => a.length === 0 },
+  )
+  /** changes 便捷别名（派生）。 */
+  const changes = $derived(changesResource.data ?? [])
 
-  // ---- 仓库快速搜索（元数据栏，默认限定仓库类型）----
+  // ---- 仓库快速搜索（元数据栏，内置 seq 竞态防护）----
   let repoSearchInput = $state('')
-  let repoSearchResults = $state<RepoSummary[] | null>(null)
-  let repoSearchLoading = $state(false)
+  const repoSearchResource = createResource(
+    async () => {
+      const { searchRepos } = await import('$lib/apps/installable/github/repo-api')
+      const { items } = await searchRepos(repoSearchInput.trim(), { perPage: 10 })
+      return items
+    },
+    { errorMessage: '搜索仓库失败', isEmpty: (a) => a.length === 0 },
+  )
+  /** 搜索结果（null 表示未搜索，[] 表示搜索了但空）。 */
+  const repoSearchResults = $derived(
+    repoSearchResource.status === 'idle' ? null : (repoSearchResource.data ?? []),
+  )
 
   /** 仓库快速搜索：支持 owner/repo 直跳 或 关键词搜索。 */
   async function handleRepoSearch() {
     const q = repoSearchInput.trim()
     if (!q) {
-      repoSearchResults = null
+      repoSearchResource.reset()
       return
     }
     // owner/repo 格式直接跳转
@@ -153,29 +227,57 @@
     if (directMatch) {
       navController.navigateMain(`/app/github/repo/${directMatch[1]}/${directMatch[2]}`)
       repoSearchInput = ''
-      repoSearchResults = null
+      repoSearchResource.reset()
       return
     }
-    // 关键词搜索仓库（默认限定仓库类型，非 issues/code）
-    repoSearchLoading = true
-    try {
-      const { searchRepos } = await import('$lib/apps/installable/github/repo-api')
-      const { items } = await searchRepos(q, { perPage: 10 })
-      repoSearchResults = items
-    } catch {
-      repoSearchResults = []
-    } finally {
-      repoSearchLoading = false
-    }
+    // 关键词搜索仓库（createResource 内置 seq 竞态防护，替代手写 try/catch）
+    void repoSearchResource.run()
   }
 
   // ---- Issues ----
-  let issues = $state<IssueSummary[]>([])
-  let issuesLoading = $state(false)
-  let issuesError = $state<string | null>(null)
+  /** 三种列表模式：open（默认）/ closed / search（关键词搜索结果）。 */
+  type IssueListMode = 'open' | 'closed' | 'search'
+  /** 当前列表模式（控制 tab 高亮 + 数据源）。 */
+  let issueMode = $state<IssueListMode>('open')
   let issueSearchInput = $state('')
   /** 移动端 issue 列表浮层开关。 */
   let issueListSheetOpen = $state(false)
+
+  const issuesResource = createResource<IssueSummary[]>(
+    // 统一处理三种 mode：open/closed 走 listIssues，search 走 searchIssues。
+    // 切换 mode 时由 setIssueMode/handleIssueSearch 先 reset 清空旧数据，
+    // 让 status 回 loading（骨架），避免 refreshing 保留上一模式的列表。
+    async () => {
+      if (issueMode === 'search') {
+        const q = issueSearchInput.trim()
+        if (!q) return []
+        const { items } = await searchIssues(owner, repo, q, { perPage: 30 })
+        return items
+      }
+      const state = issueMode === 'closed' ? 'closed' : 'open'
+      return listIssues(owner, repo, { state, perPage: 30 })
+    },
+    { errorMessage: '加载 Issues 失败', isEmpty: (a) => a.length === 0 },
+  )
+  /** issues 便捷别名。 */
+  const issues = $derived(issuesResource.data ?? [])
+
+  /** open/closed 计数（包成单一资源，替代 openCount/closedCount/countsLoading 三态）。 */
+  interface IssueCounts { open: number; closed: number }
+  const issueCountsResource = createResource<IssueCounts>(
+    async () => {
+      const [open, closed] = await Promise.all([
+        searchIssues(owner, repo, 'is:open', { perPage: 1 }),
+        searchIssues(owner, repo, 'is:closed', { perPage: 1 }),
+      ])
+      return { open: open.total, closed: closed.total }
+    },
+    { silent: true, errorMessage: '加载计数失败' },
+  )
+  /** open 计数（null 表示未加载）。 */
+  const openCount = $derived(issueCountsResource.data?.open ?? null)
+  /** closed 计数（null 表示未加载）。 */
+  const closedCount = $derived(issueCountsResource.data?.closed ?? null)
 
   // ---- 日志 ----
   const activities = $derived(
@@ -213,7 +315,22 @@
   $effect(() => {
     const o = owner
     const r = repo
+    if (!o || !r) return  // owner/repo 未就绪时跳过（避免空字符串触发无效加载）
     untrack(() => void loadAll(o, r))
+  })
+
+  // auth 就绪后重试 README 自动选中（修复整页刷新时序 bug）。
+  // 场景：整页刷新时 authStore.refresh() 是 async，组件挂载时 isAuthenticated=false，
+  // fetchReadme 走匿名分支受 60/h 限速失败；auth 就绪后需重新尝试。
+  // 仅在 files Tab + 未选中文件 + 无 fileRef 时重试（与 autoSelectReadme 条件一致）。
+  $effect(() => {
+    const authed = accountService.state.authenticated
+    const loaded = accountService.state.loaded
+    const o = owner
+    const r = repo
+    if (!authed || !loaded || !o || !r) return
+    if (activeTab !== 'files' || selectedFile || fileRef) return
+    untrack(() => void autoSelectReadme(o, r))
   })
 
   // fileRef（commit SHA）变化时清空文件树重新加载（不同 commit 的目录结构不同）。
@@ -227,25 +344,34 @@
     })
   })
 
+  /** owner/repo 变化时重新加载所有数据。
+   *  各 resource 的 fetcher 闭包读取响应式 owner/repo，run 时取最新值。
+   *  o/r 参数仅用于 isMainRepo 判断和 README/文件树等手写加载。
+   *  reset 清空所有旧数据：切换仓库时标题/统计/列表完全不同，走骨架而非 refreshing。
+   *  同时重置 issue 模式/搜索词：避免新仓库沿用上一个仓库的 search 状态。 */
   async function loadAll(o: string, r: string) {
-    void loadRepoInfo(o, r)
+    // 重置所有 mode/过滤器状态：切换仓库时不沿用上一个仓库的过滤条件
+    issueMode = 'open'
+    issueSearchInput = ''
+    commitBranch = ''
+    commitAuthor = ''
+    commitSince = ''
+    commitUntil = ''
+    repoInfoResource.reset()
+    commitsResource.reset()
+    issuesResource.reset()
+    // 主仓库判定（大小写不敏感，与 isMainRepo 一致）
+    const mainRepo =
+      o.toLowerCase() === OWNER.toLowerCase() && r.toLowerCase() === REPO.toLowerCase()
+    issueCountsResource.reset()
+    if (mainRepo) changesResource.reset()
+    void repoInfoResource.run()
     void autoSelectReadme(o, r)
-    void loadCommits(o, r)
+    void commitsResource.run()
     void loadDir('', o, r)
-    if (o === OWNER && r === REPO) void loadChanges()
-    void loadIssues(o, r)
-  }
-
-  // ---- 仓库元数据 ----
-  async function loadRepoInfo(o: string, r: string) {
-    repoInfoLoading = true
-    try {
-      repoInfo = await getRepo(o, r)
-    } catch {
-      repoInfo = null
-    } finally {
-      repoInfoLoading = false
-    }
+    if (mainRepo) void changesResource.run()
+    void issuesResource.run()
+    void issueCountsResource.run()
   }
 
   // ---- 自动选中 README（进详情页默认展示 README 内容）----
@@ -303,32 +429,53 @@
     })
   }
 
+  /** 清除 fileRef，回到默认分支（清掉 URL 的 ref 参数，保留当前 tab + file）。 */
+  function clearFileRef() {
+    const sp = new URLSearchParams({ tab: 'files' })
+    if (selectedFile) sp.set('file', selectedFile)
+    navController.navigateMain(`${basePath}?${sp.toString()}`)
+  }
+
   // ---- 历史 ----
-  async function loadCommits(o: string, r: string) {
-    commitsLoading = true
-    commitsError = null
-    try {
-      commits = await listCommits({ owner: o, repo: r, perPage: 30 })
-    } catch (e) {
-      commitsError = e instanceof Error ? e.message : '加载历史失败'
-      commits = []
-    } finally {
-      commitsLoading = false
+  // commits 数据由 commitsResource 管理（fetcher 闘包读 commitBranch/commitAuthor 等过滤器）
+  /** 切换 commit 列表的 branch/tag（RepoRefSelector 回调）。
+   *  reset 清空旧列表：不同 branch 的 commit 完全不同，走骨架而非 refreshing。 */
+  function setCommitBranch(ref: string) {
+    // 选默认分支时清空（让 selector 显示 default，而不是重复存 branch 名）
+    commitBranch = ref === (repoInfo?.default_branch ?? 'main') ? '' : ref
+    // 切换 branch 时清除选中 commit（不同 branch 的 SHA 不通用）
+    if (selectedCommitSha) {
+      const sp = new URLSearchParams({ tab: 'history' })
+      navController.navigateMain(`${basePath}?${sp.toString()}`, 'REPLACE')
     }
+    commitsResource.reset()
+    void commitsResource.run()
+  }
+
+  /** SHA 直跳：直接跳到 CommitDetail（不走列表过滤）。 */
+  function jumpToCommitSha(sha: string) {
+    navigateSelect('history', 'sha', sha)
+  }
+
+  /** 清除高级过滤器（author/since/until），保留 branch。
+   *  reset 清空旧列表：过滤条件变化导致结果集不同，走骨架。 */
+  function clearCommitFilters() {
+    commitAuthor = ''
+    commitSince = ''
+    commitUntil = ''
+    commitsResource.reset()
+    void commitsResource.run()
+  }
+
+  /** 应用高级过滤器（author/since/until/branch 变化后触发）。
+   *  reset 清空旧列表：过滤条件变化导致结果集不同，走骨架而非 refreshing。 */
+  function applyCommitFilters() {
+    commitsResource.reset()
+    void commitsResource.run()
   }
 
   // ---- 变更（仅主仓库）----
-  async function loadChanges() {
-    changesLoading = true
-    try {
-      changes = await vfs.dirtyFiles()
-    } catch {
-      changes = []
-    } finally {
-      changesLoading = false
-    }
-  }
-
+  // changes 数据由 changesResource 管理（silent 辅助数据）
   function changeKind(change: VfsNode): 'add' | 'del' | 'mod' {
     if (change.origin === 'local') return 'add'
     if (change.content === null) return 'del'
@@ -347,7 +494,7 @@
       const sha = await git.commit(msg, 'github')
       notifySuccess(`已提交（${sha.slice(0, 7)}）`)
       commitMessage = ''
-      await loadChanges()
+      await changesResource.run()
     } catch (e) {
       handlePublishError(e, navController)
     } finally {
@@ -357,39 +504,40 @@
 
   async function handleRevert(path: string) {
     await vfsStore.revert(path)
-    await loadChanges()
+    await changesResource.run()
   }
 
   // ---- Issues ----
-  async function loadIssues(o: string, r: string) {
-    issuesLoading = true
-    issuesError = null
-    try {
-      issues = await listIssues(o, r, { state: 'open', perPage: 30 })
-    } catch (e) {
-      issuesError = e instanceof Error ? e.message : '加载 Issues 失败'
-      issues = []
-    } finally {
-      issuesLoading = false
-    }
+  // issues 数据由 issuesResource 统一管理（open/closed/search 三种 mode 都走 fetcher）。
+  // 切换 mode 时 reset 清空旧数据 → run 触发 loading（骨架），避免 refreshing 保留上一模式列表。
+  // issueCounts 由 issueCountsResource 管理（silent）。
+  /** 切换列表模式（open/closed/search）。
+   *  reset 清空旧数据：不同 mode 的列表语义不同，切换时应走骨架而非 refreshing。 */
+  function setIssueMode(mode: IssueListMode) {
+    issueMode = mode
+    issuesResource.reset()
+    void issuesResource.run()
   }
 
-  async function handleIssueSearch() {
+  /** 清除搜索，回到之前的 tab（open 或 closed）。 */
+  function clearIssueSearch() {
+    issueSearchInput = ''
+    issueMode = issueMode === 'search' ? 'open' : issueMode
+    issuesResource.reset()
+    void issuesResource.run()
+  }
+
+  /** 搜索 Issues：切换到 search mode 并加载（fetcher 内根据 issueMode==='search' 走 searchIssues）。
+   *  reset 清空旧列表 → loading 骨架，提供明确的搜索反馈。 */
+  function handleIssueSearch() {
     const q = issueSearchInput.trim()
     if (!q) {
-      void loadIssues(owner, repo)
+      clearIssueSearch()
       return
     }
-    issuesLoading = true
-    issuesError = null
-    try {
-      const { items } = await searchIssues(owner, repo, q, { perPage: 30 })
-      issues = items
-    } catch (e) {
-      issuesError = e instanceof Error ? e.message : '搜索 Issues 失败'
-    } finally {
-      issuesLoading = false
-    }
+    issueMode = 'search'
+    issuesResource.reset()
+    void issuesResource.run()
   }
 
   function openIssue(num: number) {
@@ -427,6 +575,28 @@
 
   function formatActivityTime(ts: number): string {
     return new Date(ts).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })
+  }
+
+  /** 相对时间格式化（GitHub 风格："3 天前" / "2 小时前" / "刚刚"）。
+   *  超过 30 天回退到绝对日期（"2026/6/15"）。 */
+  function formatTimeAgo(iso: string | null | undefined): string {
+    if (!iso) return ''
+    try {
+      const then = new Date(iso).getTime()
+      const now = Date.now()
+      const diff = now - then
+      const min = 60 * 1000
+      const hour = 60 * min
+      const day = 24 * hour
+      const month = 30 * day
+      if (diff < min) return '刚刚'
+      if (diff < hour) return `${Math.floor(diff / min)} 分钟前`
+      if (diff < day) return `${Math.floor(diff / hour)} 小时前`
+      if (diff < month) return `${Math.floor(diff / day)} 天前`
+      return new Date(iso).toLocaleDateString('zh-CN', { dateStyle: 'short' })
+    } catch {
+      return iso
+    }
   }
 
   function actionLabel(a: GitActivity['action']): string {
@@ -480,7 +650,7 @@
                 onclick={() => {
                   navController.navigateMain(`/app/github/repo/${r.owner.login}/${r.name}`)
                   repoSearchInput = ''
-                  repoSearchResults = null
+                  repoSearchResource.reset()
                 }}
               >
                 <span class="font-medium">{r.full_name}</span>
@@ -505,7 +675,7 @@
   </div>
 
   <!-- 仓库统计 -->
-  {#if repoInfoLoading}
+  {#if repoInfoResource.isLoading}
     <div class="border-border border-b px-4 py-2"><Skeleton class="h-6 w-full" /></div>
   {:else if repoInfo}
     <div class="text-muted-foreground flex flex-wrap items-center gap-4 border-b border-border px-4 py-2 text-xs">
@@ -545,18 +715,47 @@
              fileTree 左栏 sticky + 独立滚动，fileContent 右栏直接展开（由 app 内容区滚动）。
              移动端（<md）：fileTree 收进 Sheet 浮动浮层。 -->
         <div class="grid min-w-0 gap-4 md:grid-cols-[minmax(200px,280px)_1fr]">
-          <!-- 文件树：桌面端 sticky 左栏（独立滚动），移动端隐藏（用 Sheet 触发）-->
-          <div class="border-border max-h-[calc(100dvh-12rem)] min-w-0 overflow-auto overscroll-contain rounded border p-2 text-sm md:sticky md:top-2 md:block max-md:hidden">
-            <RepoFileTree
-              dir=""
-              label="根目录"
-              {tree}
-              {expanded}
-              {loadingDirs}
-              selectedFile={selectedFile}
-              ontoggledir={toggleDir}
-              onselectfile={selectFile}
-            />
+          <!-- 文件树：桌面端 sticky 左栏（含 ref 选择器工具栏 + 独立滚动），移动端隐藏（用 Sheet 触发）。
+               与 history tab 左栏结构一致：工具栏（ref selector）+ 列表区（文件树）。 -->
+          <div class="border-border flex max-h-[calc(100dvh-12rem)] min-w-0 flex-col overflow-hidden rounded border md:sticky md:top-2 md:block max-md:hidden">
+            <!-- ref 选择器工具栏（与 history tab 一致：常驻在左栏顶部） -->
+            <div class="border-border bg-muted/30 flex items-center gap-1.5 border-b px-2 py-1.5">
+              <RepoRefSelector
+                {owner}
+                {repo}
+                currentRef={fileRef ?? ''}
+                defaultBranch={repoInfo?.default_branch ?? 'main'}
+                onSelect={(ref) => {
+                  if (ref === (repoInfo?.default_branch ?? 'main')) {
+                    clearFileRef()
+                  } else {
+                    const sp = new URLSearchParams({ tab: 'files' })
+                    if (selectedFile) sp.set('file', selectedFile)
+                    sp.set('ref', ref)
+                    navController.navigateMain(`${basePath}?${sp.toString()}`)
+                  }
+                }}
+              />
+              {#if fileRef && fileRef !== (repoInfo?.default_branch ?? 'main')}
+                <span class="bg-primary/10 text-primary inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium">
+                  <GitCommitHorizontalIcon class="size-3" />
+                  历史
+                </span>
+              {/if}
+            </div>
+            <!-- 文件树（可滚动区） -->
+            <div class="min-h-0 flex-1 overflow-auto p-2 text-sm">
+              <RepoFileTree
+                dir=""
+                label="根目录"
+                {tree}
+                {expanded}
+                {loadingDirs}
+                selectedFile={selectedFile}
+                ontoggledir={toggleDir}
+                onselectfile={selectFile}
+              />
+            </div>
           </div>
           <!-- 文件内容（右）：直接展开内容，由 app 内容区滚动 -->
           {#if selectedFile}
@@ -566,7 +765,9 @@
               {repo}
               branch={repoInfo?.default_branch ?? 'main'}
               commitSha={fileRef ?? ''}
+              permissions={repoInfo?.permissions}
               onopenfiletree={() => (fileTreeSheetOpen = true)}
+              onopenfile={(p) => selectFile(p)}
             />
           {:else}
             <div class="border-border text-muted-foreground flex min-w-0 items-center justify-center rounded border py-8 text-sm">
@@ -577,7 +778,7 @@
 
         <!-- 移动端文件树浮层（桌面端隐藏）：点击文件列表按钮触发，选中文件后自动关闭 -->
         <Sheet.Root bind:open={fileTreeSheetOpen}>
-          <Sheet.Content side="bottom" class="max-h-[75dvh] rounded-t-lg p-0 md:hidden" showCloseButton={false}>
+          <Sheet.Content side="bottom" class="flex max-h-[75dvh] flex-col rounded-t-lg p-0 md:hidden" showCloseButton={false}>
             <Sheet.Header class="flex-row items-center justify-between border-b px-4 py-3">
               <Sheet.Title class="flex items-center gap-2 text-sm font-medium">
                 <FolderTreeIcon class="size-4" />
@@ -585,7 +786,32 @@
               </Sheet.Title>
               <Sheet.Description class="sr-only">浏览仓库文件树，选择文件查看内容</Sheet.Description>
             </Sheet.Header>
-            <div class="max-h-[calc(75dvh-4rem)] overflow-auto overscroll-contain p-2 text-sm">
+            <!-- ref 选择器工具栏（与桌面端左栏一致） -->
+            <div class="border-border bg-muted/30 flex items-center gap-1.5 border-b px-2 py-1.5">
+              <RepoRefSelector
+                {owner}
+                {repo}
+                currentRef={fileRef ?? ''}
+                defaultBranch={repoInfo?.default_branch ?? 'main'}
+                onSelect={(ref) => {
+                  if (ref === (repoInfo?.default_branch ?? 'main')) {
+                    clearFileRef()
+                  } else {
+                    const sp = new URLSearchParams({ tab: 'files' })
+                    if (selectedFile) sp.set('file', selectedFile)
+                    sp.set('ref', ref)
+                    navController.navigateMain(`${basePath}?${sp.toString()}`)
+                  }
+                }}
+              />
+              {#if fileRef && fileRef !== (repoInfo?.default_branch ?? 'main')}
+                <span class="bg-primary/10 text-primary inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium">
+                  <GitCommitHorizontalIcon class="size-3" />
+                  历史
+                </span>
+              {/if}
+            </div>
+            <div class="min-h-0 flex-1 overflow-auto overscroll-contain p-2 text-sm">
               <RepoFileTree
                 dir=""
                 label="根目录"
@@ -612,42 +838,115 @@
 
         <div class="grid min-w-0 gap-4 md:grid-cols-[minmax(260px,360px)_1fr]">
           {#snippet commitList()}
-            {#if commitsLoading && commits.length === 0}
-              {#each Array(4) as _}<Skeleton class="mb-2 h-12" />{/each}
-            {:else if commitsError}
-              <p class="text-destructive p-2 text-sm">{commitsError}</p>
-            {:else if commits.length === 0}
-              <p class="text-muted-foreground py-4 text-center text-sm">暂无提交</p>
+            {#if commitsResource.status === 'loading'}
+              <div class="space-y-2 p-2">
+                {#each Array(5) as _}<Skeleton class="h-14 w-full" />{/each}
+              </div>
+            {:else if commitsResource.status === 'error'}
+              <p class="text-destructive px-3 py-4 text-sm">{commitsResource.error}</p>
+            {:else if commitsResource.status === 'empty'}
+              <p class="text-muted-foreground py-8 text-center text-sm">暂无提交</p>
             {:else}
-              {#each commits as c (c.sha)}
-                <button
-                  class="hover:bg-accent flex w-full items-start gap-2 rounded-md p-2 text-left transition-colors {selectedCommitSha === c.sha ? 'bg-accent' : ''}"
-                  onclick={() => { navigateSelect('history', 'sha', c.sha); commitListSheetOpen = false }}
-                >
-                  <div class="bg-muted text-muted-foreground flex size-6 shrink-0 items-center justify-center rounded-full font-mono text-[10px]">
-                    {c.sha.slice(0, 7)}
-                  </div>
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-xs font-medium">{c.message}</p>
-                    <p class="text-muted-foreground text-[11px]">
-                      {c.login ?? c.author?.name ?? 'unknown'}
-                      {#if c.author?.date} · {formatCommitDate(c.author.date)}{/if}
-                    </p>
-                  </div>
-                </button>
-              {/each}
+              <!-- GitHub 风格 commit 列表：avatar + 标题 + body 摘要 + author · 相对时间 + 右侧 SHA -->
+              <div class="divide-border divide-y">
+                {#each commits as c (c.sha)}
+                  <button
+                    class="hover:bg-accent/50 flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors {selectedCommitSha === c.sha ? 'bg-accent/70' : ''}"
+                    onclick={() => { navigateSelect('history', 'sha', c.sha); commitListSheetOpen = false }}
+                  >
+                    <!-- avatar（无 avatar 用 initials 占位） -->
+                    {#if c.avatarUrl}
+                      <img src={c.avatarUrl} alt={c.login ?? ''} class="mt-0.5 size-6 shrink-0 rounded-full" loading="lazy" />
+                    {:else}
+                      <div class="bg-muted text-muted-foreground mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-medium">
+                        {(c.login ?? c.author?.name ?? '?').slice(0, 2).toUpperCase()}
+                      </div>
+                    {/if}
+                    <!-- 主信息区 -->
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-xs font-medium">{c.message}</p>
+                      {#if c.body}
+                        <p class="text-muted-foreground truncate text-[11px]">{c.body.split('\n').find((l) => l.trim()) ?? ''}</p>
+                      {/if}
+                      <p class="text-muted-foreground mt-0.5 text-[11px]">
+                        <span class="font-medium text-foreground">{c.login ?? c.author?.name ?? 'unknown'}</span>
+                        {#if c.author?.date} · {formatTimeAgo(c.author.date)}{/if}
+                      </p>
+                    </div>
+                    <!-- 右侧 SHA 短码 -->
+                    <code class="text-muted-foreground mt-0.5 shrink-0 font-mono text-[11px]">{c.sha.slice(0, 7)}</code>
+                  </button>
+                {/each}
+              </div>
             {/if}
           {/snippet}
           <!-- commit 列表左栏 -->
           <div class="max-md:hidden">
-            <div class="border-border max-h-[calc(100dvh-12rem)] min-w-0 overflow-auto overscroll-contain rounded border md:sticky md:top-2">
-              <div class="border-border sticky top-0 z-[1] bg-background flex items-center justify-between p-2">
-                <span class="text-xs font-medium">提交历史</span>
-                <Button variant="ghost" size="icon-sm" onclick={() => loadCommits(owner, repo)} disabled={commitsLoading}>
-                  <RefreshCwIcon class="size-3 {commitsLoading ? 'animate-spin' : ''}" />
+            <div class="border-border flex max-h-[calc(100dvh-12rem)] min-w-0 flex-col overflow-hidden rounded border md:sticky md:top-2">
+              <!-- 工具栏：RepoRefSelector（branch/tag 切换）+ 过滤按钮 + 刷新 -->
+              <div class="border-border bg-muted/30 sticky top-0 z-[1] flex items-center gap-1.5 border-b px-2 py-1.5">
+                <RepoRefSelector
+                  {owner}
+                  {repo}
+                  currentRef={commitBranch}
+                  defaultBranch={repoInfo?.default_branch ?? 'main'}
+                  onSelect={(ref) => /^[0-9a-f]{7,40}$/i.test(ref) ? jumpToCommitSha(ref) : setCommitBranch(ref)}
+                />
+                <!-- 高级过滤器按钮（author/since/until），带激活计数 badge -->
+                <Popover.Root>
+                  <Popover.Trigger
+                    class="border-border bg-background hover:bg-accent relative inline-flex size-7 items-center justify-center rounded-md border transition-colors"
+                    aria-label="高级过滤"
+                    title="高级过滤（作者 / 时间范围）"
+                  >
+                    <FilterIcon class="size-3.5 {hasCommitFilters ? 'text-primary' : 'text-muted-foreground'}" />
+                    {#if hasCommitFilters}
+                      <span class="bg-primary text-primary-foreground absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-0.5 text-[9px] font-medium">
+                        {[!!commitAuthor, !!commitSince, !!commitUntil].filter(Boolean).length}
+                      </span>
+                    {/if}
+                  </Popover.Trigger>
+                  <Popover.Content class="w-64 p-3" align="start">
+                    <div class="space-y-3">
+                      <div>
+                        <label for="commit-filter-author" class="text-muted-foreground mb-1 block text-[11px] font-medium">作者（GitHub login）</label>
+                        <Input id="commit-filter-author" bind:value={commitAuthor} placeholder="如 gaubee" class="h-8 text-xs" />
+                      </div>
+                      <div class="grid grid-cols-2 gap-2">
+                        <div>
+                          <label for="commit-filter-since" class="text-muted-foreground mb-1 block text-[11px] font-medium">起始</label>
+                          <Input id="commit-filter-since" type="date" bind:value={commitSince} class="h-8 text-xs" />
+                        </div>
+                        <div>
+                          <label for="commit-filter-until" class="text-muted-foreground mb-1 block text-[11px] font-medium">截止</label>
+                          <Input id="commit-filter-until" type="date" bind:value={commitUntil} class="h-8 text-xs" />
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <Button size="sm" class="h-7 flex-1 text-xs" onclick={applyCommitFilters}>应用</Button>
+                        {#if hasCommitFilters}
+                          <Button size="sm" variant="ghost" class="h-7 text-xs" onclick={clearCommitFilters}>清除</Button>
+                        {/if}
+                      </div>
+                    </div>
+                  </Popover.Content>
+                </Popover.Root>
+                <!-- 刷新 -->
+                <Button variant="ghost" size="icon-sm" class="ml-auto" onclick={() => commitsResource.run()} disabled={commitsResource.isLoading} aria-label="刷新">
+                  <RefreshCwIcon class="size-3 {commitsResource.isLoading ? 'animate-spin' : ''}" />
                 </Button>
               </div>
-              <div class="p-1">
+              <!-- 过滤摘要条（激活时显示） -->
+              {#if hasCommitFilters}
+                <div class="bg-primary/5 border-primary/20 flex flex-wrap items-center gap-1.5 border-b px-2 py-1 text-[11px]">
+                  {#if commitAuthor}<span class="text-primary">author: {commitAuthor}</span>{/if}
+                  {#if commitSince}<span class="text-primary">since: {commitSince}</span>{/if}
+                  {#if commitUntil}<span class="text-primary">until: {commitUntil}</span>{/if}
+                  <button type="button" onclick={clearCommitFilters} class="text-muted-foreground hover:text-foreground ml-auto underline">清除</button>
+                </div>
+              {/if}
+              <!-- commit 列表（可滚动） -->
+              <div class="min-h-0 flex-1 overflow-auto">
                 {@render commitList()}
               </div>
             </div>
@@ -669,7 +968,7 @@
 
           <!-- 移动端 commit 列表浮层 -->
           <Sheet.Root bind:open={commitListSheetOpen}>
-            <Sheet.Content side="bottom" class="max-h-[75dvh] rounded-t-lg p-0 md:hidden" showCloseButton={false}>
+            <Sheet.Content side="bottom" class="flex max-h-[75dvh] flex-col rounded-t-lg p-0 md:hidden" showCloseButton={false}>
               <Sheet.Header class="flex-row items-center justify-between border-b px-4 py-3">
                 <Sheet.Title class="flex items-center gap-2 text-sm font-medium">
                   <HistoryIcon class="size-4" />
@@ -677,7 +976,54 @@
                 </Sheet.Title>
                 <Sheet.Description class="sr-only">浏览提交列表</Sheet.Description>
               </Sheet.Header>
-              <div class="max-h-[calc(75dvh-4rem)] overflow-auto overscroll-contain p-2">
+              <!-- 移动端也加 branch selector + 过滤 -->
+              <div class="border-border flex items-center gap-1.5 border-b px-2 py-1.5">
+                <RepoRefSelector
+                  {owner}
+                  {repo}
+                  currentRef={commitBranch}
+                  defaultBranch={repoInfo?.default_branch ?? 'main'}
+                  onSelect={(ref) => /^[0-9a-f]{7,40}$/i.test(ref) ? jumpToCommitSha(ref) : setCommitBranch(ref)}
+                />
+                <Popover.Root>
+                  <Popover.Trigger
+                    class="border-border bg-background hover:bg-accent relative inline-flex size-7 items-center justify-center rounded-md border transition-colors"
+                    aria-label="高级过滤"
+                  >
+                    <FilterIcon class="size-3.5 {hasCommitFilters ? 'text-primary' : 'text-muted-foreground'}" />
+                    {#if hasCommitFilters}
+                      <span class="bg-primary text-primary-foreground absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-0.5 text-[9px] font-medium">
+                        {[!!commitAuthor, !!commitSince, !!commitUntil].filter(Boolean).length}
+                      </span>
+                    {/if}
+                  </Popover.Trigger>
+                  <Popover.Content class="w-64 p-3" align="start">
+                    <div class="space-y-3">
+                      <div>
+                        <label for="commit-m-filter-author" class="text-muted-foreground mb-1 block text-[11px] font-medium">作者</label>
+                        <Input id="commit-m-filter-author" bind:value={commitAuthor} placeholder="GitHub login" class="h-8 text-xs" />
+                      </div>
+                      <div class="grid grid-cols-2 gap-2">
+                        <div>
+                          <label for="commit-m-filter-since" class="text-muted-foreground mb-1 block text-[11px] font-medium">起始</label>
+                          <Input id="commit-m-filter-since" type="date" bind:value={commitSince} class="h-8 text-xs" />
+                        </div>
+                        <div>
+                          <label for="commit-m-filter-until" class="text-muted-foreground mb-1 block text-[11px] font-medium">截止</label>
+                          <Input id="commit-m-filter-until" type="date" bind:value={commitUntil} class="h-8 text-xs" />
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <Button size="sm" class="h-7 flex-1 text-xs" onclick={applyCommitFilters}>应用</Button>
+                        {#if hasCommitFilters}
+                          <Button size="sm" variant="ghost" class="h-7 text-xs" onclick={clearCommitFilters}>清除</Button>
+                        {/if}
+                      </div>
+                    </div>
+                  </Popover.Content>
+                </Popover.Root>
+              </div>
+              <div class="min-h-0 flex-1 overflow-auto overscroll-contain">
                 {@render commitList()}
               </div>
             </Sheet.Content>
@@ -685,16 +1031,28 @@
         </div>
       </Tabs.Content>
 
-      <!-- 变更（双栏：dirty 文件列表左 sticky + diff 右展开，仅主仓库）-->
+      <!-- 变更（双栏：dirty 文件列表左 sticky + diff 右展开）。
+           RepoEditPermission 守卫：仓库归属/分支/保护状态三层判定，
+           不可编辑时显示精确原因（替代旧的「仅主仓库」静态提示）。 -->
       <Tabs.Content value="changes" class="p-4">
-        {#if !isMainRepo}
-          <div class="text-muted-foreground py-8 text-center text-sm">
-            变更提交仅支持主仓库 {OWNER}/{REPO}。
-          </div>
-        {:else}
-          {#snippet changeList()}
-            {#if changesLoading}
-              {#each Array(3) as _}<Skeleton class="mb-2 h-12" />{/each}
+        <RepoEditPermission
+          {owner}
+          {repo}
+          permissions={repoInfo?.permissions}
+          branch={repoInfo?.default_branch ?? 'main'}
+          commitSha={fileRef ?? ''}
+        >
+          {#snippet children(canEdit, disabledReason)}
+            {#if !canEdit}
+              <div class="text-muted-foreground py-8 text-center text-sm">
+                {disabledReason}
+              </div>
+            {:else}
+              {#snippet changeList()}
+            {#if changesResource.status === 'loading'}
+              <div class="space-y-2 p-1">
+                {#each Array(3) as _}<Skeleton class="h-12 w-full" />{/each}
+              </div>
             {:else if changes.length === 0}
               <p class="text-muted-foreground py-4 text-center text-sm">工作区干净</p>
             {:else}
@@ -733,8 +1091,8 @@
               <div class="border-border max-h-[calc(100dvh-12rem)] min-w-0 overflow-auto overscroll-contain rounded border md:sticky md:top-2">
                 <div class="border-border sticky top-0 z-[1] bg-background flex items-center justify-between p-2">
                   <span class="text-xs font-medium">变更 ({changes.length})</span>
-                  <Button variant="ghost" size="icon-sm" onclick={loadChanges} disabled={changesLoading}>
-                    <RefreshCwIcon class="size-3 {changesLoading ? 'animate-spin' : ''}" />
+                  <Button variant="ghost" size="icon-sm" onclick={() => changesResource.run()} disabled={changesResource.isLoading}>
+                    <RefreshCwIcon class="size-3 {changesResource.isLoading ? 'animate-spin' : ''}" />
                   </Button>
                 </div>
                 <div class="p-1">
@@ -811,71 +1169,141 @@
               </Sheet.Content>
             </Sheet.Root>
           </div>
-        {/if}
+            {/if}
+          {/snippet}
+        </RepoEditPermission>
       </Tabs.Content>
 
       <!-- Issues（双栏：列表左 sticky + 内容右展开，移动端列表收进 Sheet）-->
       <Tabs.Content value="issues" class="p-4">
         <div class="grid min-w-0 gap-4 md:grid-cols-[minmax(260px,360px)_1fr]">
-          <!-- issue 列表 snippet（桌面端左栏和移动端 Sheet 共用渲染逻辑）-->
-          {#snippet issueList()}
-            {#if issuesLoading && issues.length === 0}
-              {#each Array(4) as _}<Skeleton class="mb-2 h-12" />{/each}
-            {:else if issuesError}
-              <p class="text-destructive p-2 text-sm">{issuesError}</p>
-            {:else if issues.length === 0}
-              <p class="text-muted-foreground py-4 text-center text-sm">暂无 Issues</p>
-            {:else}
-              {#each issues as it (it.id)}
+          <!-- issue 工具栏 snippet（桌面端左栏 + 移动端 Sheet 共用）：
+               Open/Closed tab（带计数）+ 搜索框，或 search 模式下的结果标题 + 清除按钮。 -->
+          {#snippet issueToolbar()}
+            <div class="bg-muted/30 flex items-center gap-1 border-b px-2 py-1.5">
+              {#if issueMode === 'search'}
+                <div class="text-muted-foreground flex min-w-0 flex-1 items-center gap-1.5 text-xs">
+                  <SearchIcon class="size-3.5 shrink-0" />
+                  <span class="truncate">搜索「{issueSearchInput}」</span>
+                  {#if !issuesResource.isLoading}
+                    <span class="opacity-70">· {issues.length} 个结果</span>
+                  {/if}
+                </div>
                 <button
-                  class="hover:bg-accent flex w-full items-start gap-2 rounded-md p-2 text-left transition-colors {selectedIssue === it.number ? 'bg-accent' : ''}"
-                  onclick={() => openIssue(it.number)}
+                  type="button"
+                  onclick={clearIssueSearch}
+                  class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex size-5 items-center justify-center rounded transition-colors"
+                  aria-label="清除搜索"
+                  title="清除搜索"
                 >
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm font-medium">{it.title}</p>
-                    <p class="text-muted-foreground text-xs">
-                      #{it.number} · {it.user.login}
-                      {#if it.comments > 0} · {it.comments} 评论{/if}
-                    </p>
-                    {#if it.labels.length > 0}
-                      <div class="mt-1 flex flex-wrap gap-1">
-                        {#each it.labels.slice(0, 3) as label}
-                          <Badge variant="outline" class="text-[10px]">{label.name}</Badge>
-                        {/each}
-                      </div>
-                    {/if}
-                  </div>
+                  <XIcon class="size-3.5" />
                 </button>
-              {/each}
-            {/if}
-          {/snippet}
-          <!-- issue 列表：桌面端 sticky 左栏（独立滚动），移动端隐藏（用 Sheet 触发）-->
-          <div class="max-md:hidden">
-            <div class="border-border max-h-[calc(100dvh-12rem)] min-w-0 overflow-auto overscroll-contain rounded border md:sticky md:top-2">
-              <!-- 搜索框 -->
-              <div class="border-border sticky top-0 z-[1] bg-background p-2">
+              {:else}
+                <button
+                  type="button"
+                  onclick={() => setIssueMode('open')}
+                  class="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors {issueMode === 'open' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
+                >
+                  <CircleDotIcon class="size-3.5 {issueMode === 'open' ? 'text-emerald-500' : ''}" />
+                  Open
+                  {#if openCount !== null}
+                    <span class="text-muted-foreground tabular-nums opacity-80">{openCount}</span>
+                  {/if}
+                </button>
+                <button
+                  type="button"
+                  onclick={() => setIssueMode('closed')}
+                  class="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors {issueMode === 'closed' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
+                >
+                  <CheckCircle2Icon class="size-3.5 {issueMode === 'closed' ? 'text-purple-500' : ''}" />
+                  Closed
+                  {#if closedCount !== null}
+                    <span class="text-muted-foreground tabular-nums opacity-80">{closedCount}</span>
+                  {/if}
+                </button>
                 <form
-                  class="flex items-center gap-1.5"
+                  class="ml-auto flex items-center"
                   onsubmit={(e) => {
                     e.preventDefault()
                     void handleIssueSearch()
                   }}
                 >
-                  <div class="relative flex-1">
-                    <SearchIcon class="text-muted-foreground absolute left-2.5 top-1/2 size-4 -translate-y-1/2" />
+                  <div class="relative">
+                    <SearchIcon class="text-muted-foreground absolute left-2 top-1/2 size-3 -translate-y-1/2" />
                     <Input
                       bind:value={issueSearchInput}
-                      placeholder="搜索 issues"
-                      class="h-8 pl-8 text-sm"
+                      placeholder="搜索"
+                      class="h-7 w-28 pl-6 pr-1 text-xs"
                     />
                   </div>
-                  <Button type="submit" size="sm" disabled={issuesLoading}>
-                    {issuesLoading ? '...' : '搜索'}
-                  </Button>
                 </form>
+              {/if}
+            </div>
+          {/snippet}
+          <!-- issue 列表 snippet（桌面端左栏和移动端 Sheet 共用渲染逻辑）-->
+          {#snippet issueList()}
+            {#if issuesResource.status === 'loading'}
+              <div class="space-y-2 p-2">
+                {#each Array(4) as _}<Skeleton class="h-14 w-full" />{/each}
               </div>
-              <!-- issue 列表项 -->
-              <div class="p-1">
+            {:else if issuesResource.status === 'error'}
+              <p class="text-destructive px-3 py-4 text-sm">{issuesResource.error}</p>
+            {:else if issuesResource.status === 'empty'}
+              <p class="text-muted-foreground py-8 text-center text-sm">暂无 Issues</p>
+            {:else}
+              <!-- GitHub 风格 issue 列表：每行 border-b 分隔，状态图标 + 标题 + 彩色 labels + 元信息 + 评论数 -->
+              <div class="divide-border -mt-px divide-y border-b">
+                {#each issues as it (it.id)}
+                  <button
+                    class="hover:bg-accent/50 flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors {selectedIssue === it.number ? 'bg-accent/70' : ''}"
+                    onclick={() => openIssue(it.number)}
+                  >
+                    <!-- 状态图标：open=绿色 CircleDot，closed=紫色 CheckCircle -->
+                    {#if it.state === 'open'}
+                      <CircleDotIcon class="mt-0.5 size-4 shrink-0 text-emerald-500" />
+                    {:else}
+                      <CheckCircle2Icon class="mt-0.5 size-4 shrink-0 text-purple-500" />
+                    {/if}
+                    <!-- 主信息区 -->
+                    <div class="min-w-0 flex-1">
+                      <!-- 标题 + labels（同一行 flex-wrap，GitHub 风格）-->
+                      <div class="flex flex-wrap items-center gap-1.5">
+                        <span class="hover:text-primary truncate text-sm font-medium text-foreground underline-offset-2 group-hover:underline">
+                          {it.title}
+                        </span>
+                        {#each it.labels.slice(0, 4) as label}
+                          <span
+                            class="inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-medium leading-[1.4]"
+                            style={labelStyleString(label.color)}
+                            title={label.name}
+                          >
+                            {label.name}
+                          </span>
+                        {/each}
+                      </div>
+                      <!-- 元信息：#N opened X ago by user -->
+                      <p class="text-muted-foreground mt-0.5 truncate text-xs">
+                        #{it.number} {it.state === 'open' ? 'opened' : 'closed'} {formatTimeAgo(it.created_at)} by {it.user.login}
+                      </p>
+                    </div>
+                    <!-- 右侧评论数（GitHub 风格，带气泡图标）-->
+                    {#if it.comments > 0}
+                      <div class="text-muted-foreground flex shrink-0 items-center gap-1 text-xs">
+                        <MessageCircleIcon class="size-3.5" />
+                        <span class="tabular-nums">{it.comments}</span>
+                      </div>
+                    {/if}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          {/snippet}
+          <!-- issue 列表：桌面端 sticky 左栏（独立滚动），移动端隐藏（用 Sheet 触发）-->
+          <div class="max-md:hidden">
+            <div class="border-border flex max-h-[calc(100dvh-12rem)] min-w-0 flex-col overflow-hidden rounded border md:sticky md:top-2">
+              {@render issueToolbar()}
+              <!-- issue 列表项（可滚动区） -->
+              <div class="min-h-0 flex-1 overflow-auto">
                 {@render issueList()}
               </div>
             </div>
@@ -903,7 +1331,7 @@
 
           <!-- 移动端 issue 列表浮层（桌面端隐藏）。Sheet 是 portal 浮层，放 grid 内不影响布局。-->
           <Sheet.Root bind:open={issueListSheetOpen}>
-            <Sheet.Content side="bottom" class="max-h-[75dvh] rounded-t-lg p-0 md:hidden" showCloseButton={false}>
+            <Sheet.Content side="bottom" class="flex max-h-[75dvh] flex-col rounded-t-lg p-0 md:hidden" showCloseButton={false}>
               <Sheet.Header class="flex-row items-center justify-between border-b px-4 py-3">
                 <Sheet.Title class="flex items-center gap-2 text-sm font-medium">
                   <BugIcon class="size-4" />
@@ -911,7 +1339,8 @@
                 </Sheet.Title>
                 <Sheet.Description class="sr-only">浏览 issue 列表，选择查看详情</Sheet.Description>
               </Sheet.Header>
-              <div class="max-h-[calc(75dvh-4rem)] overflow-auto overscroll-contain p-2">
+              {@render issueToolbar()}
+              <div class="min-h-0 flex-1 overflow-auto overscroll-contain">
                 {@render issueList()}
               </div>
             </Sheet.Content>

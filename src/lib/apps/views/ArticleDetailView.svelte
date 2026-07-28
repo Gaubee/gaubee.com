@@ -8,6 +8,7 @@
   import { contentQuery } from '$lib/content-pipeline/query.svelte'
   import type { ContentEntry } from '$lib/content-pipeline/types'
   import { navController } from '$lib/nav/nav-controller-instance'
+  import { useParams } from '$lib/router'
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
   import TocTree from './TocTree.svelte'
   import { Badge } from '$lib/components/ui/badge'
@@ -19,21 +20,23 @@
   import ClockIcon from '@lucide/svelte/icons/clock'
   import TagIcon from '@lucide/svelte/icons/tag'
 
-  interface Props {
-    /** 路径：/article/{collection}/{stem} */
-    pathname: string;
-  }
+  interface Props {}
 
-  let { pathname }: Props = $props();
+  let {}: Props = $props();
 
   /** 正文容器（bind:this，传给 TocTree 作为 ScrollSpy 的 container）。 */
   let articleContentEl: HTMLElement | undefined = $state();
 
+  /** 从 router context 拿到 parse 后的 collection/stem（类型安全，zod 已校验）。
+   *  useParams 返回 getter，需 $derived 包装才能响应 URL 变化。 */
+  type ArticleDetailParams = { collection: 'articles' | 'events'; stem: string };
+  const getParams = useParams<ArticleDetailParams>();
+
   /** 解析路径参数。 */
   const target = $derived.by(() => {
-    const match = pathname.match(/^\/article\/(articles|events)\/(.+)$/)
-    if (!match) return null
-    return { collection: match[1] as 'articles' | 'events', stem: match[2] }
+    const p = getParams?.()
+    if (!p) return null
+    return { collection: p.collection, stem: p.stem }
   })
 
   /** 当前文章。 */

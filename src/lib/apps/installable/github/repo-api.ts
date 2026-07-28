@@ -96,6 +96,20 @@ export interface RepoSummary {
   /** 最近推送时间（ISO 字符串）。 */
   pushed_at: string;
   html_url: string;
+  /** 当前 token 对该仓库的权限（仅 GET /repos/{o}/{r} 详情返回，列表/搜索不返回）。
+   *  用于编辑权限判定：permissions.push === true 才允许写操作。 */
+  permissions?: RepoPermissions;
+}
+
+/** 仓库权限（GitHub API 返回的 permissions 对象）。
+ *  注意：仅在 GET /repos/{owner}/{repo} 单仓库详情时由 API 返回；
+ *  /search/repositories 和列表端点不返回此字段。 */
+export interface RepoPermissions {
+  admin: boolean;
+  maintain: boolean;
+  push: boolean;
+  triage: boolean;
+  pull: boolean;
 }
 
 interface GhRepoResponse {
@@ -111,6 +125,7 @@ interface GhRepoResponse {
   default_branch: string;
   pushed_at: string;
   html_url: string;
+  permissions?: RepoPermissions;
 }
 
 function toRepoSummary(r: GhRepoResponse): RepoSummary {
@@ -127,6 +142,8 @@ function toRepoSummary(r: GhRepoResponse): RepoSummary {
     default_branch: r.default_branch,
     pushed_at: r.pushed_at,
     html_url: r.html_url,
+    // permissions 仅 GET /repos/{o}/{r} 详情返回；列表/搜索端点为 undefined
+    permissions: r.permissions,
   };
 }
 
@@ -263,3 +280,88 @@ export {
   type IssueSummary,
   type IssueDetail,
 } from "./issue-api";
+
+// ---------------------------------------------------------------------------
+// Branch / Tag 列表（ref selector 用）
+// ---------------------------------------------------------------------------
+
+/** 分支摘要。 */
+export interface BranchSummary {
+  name: string;
+  /** 分支顶端 commit SHA。 */
+  commit: { sha: string };
+  /** 是否受保护分支。 */
+  protected: boolean;
+}
+
+/** Tag 摘要。 */
+export interface TagSummary {
+  name: string;
+  /** tag 指向的 commit SHA。 */
+  commit: { sha: string };
+}
+
+/** 列出仓库分支。
+ *  GET /repos/{owner}/{repo}/branches?per_page=N
+ *  用于 ref selector 下拉（history/files tab 切换 branch）。 */
+export async function listBranches(
+  owner: string,
+  repo: string,
+  opts?: { perPage?: number; page?: number },
+): Promise<BranchSummary[]> {
+  const params = new URLSearchParams({
+    per_page: String(opts?.perPage ?? 100),
+    page: String(opts?.page ?? 1),
+  });
+  const resp = await fetchGithub(`repos/${owner}/${repo}/branches?${params.toString()}`);
+  if (resp.status === 404) return [];
+  await assertOk(resp, `listBranches(${owner}/${repo})`);
+  const data = (await resp.json()) as Array<{
+    name: string;
+    commit: { sha: string };
+    protected: boolean;
+  }>;
+  return data.map((b) => ({ name: b.name, commit: { sha: b.commit.sha }, protected: b.protected }));
+}
+
+/** 获取单个分支详情（含保护状态）。
+ *  GET /repos/{owner}/{repo}/branches/{branch}
+ *  用于编辑权限判定（protected branch 不可直接 push）。
+ *  404 返回 null（分支不存在）；其它错误抛异常。 */
+export async function getBranch(
+  owner: string,
+  repo: string,
+  branch: string,
+): Promise<BranchSummary | null> {
+  const resp = await fetchGithub(`repos/${owner}/${repo}/branches/${encodeURIComponent(branch)}`);
+  if (resp.status === 404) return null;
+  await assertOk(resp, `getBranch(${owner}/${repo}/${branch})`);
+  const data = (await resp.json()) as {
+    name: string;
+    commit: { sha: string };
+    protected: boolean;
+  };
+  return { name: data.name, commit: { sha: data.commit.sha }, protected: data.protected };
+}
+
+/** 列出仓库 tag。
+ *  GET /repos/{owner}/{repo}/tags?per_page=N
+ *  用于 ref selector 下拉（history/files tab 切换 tag）。 */
+export async function listTags(
+  owner: string,
+  repo: string,
+  opts?: { perPage?: number; page?: number },
+): Promise<TagSummary[]> {
+  const params = new URLSearchParams({
+    per_page: String(opts?.perPage ?? 100),
+    page: String(opts?.page ?? 1),
+  });
+  const resp = await fetchGithub(`repos/${owner}/${repo}/tags?${params.toString()}`);
+  if (resp.status === 404) return [];
+  await assertOk(resp, `listTags(${owner}/${repo})`);
+  const data = (await resp.json()) as Array<{
+    name: string;
+    commit: { sha: string };
+  }>;
+  return data.map((t) => ({ name: t.name, commit: { sha: t.commit.sha } }));
+}

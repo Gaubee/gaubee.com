@@ -146,6 +146,10 @@ export async function listCommits(
     path?: string;
     /** 按 GitHub login 过滤作者。 */
     author?: string;
+    /** 仅返回此时间之后的提交（ISO 8601，如 2026-06-01T00:00:00Z）。 */
+    since?: string;
+    /** 仅返回此时间之前的提交（ISO 8601）。 */
+    until?: string;
   } = {},
 ): Promise<CommitInfo[]> {
   const { owner, repo } = resolveRepo(opts);
@@ -155,6 +159,8 @@ export async function listCommits(
   params.set("page", String(opts.page ?? 1));
   if (opts.path) params.set("path", opts.path);
   if (opts.author) params.set("author", opts.author);
+  if (opts.since) params.set("since", opts.since);
+  if (opts.until) params.set("until", opts.until);
   const resp = await fetchGithub(`repos/${owner}/${repo}/commits?${params.toString()}`);
   if (!resp.ok) {
     if (resp.status === 404) return [];
@@ -180,6 +186,13 @@ function b64decode(b64: string): string {
   const clean = b64.replace(/\n/g, "");
   const bytes = Uint8Array.from(atob(clean), (c) => c.charCodeAt(0));
   return new TextDecoder("utf-8").decode(bytes);
+}
+
+function b64encode(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary);
 }
 
 /**
@@ -212,6 +225,51 @@ export async function getFileText(path: string, ref?: RepoRef): Promise<string> 
     throw new Error(`getFileText(${path}): 非文本文件或编码异常`);
   }
   return b64decode(data.content);
+}
+
+/** 读取文件文本 + sha（用于在线编辑的乐观锁写入）。
+ *  与 getFileText 区别：返回 sha 字段，raw 模式编辑保存时必填。
+ *  @param ref 可选仓库定位（含 ref 字段可按 commit SHA 访问历史版本）。 */
+export async function getFileWithSha(
+  path: string,
+  ref?: RepoRef,
+): Promise<{ content: string; sha: string }> {
+  const resolved = resolveRepo(ref);
+  const resp = await fetchGithub(
+    `repos/${resolved.owner}/${resolved.repo}/contents/${path}?ref=${resolved.ref}`,
+  );
+  await assertOk(resp, `getFileWithSha(${path})`);
+  const data = (await resp.json()) as GhFileContent;
+  if (data.type !== "file" || data.encoding !== "base64") {
+    throw new Error(`getFileWithSha(${path}): 非文本文件或编码异常`);
+  }
+  return { content: b64decode(data.content), sha: data.sha };
+}
+
+/** 更新或新建文件内容（GitHub Contents API PUT）。
+ *  适用于任意仓库的在线编辑（raw 模式），绕过 vfsStore 的单仓库限制。
+ *  @param sha 乐观锁：更新已有文件必填（从 getFileWithSha 取）；新建文件不传
+ *  @returns 新 commit sha
+ *  GitHub 端点：PUT /repos/{owner}/{repo}/contents/{path} */
+export async function updateFileContent(
+  path: string,
+  content: string,
+  opts: { owner: string; repo: string; branch?: string; sha?: string | null; message: string },
+): Promise<string> {
+  const { owner, repo, branch, sha, message } = opts;
+  const body: Record<string, string> = {
+    message,
+    content: b64encode(content),
+  };
+  if (branch) body.branch = branch;
+  if (sha) body.sha = sha;
+  const resp = await fetchGithub(`repos/${owner}/${repo}/contents/${path}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+  await assertOk(resp, `updateFileContent(${owner}/${repo}/${path})`);
+  const data = (await resp.json()) as { commit: { sha: string } };
+  return data.commit.sha;
 }
 
 /** 列出集合（articles/events）下所有 markdown 文件条目。 */

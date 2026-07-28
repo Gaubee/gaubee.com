@@ -1,3 +1,4 @@
+import { leafRoute } from "$lib/router";
 /**
  * 写作应用（可选安装，手动安装）。
  *
@@ -10,6 +11,7 @@
  * 写作应用专注内容创作与发表。
  */
 import FileText from "@lucide/svelte/icons/file-text";
+import { z } from "zod";
 
 import type { AppEntry } from "../types";
 
@@ -23,23 +25,43 @@ export const writerApp: AppEntry = {
     defaultArea: "main",
     activities: [
       {
-        route: "/app/writer",
+        pattern: "/app/writer",
         entry: true,
-        view: () => import("$lib/apps/views/WriterView.svelte"),
+        root: leafRoute("writer", () => import("$lib/apps/views/WriterView.svelte")),
       },
       {
-        route: "/app/editor",
-        view: () => import("$lib/views/EditorView.svelte"),
+        // 内容管线编辑（collection/stem 走 search query，避免多段 stem 撑爆 index route 段匹配）
+        pattern: "/app/editor",
+        root: leafRoute(
+          "writer.editor",
+          () => import("$lib/views/EditorView.svelte"),
+          z.object({
+            collection: z.enum(["articles", "events", "draft"]),
+            stem: z.string().min(1),
+          }),
+        ),
       },
       {
         // GithubApp 跳转的任意文件编辑（raw 模式），复用 EditorView。
         // 路由域归属 writer，使 Dock 高亮写作应用。
-        route: "/app/github-edit",
-        view: () => import("$lib/views/EditorView.svelte"),
+        // owner/repo/file 走 search query（与 github.repo.detail 的 file 一致），
+        // 避免多段文件路径（如 src/lib/x.ts）撑爆 leafRoute 的 index route 段匹配。
+        // ref 可选：当前 git ref（commitSha/分支名），编辑器据此判定权限。
+        pattern: "/app/github-edit",
+        root: leafRoute(
+          "writer.github-edit",
+          () => import("$lib/views/EditorView.svelte"),
+          z.object({
+            owner: z.string().min(1),
+            repo: z.string().min(1),
+            file: z.string().min(1),
+            ref: z.string().optional(),
+          }),
+        ),
       },
       {
-        route: "/app/changes",
-        view: () => import("$lib/views/ChangesView.svelte"),
+        pattern: "/app/changes",
+        root: leafRoute("writer.changes", () => import("$lib/views/ChangesView.svelte")),
       },
     ],
     cliCommands: [],

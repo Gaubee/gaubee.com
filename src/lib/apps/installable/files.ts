@@ -1,3 +1,4 @@
+import { leafRoute } from "$lib/router";
 /**
  * 文件管理应用（默认安装，可卸载）。
  *
@@ -20,9 +21,9 @@ export const filesApp: AppEntry = {
     defaultArea: "main",
     activities: [
       {
-        route: "/app/files",
+        pattern: "/app/files",
         entry: true,
-        view: () => import("$lib/views/FilesView.svelte"),
+        root: leafRoute("files", () => import("$lib/views/FilesView.svelte")),
       },
     ],
     vfsOwnership: ["src/content/articles/", "src/content/events/", "src/content/draft/"],

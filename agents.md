@@ -89,6 +89,220 @@ gaubeeos.getAppService('notification')→ NotificationService（通知应用，�
 
 `contentStore`（`src/lib/data/content.svelte.ts`）是纯派生只读视图层（无鉴权、无写操作），允许视图直接 import，未 service 化。
 
+## 类型安全路由系统（2026-07-27）
+
+### 心智模型
+
+```
+URL (string)
+  │
+  ▼
+NavController            ← 黑盒状态机（三 area 单 URL 编码），不修改
+  │  输出 location.pathname / search
+  ▼
+AreaOutlet               ← 找到归属 manifest + Activity
+  │  按 tabId 常驻 DOM（跨应用保活）
+  ▼
+<AppShell activity>      ← 内置 ActivityRouter
+  │  通过 setRouterContext 下发 useRoute/useParams/useSearch
+  ▼
+<ActivityRouter>         ← matchRouteTree 解析 RouteContract 树
+  │  按 RouteId 缓存组件（应用内保活）
+  ▼
+<View params search />   ← 类型安全 props（来自 zod schema）
+```
+
+### RouteContract：声明式路由节点
+
+```ts
+defineRoute({
+  id: "github.repo.detail",       // 全局唯一 id
+  pattern: "repo/:owner/:repo",   // 相对段，与父级拼接
+  params: z.object({...}),        // pathname 参数 schema（zod）
+  search: z.object({...}),        // query 参数 schema（zod）
+  component: () => import("..."), // 视图懒加载
+  children: [...],                // 嵌套子路由（无限层）
+})
+```
+
+### 声明一个新 Route（三步）
+
+1. **定义 Route**：在应用目录建 `routes.ts`，用 `defineRoute`（多页面）或 `leafRoute`（单页面）声明。
+2. **挂到 Activity**：在 manifest 里 `defineActivity({ pattern, root })`，或直接 `{ pattern, entry, root }`。
+3. **视图消费**：组件内 `useParams<T>()` / `useSearch<T>()` 拿到类型安全的参数。
+
+### 导航 API（替代 navigateMain 字符串）
+
+```ts
+import { go, goById, targetById, buildHrefById } from "$lib/router";
+
+// 同应用内：直接传 Route 单例（最强类型）
+go(repoDetailRoute, "/app/github", { owner: "a", repo: "b" });
+
+// 跨应用：字符串 RouteId（解耦，类型由 codegen 提供）
+goById("github.repo.detail", { owner: "a", repo: "b" });
+
+// 构造 target（用于 NotificationAction.to 等延迟跳转）
+notifySuccess("成功", "查看", { to: targetById("github.repo.detail", { owner, repo }) });
+```
+
+### 关键约定
+
+- **route id**：点号分隔小写，如 `github.repo.detail`（推荐 `app.scene.sub` 格式）。
+- **Activity 内部多页面**：用 `root.children` 嵌套声明，**不再用组件内 path.match 正则分发**。
+- **保活模型**：
+  - 跨应用保活：AreaOutlet 按 tabId 常驻 AppShell DOM
+  - 应用内保活：ActivityRouter 按 RouteId 缓存组件实例
+- **SearchParams 不支持数组**：扁平 key-value，zod 做 coerce。
+- **NavController 当黑盒**：navigate API 通过 NavControllerAdapter 注入，应用层不直接调 `navigateMain(string)`。
+- **pop/bottom 区过渡**：search/notifications（pop）和 terminal（bottom）暂走 AreaOutlet 旧机制，root 字段仅供类型一致性，未来统一。
+
+### 文件结构
+
+```
+src/lib/router/                  ← 路由系统核心
+├── contract.ts                  RouteContract 类型
+├── define-route.ts              defineRoute 工厂（含自注册）
+├── define-activity.ts           defineActivity 工厂
+├── leaf-route.ts                单页面快捷工厂
+├── match.ts                     matchRouteTree 纯函数
+├── path-pattern.ts              path-to-regexp 风格编译器
+├── search.ts                    search 序列化
+├── navigate.ts                  go/buildHref/targetById
+├── registry.ts                  routeRegistry 单例
+├── hooks.svelte.ts              useRoute/useParams/useSearch
+├── ActivityRouter.svelte        Activity 内部渲染组件
+└── __tests__/                   79 个单测
+
+vite-plugins/gaubee-routes/      ← codegen 插件（骨架，阶段 3 完善）
+```
+
+## Markdown 链接规范（2026-07-28）
+
+### 心智模型
+
+文章（articles）/说说（events）正文里的 `<a>` 链接按 href 分类，统一走两套行为：
+
+```
+href 形态                分类          渲染输出                          点击行为
+─────────────────────────────────────────────────────────────────────────────────
+http(s):// mailto: tel:  external     <a class=md-link-external          新窗口打开
+                                      target=_blank rel=noopener>        （浏览器原生）
+//host 协议相对          external     同上                               同上
+
+/articles/x /events/x    internal     <a data-internal-link>             SPA 应用内导航
+/#路径                                                                    （click 委托拦截）
+
+#section                 anchor       <a href=#section>                  页内锚点（原生）
+./x.md x.md 相对路径     other        <a href=...>                       原生（README 场景
+                                                                         由 readme.ts 改写）
+```
+
+### 核心 API
+
+```ts
+// src/lib/markdown/link.ts（客户端 + SSG 共享纯函数）
+import { classifyLink, renderLinkTag } from "./link";
+
+classifyLink("/articles/x"); // → "internal"
+classifyLink("https://github.com"); // → "external"
+classifyLink("#section"); // → "anchor"
+
+// marked renderer.link 直接委托
+renderer.link = ({ href, title, tokens }) => {
+  const text = marked.Parser.parseInline(tokens as never);
+  return renderLinkTag({ href, text, title });
+};
+```
+
+### 关键约定
+
+- **图标实现**：CSS `::after` + `mask`（DOM 零增节点，SSG 同步生效），`background: currentColor` 自动跟随链接色/悬停态/暗色模式。**不用** Svelte 组件渲染（SSG 同步函数拿不到组件上下文）。
+- **内链拦截**：`MarkdownViewer` 容器 click 委托命中 `a[data-internal-link]` → `navController.navigateMain(href)`。修饰键（ctrl/meta/shift/alt）与中键放过走原生新窗。容器加 `role="presentation"`（交互语义由内部 `<a>` 承担，模式同 `RepoFileContent.svelte` 的 `data-repo-file`）。
+- **不引入路径→RouteId 反向匹配**：markdown 内链走裸字符串 `navigateMain(path)`，与 `ArticleDetailView.svelte:78` 现有写法一致。反向匹配是新基建，成本不匹配。
+- **readme.ts 保持独立**：GitHub README 的 `data-repo-file`（指向文件面板）是仓库专属语义，不接入本规范。
+- **双层 prose 问题**（`ArticleDetailView` 外层 article + MarkdownViewer 内层都套 prose）不在本规范范围，记为 TODO。
+
+### 文件结构
+
+```
+src/lib/markdown/
+├── link.ts                   classifyLink + renderLinkTag（共享纯函数）
+├── link.test.ts              分类边界 + XSS 转义测试（server project）
+├── MarkdownViewer.svelte     客户端：renderer.link + click 委托
+└── render.ts                 SSG：renderer.link（同步函数）
+
+src/app.css                   .md-link-external::after 图标 + .shout-markdown 链接基础样式
+```
+
+## 加载状态机抽象（2026-07-28）
+
+### 心智模型
+
+网络数据加载从 3 态（loading/error/success）升级到 8 态拓扑，核心是中间态：`refreshing`（有旧数据时背景刷新，不闪骨架）和 `stale-error`（刷新失败保留旧数据 + 错误条）。
+
+```
+  无数据区                         有数据区
+┌──────────────┐               ┌──────────────┐
+│ idle         │               │ success      │ 已加载
+│ loading      │ 首屏骨架      │ refreshing ★ │ 背景刷新，保留旧数据
+│ empty        │ 列表空态      │ stale-error ★│ 刷新失败，保留旧数据 + 错误条
+│ error        │ 首屏失败      │              │
+└──────────────┘               └──────────────┘
+```
+
+### 核心 API
+
+```ts
+// 声明资源（runes 工厂）
+const commits = createResource(
+  () => listCommits({ owner, repo, perPage: 30 }),
+  { isEmpty: (a) => a.length === 0, errorMessage: "加载历史失败" },
+);
+
+// 触发（监听参数变化，fetcher 闭包读响应式值）
+$effect(() => { if (owner && repo) void commits.run(); });
+
+// 渲染（AsyncBoundary 按 status 自动分支）
+<AsyncBoundary resource={commits} skeleton={SkeletonSnippet} emptyMessage="暂无提交">
+  {#snippet children()}
+    {@const data = commits.data!}
+    {#each data as c}<CommitRow {c} />{/each}
+  {/snippet}
+</AsyncBoundary>
+```
+
+### 内置能力
+
+- **seq 竞态防护**：内置序号丢弃过期请求结果（替代手写 `searchSeq`/`loadSeq`）。
+- **refreshing 保留旧 data**：有数据时重新 run，status=refreshing，data 不清空。
+- **stale-error 保留旧 data**：刷新失败不清空 data，显示错误条 + 重试。
+- **silent 选项**：辅助数据（repoInfo/counts/events）静默失败，不设 error。
+- **isEmpty 列表空态**：列表资源配置后，空数据显示 empty 态而非 success。
+- **setData mutation**：评论 CRUD 等本地更新（`setData(prev => [...prev, created])`）。
+
+### 关键约定
+
+- **位置**：`src/lib/apps/installable/github/state/`（GithubApp 内部，非全局 lib）。
+- **协变接口**：AsyncBoundary 接收 `ReadonlyResource<out T>`（协变于 T），解决 `Resource<T>` 因 setData 逆变导致的类型不兼容。调用方在 children snippet 内用 `{@const data = resource.data!}` 取值（success 分支内非空安全）。
+- **纯逻辑分层**：状态派生逻辑在 `status.ts`（server project 可测，纯函数），runes 集成在 `resource.svelte.ts`（client project `.svelte.test.ts` 测）。
+- **不适用场景**：分页/增量加载（listCache、文件树 loadingDirs）形态不匹配，保持手写。
+
+### 文件结构
+
+```
+src/lib/apps/installable/github/state/
+├── status.ts                  状态机派生纯函数（idle/loading/refreshing/...）
+├── status.test.ts             纯逻辑单测（server project）
+├── resource.svelte.ts         createResource runes 工厂（Resource<T> + ReadonlyResource）
+├── resource.svelte.test.ts    runes 行为测试（client project）
+├── AsyncBoundary.svelte       状态机渲染边界（泛型，snippet 传 data）
+├── EmptyState.svelte          空态（图标 + 文案）
+├── ErrorState.svelte          错误态（图标 + 文案 + 重试，role=alert）
+├── RefreshIndicator.svelte    refreshing/stale-error 顶部指示条
+└── index.ts                   统一导出
+```
+
 ## 提交规范
 
 1. git-commit-message 的提交规范的格式为：

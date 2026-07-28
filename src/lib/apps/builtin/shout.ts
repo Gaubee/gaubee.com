@@ -1,6 +1,7 @@
 import { searchIndexProcessor } from "$lib/content-pipeline/processors/search-index";
 import { tagsProcessor } from "$lib/content-pipeline/processors/tags";
 import { eventsSource } from "$lib/content-pipeline/sources/events";
+import { leafRoute } from "$lib/router";
 import { createFileSearchService } from "$lib/search/file-service";
 /**
  * 说说应用（系统内置，不可卸载）。
@@ -29,9 +30,9 @@ export const shoutApp: AppEntry = {
     defaultArea: "main",
     activities: [
       {
-        route: "/app/shout",
+        pattern: "/app/shout",
         entry: true,
-        view: () => import("$lib/apps/views/ShoutView.svelte"),
+        root: leafRoute("shout", () => import("$lib/apps/views/ShoutView.svelte")),
       },
     ],
     vfsOwnership: ["src/content/events/"],

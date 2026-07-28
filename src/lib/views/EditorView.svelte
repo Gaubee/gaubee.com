@@ -1,6 +1,8 @@
 <!--
 	EditorView：编辑器主页。
-	- 从 main location 路径解析要编辑的文章（/app/editor/{collection}/{stem}）
+	- 从 search query 解析编辑目标：
+	  - content：/app/editor?collection=articles&stem=xxx（内容管线，frontmatter + 发表）
+	  - raw：/app/github-edit?owner=X&repo=Y&file=Z（GithubApp 任意文件，纯文本，仅主仓库可写）
 	- 加载文章内容（VFS 三层读取：本地修改 > 远程缓存 > 在线拉取）
 	- 三视图：编辑 / 分屏 / 预览
 	- 自动保存到 VFS（dirty 标记），debounce 1s
@@ -18,8 +20,11 @@
   import { gaubeeos } from '$lib/os/services'
   import { handlePublishError } from '$lib/os/services/publish-helper'
   import { notifySuccess } from '$lib/apps/builtin/notifications/service.svelte'
+  import { useSearch } from '$lib/router'
+  import { targetById } from '$lib/router'
   import { parseMarkdown, serializeMarkdown, type ArticleMetadata } from '$lib/data/frontmatter'
-  import { OWNER, REPO } from '$lib/github/client'
+  import { getFileWithSha, updateFileContent } from '$lib/github/client'
+  import { useRepoEditPermission } from '$lib/apps/views/github/use-repo-edit-permission.svelte'
   import { Button } from '$lib/components/ui/button'
   import * as Dialog from '$lib/components/ui/dialog'
   import { Skeleton } from '$lib/components/ui/skeleton'
@@ -36,6 +41,9 @@
   type View = 'edit' | 'split' | 'preview'
 
   const navState = $derived(navStore.current)
+  // EditorView 同时作为 writer.editor 与 writer.github-edit 两个 activity 的组件，
+  // 二者都通过 search query 传参。useSearch 拿到当前 activity 的 parsed search。
+  const getSearch = useSearch()
   let view = $state<View>('edit')
   let metadataOpen = $state(false)
   let loading = $state(false)
@@ -55,38 +63,58 @@
   let publishing = $state(false)
 
   /**
-   * 从路径解析编辑目标，支持两种模式：
-   * - content：/app/editor/{articles|events|draft}/{stem}（内容管线，frontmatter + 发表）
-   * - raw：/app/github-edit/{owner}/{repo}/{...path}（GithubApp 任意文件，纯文本，仅主仓库可写）
+   * 从 search query 解析编辑目标，支持两种模式（按当前 activity 的 pathname 区分）：
+   * - content：/app/editor?collection=articles&stem=xxx（内容管线，frontmatter + 发表）
+   * - raw：/app/github-edit?owner=X&repo=Y&file=Z&ref?（GithubApp 任意文件，基于 GitHub
+   *   API 真实权限判定可写性，不经 vfsStore，直接 Contents API 读写）
    */
   const target = $derived.by(() => {
     const path = navState.mainLocation.pathname
-    // GithubApp 任意文件编辑（raw 模式）
-    const gitMatch = path.match(/^\/app\/github-edit\/([^/]+)\/([^/]+)\/(.+)$/)
-    if (gitMatch) {
-      const [_, owner, repo, filePath] = gitMatch
+    const search = getSearch?.()
+    if (!search) return null
+    if (path === '/app/github-edit') {
+      const { owner, repo, file, ref } = search as {
+        owner: string
+        repo: string
+        file: string
+        ref?: string
+      }
       return {
         kind: 'raw' as const,
         owner,
         repo,
-        filePath,
-        writable: owner === OWNER && repo === REPO,
+        filePath: file,
+        ref: ref ?? '',
       }
     }
-    // 内容管线编辑
-    const contentMatch = path.match(/^\/app\/editor\/(articles|events|draft)\/(.+)$/)
-    if (contentMatch) {
-      return {
-        kind: 'content' as const,
-        collection: contentMatch[1] as 'articles' | 'events' | 'draft',
-        stem: contentMatch[2],
-      }
+    if (path === '/app/editor') {
+      const { collection, stem } = search as { collection: 'articles' | 'events' | 'draft'; stem: string }
+      return { kind: 'content' as const, collection, stem }
     }
     return null
   })
 
-  /** raw 模式是否只读（非主仓库）。 */
-  const isRawReadonly = $derived(target?.kind === 'raw' && !target.writable)
+  /** raw 模式：当前文件的 GitHub sha（乐观锁用，更新已有文件必填）。
+   *  每次 loadPost 加载时填充，保存成功后更新为新 sha。 */
+  let rawSha = $state<string | null>(null)
+  /** raw 模式：是否正在保存到 GitHub（保存按钮 loading 态）。 */
+  let rawSaving = $state(false)
+
+  /** raw 模式权限判定 hook（owner/repo 变化时自动重查 getRepo + getBranch）。
+   *  三层判定：push 权限 + ref 一致性 + 分支保护。
+   *  传 getter 保证响应性（target 变化时 hook 内部 $derived 自动重算）。 */
+  const rawPermission = useRepoEditPermission(
+    () =>
+      target?.kind === 'raw'
+        ? { owner: target.owner, repo: target.repo, ref: target.ref }
+        : { owner: '', repo: '' },
+  )
+
+  /** raw 模式是否只读（基于 GitHub API 真实权限，取代旧的 owner/repo 硬编码）。
+   *  注意：权限加载中（loading）时保守按只读处理，避免越权编辑。 */
+  const isRawReadonly = $derived(
+    target?.kind === 'raw' && (!rawPermission.canEdit || rawPermission.loading),
+  )
 
   async function loadPost() {
     if (!target) {
@@ -107,11 +135,25 @@
       } else {
         path = `src/content/${target.collection}/${target.stem}.md`
       }
-      // VFS.read：三层自动取本地修改 > 只读层 > 在线拉
-      const text = await vfsStore.read(path)
+      // raw 模式：直接调 GitHub Contents API 读（不经 vfsStore，避免主仓库 IndexedDB 污染）。
+      // 同时取 sha 用于保存时的乐观锁。
+      // content 模式：走 vfsStore.read（三层自动取本地修改 > 只读层 > 在线拉）。
+      let text: string
+      if (target.kind === 'raw') {
+        const result = await getFileWithSha(target.filePath, {
+          owner: target.owner,
+          repo: target.repo,
+          ref: target.ref || undefined,
+        })
+        text = result.content
+        rawSha = result.sha
+      } else {
+        text = await vfsStore.read(path)
+        rawSha = null
+      }
       if (mySeq !== loadSeq) return // 已切到别的文章，丢弃结果（竞态防护）
       currentPath = path
-      docId = path
+      docId = target.kind === 'raw' ? `${target.owner}/${target.repo}/${target.filePath}` : path
       if (target.kind === 'content') {
         // content 模式：解析 frontmatter
         const { metadata: meta, body: parsedBody } = parseMarkdown(text)
@@ -123,7 +165,7 @@
         body = text
       }
       // 记录本次加载的 kind，供切换文章前 flush 判断（raw 只读不 flush）
-      lastKind = target.kind === 'raw' ? (target.writable ? 'raw' : 'readonly') : 'content'
+      lastKind = target.kind === 'raw' ? (isRawReadonly ? 'readonly' : 'raw') : 'content'
       dirty = false
     } catch (e) {
       if (mySeq !== loadSeq) return
@@ -183,10 +225,12 @@
   }
 
   /**
-   * 立即将当前内容写入 VFS（如有 currentPath）。
+   * 立即将当前内容写入 VFS（content 模式）。
    * handleSave/handlePublish/切文章前调用，确保内容不丢。
    * 取消 pending debounce timer，避免重复/错位写入。
-   * raw 模式纯文本写入；content 模式 serializeMarkdown。
+   *
+   * raw 模式不经 vfsStore（直接走 GitHub Contents API，见 handleRawSave），
+   * 此函数对 raw 模式直接 return（切文章前不自动落盘 GitHub，避免误写）。
    */
   async function flushSave(): Promise<void> {
     if (saveTimer) {
@@ -194,17 +238,51 @@
       saveTimer = null
     }
     if (!currentPath) return
-    if (isRawReadonly) return
-    const content =
-      target?.kind === 'content' ? serializeMarkdown(metadata, body) : body
+    if (target?.kind !== 'content') return // raw 模式不经 vfsStore
+    const content = serializeMarkdown(metadata, body)
     await vfsStore.write(currentPath, content)
-    // raw 模式不影响内容管线缓存，跳过 refresh
-    if (target?.kind === 'content') contentQuery.refresh()
+    contentQuery.refresh()
     dirty = false
   }
 
-  /** 保存按钮：立即落盘（不再走 1s debounce）。 */
+  /**
+   * raw 模式保存：直接调 GitHub Contents API PUT（不经 vfsStore）。
+   * - 无 push 权限/分支保护 → 静默不调（按钮已 disabled）
+   * - 成功 → 更新本地 rawSha（下次保存乐观锁）+ toast 提示 commit sha
+   */
+  async function handleRawSave(): Promise<void> {
+    if (target?.kind !== 'raw' || !currentPath) return
+    if (!rawPermission.canEdit) return
+    rawSaving = true
+    try {
+      const branch = rawPermission.defaultBranch ?? undefined
+      const sha = await updateFileContent(target.filePath, body, {
+        owner: target.owner,
+        repo: target.repo,
+        branch,
+        sha: rawSha,
+        message: `在线编辑：${target.filePath.split('/').pop() ?? target.filePath}`,
+      })
+      rawSha = sha // 更新本地 sha，供下次保存乐观锁
+      dirty = false
+      toast.success(`已保存（commit ${sha.slice(0, 7)}）`, { duration: 2000 })
+    } catch (e) {
+      // 409 Conflict 通常意味着 sha 过期（期间有新提交），需重新加载
+      const msg = e instanceof Error ? e.message : '保存失败'
+      toast.error('保存失败', { description: msg, duration: 4000 })
+    } finally {
+      rawSaving = false
+    }
+  }
+
+  /** 保存按钮：立即落盘。
+   *  content 模式 → flushSave 写 vfsStore（IndexedDB）。
+   *  raw 模式 → handleRawSave 直接 PUT GitHub Contents API。 */
   async function handleSave() {
+    if (target?.kind === 'raw') {
+      await handleRawSave()
+      return
+    }
     await flushSave()
     toast.success('已保存', { duration: 1500 })
   }
@@ -230,7 +308,7 @@
       const sha = await git.commit(`发表：${title}`)
       notifySuccess(`已发表（${sha.slice(0, 7)}）`, undefined, {
         label: '查看变更',
-        href: '/app/changes',
+        to: targetById('writer.changes'),
       })
     } catch (e) {
       handlePublishError(e, navController)
@@ -280,9 +358,18 @@
           <span class="hidden sm:inline">元数据</span>
         </Button>
       {/if}
-      <Button size="sm" variant="default" onclick={handleSave} disabled={!currentPath || isRawReadonly}>
+      <Button
+        size="sm"
+        variant="default"
+        onclick={handleSave}
+        disabled={
+          !currentPath ||
+          isRawReadonly ||
+          (target?.kind === 'raw' ? rawSaving : false)
+        }
+      >
         <SaveIcon data-icon="inline-start" />
-        <span class="hidden sm:inline">保存</span>
+        <span class="hidden sm:inline">{target?.kind === 'raw' && rawSaving ? '保存中…' : '保存'}</span>
       </Button>
       {#if target?.kind === 'content'}
         <Button
@@ -305,11 +392,10 @@
         请从文件或阅读流中选择一篇文章编辑
       </div>
     {:else if isRawReadonly && !loading}
-      <!-- 只读仓库提示（非主仓库不可编辑）-->
+      <!-- 只读提示（基于 GitHub API 真实权限判定，给出精确原因） -->
       <div class="text-muted-foreground flex h-full flex-col items-center justify-center gap-2 text-sm">
         <LockIcon class="size-6" />
-        <p>只读仓库 {target?.owner}/{target?.repo} 不可编辑</p>
-        <p class="text-xs">仅主仓库 {OWNER}/{REPO} 支持在线编辑。</p>
+        <p>{rawPermission.disabledReason ?? '加载中…'}</p>
       </div>
     {:else if loading}
       <div class="space-y-2 p-6">

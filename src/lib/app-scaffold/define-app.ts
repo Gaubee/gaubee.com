@@ -15,7 +15,7 @@ export function defineApp(config: AppManifest): AppEntry {
     const entries = config.activities.filter((a) => a.entry);
     if (entries.length > 1) {
       console.warn(
-        `[defineApp] 应用 ${config.id} 有多个 entry activity，将取第一个：${entries[0]?.route}`,
+        `[defineApp] 应用 ${config.id} 有多个 entry activity，将取第一个：${entries[0]?.pattern}`,
       );
     }
     if (config.activities.length === 0) {

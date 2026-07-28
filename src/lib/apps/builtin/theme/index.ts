@@ -1,3 +1,4 @@
+import { leafRoute } from "$lib/router";
 /**
  * 主题应用（系统内置，不可卸载）。
  *
@@ -22,9 +23,9 @@ export const themeApp: AppEntry = {
     defaultArea: "main",
     activities: [
       {
-        route: "/app/theme",
+        pattern: "/app/theme",
         entry: true,
-        view: () => import("$lib/apps/views/ThemeView.svelte"),
+        root: leafRoute("theme", () => import("$lib/apps/views/ThemeView.svelte")),
       },
     ],
     // 向 GaubeeOS 暴露主题服务（gaubeeos.getAppService('theme')）

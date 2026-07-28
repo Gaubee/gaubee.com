@@ -1,23 +1,21 @@
 <!--
 	TagsView：标签页（深链接 /tags 和 /tags/{tag}）。
-	- /tags（无标签）：标签云，显示所有标签 + 文章数，点击进筛选。
-	- /tags/{tag}：显示带指定标签的所有文章。
+	- /tags（index route）：标签云，显示所有标签 + 文章数，点击进筛选。
+	- /tags/{tag}（child :tag route）：显示带指定标签的所有文章。
+	同一组件承担两种视图，由 useParams 是否返回 tag 区分（替代旧 pathname 正则分发）。
 	数据源 contentQuery（内容管道，背后是 tags processor 的频次缓存 + byTag 筛选）。
 -->
 <script lang="ts">
   import { contentQuery } from '$lib/content-pipeline/query.svelte'
-  import { navStore } from '$lib/nav/nav.svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
+  import { useParams } from '$lib/router'
   import * as Card from '$lib/components/ui/card'
   import { Badge } from '$lib/components/ui/badge'
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left'
 
-  const navState = $derived(navStore.current)
-  // /tags → 无标签（标签云）；/tags/{tag} → 筛选
-  const tag = $derived.by(() => {
-    const match = navState.mainLocation.pathname.match(/^\/tags\/(.+)$/)
-    return match ? decodeURIComponent(match[1]) : ''
-  })
+  // /tags（index）时 getParams 为 undefined；/tags/{tag}（child）时返回 { tag }
+  const getParams = useParams<{ tag: string }>()
+  const tag = $derived(getParams?.()?.tag ?? '')
   const isTagCloud = $derived(tag === '')
 
   // 标签频次来自 contentQuery.listTags()（tags processor 缓存）；依赖 version 触发重算

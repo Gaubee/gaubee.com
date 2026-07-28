@@ -43,7 +43,9 @@
   function openFile(path: string) {
     const match = path.match(/^src\/content\/(articles|events|draft)\/(.+)\.md$/)
     if (match) {
-      navController.navigateMain(`/app/editor/${match[1]}/${match[2]}`)
+      navController.navigateMain(
+        `/app/editor?collection=${encodeURIComponent(match[1])}&stem=${encodeURIComponent(match[2])}`,
+      )
     }
   }
 
@@ -73,7 +75,9 @@
     await vfsStore.write(path, content)
     const label = collection === 'articles' ? '文章' : collection === 'events' ? '短评' : '草稿'
     notifySuccess(`已新建${label} ${stem}`)
-    navController.navigateMain(`/app/editor/${collection}/${stem}`)
+    navController.navigateMain(
+      `/app/editor?collection=${encodeURIComponent(collection)}&stem=${encodeURIComponent(stem)}`,
+    )
   }
 
   /**
@@ -94,7 +98,9 @@
       }
     }
     if (latestStem) {
-      navController.navigateMain(`/app/editor/articles/${latestStem}`)
+      navController.navigateMain(
+        `/app/editor?collection=articles&stem=${encodeURIComponent(latestStem)}`,
+      )
     } else {
       // 无文章时新建一篇
       createNew('articles')

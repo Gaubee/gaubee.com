@@ -2,6 +2,7 @@ import { defineApp } from "$lib/app-scaffold/define-app";
 import { searchIndexProcessor } from "$lib/content-pipeline/processors/search-index";
 import { tagsProcessor } from "$lib/content-pipeline/processors/tags";
 import { articlesSource } from "$lib/content-pipeline/sources/articles";
+import { defineRoute, leafRoute } from "$lib/router";
 import { createFileSearchService } from "$lib/search/file-service";
 import ListIcon from "@lucide/svelte/icons/list";
 /**
@@ -19,10 +20,39 @@ import ListIcon from "@lucide/svelte/icons/list";
  */
 import Newspaper from "@lucide/svelte/icons/newspaper";
 import TagsIcon from "@lucide/svelte/icons/tags";
+import { z } from "zod";
 
-import { asView } from "../types";
 import RecentArticlesWidget from "../widget/RecentArticlesWidget.svelte";
 import TagsWidget from "../widget/TagsWidget.svelte";
+
+/** 文章详情 Route：/article/{collection}/{stem}。
+ *  带类型安全的 params schema，替代旧 ArticleDetailView 内部的 path.match 正则解析。 */
+const articleDetailRoute = defineRoute({
+  id: "articles.detail",
+  pattern: ":collection/:stem",
+  params: z.object({
+    collection: z.enum(["articles", "events"]),
+    stem: z.string().min(1),
+  }),
+  component: () => import("$lib/apps/views/ArticleDetailView.svelte"),
+});
+
+/** 标签 Route：/tags（标签云）+ /tags/{tag}（筛选）。
+ *  root index 渲染标签云，child :tag 渲染带指定标签的文章列表。
+ *  替代旧 TagsView 内部的 pathname 正则分发（2026-07-28 路由系统迁移）。 */
+const tagsRoute = defineRoute({
+  id: "articles.tags",
+  pattern: "",
+  component: () => import("$lib/views/TagsView.svelte"),
+  children: [
+    defineRoute({
+      id: "articles.tags.detail",
+      pattern: ":tag",
+      params: z.object({ tag: z.string().min(1) }),
+      component: () => import("$lib/views/TagsView.svelte"),
+    }),
+  ],
+});
 
 export const articlesApp = defineApp({
   id: "articles",
@@ -32,18 +62,20 @@ export const articlesApp = defineApp({
   defaultArea: "main",
   activities: [
     {
-      route: "/app/articles",
+      pattern: "/app/articles",
       entry: true,
-      view: () => import("$lib/apps/views/ArticlesView.svelte"),
+      root: leafRoute("articles", () => import("$lib/apps/views/ArticlesView.svelte")),
     },
-    // 文章详情需 pathname prop（由 AreaOutlet 从 location.pathname 注入），用 asView 断言。
+    // 文章详情：/article/{collection}/{stem}。
+    // 新方案：ActivityRouter 通过 useParams 把 collection/stem 注入 ArticleDetailView，
+    // 替代旧的 pathname prop + 手工正则解析。
     {
-      route: "/article",
-      view: asView(() => import("$lib/apps/views/ArticleDetailView.svelte")),
+      pattern: "/article",
+      root: articleDetailRoute,
     },
     {
-      route: "/tags",
-      view: () => import("$lib/views/TagsView.svelte"),
+      pattern: "/tags",
+      root: tagsRoute,
     },
   ],
   vfsOwnership: ["src/content/articles/"],

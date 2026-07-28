@@ -1,4 +1,5 @@
 import { notifyError, notifyInfo } from "$lib/apps/builtin/notifications/service.svelte";
+import { buildHrefById, targetById } from "$lib/router";
 
 /**
  * 发表流程共享错误处理。
@@ -12,6 +13,9 @@ import { notifyError, notifyInfo } from "$lib/apps/builtin/notifications/service
  *
  * 通知走 NotificationService（notify* 便捷函数），自动写入通知历史。
  * 返回 true 表示错误已处理（调用方通常无需再做事）。
+ *
+ * 2026-07-27 路由重构：通知 action 用类型安全的 targetById 替代裸字符串 href。
+ * 注意：account/settings 应用是 leafRoute（无 params），targetById 第二个参数可省略。
  */
 import { AppServiceNotInstalled, NotAuthenticatedError, NoChangesError } from "./bus";
 
@@ -30,18 +34,18 @@ export function handlePublishError(e: unknown, nav: PublishNavLike): boolean {
   if (e instanceof NotAuthenticatedError) {
     notifyError("请先登录账户", "即将跳转到账户页面", {
       label: "去登录",
-      href: "/app/account",
+      to: targetById("account"),
     });
-    nav.navigateMain("/app/account");
+    nav.navigateMain(buildHrefById("account"));
     return true;
   }
   if (e instanceof AppServiceNotInstalled) {
     notifyError(
       "需要安装 Github 应用",
       "发表功能依赖 Github 应用提供仓库操作能力，请在设置中安装。",
-      { label: "去设置", href: "/app/settings" },
+      { label: "去设置", to: targetById("settings") },
     );
-    nav.navigateMain("/app/settings");
+    nav.navigateMain(buildHrefById("settings"));
     return true;
   }
   if (e instanceof NoChangesError) {

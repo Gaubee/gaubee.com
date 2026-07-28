@@ -774,3 +774,287 @@ agent-browser 双端走查（手机 390x844 / 平板 834x1194 / 桌面 1280）�
 - `worker/src/index.ts`：OAuth 回调不再设 httpOnly cookie，改为重定向带 fragment；/api/proxy、/auth/me、/auth/logout 标记废弃
 - `src/lib/auth/session.svelte.ts`：token 存内存 $state；fetchGithub 直连 api.github.com；refresh 用 token 直调 /user；consumeTokenFromFragment 消费回调 token
 - `scripts/dev-login.sh`：改为构造 `#auth_token=xxx` URL 让浏览器消费（取代 cookie 注入）
+
+## 类型安全路由系统重构（2026-07-27）
+
+### 问题
+
+旧路由方案的类型安全缺口：
+
+- `navController.navigateMain('/app/github/repo/...')` 是裸字符串，改路径所有调用点编译期不报错
+- pathname 段靠 `path.match(/.../)` 裸正则 + `match[1]`，无 schema
+- query 全是 `string|null`，靠 `as` + `Number()`，`NaN` 风险
+- `asView()` 用 `as unknown as` 绕开 Svelte Component 逆变
+- `NotificationAction.href` 是任意 string，拼错只渲染 NotFound
+- GithubView.svelte 手工正则分发列表/详情，散落在每个应用内
+
+### 新架构（RouteContract + zod + ActivityRouter）
+
+```
+URL ─► NavController(黑盒) ─► AreaOutlet ─► <AppShell activity>
+                                            └► <ActivityRouter>
+                                                 └► matchRouteTree 解析 RouteContract 树
+                                                      └► <View params search/>  类型安全
+```
+
+核心数据结构：
+
+- `RouteContract`：声明式路由节点，携带 id + pattern + zod schema + component + children（无限嵌套）
+- `defineRoute` / `defineActivity` / `leafRoute`：类型安全工厂
+- `matchRouteTree`：纯函数解析（段数组模型 + zod parse）
+- `routeRegistry`：运行时自描述（defineRoute 时自动注册 + defineActivity 时回填 absolutePattern）
+- `nav.go` / `nav.goById` / `targetById` / `buildHrefById`：替代 `navigateMain(string)`
+- `useParams` / `useSearch` / `useRoute`：Svelte 5 runes 风格 hooks
+
+### 改动
+
+**新增**（`src/lib/router/`）：
+
+- contract.ts / define-route.ts / define-activity.ts / leaf-route.ts：类型安全工厂
+- match.ts / path-pattern.ts / search.ts：纯函数解析（段数组模型）
+- navigate.ts / registry.ts：导航 API + 全局注册表
+- hooks.svelte.ts：useRoute/useParams/useSearch（context getter 模式保证响应式）
+- ActivityRouter.svelte：Activity 内部渲染组件（按 RouteId 缓存保活）
+- `__tests__/`：49 个单测（path-pattern 13 + match 12 + search 11 + navigate 9 + define-route 4）
+
+**升级**：
+
+- `types.ts`：AppActivity 从 `{route, view}` 改为 `{pattern, root}`；删除 asView；ViewLoader 标 @deprecated
+- `AppShell.svelte`：内置 ActivityRouter，从隔离容器升级为通用范式承载者（5 个正交意图，达上限警告）
+- `AreaOutlet.svelte`：resolveActivityForPath 替代 resolveMainView；按 tabId 常驻 AppShell DOM
+- `nav-controller-instance.ts`：注入 NavControllerAdapter，让 nav.go/goById 委托 NavController
+- `notifications/service.svelte.ts`：NotificationAction.href 改为 `to: IdTarget`（类型安全）
+- `publish-helper.ts`：用 targetById 替代裸字符串 href
+- 13 个应用 manifest 全部迁移到 `{pattern, root}` 结构
+
+**删除**：
+
+- GithubView.svelte（手工正则分发器，被 RouteContract 嵌套树取代）
+- GithubView.svelte.spec.ts（被 match.test.ts 单测覆盖）
+- placeholders.ts 简化为只保留 pop 浮层注册
+
+**关键迁移范例**：
+
+- GithubApp：root index（RepoListView）+ `repo/:owner/:repo`（RepoDetailView，带 5 字段 search schema）+ `list/:type`
+- ArticlesApp：`/article/:collection/:stem` 用 zod enum 校验 collection
+- RepoDetailView：props（owner/repo）→ useParams；searchParams.get('tab') as ... → useSearch（zod 已校验）
+
+**待办（阶段 3/5，未完成）**：
+
+- `vite-plugin-gaubee-routes`：codegen 生成 RouteId 联合类型 + RouteParamsMap（骨架已建，扫描逻辑待补）
+- pop/bottom 区应用（search/notifications/terminal）统一到 ActivityRouter（当前走 AreaOutlet 旧机制）
+- 删除 `ViewLoader` / `placeholders.ts` / `resolver.ts`（阶段 5 清理）
+
+### 验证
+
+- 类型检查 0 错误 0 警告（`pnpm check`）
+- 路由单测 79/79 全过（`pnpm test:unit src/lib/router src/lib/views`）
+- 8 页 dogfood 全绿（home/github-list/github-detail/articles/settings/shout/files/theme）：
+  - URL-first 渲染正确（直接访问深链接可渲染）
+  - 嵌套路由 params/search 解析正确
+  - 跨应用跳转类型安全（NotificationAction.to）
+  - 应用内/跨应用保活模型正常
+- `mobile.e2e.ts` 失败 2 项为预存问题（重构前已失败，与本改动无关）
+
+## GithubApp：history/files ref 切换 + IssueDetail 视觉精修（2026-07-27）
+
+继路由系统重构后，集中提升 GithubApp 仓库详情页的两个核心体验。
+
+### 一、history/files tab 的 ref 切换器（2026-07-27）
+
+痛点：history tab 只能看默认分支的 commit 列表，files tab 只在 `?ref=` 存在时被动提示「历史版本」，体验割裂。
+
+#### API 扩展
+
+- `client.ts` 的 `listCommits` 补 `since`/`until` 参数（GitHub ISO 8601 时间过滤）。
+- `repo-api.ts` 新增 `listBranches`/`listTags`（`GET /repos/{owner}/{repo}/{branches,tags}`）+ `BranchSummary`/`TagSummary` 类型。
+
+#### 新组件 `RepoRefSelector.svelte`
+
+封装 branch/tag 列表 + SHA 直跳，history tab 与 files tab 共用：
+
+```
+[main ▾]  ← 触发按钮（当前 ref + 箭头）
+  ┌──────────────────────────┐
+  │ 🔍 [输入 branch/tag/SHA]  │  ← 搜索框（同时过滤列表 + 接受 SHA 直跳）
+  │ ── Branches ──            │
+  │   main（默认分支置顶）     │
+  │   dev                     │
+  │ ── Tags ──                │
+  │   v1.0.0                  │
+  └──────────────────────────┘
+```
+
+- 数据懒加载：首次打开 Popover 时才请求 branches/tags。
+- 输入 ≥7 位 hex（SHA 格式）→ 回车直接 `onSelect(sha)`（直跳 CommitDetail）。
+- 否则按输入过滤 branch/tag 列表。
+
+#### history tab 改造
+
+- RepoRefSelector 常驻（切换 branch 触发 loadCommits）。
+- 「过滤」按钮带 badge 显示激活数量，点开 Popover（author input + since/until 原生 `<input type="date">`）。
+- commit 列表项重构为 GitHub 风格：横向布局，左 avatar + 中标题（粗）+ body 摘要 + author · 相对时间，右 SHA 短码。
+
+#### files tab 改造
+
+- 用 RepoRefSelector 替代被动提示条，常驻文件树容器头部。
+- 切换 ref → `navigateSelect('files', 'ref', newRef)`；ref ≠ 默认分支时旁边显示「历史版本」badge。
+
+### 二、IssueDetail 视觉精修（2026-07-27）
+
+对比 GitHub 官方 issue 详情页，timeline 从「漂浮节点」升级为「卡片化 timeline + 元信息 Dialog 化」。
+
+#### Timeline 卡片化
+
+- issue 正文 + 评论统一为 `border rounded-lg` 卡片，header 用 `bg-muted/50` 灰条作视觉锚点，body + footer（reactions）独立分区。
+- 全局左侧 2px 轴线穿过所有节点中心，头像用 `ring-2 ring-background` 遮断轴线 → 视觉上「坐」在轴线上。
+- event 行用圆形彩色背景小图标（closed=紫底 / reopened=绿底 / 其它=灰底）遮断轴线。
+- 标题字号 `text-base`(16px) → `text-xl`(20px) 更醒目。
+
+#### 元信息 Dialog 化（参考用户给的 GitHub sidebar 截图）
+
+痛点：title 下方「作者头像+名字+时间」meta 行与第一条 timeline 卡片 header 重复；labels 占两行。
+
+新组件 `IssueMetaBar.svelte`：
+
+- **缩略行**：title 正下方独立一行，整行可点（trigger 是 button，hover 有背景色反馈）。
+  - 基础信息（永远显示）：opened 时间 · 评论数（无 meta 字段时也兜底展示，避免 title 下方视觉断层）。
+  - meta 字段（有值时叠加）：assignees 叠加头像 · labels 彩色圆点 + 计数 · milestone 图标+标题。
+- **Dialog**：Assignees / Labels / Milestone / Participants（从 events.actor 聚合）/ 创建时间 / 评论数 / GitHub 链接。
+  - 无值字段显示占位（No assignees / No milestone），保持结构完整。
+
+#### API 扩展
+
+`IssueDetail` 补 `assignees: Array<{login, avatar_url}>` + `milestone: {title, html_url?} | null`，`toIssueDetail` 透传。
+
+#### 底部评论编辑器
+
+加左侧当前用户头像（`size-7 ring-2 ring-background`，与 timeline 风格对齐）。
+
+### 验证
+
+- 类型检查 0 错误 0 警告。
+- issue-api 单测 13/13 全过（补 getIssue 的 assignees/milestone 投影测试）。
+- Playwright DOM 验证：
+  - 标题 text-xl(20px) ✅、卡片 count=6 ✅、header bg-muted/50 ✅、左侧轴线渲染 ✅、event 圆形彩色图标 ✅、底部编辑器头像 ✅
+  - IssueMetaBar 触发文本正确：空 meta = `opened 28 天前 · 5 详情`，有 labels = `opened 2 天前 · 3 · 2 labels 详情`
+  - Dialog 6 区块全过（Assignees/Labels/Milestone/Participants/时间/GitHub 链接）
+
+## GithubApp：加载状态机抽象（2026-07-28）
+
+### 问题
+
+GithubApp 所有视图各自手写 `loading + error + data` 三元组（15+ 处重复），仅覆盖 3 种状态，缺失全部中间态：
+
+- 切换 issue/commit SHA 时清空旧数据闪烁（无 refreshing 态）。
+- 网络抖动失败时 `data = []` 清空已加载数据（无 stale-error 态）。
+- 静默失败的资源（repoInfo/changes/events）异常不可观测。
+- 竞态防护（searchSeq）、去重（inFlight）散落各处无统一收口。
+- 错误/空态视觉不一致（padding、图标、role=alert 各异）。
+
+### 新架构：createResource + AsyncBoundary（8 态拓扑）
+
+升级到 8 种拓扑状态：idle/loading/refreshing/success/empty/error/stale-error。核心是 `refreshing`（背景刷新保留旧数据）和 `stale-error`（刷新失败保留旧数据 + 错误条）。
+
+```
+src/lib/apps/installable/github/state/
+├── status.ts                  状态机派生纯函数（server project 可测）
+├── resource.svelte.ts         createResource runes 工厂（内置 seq 竞态/silent/isEmpty/setData）
+├── AsyncBoundary.svelte       状态机渲染边界（ReadonlyResource<out T> 协变接口）
+├── EmptyState / ErrorState / RefreshIndicator   统一占位组件
+└── index.ts
+```
+
+### 迁移的视图（6 个）
+
+- `CommitDetailPanel`：commit 单值资源，切换 SHA 时 refreshing 保留旧内容。
+- `RepoFileContent`：文件内容资源，媒体短路（reset 跳过 loading）。
+- `RepoRefSelector`：branches/tags 懒加载（silent 静默失败）。
+- `IssueContentPanel`：issue/comments/events 三路并发，评论 CRUD 用 setData。
+- `RepoDetailView`：repoInfo(commits/issues/issueCounts/repoSearch/changes) 6 路并发。
+- `RepoListView`：search 用 createResource（替代手写 searchSeq 竞态）。
+
+### 不迁移（形态不匹配）
+
+- 文件树 `loadingDirs`（多路增量加载）、listCache 缓存层（分页/增量渲染）、activities（本地派生无网络）。
+
+### 验证
+
+- 类型检查 0 错误 0 警告。
+- state 抽象层单测 29/29 全过（status 派生 13 + resource runes 行为 16）。
+- 前端走查（agent-browser）：列表页/详情页/历史 Tab/commit 详情/Issues Tab/issue 详情/搜索/ref 选择器全部正常渲染，无白屏无错误。
+
+## Markdown 正文链接样式统一（2026-07-28）
+
+文章（articles）/说说（events）正文里的 `<a>` 链接之前走 marked 默认渲染（裸 `<a href>`），无外链标识、无内链拦截。统一为外链/内链两套行为。
+
+### 决策
+
+| 维度       | 决策                                                                        |
+| ---------- | --------------------------------------------------------------------------- |
+| 外链视觉   | 尾部 external-link 图标（CSS `::after` + mask，DOM 零增节点，SSG 同步生效） |
+| 外链行为   | `target=_blank` + `rel="noopener noreferrer"`                               |
+| 内链判定   | 仅站内绝对路径（`/` 开头，排除 `//host`）                                   |
+| 内链行为   | click 委托拦截 → SPA 应用内导航（修饰键/中键放过走原生）                    |
+| SSG 一致性 | `render.ts` 同步处理，SEO 产物与客户端一致                                  |
+
+### 改动
+
+- 新建 `src/lib/markdown/link.ts`：`classifyLink`（external/internal/anchor/other）+ `renderLinkTag`（共享纯函数，客户端 + SSG 复用，XSS 转义）。
+- `MarkdownViewer.svelte`：加 `renderer.link` + 容器 click 委托（`a[data-internal-link]` → `navigateMain`，`role=presentation`）。
+- `render.ts`：SSG 加 `renderer.link`。
+- `app.css`：`.md-link-external::after` 用 mask + currentColor 渲染图标（自动跟随暗色/hover），`.shout-markdown a` 补基础链接样式。
+- 单测 12/12 全过（分类边界 + XSS 转义）。
+
+## 渲染 bug 修复：应用市场 + 文件编辑器空白（2026-07-28）
+
+修复两个「页面不渲染内容」的 bug，均为类型安全路由系统重构遗留问题。
+
+### Bug 1：`/app/store` 应用市场空白
+
+**根因**：`app-store` 是 `hiddenFromNav:true` 且唯一 activity 是 entry activity，AreaOutlet 三层渲染全部排除它（entry 浮层过滤 hiddenFromNav；deep-link 层要求 `!isEntry`；desktop/notfound 不满足）。
+
+**修复**（`AreaOutlet.svelte`）：放宽 `nonEntryActive` 判定，hiddenFromNav 应用的 entry activity 也走 deep-link 层。一并修复同类应用（account/notifications/search）。
+
+### Bug 2：`/app/github-edit/...` 与 `/app/editor/...` 编辑器空白
+
+**根因**：`leafRoute`（index route，pattern `""` 无 children）无法匹配多段深路径。剥前缀后剩余段非空 → `matchChain` no-match → 渲染空 div。路由库不支持 splat。
+
+**修复**（迁移到 search query，与 `github.repo.detail` 既定模式一致）：
+
+- `leaf-route.ts`：增强 `leafRoute` 支持可选 search schema。
+- `writer.ts`：`/app/editor`（collection/stem）和 `/app/github-edit`（owner/repo/file）都加 search schema。
+- `EditorView.svelte`：`target` 从正则解析 pathname 改为 `useSearch()` 取参。
+- 调用方更新：`FilesView`（3 处）、`WriterView`、`RepoFileContent`、SSG `+page.svelte`。
+
+### 验证
+
+- 类型检查 0 错误 0 警告；单元测试仅预存 `shell.test.ts` 环境噪声失败（无关）。
+- agent-browser 走查：`/app/store` 渲染完整应用列表；`/app/github-edit?...&file=README.md` CodeMirror 加载 README.md 完整内容。
+
+### Bug 3：`/app/store/writer` 应用详情页空白（2026-07-28）
+
+**根因**：与前两个 bug 同源（路由重构遗留）。`AppStoreView` 用组件内 pathname 正则（`/^\/app\/store\/(.+)$/`）二级分发列表/详情，但 `app-store` 的 activity root 是 `leafRoute`（index route），`/app/store/writer` 剥前缀后剩余段非空 → no-match → 组件根本没加载。
+
+**修复**（迁移到嵌套子路由，与 `github.repo.detail` 范式一致）：
+
+- `app-store.ts`：`leafRoute` → `defineRoute`，root index（列表）+ child `:appId`（详情）。
+- `AppStoreView`：去掉正则分发，只保留列表渲染。
+- `AppStoreDetailView`：从 prop `appId` 改为 `useParams<{ appId: string }>()` 取参。
+
+### Bug 4：`/tags/{tag}` 标签筛选页空白（2026-07-28，全面走查发现）
+
+**根因**：与前三个 bug 同源。`TagsView` 用组件内 pathname 正则（`/^\/tags\/(.+)$/`）分发标签云/筛选，但 `/tags` 的 activity root 是 `leafRoute`（index route），`/tags/javascript` 剥前缀后剩余段非空 → no-match → 空白。影响面比前三个更广：TagsWidget（桌面默认 widget）、标签云自身点击、markdown 内链均可触发。
+
+**修复**（与 app-store 范式一致）：
+
+- `articles.ts`：`/tags` 的 `leafRoute` → `defineRoute`，root index（标签云）+ child `:tag`（筛选）。
+- `TagsView`：去掉 pathname 正则，用 `useParams<{ tag }>()` 区分两种视图（index 返回 undefined，child 返回 tag）。
+
+### 全面走查结论（2026-07-28）
+
+对全部 13 个应用逐一排查「`leafRoute` + 组件内 pathname 正则分发」的系统性 bug 模式：
+
+- **已修复**：app-store、writer(editor/github-edit)、tags 共 4 处。
+- **安全确认**：articles（详情走 defineRoute）、shout、settings、theme、files、search、notifications、account、desktop、terminal、github（defineRoute + children）——均不做 pathname 子路径正则分发。
+- **风险（有兜底，非渲染 bug）**：deepLinks 死字段（未落地，建议清理）；NotificationsView 消费 localStorage 持久化 routeId（失效时跳桌面兜底）；markdown 内链 href 无白名单（错误路径走 NotFound 兜底）。

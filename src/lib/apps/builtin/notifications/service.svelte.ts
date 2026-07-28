@@ -12,17 +12,26 @@ import { browser } from "$app/environment";
  */
 import type { AppService } from "$lib/os/services";
 import { gaubeeos } from "$lib/os/services";
+import type { IdTarget } from "$lib/router";
 import { toast } from "svelte-sonner";
 
 /** 通知严重级别。 */
 export type NotificationSeverity = "success" | "error" | "info" | "warning";
 
-/** 通知的可选操作（点击通知卡片可跳转）。 */
+/**
+ * 通知的可选操作（点击通知卡片可跳转）。
+ *
+ * 2026-07-27 路由重构：旧字段 href: string 已替换为 to: IdTarget。
+ * - IdTarget 携带类型安全的 routeId + params + search（来自 $lib/router）。
+ * - 通过 nav.targetById('github.repo.detail', { owner, repo }) 构造。
+ * - 拼错 routeId 或 params 形状会在编译期报错。
+ * - 调用方仍可用 navigateMain('/裸路径') 作为 escape hatch，但推荐走 to。
+ */
 export interface NotificationAction {
   /** 按钮文案，如「查看」「去登录」。 */
   label: string;
-  /** 跳转路径（main 区），如 /app/changes、/app/account。 */
-  href: string;
+  /** 类型安全的导航目标（替代旧 href: string）。 */
+  to: IdTarget;
 }
 
 /** 一条通知记录。 */

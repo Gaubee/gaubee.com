@@ -40,7 +40,7 @@
     {/if}
     <!-- 互链：编辑器打开 + raw md -->
     <div class="text-muted-foreground mt-4 flex gap-3 text-xs">
-      <a href={`/app/editor/${article.collection}/${article.stem}`} class="hover:text-foreground underline">在编辑器打开</a>
+      <a href={`/app/editor?collection=${encodeURIComponent(article.collection)}&stem=${encodeURIComponent(article.stem)}`} class="hover:text-foreground underline">在编辑器打开</a>
       <a href={`/pages/raw/${article.collection}/${article.stem}.md`} class="hover:text-foreground underline">查看原始 Markdown</a>
     </div>
   </header>

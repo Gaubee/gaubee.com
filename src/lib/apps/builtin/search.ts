@@ -1,3 +1,4 @@
+import { leafRoute } from "$lib/router";
 /**
  * 搜索应用（系统内置，不可卸载）。
  *
@@ -16,9 +17,11 @@ export const searchApp: AppEntry = {
     defaultArea: "pop",
     activities: [
       {
-        route: "/app/search",
+        pattern: "/app/search",
         entry: true,
-        view: () => import("$lib/views/SearchView.svelte"),
+        // 注意：pop 浮层应用走 AreaOutlet 的 popLoader 路径（旧机制），
+        // 不经 ActivityRouter，root 字段仅供类型一致性 + 未来统一渲染用。
+        root: leafRoute("search", () => import("$lib/views/SearchView.svelte")),
       },
     ],
     // 浮层应用：不占 main/bottom tab，只通过 pop 入口进入

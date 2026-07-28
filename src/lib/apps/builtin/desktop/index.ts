@@ -1,3 +1,4 @@
+import { leafRoute } from "$lib/router";
 /**
  * 桌面应用（系统级，不可卸载）。
  *
@@ -20,9 +21,9 @@ export const desktopApp: AppEntry = {
     defaultArea: "main",
     activities: [
       {
-        route: "/desktop",
+        pattern: "/desktop",
         entry: true,
-        view: () => import("$lib/apps/views/DesktopView.svelte"),
+        root: leafRoute("desktop", () => import("$lib/apps/views/DesktopView.svelte")),
       },
     ],
     // 向 GaubeeOS 暴露桌面服务（gaubeeos.getAppService('desktop')），
