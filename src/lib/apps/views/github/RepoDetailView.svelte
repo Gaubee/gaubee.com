@@ -64,6 +64,7 @@
   import TagIcon from '@lucide/svelte/icons/tag'
   import GitForkIcon from '@lucide/svelte/icons/git-fork'
   import ExternalLinkIcon from '@lucide/svelte/icons/external-link'
+  import SquarePenIcon from '@lucide/svelte/icons/square-pen'
   import HistoryIcon from '@lucide/svelte/icons/history'
   import FolderIcon from '@lucide/svelte/icons/folder'
   import FolderTreeIcon from '@lucide/svelte/icons/folder-tree'
@@ -625,6 +626,16 @@
       aria-label={favorited ? '取消收藏' : '收藏'}
     >
       <TagIcon class="size-4 {favorited ? 'fill-current' : ''}" />
+    </Button>
+    <!-- 在 GithubEditor 中打开此仓库（跳编辑器工作区） -->
+    <Button
+      size="icon-sm"
+      variant="ghost"
+      onclick={() => navController.navigateMain(`/app/github-editor/repo/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`)}
+      aria-label="在编辑器中打开"
+      title="在 Github 编辑器中打开"
+    >
+      <SquarePenIcon class="size-4" />
     </Button>
     <!-- 仓库快速搜索（默认限定仓库类型）：owner/repo 直跳 或 关键词搜索 -->
     <form

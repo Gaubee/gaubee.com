@@ -30,6 +30,8 @@
   // 响应式数据
   const favorites = $derived(repoFavorites.items)
   const recents = $derived(recentRepos.items)
+  /** 首屏初始加载（store init 期间显示骨架）。 */
+  const initialLoading = $derived(!repoFavorites.initialized || !recentRepos.initialized)
 
   // 元数据缓存（owner/repo → RepoSummary，渲染时批量拉取）
   let repoMeta = $state<Map<string, RepoSummary>>(new Map())
@@ -121,7 +123,12 @@
         <span class="text-muted-foreground text-xs">({favorites.length})</span>
       {/if}
     </h2>
-    {#if favorites.length === 0}
+    {#if initialLoading}
+      <!-- 首屏骨架（store init 期间） -->
+      <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {#each Array(6) as _}<Skeleton class="h-20" />{/each}
+      </div>
+    {:else if favorites.length === 0}
       <p class="text-muted-foreground py-4 text-center text-sm">
         暂无收藏。在 GithubApp 浏览仓库时点击星标即可收藏。
       </p>

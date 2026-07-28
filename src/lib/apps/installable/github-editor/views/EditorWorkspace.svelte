@@ -91,22 +91,28 @@
 
   // ---- 上传 Dialog ----
   let uploadOpen = $state(false)
+  /** 工作区初始加载（repoInfo + remote + 文件树首屏，期间显示整页骨架）。 */
+  let workspaceLoading = $state(true)
 
   onMount(async () => {
-    // 加载仓库信息
     try {
-      repoInfo = await getRepo(owner, repo)
-    } catch {
-      // 忽略，用默认分支
+      // 加载仓库信息
+      try {
+        repoInfo = await getRepo(owner, repo)
+      } catch {
+        // 忽略，用默认分支
+      }
+      // 创建 EditorVfs + 加载
+      editorVfs = createEditorVfs(owner, repo)
+      await editorVfs.loadLocal()
+      await editorVfs.loadRemote(effectiveBranch)
+      // 加载文件树根目录
+      await loadDir('')
+      // 记录最近打开
+      void recentRepos.touch(owner, repo, { branch: effectiveBranch, path: selectedFile || undefined })
+    } finally {
+      workspaceLoading = false
     }
-    // 创建 EditorVfs + 加载
-    editorVfs = createEditorVfs(owner, repo)
-    await editorVfs.loadLocal()
-    await editorVfs.loadRemote(effectiveBranch)
-    // 加载文件树根目录
-    await loadDir('')
-    // 记录最近打开
-    void recentRepos.touch(owner, repo, { branch: effectiveBranch, path: selectedFile || undefined })
   })
 
   // ---- 文件树懒加载（从 remoteCache.blobs 推导）----
@@ -272,6 +278,31 @@
 </script>
 
 <div class="flex h-full flex-col">
+  {#if workspaceLoading}
+    <!-- 工作区初始加载骨架（repoInfo + remote + 文件树首屏） -->
+    <div class="border-border flex items-center gap-2 border-b px-3 py-1.5">
+      <Skeleton class="h-4 w-32" />
+      <Skeleton class="h-3 w-16" />
+      <div class="ml-auto flex gap-2">
+        <Skeleton class="h-7 w-32" />
+      </div>
+    </div>
+    <div class="grid h-full min-w-0 md:grid-cols-[minmax(200px,280px)_1fr]">
+      <!-- 左：文件树骨架 -->
+      <div class="border-border max-md:hidden border-r p-2">
+        {#each Array(8) as _}<Skeleton class="mb-2 h-5" />{/each}
+      </div>
+      <!-- 右：编辑器骨架 -->
+      <div class="p-6">
+        <Skeleton class="mb-3 h-4 w-3/4" />
+        <Skeleton class="mb-2 h-3 w-full" />
+        <Skeleton class="mb-2 h-3 w-5/6" />
+        <Skeleton class="mb-2 h-3 w-full" />
+        <Skeleton class="mb-2 h-3 w-4/5" />
+        <Skeleton class="h-3 w-3/4" />
+      </div>
+    </div>
+  {:else}
   <!-- 顶部工具栏 -->
   <div class="flex items-center gap-2 border-b border-border px-3 py-1.5">
     <span class="font-mono text-sm font-semibold">{owner}/{repo}</span>
@@ -496,6 +527,7 @@
       </div>
     {/if}
   </div>
+  {/if}
 </div>
 
 {#if uploadOpen && editorVfs}
