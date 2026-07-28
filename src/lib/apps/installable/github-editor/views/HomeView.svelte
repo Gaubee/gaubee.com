@@ -20,6 +20,7 @@
   import { navController } from '$lib/nav/nav-controller-instance'
   import { Button } from '$lib/components/ui/button'
   import { Skeleton } from '$lib/components/ui/skeleton'
+  import * as Card from '$lib/components/ui/card'
   import StarIcon from '@lucide/svelte/icons/star'
   import GitForkIcon from '@lucide/svelte/icons/git-branch'
   import ExternalLinkIcon from '@lucide/svelte/icons/external-link'
@@ -170,31 +171,37 @@
     {/if}
   </section>
 
-  <!-- 2. 链接输入 -->
+  <!-- 2. 链接输入（Card 组装） -->
   <section>
-    <h2 class="mb-3 flex items-center gap-2 text-sm font-semibold">
-      <SearchIcon class="size-4" />
-      打开仓库
-    </h2>
-    <div class="flex gap-2">
-      <input
-        type="url"
-        bind:value={urlInput}
-        onkeydown={(e) => { if (e.key === 'Enter') handleOpenUrl() }}
-        placeholder="粘贴 GitHub 链接（如 https://github.com/owner/repo/tree/main/src）"
-        class="border-border bg-background focus:border-ring min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm outline-none transition-colors"
-      />
-      <Button onclick={handleOpenUrl} disabled={!urlInput.trim()}>
-        <ArrowRightIcon class="size-4" />
-        <span class="hidden sm:inline">打开</span>
-      </Button>
-    </div>
-    {#if urlError}
-      <p class="text-destructive mt-2 text-xs">{urlError}</p>
-    {/if}
-    <p class="text-muted-foreground mt-2 text-xs">
-      支持完整 URL、<code class="font-mono">owner/repo</code> 短格式，可含分支和文件路径。
-    </p>
+    <Card.Root>
+      <Card.Header>
+        <Card.Title class="flex items-center gap-2 text-sm">
+          <SearchIcon class="size-4" />
+          打开仓库
+        </Card.Title>
+        <Card.Description>
+          粘贴 GitHub 链接，支持完整 URL、<code class="font-mono">owner/repo</code> 短格式，可含分支和文件路径。
+        </Card.Description>
+      </Card.Header>
+      <Card.Content class="flex gap-2">
+        <input
+          type="url"
+          bind:value={urlInput}
+          onkeydown={(e) => { if (e.key === 'Enter') handleOpenUrl() }}
+          placeholder="https://github.com/owner/repo/tree/main/src"
+          class="border-border bg-background focus:border-ring min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm outline-none transition-colors"
+        />
+        <Button onclick={handleOpenUrl} disabled={!urlInput.trim()}>
+          <ArrowRightIcon class="size-4" />
+          <span class="hidden sm:inline">打开</span>
+        </Button>
+      </Card.Content>
+      {#if urlError}
+        <Card.Footer class="!pt-0">
+          <p class="text-destructive text-xs">{urlError}</p>
+        </Card.Footer>
+      {/if}
+    </Card.Root>
   </section>
 
   <!-- 3. 最近打开 -->
