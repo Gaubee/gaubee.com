@@ -327,10 +327,16 @@
     {/if}
 
     <div class="ml-auto flex items-center gap-1">
-      <!-- 在 GithubApp 中查看此仓库（跳详情页浏览） -->
+      <!-- 在 GithubApp 中查看此仓库（跳详情页浏览，带上当前文件路径 + 分支） -->
       <button
         type="button"
-        onclick={() => navController.navigateMain(`/app/github/repo/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`)}
+        onclick={() => {
+          const params = new URLSearchParams()
+          if (selectedFile) params.set('file', selectedFile)
+          if (fileRef) params.set('ref', fileRef)
+          const qs = params.toString()
+          navController.navigateMain(`/app/github/repo/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}${qs ? `?${qs}` : ''}`)
+        }}
         class="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-7 items-center justify-center rounded transition-colors"
         aria-label="在 GithubApp 中查看"
         title="在 GithubApp 中查看"
