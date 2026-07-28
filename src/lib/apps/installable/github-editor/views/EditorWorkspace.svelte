@@ -188,7 +188,9 @@
   }
 
   // ---- 文件选择 + 加载内容 ----
+  // 依赖 selectedFile（切文件）+ remoteCommitSha（切分支后 remote 内容变了，需重新加载）
   $effect(() => {
+    void editorVfs?.remoteCommitSha
     if (selectedFile && editorVfs) {
       void loadFileContent(selectedFile)
     }
