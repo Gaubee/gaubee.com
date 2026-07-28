@@ -3,11 +3,10 @@
 
 	布局：
 	- 顶部元数据栏：返回 + owner/repo + 收藏星标 + 仓库统计（star/fork/语言/更新时间）+ GitHub 外链。
-	- Tab 区：文件（含 README）/ 历史 / 变更（仅主仓库）/ Issues / 日志。
+	- Tab 区：文件（含 README）/ 历史 / Issues / 日志。
 	  - 文件 Tab（默认）：左侧递归文件树（RepoFileTree，修复扁平遍历 BUG）+ 右侧 README 渲染。
 	    点击文件 → FilePreviewDialog。
 	  - 历史 Tab：listCommits REST API。
-	  - 变更 Tab：仅主仓库（vfsStore dirty + gitService.commit）；其它仓库只读提示。
 	  - Issues Tab：列表（sticky 左栏）+ IssueContentPanel（详情+评论+编辑器）；移动端列表收进 Sheet。
 	  - 日志 Tab：activityLog 过滤当前 repo。
 
@@ -16,12 +15,10 @@
 -->
 <script lang="ts">
   import { onMount, untrack } from 'svelte'
-  import { gaubeeos } from '$lib/os/services'
-  import { handlePublishError } from '$lib/os/services/publish-helper'
   import { navController } from '$lib/nav/nav-controller-instance'
   import { navStore } from '$lib/nav/nav.svelte'
   import { useParams, useSearch } from '$lib/router'
-  import { notifySuccess, notifyWarning } from '$lib/apps/builtin/notifications/service.svelte'
+  import { notifySuccess } from '$lib/apps/builtin/notifications/service.svelte'
   import { accountService } from '$lib/apps/builtin/account/service'
   import {
     listCommits,
@@ -31,7 +28,6 @@
     type CommitInfo,
     type GhContentEntry,
   } from '$lib/github/client'
-  import { vfs, vfsStore, type VfsNode } from '$lib/vfs/vfs.svelte'
   import {
     activityLog,
     type GitActivity,
@@ -51,7 +47,6 @@
   import IssueContentPanel from './IssueContentPanel.svelte'
   import CommitDetailPanel from './CommitDetailPanel.svelte'
   import RepoRefSelector from './RepoRefSelector.svelte'
-  import { diffLines } from '$lib/utils/diff'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import { Badge } from '$lib/components/ui/badge'
@@ -68,7 +63,6 @@
   import HistoryIcon from '@lucide/svelte/icons/history'
   import FolderIcon from '@lucide/svelte/icons/folder'
   import FolderTreeIcon from '@lucide/svelte/icons/folder-tree'
-  import FilePenIcon from '@lucide/svelte/icons/file-pen'
   import BugIcon from '@lucide/svelte/icons/bug'
   import ScrollTextIcon from '@lucide/svelte/icons/scroll-text'
   import ChevronRightIcon from '@lucide/svelte/icons/chevron-right'
@@ -91,7 +85,7 @@
   // ---- 路由参数（2026-07-27 重构：useParams/useSearch 返回 getter，需 $derived 包装）----
   type RepoDetailParams = { owner: string; repo: string };
   type RepoDetailSearch = {
-    tab: 'files' | 'history' | 'changes' | 'issues' | 'log';
+    tab: 'files' | 'history' | 'issues' | 'log';
     sha?: string;
     file?: string;
     issue?: number;
@@ -124,7 +118,6 @@
   const selectedFile = $derived(search?.file ?? '')
   const selectedCommitSha = $derived(search?.sha)
   const selectedIssue = $derived(search?.issue ?? null)
-  const selectedChangePath = $derived(search?.change)
   const selectedActivityId = $derived(search?.activity)
   /** 文件 Tab 的 git ref（commit SHA/分支名），用于按历史版本浏览文件树和文件内容。 */
   const fileRef = $derived(search?.ref)
@@ -188,18 +181,6 @@
   )
   /** commits 便捷别名（派生，模板用）。 */
   const commits = $derived(commitsResource.data ?? [])
-
-  // ---- 变更（仅主仓库，silent 辅助数据）----
-  let commitMessage = $state('')
-  let committing = $state(false)
-  /** 移动端变更列表浮层。 */
-  let changeListSheetOpen = $state(false)
-  const changesResource = createResource(
-    () => vfs.dirtyFiles(),
-    { silent: true, errorMessage: '加载变更失败', isEmpty: (a) => a.length === 0 },
-  )
-  /** changes 便捷别名（派生）。 */
-  const changes = $derived(changesResource.data ?? [])
 
   // ---- 仓库快速搜索（元数据栏，内置 seq 竞态防护）----
   let repoSearchInput = $state('')
@@ -291,17 +272,6 @@
     selectedActivityId ? activities.find((a) => a.id === selectedActivityId) ?? null : null,
   )
 
-  /** 派生：选中变更文件的 diff 行（变更 Tab 右栏用）。 */
-  const selectedChangeNode = $derived(
-    selectedChangePath ? changes.find((c) => c.path === selectedChangePath) ?? null : null,
-  )
-  const selectedChangeDiff = $derived(
-    selectedChangeNode ? diffLines(
-      typeof selectedChangeNode.baseContent === 'string' ? selectedChangeNode.baseContent : '',
-      selectedChangeNode.content ?? '',
-    ) : [],
-  )
-
   // ---- 收藏 ----
   const favorited = $derived(repoFavorites.has(owner, repo))
 
@@ -361,16 +331,11 @@
     repoInfoResource.reset()
     commitsResource.reset()
     issuesResource.reset()
-    // 主仓库判定（大小写不敏感，与 isMainRepo 一致）
-    const mainRepo =
-      o.toLowerCase() === OWNER.toLowerCase() && r.toLowerCase() === REPO.toLowerCase()
     issueCountsResource.reset()
-    if (mainRepo) changesResource.reset()
     void repoInfoResource.run()
     void autoSelectReadme(o, r)
     void commitsResource.run()
     void loadDir('', o, r)
-    if (mainRepo) void changesResource.run()
     void issuesResource.run()
     void issueCountsResource.run()
   }
@@ -473,39 +438,6 @@
   function applyCommitFilters() {
     commitsResource.reset()
     void commitsResource.run()
-  }
-
-  // ---- 变更（仅主仓库）----
-  // changes 数据由 changesResource 管理（silent 辅助数据）
-  function changeKind(change: VfsNode): 'add' | 'del' | 'mod' {
-    if (change.origin === 'local') return 'add'
-    if (change.content === null) return 'del'
-    return 'mod'
-  }
-
-  async function handleCommit() {
-    if (changes.length === 0) {
-      notifyWarning('没有待提交的变更')
-      return
-    }
-    const msg = commitMessage.trim() || `更新 ${changes.length} 个文件`
-    committing = true
-    try {
-      const git = await gaubeeos.requestAppService('git')
-      const sha = await git.commit(msg, 'github')
-      notifySuccess(`已提交（${sha.slice(0, 7)}）`)
-      commitMessage = ''
-      await changesResource.run()
-    } catch (e) {
-      handlePublishError(e, navController)
-    } finally {
-      committing = false
-    }
-  }
-
-  async function handleRevert(path: string) {
-    await vfsStore.revert(path)
-    await changesResource.run()
   }
 
   // ---- Issues ----
@@ -712,10 +644,9 @@
   <!-- Tab 区。滚动容器命名 scroll-timeline，供 .repo-tabs 的 scroll-driven 动画引用。 -->
   <div class="repo-tab-scroll min-h-0 flex-1 overflow-auto">
     <Tabs.Root value={activeTab} onValueChange={(v) => switchTab(v)} class="w-full">
-      <Tabs.List class="repo-tabs grid w-full grid-cols-5">
+      <Tabs.List class="repo-tabs grid w-full grid-cols-4">
         <Tabs.Trigger value="files" class="gap-1.5"><FolderIcon class="size-4" /><span class="tab-label">文件</span></Tabs.Trigger>
         <Tabs.Trigger value="history" class="gap-1.5"><HistoryIcon class="size-4" /><span class="tab-label">历史</span></Tabs.Trigger>
-        <Tabs.Trigger value="changes" class="gap-1.5"><FilePenIcon class="size-4" /><span class="tab-label">变更</span></Tabs.Trigger>
         <Tabs.Trigger value="issues" class="gap-1.5"><BugIcon class="size-4" /><span class="tab-label">Issues</span></Tabs.Trigger>
         <Tabs.Trigger value="log" class="gap-1.5"><ScrollTextIcon class="size-4" /><span class="tab-label">日志</span></Tabs.Trigger>
       </Tabs.List>
@@ -1040,149 +971,6 @@
             </Sheet.Content>
           </Sheet.Root>
         </div>
-      </Tabs.Content>
-
-      <!-- 变更（双栏：dirty 文件列表左 sticky + diff 右展开）。
-           RepoEditPermission 守卫：仓库归属/分支/保护状态三层判定，
-           不可编辑时显示精确原因（替代旧的「仅主仓库」静态提示）。 -->
-      <Tabs.Content value="changes" class="p-4">
-        <RepoEditPermission
-          {owner}
-          {repo}
-          permissions={repoInfo?.permissions}
-          branch={repoInfo?.default_branch ?? 'main'}
-          commitSha={fileRef ?? ''}
-        >
-          {#snippet children(canEdit, disabledReason)}
-            {#if !canEdit}
-              <div class="text-muted-foreground py-8 text-center text-sm">
-                {disabledReason}
-              </div>
-            {:else}
-              {#snippet changeList()}
-            {#if changesResource.status === 'loading'}
-              <div class="space-y-2 p-1">
-                {#each Array(3) as _}<Skeleton class="h-12 w-full" />{/each}
-              </div>
-            {:else if changes.length === 0}
-              <p class="text-muted-foreground py-4 text-center text-sm">工作区干净</p>
-            {:else}
-              {#each changes as change (change.path)}
-                {@const kind = changeKind(change)}
-                <button
-                  class="hover:bg-accent flex w-full items-center gap-2 rounded-md p-2 text-left transition-colors {selectedChangePath === change.path ? 'bg-accent' : ''}"
-                  onclick={() => { navigateSelect('changes', 'change', change.path); changeListSheetOpen = false }}
-                >
-                  {#if kind === 'add'}
-                    <FilePlusIcon class="size-4 shrink-0 text-emerald-500" />
-                  {:else if kind === 'del'}
-                    <FileMinusIcon class="size-4 shrink-0 text-destructive" />
-                  {:else}
-                    <FilePenIcon class="size-4 shrink-0 text-amber-500" />
-                  {/if}
-                  <span class="truncate text-xs font-medium">{change.path}</span>
-                  <span class="text-muted-foreground text-[10px]">
-                    {kind === 'add' ? '新' : kind === 'del' ? '删' : '改'}
-                  </span>
-                </button>
-              {/each}
-            {/if}
-          {/snippet}
-
-          <div class="flex items-center gap-2 pb-2 md:hidden">
-            <Button size="sm" variant="default" onclick={() => (changeListSheetOpen = true)}>
-              <FilePenIcon class="size-4" />
-              变更列表 ({changes.length})
-            </Button>
-          </div>
-
-          <div class="grid min-w-0 gap-4 md:grid-cols-[minmax(260px,360px)_1fr]">
-            <!-- 变更文件列表左栏 -->
-            <div class="max-md:hidden">
-              <div class="border-border max-h-[calc(100dvh-12rem)] min-w-0 overflow-auto overscroll-contain rounded border md:sticky md:top-2">
-                <div class="border-border sticky top-0 z-[1] bg-background flex items-center justify-between p-2">
-                  <span class="text-xs font-medium">变更 ({changes.length})</span>
-                  <Button variant="ghost" size="icon-sm" onclick={() => changesResource.run()} disabled={changesResource.isLoading}>
-                    <RefreshCwIcon class="size-3 {changesResource.isLoading ? 'animate-spin' : ''}" />
-                  </Button>
-                </div>
-                <div class="p-1">
-                  {@render changeList()}
-                </div>
-                <!-- commit 提交区（左栏底部固定）-->
-                {#if changes.length > 0}
-                  <div class="border-border border-t p-2">
-                    <Input
-                      type="text"
-                      value={commitMessage}
-                      oninput={(e) => (commitMessage = e.currentTarget.value)}
-                      placeholder="提交信息"
-                      class="mb-2 h-8 text-xs"
-                    />
-                    <Button size="sm" class="w-full gap-1" onclick={handleCommit} disabled={committing}>
-                      <GitCommitHorizontalIcon class="size-3.5" />
-                      {committing ? '提交中…' : `提交 ${changes.length} 个变更`}
-                    </Button>
-                  </div>
-                {/if}
-              </div>
-            </div>
-
-            <!-- 变更 diff 右栏 -->
-            {#if selectedChangePath && selectedChangeNode}
-              <div class="border-border min-w-0 rounded border">
-                <!-- 工具栏：文件路径 + 撤销 -->
-                <div class="border-border flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
-                  <FilePenIcon class="text-muted-foreground size-3.5 shrink-0" />
-                  <span class="text-muted-foreground truncate font-mono text-xs" title={selectedChangePath}>{selectedChangePath}</span>
-                  <Button size="icon-sm" variant="ghost" class="ml-auto" onclick={() => selectedChangePath && handleRevert(selectedChangePath)} aria-label="撤销修改">
-                    <Undo2Icon class="size-3.5" />
-                  </Button>
-                </div>
-                <!-- diff 渲染 -->
-                <div class="max-h-[60vh] overflow-auto p-2">
-                  {#if selectedChangeDiff.length > 0}
-                    <div class="font-mono text-xs">
-                      {#each selectedChangeDiff.slice(0, 100) as line}
-                        <div class="flex {line.type === 'add' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : line.type === 'del' ? 'bg-destructive/10 text-destructive' : ''}">
-                          <span class="w-4 shrink-0 select-none opacity-50">{line.type === 'add' ? '+' : line.type === 'del' ? '-' : ' '}</span>
-                          <span class="whitespace-pre-wrap break-all">{line.text}</span>
-                        </div>
-                      {/each}
-                      {#if selectedChangeDiff.length > 100}
-                        <p class="text-muted-foreground py-1 text-center">…还有 {selectedChangeDiff.length - 100} 行</p>
-                      {/if}
-                    </div>
-                  {:else}
-                    <p class="text-muted-foreground py-4 text-center text-xs">无 diff 内容</p>
-                  {/if}
-                </div>
-              </div>
-            {:else}
-              <div class="border-border text-muted-foreground flex min-w-0 items-center justify-center rounded border py-12 text-sm">
-                选择左侧文件查看 diff
-              </div>
-            {/if}
-
-            <!-- 移动端变更列表浮层 -->
-            <Sheet.Root bind:open={changeListSheetOpen}>
-              <Sheet.Content side="bottom" class="max-h-[75dvh] rounded-t-lg p-0 md:hidden" showCloseButton={false}>
-                <Sheet.Header class="flex-row items-center justify-between border-b px-4 py-3">
-                  <Sheet.Title class="flex items-center gap-2 text-sm font-medium">
-                    <FilePenIcon class="size-4" />
-                    变更列表
-                  </Sheet.Title>
-                  <Sheet.Description class="sr-only">浏览变更文件</Sheet.Description>
-                </Sheet.Header>
-                <div class="max-h-[calc(75dvh-4rem)] overflow-auto overscroll-contain p-2">
-                  {@render changeList()}
-                </div>
-              </Sheet.Content>
-            </Sheet.Root>
-          </div>
-            {/if}
-          {/snippet}
-        </RepoEditPermission>
       </Tabs.Content>
 
       <!-- Issues（双栏：列表左 sticky + 内容右展开，移动端列表收进 Sheet）-->

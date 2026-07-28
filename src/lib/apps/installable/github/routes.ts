@@ -41,11 +41,10 @@ export const githubHomeRoute = defineRoute({
         repo: z.string().min(1),
       }),
       search: z.object({
-        tab: z.enum(["files", "history", "changes", "issues", "log"]).default("files"),
+        tab: z.enum(["files", "history", "issues", "log"]).default("files"),
         sha: z.string().optional(),
         file: z.string().optional(),
         issue: z.coerce.number().optional(),
-        change: z.string().optional(),
         activity: z.string().optional(),
         ref: z.string().optional(),
       }),

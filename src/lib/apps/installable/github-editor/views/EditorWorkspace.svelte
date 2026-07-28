@@ -29,6 +29,7 @@
   import { Button } from '$lib/components/ui/button'
   import * as Tabs from '$lib/components/ui/tabs'
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left'
+  import ExternalLinkIcon from '@lucide/svelte/icons/external-link'
   import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw'
   import UploadIcon from '@lucide/svelte/icons/upload'
   import FolderIcon from '@lucide/svelte/icons/folder'
@@ -326,6 +327,16 @@
     {/if}
 
     <div class="ml-auto flex items-center gap-1">
+      <!-- 在 GithubApp 中查看此仓库（跳详情页浏览） -->
+      <button
+        type="button"
+        onclick={() => navController.navigateMain(`/app/github/repo/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`)}
+        class="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-7 items-center justify-center rounded transition-colors"
+        aria-label="在 GithubApp 中查看"
+        title="在 GithubApp 中查看"
+      >
+        <ExternalLinkIcon class="size-3.5" />
+      </button>
       <Tabs.Root value={activeTab} onValueChange={(v) => navigateSelect('tab', v)}>
         <Tabs.List>
           <Tabs.Trigger value="edit">编辑</Tabs.Trigger>
