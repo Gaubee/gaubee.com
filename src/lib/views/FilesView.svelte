@@ -41,12 +41,10 @@
   }
 
   function openFile(path: string) {
-    const match = path.match(/^src\/content\/(articles|events|draft)\/(.+)\.md$/)
-    if (match) {
-      navController.navigateMain(
-        `/app/editor?collection=${encodeURIComponent(match[1])}&stem=${encodeURIComponent(match[2])}`,
-      )
-    }
+    // 跳 GithubEditorApp 编辑（主仓库 gaubee/gaubee.com）
+    navController.navigateMain(
+      `/app/github-editor/repo/gaubee/gaubee.com?file=${encodeURIComponent(path)}`,
+    )
   }
 
   /**
@@ -76,7 +74,7 @@
     const label = collection === 'articles' ? '文章' : collection === 'events' ? '短评' : '草稿'
     notifySuccess(`已新建${label} ${stem}`)
     navController.navigateMain(
-      `/app/editor?collection=${encodeURIComponent(collection)}&stem=${encodeURIComponent(stem)}`,
+      `/app/github-editor/repo/gaubee/gaubee.com?file=${encodeURIComponent(path)}`,
     )
   }
 
@@ -99,7 +97,7 @@
     }
     if (latestStem) {
       navController.navigateMain(
-        `/app/editor?collection=articles&stem=${encodeURIComponent(latestStem)}`,
+        `/app/github-editor/repo/gaubee/gaubee.com?file=${encodeURIComponent(`src/content/articles/${latestStem}.md`)}`,
       )
     } else {
       // 无文章时新建一篇

@@ -8,9 +8,13 @@
   import { contentQuery } from '$lib/content-pipeline/query.svelte'
   import type { ContentEntry } from '$lib/content-pipeline/types'
   import { navController } from '$lib/nav/nav-controller-instance'
+  import { OWNER } from '$lib/github/client'
+  import { authStore } from '$lib/auth/session.svelte'
   import YearToc from './YearToc.svelte'
+  import NewContentDialog from './NewContentDialog.svelte'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { Badge } from '$lib/components/ui/badge'
+  import { Button } from '$lib/components/ui/button'
   import AIBadge from '$lib/components/ui/ai-badge/AIBadge.svelte'
   import {
     createPrefixedSectionDetector,
@@ -22,6 +26,19 @@
   import FileTextIcon from '@lucide/svelte/icons/file-text'
   import CalendarIcon from '@lucide/svelte/icons/calendar'
   import ArrowRightIcon from '@lucide/svelte/icons/arrow-right'
+  import PlusIcon from '@lucide/svelte/icons/plus'
+
+  /** 当前登录用户是否为仓库本人（显示编辑/新增入口）。 */
+  const isOwner = $derived(
+    !!authStore.state.user && authStore.state.user.login.toLowerCase() === OWNER.toLowerCase(),
+  )
+  let newDialogOpen = $state(false)
+
+  /** 新建文章确认：跳 GithubEditorApp 编辑新文件。 */
+  function handleCreated(path: string): void {
+    newDialogOpen = false
+    navController.navigateMain(`/app/github-editor/repo/gaubee/gaubee.com?file=${encodeURIComponent(path)}`)
+  }
 
   // contentQuery 已在 AppManager.init() 投影内容管道后初始化（同步内存读取）
   // 依赖 version 触发响应式重算（编辑器写入后 refresh 自增）
@@ -96,6 +113,12 @@
             <FileTextIcon class="text-primary size-5" />
           </div>
           <h1 class="text-balance text-3xl font-bold">文章</h1>
+          {#if isOwner}
+            <Button size="sm" variant="outline" class="ml-auto" onclick={() => (newDialogOpen = true)}>
+              <PlusIcon class="size-4" />
+              <span class="hidden sm:inline">新建文章</span>
+            </Button>
+          {/if}
         </div>
         <p class="text-muted-foreground text-sm ml-[52px]">
           共 {posts.length} 篇文章
@@ -225,3 +248,7 @@
     }
   }
 </style>
+
+{#if isOwner}
+  <NewContentDialog collection="articles" bind:open={newDialogOpen} oncreated={handleCreated} />
+{/if}

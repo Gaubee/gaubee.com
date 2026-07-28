@@ -71,7 +71,7 @@ export const SYSTEM_APP_IDS = [
 ] as const;
 
 /** 默认安装的应用 ID（可卸载）。 */
-export const DEFAULT_APP_IDS = ["github", "github-editor", "terminal", "files", "writer"] as const;
+export const DEFAULT_APP_IDS = ["github", "github-editor", "terminal", "files"] as const;
 
 export type SystemAppId = (typeof SYSTEM_APP_IDS)[number];
 export type DefaultAppId = (typeof DEFAULT_APP_IDS)[number];

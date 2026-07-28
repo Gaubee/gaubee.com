@@ -8,12 +8,29 @@
   import { contentQuery } from '$lib/content-pipeline/query.svelte'
   import type { ContentEntry } from '$lib/content-pipeline/types'
   import { navController } from '$lib/nav/nav-controller-instance'
+  import { OWNER } from '$lib/github/client'
+  import { authStore } from '$lib/auth/session.svelte'
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
+  import NewContentDialog from './NewContentDialog.svelte'
   import { Skeleton } from '$lib/components/ui/skeleton'
+  import { Button } from '$lib/components/ui/button'
   import MessageSquareIcon from '@lucide/svelte/icons/message-square'
   import CalendarIcon from '@lucide/svelte/icons/calendar'
   import ArrowUpRightIcon from '@lucide/svelte/icons/arrow-up-right'
   import UserIcon from '@lucide/svelte/icons/user'
+  import PlusIcon from '@lucide/svelte/icons/plus'
+
+  /** 当前登录用户是否为仓库本人（显示编辑/新增入口）。 */
+  const isOwner = $derived(
+    !!authStore.state.user && authStore.state.user.login.toLowerCase() === OWNER.toLowerCase(),
+  )
+  let newDialogOpen = $state(false)
+
+  /** 新建说说确认：跳 GithubEditorApp 编辑新文件。 */
+  function handleCreated(path: string): void {
+    newDialogOpen = false
+    navController.navigateMain(`/app/github-editor/repo/gaubee/gaubee.com?file=${encodeURIComponent(path)}`)
+  }
 
   const LONG_SHOUT_CHARACTERS = 560
   const LONG_SHOUT_LINES = 8
@@ -70,6 +87,12 @@
         <h1 class="text-2xl font-bold">说说</h1>
         <p class="text-muted-foreground text-sm">共 {shouts.length} 条短评</p>
       </div>
+      {#if isOwner}
+        <Button size="sm" variant="outline" class="ml-auto" onclick={() => (newDialogOpen = true)}>
+          <PlusIcon class="size-4" />
+          <span class="hidden sm:inline">新建说说</span>
+        </Button>
+      {/if}
     </div>
   </header>
 
@@ -192,3 +215,7 @@
     max-width: 100%;
   }
 </style>
+
+{#if isOwner}
+  <NewContentDialog collection="events" bind:open={newDialogOpen} oncreated={handleCreated} />
+{/if}

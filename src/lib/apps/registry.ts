@@ -14,7 +14,6 @@ import { filesApp } from "./installable/files";
 import { githubApp } from "./installable/github";
 import { githubEditorApp } from "./installable/github-editor";
 import { terminalApp } from "./installable/terminal";
-import { writerApp } from "./installable/writer";
 /**
  * GaubeeOS 应用注册中心。
  *
@@ -47,7 +46,6 @@ export function registerAllApps(): void {
   appManager.register(githubEditorApp);
   appManager.register(terminalApp);
   appManager.register(filesApp);
-  appManager.register(writerApp);
 
   // 初始化：恢复用户安装状态
   appManager.init();
@@ -65,7 +63,7 @@ export {
   appStoreApp,
   themeApp,
 };
-export { githubApp, githubEditorApp, terminalApp, filesApp, writerApp };
+export { githubApp, githubEditorApp, terminalApp, filesApp };
 
 /** 获取所有已注册应用。 */
 export function getAllRegisteredApps(): AppEntry[] {
@@ -83,7 +81,6 @@ export function getAllRegisteredApps(): AppEntry[] {
     githubEditorApp,
     terminalApp,
     filesApp,
-    writerApp,
   ];
 }
 

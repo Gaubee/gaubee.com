@@ -9,9 +9,12 @@
   import type { ContentEntry } from '$lib/content-pipeline/types'
   import { navController } from '$lib/nav/nav-controller-instance'
   import { useParams } from '$lib/router'
+  import { OWNER } from '$lib/github/client'
+  import { authStore } from '$lib/auth/session.svelte'
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
   import TocTree from './TocTree.svelte'
   import { Badge } from '$lib/components/ui/badge'
+  import { Button } from '$lib/components/ui/button'
   import AIBadge from '$lib/components/ui/ai-badge/AIBadge.svelte'
   import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left'
   import ChevronRightIcon from '@lucide/svelte/icons/chevron-right'
@@ -19,6 +22,19 @@
   import CalendarIcon from '@lucide/svelte/icons/calendar'
   import ClockIcon from '@lucide/svelte/icons/clock'
   import TagIcon from '@lucide/svelte/icons/tag'
+  import SquarePenIcon from '@lucide/svelte/icons/square-pen'
+
+  /** 当前登录用户是否为仓库本人（显示编辑入口）。 */
+  const isOwner = $derived(
+    !!authStore.state.user && authStore.state.user.login.toLowerCase() === OWNER.toLowerCase(),
+  )
+
+  /** 跳 GithubEditorApp 编辑当前文章。 */
+  function handleEdit(): void {
+    if (!target) return
+    const path = `src/content/${target.collection}/${target.stem}.md`
+    navController.navigateMain(`/app/github-editor/repo/gaubee/gaubee.com?file=${encodeURIComponent(path)}`)
+  }
 
   interface Props {}
 
@@ -107,9 +123,17 @@
       <div class="min-w-0">
         <!-- 文章头部 -->
         <header class="mb-8">
-          <h1 class="mb-4 text-balance text-3xl font-bold leading-tight sm:text-4xl">
-            {post.title}
-          </h1>
+          <div class="mb-4 flex items-start gap-3">
+            <h1 class="min-w-0 flex-1 text-balance text-3xl font-bold leading-tight sm:text-4xl">
+              {post.title}
+            </h1>
+            {#if isOwner}
+              <Button size="sm" variant="outline" class="shrink-0" onclick={handleEdit}>
+                <SquarePenIcon class="size-4" />
+                <span class="hidden sm:inline">编辑</span>
+              </Button>
+            {/if}
+          </div>
 
           <div class="text-muted-foreground flex flex-wrap items-center gap-4 text-sm">
             <div class="flex items-center gap-1.5">
