@@ -60,6 +60,49 @@
 - 使用 `pnpm -w run dev` 可以启动http服务
 - 使用 `pnpm -w run check` 来获取ts类型检查，使用`pnpm -w run check:watch`可以实时监控
 
+## 部署架构（2026-07-30）
+
+### 心智模型
+
+```
+gaubee.com（zone 在 Cloudflare）
+├── 主站静态站 ── GitHub Pages（4 条 A + www CNAME，灰云 DNS-only）
+│                 证书由 GitHub 自动签发；不可橙云代理（会致 Pages 证书验证失败/404）
+└── auth.gaubee.com ── Cloudflare Worker「gaubae-auth」
+                      经 Workers Custom Domain 绑定（自动签边缘证书 + 建路由）
+                      职责：/auth/github（OAuth 发起）+ /auth/github/callback + /upload/image
+```
+
+### 三方一致性（不可调和约束）
+
+Worker 用 `WORKER_ORIGIN` 构造 GitHub OAuth 的 `redirect_uri`，故「Worker 域名」必须三处相同：
+
+```
+1. worker/wrangler.toml   WORKER_ORIGIN                 ← Worker 自身认知
+2. 前端构建注入            VITE_AUTH_BASE（GitHub Secret） ← 前端跳转目标
+3. GitHub OAuth App       Authorization callback URL    ← GitHub 回跳目标
+```
+
+改任一处必须同步其余两处，否则 `redirect_uri` 与 callback 不匹配，GitHub 拒绝请求。当前生产值：`https://auth.gaubee.com`，callback：`https://auth.gaubee.com/auth/github/callback`。
+
+### 关键约定
+
+- **Workers Custom Domain 的硬约束**：要求 zone 在 Cloudflare nameservers 上 active。不可用裸 CNAME 指向 `*.workers.dev`——workers.dev 默认域的边缘证书不覆盖 CNAME 进来的自定义主机名，会触发 `ERR_SSL_VERSION_OR_CIPHER_MISMATCH`。
+- **CI 防回退**：`.github/workflows/main.yml` 构建前校验 `VITE_AUTH_BASE` 非空且 `https://` 开头，否则 fail（防生产回退 localhost 静默上线）。
+- **协调切换窗口**：统一 `redirect_uri` 时，改 OAuth App callback → push 部署 Worker/前端 之间有几分钟中断窗口（旧前端跳旧域名但 callback 已改），选低峰。
+- **敏感变量不入库**：`.env` 已 gitignore；`GITHUB_CLIENT_*` 用 `wrangler secret put` 配置，不入仓库。
+
+### 文件结构
+
+```
+worker/
+├── wrangler.toml              WORKER_ORIGIN / APP_ORIGIN / ENVIRONMENT（本地 + 生产两段）
+├── src/index.ts               Hono Worker：/auth/github + /callback + /upload/image
+└── .github/workflows/
+    ├── deploy-worker.yml       worker/ 变更 → wrangler-action 部署（--env production）
+    └── main.yml                前端 → GitHub Pages，注入 VITE_AUTH_BASE（带格式校验）
+```
+
 ## 应用服务总线架构（2026-07-23）
 
 ### 核心机制

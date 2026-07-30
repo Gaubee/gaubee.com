@@ -39,11 +39,23 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --config.dangerouslyAllowAllBuilds=true
 
+      - name: Verify VITE_AUTH_BASE
+        # 防止生产构建回退到 localhost（登录会指向不可达地址）。
+        # VITE_AUTH_BASE 必须与 worker/wrangler.toml 的 WORKER_ORIGIN、GitHub OAuth App callback
+        # 三方一致（见 .env.example / wrangler.toml 顶部说明）。
+        env:
+          VITE_AUTH_BASE: ${{ secrets.VITE_AUTH_BASE }}
+        run: |
+          if [[ ! "$VITE_AUTH_BASE" =~ ^https:// ]]; then
+            echo "::error::VITE_AUTH_BASE 必须是 https:// 开头的 Worker 域名（当前：'$VITE_AUTH_BASE'）。"
+            echo "::error::请到 Settings → Secrets → Actions 配置 VITE_AUTH_BASE，并确认与 wrangler.toml WORKER_ORIGIN、OAuth App callback 一致。"
+            exit 1
+          fi
+          echo "VITE_AUTH_BASE=$VITE_AUTH_BASE"
+
       - name: Build static site
         # pnpm build = content:prepare（生成只读 VFS + 搜索索引）+ vite build（adapter-static 输出 build/）
-        # VITE_AUTH_BASE：生产环境的 Cloudflare Worker 域名（OAuth + API 代理）。
-        # 在 GitHub Secrets 配置 VITE_AUTH_BASE（如 https://gaubee-auth.workers.dev）。
-        # 未配置时回退到 localhost（仅开发用），生产构建会警告。
+        # VITE_AUTH_BASE：生产环境的 Cloudflare Worker 域名（OAuth + API 代理），三方一致性见上方校验步。
         env:
           VITE_AUTH_BASE: ${{ secrets.VITE_AUTH_BASE }}
         run: pnpm build

@@ -195,9 +195,12 @@ gaubee.com/
 
 ### 部署
 
-- [ ] Cloudflare Pages（静态主体）+ Workers（OAuth）正式部署
-- [ ] GitHub OAuth App 配置（Client ID/Secret）
-- [ ] CI/CD（替换旧的 Astro workflow）
+- [x] Cloudflare Pages（静态主体）+ Workers（OAuth）正式部署
+  - 前端静态站 → GitHub Pages（`gaubee.com`）；OAuth Worker → Cloudflare Workers
+  - Worker 经 Workers Custom Domain 暴露为 `auth.gaubee.com`（zone `gaubee.com` 迁至 Cloudflare 托管，自动签边缘证书）
+  - ⚠️ 不可用裸 CNAME 指向 `*.workers.dev`：workers.dev 默认域证书不覆盖自定义主机名，会触发 `ERR_SSL_VERSION_OR_CIPHER_MISMATCH`
+- [x] GitHub OAuth App 配置（Client ID/Secret）
+- [x] CI/CD（替换旧的 Astro workflow）
 
 ## 第三阶段：GaubeeOS 应用系统架构重构（已完成）
 

@@ -23,15 +23,20 @@ ENVIRONMENT = "dev"
 # 部署前请确认下面三个值与你的实际域名匹配（WORKER_ORIGIN 用你选定的 Worker 域名，含 https 无尾斜杠）。
 [env.production.vars]
 APP_ORIGIN = "https://gaubee.com"
-WORKER_ORIGIN = "https://gaubee-auth-production.gaubeebangeel.workers.dev"
+WORKER_ORIGIN = "https://auth.gaubee.com"
 ENVIRONMENT = "production"
 
-# OAuth 回调路径必须与 GitHub OAuth App 配置的 Authorization callback URL 一致：
-# https://<worker-domain>/auth/github/callback
-# 生产 Worker 域名请在 Cloudflare Dashboard 确认（默认 *.workers.dev，或绑定自定义域名），
-# 然后到 GitHub OAuth App 把 Authorization callback URL 设为：
-#   https://<worker-domain>/auth/github/callback
-# 同时确保前端（APP_ORIGIN）调用 Worker 的地址正确（见 src/lib 中 Worker URL 配置）。
+# ===== 三方一致性检查清单（改动任一处，必须同步其余两处）=====
+# Worker 用 WORKER_ORIGIN 构造 GitHub OAuth 的 redirect_uri，故下面三处的「Worker 域名」必须相同：
+#   1. 本文件上方 WORKER_ORIGIN                          （Worker 自身认知）
+#   2. 前端构建注入的 VITE_AUTH_BASE（GitHub Secret）    （前端跳转目标）
+#   3. GitHub OAuth App 的 Authorization callback URL    （GitHub 回跳目标）
+# 当前 Worker 域名：https://auth.gaubee.com
+#   callback URL 须为：https://auth.gaubee.com/auth/github/callback
+#
+# 域名机制：auth.gaubee.com 经 Cloudflare Workers Custom Domain 绑定（zone 须在 Cloudflare，
+# Cloudflare 自动签边缘证书 + 建路由）。不可用裸 CNAME 指向 *.workers.dev——workers.dev 默认
+# 域的证书不覆盖 CNAME 进来的自定义主机名，会导致 ERR_SSL_VERSION_OR_CIPHER_MISMATCH。
 
 # 本地开发：wrangler dev 默认 http://localhost:8787
-# 生产：部署到 *.workers.dev 或自定义域名
+# 生产：auth.gaubee.com（Workers Custom Domain）
