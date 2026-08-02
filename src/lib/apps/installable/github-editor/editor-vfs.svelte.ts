@@ -146,8 +146,13 @@ export function createEditorVfs(owner: string, repo: string) {
     return getFileText(path, { owner, repo });
   }
 
-  /** 写 local 层（标 dirty）。若文件不存在则新建（sha=null）。 */
-  async function writeLocal(path: string, content: string): Promise<void> {
+  /** 写 local 层（标 dirty）。若文件不存在则新建（sha=null）。
+   *  @param opts.encoding 'base64' 时 content 为纯 base64 字符串（二进制文件） */
+  async function writeLocal(
+    path: string,
+    content: string,
+    opts: { encoding?: "utf-8" | "base64" } = {},
+  ): Promise<void> {
     const id = `${owner}/${repo}/${path}`;
     const existing = localFiles.find((f) => f.path === path);
     // remote 原始 sha（首次写入时捕获，用于 diff + 提交乐观锁）
@@ -159,6 +164,7 @@ export function createEditorVfs(owner: string, repo: string) {
       path,
       sha: remoteSha,
       content,
+      encoding: opts.encoding,
       deleted: false,
       mtime: Date.now(),
     };
@@ -206,6 +212,47 @@ export function createEditorVfs(owner: string, repo: string) {
   async function revertLocal(path: string): Promise<void> {
     await editorLocalDelete(owner, repo, path);
     localFiles = localFiles.filter((f) => f.path !== path);
+  }
+
+  /**
+   * 重命名/移动文件：读旧内容 → 写新路径（保留 encoding）→ 删旧路径。
+   * 用于文件树的重命名和拖拽移动。
+   * @returns 新路径（成功）或 null（旧路径不存在 / 新路径已存在冲突）
+   */
+  async function renameLocal(oldPath: string, newPath: string): Promise<string | null> {
+    if (oldPath === newPath) return newPath;
+    if (await exists(newPath)) return null;
+    // 读旧内容（local 优先，否则 remote）
+    const local = localFiles.find((f) => f.path === oldPath);
+    let content: string;
+    let encoding: "utf-8" | "base64" | undefined;
+    if (local && !local.deleted) {
+      content = local.content;
+      encoding = local.encoding;
+    } else {
+      content = await readFile(oldPath);
+      // remote 读出的文本文件 encoding 留空（默认 utf-8）
+    }
+    await writeLocal(newPath, content, { encoding });
+    // 旧路径：local 新建的文件直接删；remote 有的软删除
+    const oldInRemote = remoteCache?.blobs.some((b) => b.path === oldPath);
+    if (oldInRemote) {
+      await deleteLocal(oldPath);
+    } else {
+      await editorLocalDelete(owner, repo, oldPath);
+      localFiles = localFiles.filter((f) => f.path !== oldPath);
+    }
+    return newPath;
+  }
+
+  /**
+   * 检查路径是否已存在（local 未删除 或 remote 有）。
+   * 用于重命名/粘贴/上传时的冲突检测。
+   */
+  async function exists(path: string): Promise<boolean> {
+    const inLocal = localFiles.some((f) => f.path === path && !f.deleted);
+    if (inLocal) return true;
+    return remoteCache?.blobs.some((b) => b.path === path) ?? false;
   }
 
   /**
@@ -276,7 +323,11 @@ export function createEditorVfs(owner: string, repo: string) {
         return { path: d.path, content: null };
       }
       const local = localFiles.find((f) => f.path === d.path);
-      return { path: d.path, content: local?.content ?? "" };
+      return {
+        path: d.path,
+        content: local?.content ?? "",
+        encoding: local?.encoding,
+      };
     });
     if (changes.length === 0) {
       throw new Error("没有可提交的变更");
@@ -324,6 +375,8 @@ export function createEditorVfs(owner: string, repo: string) {
     writeLocal,
     deleteLocal,
     revertLocal,
+    renameLocal,
+    exists,
     fileContentDiff,
     commit,
   };

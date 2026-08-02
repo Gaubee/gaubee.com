@@ -67,9 +67,12 @@ app.use(
 
 app.get("/", (c) => c.json({ name: "gaubee-auth", ok: true }));
 
-// ---- 图片上传（GithubApp Issues 评论插图）----
-// 前端发送 multipart（owner + repo + file），Worker 用 token 调 GitHub Contents API
-// PUT 上传到 .github-issue-assets/{timestamp}-{rand}.{ext}，返回 raw URL。
+// ---- 图片上传（GithubApp Issues 评论插图 + GithubEditor 资产上传）----
+// 前端发送 multipart（owner + repo + file，可选 path/branch），Worker 用 token 调
+// GitHub Contents API PUT 上传，返回 raw URL。
+// - path（可选）：目录前缀。提供则上传到 {path}/{filename}；否则默认 .github-issue-assets/
+//   （向后兼容 Issue 评论插图）。
+// - branch（可选）：指定分支。提供则 PUT 时带 ?ref={branch}。
 app.post("/upload/image", async (c) => {
   // token 通过 Authorization header 传（新架构 token 在前端内存，非 cookie）
   const authHeader = c.req.header("Authorization");
@@ -81,14 +84,23 @@ app.post("/upload/image", async (c) => {
   const owner = formData.get("owner");
   const repo = formData.get("repo");
   const file = formData.get("file");
+  // 可选参数（向后兼容：不传时走 Issue 评论默认行为）
+  const dirPath = formData.get("path"); // 目录前缀（不带首尾斜杠）
+  const branch = formData.get("branch"); // 目标分支
   if (typeof owner !== "string" || typeof repo !== "string" || !(file instanceof File)) {
     return c.json({ error: "invalid: owner/repo/file required" }, 400);
   }
 
-  // 生成仓库内路径：.github-issue-assets/{timestamp}-{rand}.{ext}
+  // 生成仓库内路径：
+  // - dirPath 提供 → {dirPath}/{timestamp}-{rand}.{ext}
+  // - 否则 → .github-issue-assets/{timestamp}-{rand}.{ext}（Issue 评论兼容）
   const ext = file.name.split(".").pop() || "png";
   const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const path = `.github-issue-assets/${filename}`;
+  const dir =
+    typeof dirPath === "string" && dirPath.trim()
+      ? dirPath.replace(/^\/+|\/+$/g, "")
+      : ".github-issue-assets";
+  const path = `${dir}/${filename}`;
 
   // File → base64
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -96,8 +108,11 @@ app.post("/upload/image", async (c) => {
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   const base64 = btoa(binary);
 
-  // GitHub Contents API PUT
-  const resp = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+  // GitHub Contents API PUT（带可选 branch ref）
+  const url = branch
+    ? `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(branch)}`
+    : `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+  const resp = await fetch(url, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${effectiveToken}`,
@@ -106,7 +121,7 @@ app.post("/upload/image", async (c) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      message: `upload issue image: ${filename}`,
+      message: `upload image: ${filename}`,
       content: base64,
     }),
   });
@@ -115,8 +130,8 @@ app.post("/upload/image", async (c) => {
     return c.json({ error: `upload failed: ${resp.status} ${text}` }, resp.status);
   }
   const data = (await resp.json()) as { content: { download_url: string } };
-  const url = data.content.download_url;
-  return c.json({ url });
+  const downloadUrl = data.content.download_url;
+  return c.json({ url: downloadUrl, path });
 });
 
 // ---- 1. 发起 OAuth：重定向到 GitHub ----

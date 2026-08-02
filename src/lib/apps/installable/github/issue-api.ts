@@ -520,13 +520,21 @@ export async function searchCode(
  * @param file 图片文件（前端 paste/drop 获取）
  * @returns raw URL（可直接用于 markdown ![](url)）
  */
-export async function uploadIssueImage(owner: string, repo: string, file: File): Promise<string> {
+export async function uploadIssueImage(
+  owner: string,
+  repo: string,
+  file: File,
+  opts: { path?: string; branch?: string } = {},
+): Promise<string> {
   const AUTH_BASE =
     (import.meta.env.VITE_AUTH_BASE as string | undefined) ?? "http://localhost:8787";
   const formData = new FormData();
   formData.append("owner", owner);
   formData.append("repo", repo);
   formData.append("file", file);
+  // 可选：目录前缀 + 分支（向后兼容，不传时 Worker 走 .github-issue-assets 默认行为）
+  if (opts.path) formData.append("path", opts.path);
+  if (opts.branch) formData.append("branch", opts.branch);
 
   // token 从 authStore 内存取，通过 Authorization header 传给 Worker
   const token = authStore.apiToken;
