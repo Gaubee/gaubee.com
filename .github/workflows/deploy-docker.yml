@@ -33,6 +33,10 @@ concurrency:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    # secrets context 不能直接用于 step if（Unrecognized named-value），
+    # 经 job env 中转后用 env 比较（官方推荐模式）。
+    env:
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
       - name: Checkout your repository using git
         uses: actions/checkout@v4
@@ -84,7 +88,7 @@ jobs:
 
       # ---- Docker Hub（可选通道，配置 secrets 后自动启用）----
       - name: Log in to Docker Hub
-        if: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+        if: ${{ env.DOCKERHUB_TOKEN != '' }}
         uses: docker/login-action@v3
         with:
           registry: docker.io
@@ -93,7 +97,7 @@ jobs:
 
       - name: Docker Hub metadata (tags, labels)
         id: meta-dockerhub
-        if: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+        if: ${{ env.DOCKERHUB_TOKEN != '' }}
         uses: docker/metadata-action@v5
         with:
           images: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/gaubee.com
@@ -103,7 +107,7 @@ jobs:
 
       - name: Push to Docker Hub
         # 复用上一步的 GHA layer 缓存，第二次构建秒级完成
-        if: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+        if: ${{ env.DOCKERHUB_TOKEN != '' }}
         uses: docker/build-push-action@v6
         with:
           context: .
