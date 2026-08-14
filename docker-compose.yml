@@ -10,7 +10,12 @@
 #   2. docker compose pull && docker compose up -d
 #   3. 外层用你自己的 nginx/caddy 反代 8080 → 443 + TLS 证书
 #
-# 更新：docker compose pull && docker compose up -d
+# 更新方式（三选一）：
+#   a. 手动：docker compose pull && docker compose up -d
+#   b. 1Panel Webhook 即时拉取：1Panel「计划任务」建 Shell 脚本任务（内容见
+#      下方注释），开启 Webhook 触发，URL 配到 GitHub secret PANEL_WEBHOOK_URL，
+#      CI 发布完镜像自动通知服务器执行
+#   c. Watchtower 轮询（无需暴露面板端口）：docker compose --profile auto-update up -d
 # ---------------------------------------------------------------------------
 
 services:
@@ -21,6 +26,9 @@ services:
     #   image: ghcr.io/gaubee/gaubee.com:latest
     container_name: gaubee-com
     restart: unless-stopped
+    # watchtower 只更新带此 label 的容器（label 无副作用，不用 watchtower 也可保留）
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     ports:
       # 宿主端口可用 PORT 环境变量覆盖（默认 8080，避免与宿主已有 nginx 冲突）
       - "${PORT:-8080}:80"
@@ -30,3 +38,26 @@ services:
       timeout: 3s
       retries: 3
       start_period: 5s
+
+  # 自动更新（可选，方式 c）：默认不启动，需显式启用
+  #   docker compose --profile auto-update up -d
+  # 每 5 分钟检查 Docker Hub 上 latest 是否变化，变了才拉取并重建（走 daemon 加速器）。
+  # 1Panel Webhook（方式 b）即时时，无需启用本服务。
+  watchtower:
+    profiles: ["auto-update"]
+    image: containrrr/watchtower
+    container_name: gaubee-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 300 --cleanup --label-enable
+    environment:
+      # 只更新带 watchtower.enable=true label 的容器（即上方 web）
+      WATCHTOWER_LABEL_ENABLE: "true"
+      TZ: Asia/Shanghai
+
+# 1Panel 计划任务的 Shell 脚本内容（方式 b，路径按实际 compose 目录调整）：
+#   cd /opt/gaubee.com
+#   for i in 1 2 3; do docker compose pull && break || sleep 10; done
+#   docker compose up -d
+#   docker image prune -f

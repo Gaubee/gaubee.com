@@ -116,6 +116,17 @@ ghcr.io 为备用通道（国内直连极慢，仅境外/加速器失效时用�
 优先云厂商专属加速器（阿里云 ACR 控制台专属地址 / 腾讯云内网 `mirror.ccs.tencentyun.com`），
 公共兜底 `https://docker.m.daocloud.io` 或南大 `https://docker.nju.edu.cn`。
 
+### 服务器自动拉取（1Panel，2026-08-14）
+
+服务器用 1Panel 管理，两种自动更新方式（compose 注释同源）：
+
+- **Webhook 即时（主）**：1Panel「计划任务」建 Shell 脚本任务（pull 重试 + up -d + prune），
+  开 Webhook 触发，URL 配 GitHub secret `PANEL_WEBHOOK_URL`；CI 推完镜像自动 curl 通知。
+  前提：1Panel 面板端口可被 GitHub Actions 出网访问。
+- **Watchtower 轮询（备）**：compose 内置 `profiles: [auto-update]` 的 watchtower 服务
+  （默认不启动，`docker compose --profile auto-update up -d` 启用），每 5 分钟检查
+  latest 变化，只更新带 `watchtower.enable=true` label 的 web 容器，出站拉取无入站端口要求。
+
 ### 文件结构
 
 ```

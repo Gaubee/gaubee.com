@@ -1205,3 +1205,11 @@ GitHub Pages 保留（域名 DNS 由用户自行切换）。
   ghcr 备用注释保留。
 - 服务器侧加速器：优先云厂商专属（阿里云 ACR 专属地址/腾讯云内网），公共兜底
   daocloud/南大（详见 agents.md 部署架构段）。
+
+### 服务器自动拉取（1Panel，2026-08-14 追加）
+
+- Webhook 即时（主）：1Panel 计划任务（Shell：pull 重试 + up -d）开 Webhook 触发，
+  URL 配 secret `PANEL_WEBHOOK_URL`；CI 加「Notify server to pull」步骤（未配置跳过）。
+- Watchtower 轮询（备）：compose 内 `profiles: [auto-update]` 可选服务，label 过滤只更
+  web 容器，默认不启动；`docker compose --profile auto-update up -d` 启用。
+- 验证：compose config 双模式 services 正确（默认仅 web / profile 加 watchtower）。
