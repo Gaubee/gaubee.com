@@ -1,0 +1,82 @@
+# ---------------------------------------------------------------------------
+# 构建静态站镜像并推送到 GHCR（备案合规：国内服务器 docker 部署）。
+#
+# 触发：main 分支 push（合并 feature 分支后）+ 手动 workflow_dispatch
+# 产物：ghcr.io/gaubee/gaubee.com:latest（+ git sha 短码 tag 便于回滚）
+# 服务器侧：docker-compose.yml 直接引用 latest，pull && up -d 即更新。
+#
+# 与 Pages 部署（main.yml）并行不悖：Pages 保留作为境外/备用入口，
+# 主域名 DNS 由用户自行切换到国内服务器（备案合规要求）。
+# ---------------------------------------------------------------------------
+
+name: Build and Push Docker Image to GHCR
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-ghcr
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  # 仓库名必须全小写（GHCR 要求）
+  IMAGE_NAME: gaubee/gaubee.com
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout your repository using git
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-,format=short
+
+      - name: Verify VITE_AUTH_BASE
+        # 防回退（与 main.yml 同逻辑）：镜像内前端的 OAuth 跳转目标必须显式生产值。
+        # Dockerfile 默认值即生产 Worker 域名，此处校验 secret 一致性；
+        # 未配置 secret 时使用默认值跳过（镜像构建走 Dockerfile 内置校验）。
+        env:
+          VITE_AUTH_BASE: ${{ secrets.VITE_AUTH_BASE }}
+        run: |
+          if [[ -n "$VITE_AUTH_BASE" && ! "$VITE_AUTH_BASE" =~ ^https:// ]]; then
+            echo "::error::VITE_AUTH_BASE 必须是 https:// 开头（当前：'$VITE_AUTH_BASE'）。"
+            exit 1
+          fi
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64 # 国内服务器主流架构；需 arm64 再扩展
+          push: true
+          build-args: |
+            VITE_AUTH_BASE=${{ secrets.VITE_AUTH_BASE || 'https://auth.gaubee.com' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

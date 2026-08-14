@@ -1165,3 +1165,32 @@ src/lib/apps/installable/github/state/
 - 类型检查 0 错误 0 警告；单测 445 过（2 个 shell.test.ts 失败为预存环境噪声，已 stash 对照确认与本次无关）。
 - 走查（`tests/jules-scratch/footer-bar/`）13 项全过：贴底全宽、半高（18=36/2）、右对齐、
   分割线、链接 href/target/rel、跨路由常驻、移动端贴底、SSG 页脚；亮/暗截图视觉确认。
+
+## Docker 镜像发布通道（备案合规：国内服务器部署）（2026-08-14）
+
+备案要求主域名指向国内服务器。新增「同一构建产物 → GHCR 镜像 → 服务器 docker compose」通道，
+GitHub Pages 保留（域名 DNS 由用户自行切换）。
+
+### 改动
+
+- `Dockerfile`：多阶段构建（node:22-alpine + pnpm@10.22.0 install/build → nginx:alpine 托管 build/）。
+  ARG VITE_AUTH_BASE 默认生产值 + 构建内防回退校验（与 CI 同逻辑）。
+- `deploy/nginx.conf`：SPA/SSG 双格式兜底（`try_files $uri $uri/index.html $uri.html /index.html`）、
+  server 级 no-cache（协商缓存）+ `_app/immutable` 永久缓存覆盖、raw md 显式 text/markdown、gzip。
+- `docker-compose.yml`：服务器部署入口（ghcr.io/gaubee/gaubee.com:latest，PORT 默认 8080，healthcheck）。
+- `.dockerignore`：排除 node_modules/.git/tests/worker 等；**严禁排除 md**（src/content 是内容本体）。
+- `.github/workflows/deploy-docker.yml`：main push → buildx 构建推送 GHCR（latest + sha tag，amd64，GHA 缓存）。
+- `agents.md` 部署架构段更新为双通道模型。
+
+### 踩坑记录
+
+- pnpm 10.x 新版 `--config.dangerouslyAllowAllBuilds` 与 `pnpm-workspace.yaml` 显式
+  `onlyBuiltDependencies` 白名单互斥（ERR_PNPM_CONFIG_CONFLICT_BUILT_DEPENDENCIES）；
+  容器内白名单已覆盖所需构建脚本，直接去掉 flag。
+- nginx `try_files` 中间参数命中不重走 location 匹配 → no-cache 必须放 server 级而非 `.html$` location。
+- GHCR 包默认 private：服务器拉取需 docker login ghcr.io（read:packages）或将 package 设 public。
+
+### 验证
+
+- 本地 arm64 构建 + 容器内全链路验证：SSG/SPA/深层路由全 200、备案号渲染、
+  缓存头矩阵（内容 no-cache / immutable 1y）、md MIME、gzip、搜索索引可达。
