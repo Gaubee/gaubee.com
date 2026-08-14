@@ -336,13 +336,43 @@ export async function fetchTree(
 export interface StagedChange {
   /** 仓库内路径，如 'src/content/articles/0057.tc39-signals.md'。 */
   path: string;
-  /** 新内容（UTF-8 文本）。删除时为 null。 */
+  /** 新内容。删除时为 null。
+   *  - encoding='utf-8'（默认）：UTF-8 文本字符串
+   *  - encoding='base64'：纯 base64 字符串（无 data: 前缀），用于二进制文件（图片等） */
   content: string | null;
   /**
    * 远程已有文件的 blob sha（删除时必填；修改时可选，但提供可减少 blob 创建）。
    * 新建文件为 null/undefined。
    */
   sha?: string | null;
+  /** 内容编码。默认 'utf-8'。
+   *  - 'utf-8'：content 为 UTF-8 文本，直接进 tree item content 字段
+   *  - 'base64'：content 为 base64 字符串，需先经 createBlob 上传拿 blob sha，tree item 只带 sha */
+  encoding?: "utf-8" | "base64";
+}
+
+/**
+ * 创建一个 git blob（Git Data API）。
+ * 用于提交二进制内容（图片等）：content 为纯 base64 字符串，encoding='base64'。
+ * 文本内容通常不需要单独建 blob（直接在 tree item 里带 content 即可）。
+ *
+ * GitHub 端点：POST /repos/{owner}/{repo}/git/blobs
+ * @returns 新建 blob 的 sha
+ */
+export async function createBlob(
+  content: string,
+  encoding: "utf-8" | "base64",
+  opts: { owner?: string; repo?: string } = {},
+): Promise<string> {
+  const { owner = OWNER, repo = REPO } = opts;
+  const resp = await fetchGithub(`repos/${owner}/${repo}/git/blobs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content, encoding }),
+  });
+  await assertOk(resp, "createBlob");
+  const data = (await resp.json()) as { sha: string };
+  return data.sha;
 }
 
 /**
@@ -371,7 +401,9 @@ export async function commitChanges(
 
   // 2. 构造 tree 条目
   // GitHub Trees API 语义（配合 base_tree）：
-  // - { path, mode, type:'blob', content } → 新增/修改该 path 的内容
+  // - { path, mode, type:'blob', content } → 新增/修改该 path（content 仅支持 UTF-8 文本）
+  // - { path, mode, type:'blob', sha } → 用已有 blob sha 指定该 path 的内容
+  //   （二进制/图片必须走这条路：先 createBlob 拿 sha，再在 tree 里引用）
   // - { path, mode, type:'blob', sha: null } → 从 base_tree 删除该 path
   const treeItems: Array<{
     path: string;
@@ -380,6 +412,21 @@ export async function commitChanges(
     content?: string;
     sha?: string | null;
   }> = [];
+
+  // 2a. 二进制条目（encoding='base64'）先并发 createBlob 拿 sha
+  const binaryChanges = changes.filter((c) => c.content !== null && c.encoding === "base64");
+  const blobShaMap = new Map<string, string>();
+  if (binaryChanges.length > 0) {
+    const entries = await Promise.all(
+      binaryChanges.map(async (c) => {
+        const sha = await createBlob(c.content as string, "base64", { owner, repo });
+        return [c.path, sha] as const;
+      }),
+    );
+    for (const [path, sha] of entries) blobShaMap.set(path, sha);
+  }
+
+  // 2b. 组装 tree items
   for (const change of changes) {
     if (change.content === null) {
       // 删除：sha: null 配合 base_tree 表示移除。要求调用方提供原 sha（VFS 会保留）。
@@ -389,8 +436,20 @@ export async function commitChanges(
         type: "blob",
         sha: null,
       });
+    } else if (change.encoding === "base64") {
+      // 二进制：引用 2a 步骤创建的 blob sha（不带 content）
+      const blobSha = blobShaMap.get(change.path);
+      if (!blobSha) {
+        throw new Error(`commitChanges: 二进制条目 ${change.path} 缺少 blob sha`);
+      }
+      treeItems.push({
+        path: change.path,
+        mode: "100644",
+        type: "blob",
+        sha: blobSha,
+      });
     } else {
-      // 新增/修改：直接在 tree 里带 content（GitHub 会自动创建 blob）
+      // 文本：直接在 tree 里带 content（GitHub 会自动创建 blob）
       treeItems.push({
         path: change.path,
         mode: "100644",

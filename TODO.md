@@ -1061,3 +1061,107 @@ src/lib/apps/installable/github/state/
 - **已修复**：app-store、writer(editor/github-edit)、tags 共 4 处。
 - **安全确认**：articles（详情走 defineRoute）、shout、settings、theme、files、search、notifications、account、desktop、terminal、github（defineRoute + children）——均不做 pathname 子路径正则分发。
 - **风险（有兜底，非渲染 bug）**：deepLinks 死字段（未落地，建议清理）；NotificationsView 消费 localStorage 持久化 routeId（失效时跳桌面兜底）；markdown 内链 href 无白名单（错误路径走 NotFound 兜底）。
+
+## GithubEditor 工作区交互重构（2026-08-02）
+
+一次性交付三块能力：图片上传闭环 + 文件树操作升级 + 变更页升级。按「底层 → 抽象层 → UI 层」自下而上改造。
+
+### 关键技术修正
+
+探索结论曾以为 GitHub Trees API 的 `content` 字段支持 base64——**错误**。Trees API 的 tree 项 `content` 只接受 raw UTF-8 文本；提交二进制（图片）必须先用 Blobs API（`POST /git/blobs {content, encoding:"base64"}`）建 blob 拿 sha，再在 tree item 里只传 `sha`（不带 content）。这是方案 B（VFS commit 二进制）的核心。
+
+### 阶段 1：打通 VFS 二进制（`src/lib/github/client.ts`）
+
+- `StagedChange` 加 `encoding?: "utf-8" | "base64"`（默认 utf-8，向后兼容）。
+- 新增 `createBlob(content, encoding, opts)`：`POST /git/blobs` → 返回 blob sha。
+- `commitChanges` 改 tree 构造：先并发为 base64 条目建 blob 拿 sha，再合并进 tree items（带 sha 不带 content）；utf-8 走原逻辑。文本 + 图片可合并在同一个 commit。
+
+### 阶段 2：EditorVfs + meta-store 二进制支持
+
+- `EditorFileMeta`（`meta-store.ts`）加 `encoding?: "utf-8" | "base64"`；content 保持 string（base64 时存纯 base64，无 `data:` 前缀）。
+- `editor-vfs.svelte.ts`：`writeLocal(path, content, opts?)` 透传 encoding；`commit()` 构造 StagedChange 时透传 encoding；新增 `renameLocal(old, new)`（重命名/移动，含冲突检测）+ `exists(path)`（冲突检测用）。
+
+### 阶段 3：CodeMirror 命令式 insertText API
+
+- `CodeMirror.svelte` 用 `<script module>` 导出 `CodeMirrorApi` 接口；新增 `api` prop（父组件创建传入，组件 onMount 时填充 `insertText`）。
+- 内部用 `view.dispatch({changes, selection, scrollIntoView})` 在光标处插入，**不重载文档、不丢光标**。解决 `CommentEditor.svelte:165` 久悬 TODO（本次未改 CommentEditor）。
+
+### 阶段 4：图片上传核心逻辑（双方案）
+
+- 新建 `github-editor/image-upload.ts`：`fileToBase64`（剥离 data: 前缀）、`uploadImageAsAsset`（方案 A：经 Worker 单文件即时 commit）、`uploadImageToVfs`（方案 B：base64 写 local 层随 commit 提交）、`pickFirstImage`/`hasImageFiles`/`buildImageMarkdown` 辅助。属性检测替代 instanceof 避免 Node 环境报错。
+- Worker `/upload/image`（`worker/src/index.ts`）：新增可选 `path`（目录前缀）+ `branch` 参数；有 path 用自定义目录，无 path 保持 `.github-issue-assets/`（**向后兼容** Issue 评论）；有 branch 时 PUT 带 `?ref=`。
+- `uploadIssueImage`（`issue-api.ts`）加可选 `{path?, branch?}`（向后兼容，CommentEditor 不传仍走原逻辑）。
+
+### 阶段 5：文件树升级为递归组件
+
+- 新建 `github-editor/views/FileTree.svelte`：真正递归渲染（替换 EditorWorkspace 内联的简化版「根+一层」）；节点支持 draggable + drop 接收 + oncontextmenu + 内联重命名 input。
+- 新建 `github-editor/file-ops.svelte.ts`：`createFileOps(vfs)` 工厂，封装 rename/remove/copy/cut/paste/moveByDrop（基于 vfs + fileClipboard）。
+- 新建 `github-editor/clipboard.svelte.ts`：内存剪贴板单例（copy/cut mode）。
+- 新建 `src/lib/utils/clipboard.ts`：`copyText` 封装 `navigator.clipboard.writeText`。
+
+### 阶段 6：右键菜单 + 文件操作
+
+- `npx shadcn-svelte add context-menu`（与 dropdown-menu 共用 bits-ui，无新依赖）。
+- 新建 `github-editor/views/FileTreeContextMenu.svelte`：受控菜单（父组件管 open + target），项含重命名/复制路径/复制/剪切/粘贴（目录+剪贴板非空）/上传图片到这里（目录）/删除。
+
+### 阶段 7+8：EditorWorkspace 接入
+
+- 替换内联文件树为 `<FileTree>` + `<FileTreeContextMenu>`。
+- 顶部工具栏加两个图片按钮：「插入图片（资产）」+「上传图片到仓库（VFS）」，各走各链路。
+- 拖拽遮罩分流：拖到 fileTree 区域 → VFS 上传（遮罩提示「随下次提交 commit」）；拖到 code-editor 区域 → 资产上传（遮罩提示「即时插入链接」）。drop 事件按 dataTransfer.files 类型分流。
+- 编辑器区域支持 paste 上传图片（资产方案）。
+- 变更 tab：每项 hover 显示「定位到 fileTree」+「discard 撤销此文件修改」按钮。
+
+### 阶段 9：验证
+
+- 类型检查 **0 错误 0 警告**（`pnpm check`）。
+- 单元测试新增 32 个全过：`client.test.ts` +7（createBlob、二进制+文本混合 commit、纯文本不调 createBlob）；`image-upload.test.ts` +16（fileToBase64/generateImageFilename/joinPath/buildImageMarkdown/事件提取）。
+- 既有失败 `publish-helper.test.ts`（2 个）为预存问题（main 分支同样失败，route registry 未注册），与本次无关。
+- `pnpm fmt` 格式化全量。
+
+### 文件清单
+
+```
+新增:
+  src/lib/apps/installable/github-editor/image-upload.ts          双方案上传逻辑
+  src/lib/apps/installable/github-editor/image-upload.test.ts     16 单测
+  src/lib/apps/installable/github-editor/file-ops.svelte.ts       文件操作 hooks
+  src/lib/apps/installable/github-editor/clipboard.svelte.ts      内存剪贴板
+  src/lib/apps/installable/github-editor/views/FileTree.svelte    递归文件树
+  src/lib/apps/installable/github-editor/views/FileTreeContextMenu.svelte
+  src/lib/components/ui/context-menu/*                            shadcn add
+  src/lib/utils/clipboard.ts                                      copyText 封装
+
+修改:
+  src/lib/github/client.ts                       StagedChange.encoding + createBlob + commitChanges 二进制分支
+  src/lib/github/client.test.ts                  +7 测试（createBlob + 混合 commit）
+  src/lib/vfs/meta-store.ts                      EditorFileMeta.encoding
+  src/lib/apps/installable/github-editor/editor-vfs.svelte.ts   writeLocal opts + renameLocal + exists + commit 透传
+  src/lib/apps/installable/github-editor/views/EditorWorkspace.svelte  FileTree 接入 + 拖拽遮罩 + 工具栏按钮 + 变更页升级
+  src/lib/editor/CodeMirror.svelte               CodeMirrorApi + insertText
+  src/lib/apps/installable/github/issue-api.ts   uploadIssueImage 可选 path/branch
+  worker/src/index.ts                            /upload/image 可选 path/branch
+```
+
+## 底部系统状态栏 + ICP 备案（2026-08-14）
+
+页面底部新增跨路由常驻的系统状态栏（与顶部 SystemStatusBar 对偶），承载备案号等站点级信息。
+
+### 改动
+
+- 新增 `src/lib/site/site.ts`：站点级展示常量单一事实源（GitHub 源码地址 + ICP 备案号/工信部链接）。
+- 新增 `src/lib/components/layout/SystemFooterBar.svelte`：
+  - 视觉对齐顶栏（glass-surface 毛玻璃 + border-t + z-shell-base），高度减半（h-4.5 = 18px）。
+  - 条目右对齐、分割线隔开：`GitHub | 闽ICP备17026139号-1`（均新窗口 + noopener noreferrer）。
+  - iOS 安全区让位（viewport-fit=cover 下 env(safe-area-inset-bottom)）。
+  - 头部注释记录未来演进（用户设想，未实现）：抽屉化（小手柄 + Sheet 向上展开）、
+    方案一「数据中转站」（全站功能数据建模为类剪贴板结构，卡片化存储）、
+    方案二「AI 入口」（个人 AI 助理对话，WebMCP 操作 GaubeeOS 内容）。
+- SPA 布局接入：`[...path]/+layout.svelte` 在 app-workspace 之后渲染 SystemFooterBar。
+- SSG 页脚（`/pages`）补备案号链接（国标要求：备案号链接工信部备案管理系统 beian.miit.gov.cn）。
+
+### 验证
+
+- 类型检查 0 错误 0 警告；单测 445 过（2 个 shell.test.ts 失败为预存环境噪声，已 stash 对照确认与本次无关）。
+- 走查（`tests/jules-scratch/footer-bar/`）13 项全过：贴底全宽、半高（18=36/2）、右对齐、
+  分割线、链接 href/target/rel、跨路由常驻、移动端贴底、SSG 页脚；亮/暗截图视觉确认。

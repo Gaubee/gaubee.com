@@ -7,7 +7,19 @@
 	  避免循环：外部 doc → CM dispatch → onUpdate → 外部 doc → ...
 	- 用户编辑通过 onInput 回调通知父组件（父组件可存 IndexedDB，但不应把回写的 doc
 	  再传回来触发 CM 重载，除非文档身份变了）。
+	- 命令式 API（insertText）：父组件传入 `api` 对象（CodeMirrorApi），组件 onMount 时
+	  填充 insertText 方法。用于在光标处插入片段（如图片上传后插入 ![](url)），
+	  不触发文档重载、不丢光标位置。
 -->
+
+<script lang="ts" module>
+  /** CodeMirror 命令式 API（由组件填充，父组件调用）。 */
+  export interface CodeMirrorApi {
+    /** 在当前光标位置插入文本（不重载文档、不丢光标，光标移到插入内容末尾）。 */
+    insertText: (text: string) => void
+  }
+</script>
+
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
   import { EditorState, type Extension } from '@codemirror/state'
@@ -31,6 +43,8 @@
     filePath = '',
     onInput,
     onSave,
+    /** 命令式 API 载体（父组件创建并传入，组件挂载时填充 insertText 方法）。 */
+    api,
   }: {
     doc?: string
     docId?: string
@@ -39,6 +53,7 @@
     filePath?: string
     onInput?: (value: string) => void
     onSave?: () => void
+    api?: CodeMirrorApi
   } = $props()
 
   let host: HTMLDivElement
@@ -154,6 +169,19 @@
       state: createState(currentDoc),
       parent: host,
     })
+    // 填充命令式 API：在光标处插入文本，dispatch transaction（不重载、不丢光标）
+    if (api) {
+      api.insertText = (text: string) => {
+        if (!view) return
+        const sel = view.state.selection.main
+        view.dispatch({
+          changes: { from: sel.from, to: sel.to, insert: text },
+          selection: { anchor: sel.from + text.length },
+          scrollIntoView: true,
+        })
+        view.focus()
+      }
+    }
   })
 
   onDestroy(() => {

@@ -123,8 +123,12 @@ export interface EditorFileMeta {
   path: string;
   /** 远程原始 sha（用于 diff + 提交乐观锁；新建文件为 null）。 */
   sha: string | null;
-  /** 本地内容（未提交，内存 + IndexedDB 双写）。 */
+  /** 本地内容（未提交，内存 + IndexedDB 双写）。
+   *  - encoding='utf-8'（默认）：UTF-8 文本字符串
+   *  - encoding='base64'：纯 base64 字符串（无 data: 前缀），用于二进制文件（图片等） */
   content: string;
+  /** 内容编码。默认 'utf-8'。'base64' 用于二进制文件（content 存纯 base64）。 */
+  encoding?: "utf-8" | "base64";
   /** 是否标记删除（软删除，提交时真正删除）。 */
   deleted: boolean;
   /** 最后修改时间戳。 */

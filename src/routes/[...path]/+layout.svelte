@@ -2,6 +2,7 @@
 	根布局：挂载 NavController，渲染 OS 骨架。
 	- SystemStatusBar：顶部全宽系统状态栏（最高优先级）
 	- app-workspace：左侧 Dock（DesktopSidebar）+ 主体（main + bottom 堆叠），始终横排，移动/桌面统一
+	- SystemFooterBar：底部全宽系统状态栏（ICP 备案号，未来抽屉化，见组件注释）
 	- PopAreaRouter：浮层（Dialog），任何视口都可用
 -->
 <script lang="ts">
@@ -30,6 +31,7 @@
   import LaunchpadDialog from '$lib/components/layout/LaunchpadDialog.svelte'
   import DesktopAppSheet from '$lib/apps/views/DesktopAppSheet.svelte'
   import SystemStatusBar from '$lib/components/layout/SystemStatusBar.svelte'
+  import SystemFooterBar from '$lib/components/layout/SystemFooterBar.svelte'
   import { Toaster } from '$lib/components/ui/sonner'
   import { notifySuccess, notifyError } from '$lib/apps/builtin/notifications/service.svelte'
   import { ModeWatcher } from 'mode-watcher'
@@ -134,6 +136,9 @@
       </div>
     </div>
   </div>
+
+  <!-- 底部系统状态栏（全宽，跨路由常驻，与顶部 SystemStatusBar 对偶） -->
+  <SystemFooterBar />
 </div>
 
 <!-- pop 区浮层（任何视口） -->
