@@ -1,20 +1,24 @@
 # ---------------------------------------------------------------------------
 # gaubee.com 国内服务器部署（备案合规）。
 #
-# 服务器用法（镜像由 CI 自动推送到 GHCR，无需本地构建）：
+# 镜像走 Docker Hub 通道（国内可配镜像加速器；ghcr.io 国内直连极慢）。
+# 前置：repo 已配置 DOCKERHUB_USERNAME/DOCKERHUB_TOKEN secrets 且
+# 「Build and Push Docker Image」workflow 已成功双发（Docker Hub 上有镜像）。
+#
+# 服务器用法：
 #   1. 保存本文件到服务器任意目录（如 /opt/gaubee.com/）
 #   2. docker compose pull && docker compose up -d
 #   3. 外层用你自己的 nginx/caddy 反代 8080 → 443 + TLS 证书
-#      （或 PORT=80 直接对外，再由云厂商/防火墙管 443）
 #
-# 更新：git pull（或重新下载本文件）→ docker compose pull && docker compose up -d
+# 更新：docker compose pull && docker compose up -d
 # ---------------------------------------------------------------------------
 
 services:
   web:
-    # 默认 GHCR 镜像；若服务器配置了 Docker Hub 加速器，可切换为：
-    #   image: docker.io/<你的DockerHub用户名>/gaubee.com:latest
-    image: ghcr.io/gaubee/gaubee.com:latest
+    # Docker Hub 主通道（若用户名非 gaubee，改为此处 + GitHub secrets 同步）
+    image: docker.io/gaubee/gaubee.com:latest
+    # 备用通道（境外/加速器失效时）：
+    #   image: ghcr.io/gaubee/gaubee.com:latest
     container_name: gaubee-com
     restart: unless-stopped
     ports:

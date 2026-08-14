@@ -110,6 +110,12 @@ docker compose pull && docker compose up -d   # 默认宿主端口 8080，PORT �
 # 外层用自有 nginx/caddy 反代 8080 → 443 + TLS
 ```
 
+镜像主通道为 Docker Hub（`docker.io/gaubee/gaubee.com`，国内服务器配镜像加速器后拉取快）；
+ghcr.io 为备用通道（国内直连极慢，仅境外/加速器失效时用）。
+服务器 dockerd 加速器配置（`/etc/docker/daemon.json`，改后 `systemctl restart docker`）：
+优先云厂商专属加速器（阿里云 ACR 控制台专属地址 / 腾讯云内网 `mirror.ccs.tencentyun.com`），
+公共兜底 `https://docker.m.daocloud.io` 或南大 `https://docker.nju.edu.cn`。
+
 ### 文件结构
 
 ```
@@ -119,7 +125,7 @@ worker/
 
 /（仓库根）
 ├── Dockerfile                 静态站镜像（node:22-alpine pnpm build → nginx:alpine）
-├── docker-compose.yml         服务器部署入口（引用 GHCR 镜像，PORT 可覆盖）
+├── docker-compose.yml         服务器部署入口（Docker Hub 主通道 + ghcr 备用，PORT 可覆盖）
 ├── deploy/nginx.conf          容器 nginx 配置（SPA/SSG 兜底 + 缓存矩阵 + md MIME）
 └── .github/workflows/
     ├── deploy-worker.yml      worker/ 变更 → wrangler-action 部署（--env production）
