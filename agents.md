@@ -99,7 +99,8 @@ Worker 用 `WORKER_ORIGIN` 构造 GitHub OAuth 的 `redirect_uri`，故「Worker
 - **协调切换窗口**：统一 `redirect_uri` 时，改 OAuth App callback → push 部署 Worker/前端 之间有几分钟中断窗口（旧前端跳旧域名但 callback 已改），选低峰。
 - **敏感变量不入库**：`.env` 已 gitignore；`GITHUB_CLIENT_*` 用 `wrangler secret put` 配置，不入仓库。
 - **Docker 镜像构建注意**（`Dockerfile`）：pnpm 锁 10.22.0（更新版 10.x 的 `--config.dangerouslyAllowAllBuilds` 与 `pnpm-workspace.yaml` 的 `onlyBuiltDependencies` 白名单互斥）；`.dockerignore` 严禁排除 `*.md`（`src/content/` 的 markdown 是内容本体）。
-- **GHCR 私有性**：GITHUB_TOKEN 推送的包默认 private；服务器拉取需 `docker login ghcr.io`（PAT 带 read:packages）或在 GitHub 网页将 package 设为 public。
+- **GHCR 私有性**：GITHUB_TOKEN 推送的包默认 private；服务器拉取需 `docker login ghcr.io`（PAT 带 read:packages）或在 GitHub 网页将 package 设为 public。（实测当前为 public，匿名可拉。）
+- **Docker Hub 可选通道**：`deploy-docker.yml` 支持 `DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN`（Docker Hub Access Token，Read/Write）双发；未配置 secrets 时该通道自动跳过，CI 保持绿。
 
 ### 服务器部署（docker compose）
 
@@ -122,7 +123,7 @@ worker/
 ├── deploy/nginx.conf          容器 nginx 配置（SPA/SSG 兜底 + 缓存矩阵 + md MIME）
 └── .github/workflows/
     ├── deploy-worker.yml      worker/ 变更 → wrangler-action 部署（--env production）
-    ├── deploy-docker.yml      main push → 镜像构建推送 ghcr.io/gaubee/gaubee.com（amd64）
+    ├── deploy-docker.yml      main push → 镜像构建推送 ghcr.io/gaubee/gaubee.com（amd64）；配置 DOCKERHUB_* secrets 后双发 Docker Hub
     └── main.yml               前端 → GitHub Pages，注入 VITE_AUTH_BASE（带格式校验）
 ```
 

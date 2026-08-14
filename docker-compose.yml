@@ -12,6 +12,8 @@
 
 services:
   web:
+    # 默认 GHCR 镜像；若服务器配置了 Docker Hub 加速器，可切换为：
+    #   image: docker.io/<你的DockerHub用户名>/gaubee.com:latest
     image: ghcr.io/gaubee/gaubee.com:latest
     container_name: gaubee-com
     restart: unless-stopped

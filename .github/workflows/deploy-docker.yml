@@ -1,15 +1,20 @@
 # ---------------------------------------------------------------------------
-# 构建静态站镜像并推送到 GHCR（备案合规：国内服务器 docker 部署）。
+# 构建静态站镜像并推送镜像仓库（备案合规：国内服务器 docker 部署）。
 #
 # 触发：main 分支 push（合并 feature 分支后）+ 手动 workflow_dispatch
-# 产物：ghcr.io/gaubee/gaubee.com:latest（+ git sha 短码 tag 便于回滚）
-# 服务器侧：docker-compose.yml 直接引用 latest，pull && up -d 即更新。
+# 双仓库发布：
+#   - GHCR（默认，始终推送）：ghcr.io/gaubee/gaubee.com:latest（+ sha 短码 tag）
+#   - Docker Hub（可选）：docker.io/<DOCKERHUB_USERNAME>/gaubee.com
+#     需配置 repo secrets：DOCKERHUB_USERNAME + DOCKERHUB_TOKEN（Docker Hub
+#     → Account Settings → Security → New Access Token，Read/Write 权限）。
+#     未配置时该步骤自动跳过，CI 保持绿。
+# 服务器侧：docker-compose.yml 直接引用镜像，pull && up -d 即更新。
 #
 # 与 Pages 部署（main.yml）并行不悖：Pages 保留作为境外/备用入口，
 # 主域名 DNS 由用户自行切换到国内服务器（备案合规要求）。
 # ---------------------------------------------------------------------------
 
-name: Build and Push Docker Image to GHCR
+name: Build and Push Docker Image
 
 on:
   push:
@@ -22,13 +27,8 @@ permissions:
   packages: write
 
 concurrency:
-  group: docker-ghcr
+  group: docker-publish
   cancel-in-progress: true
-
-env:
-  REGISTRY: ghcr.io
-  # 仓库名必须全小写（GHCR 要求）
-  IMAGE_NAME: gaubee/gaubee.com
 
 jobs:
   build-and-push:
@@ -39,22 +39,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=latest
-            type=sha,prefix=sha-,format=short
 
       - name: Verify VITE_AUTH_BASE
         # 防回退（与 main.yml 同逻辑）：镜像内前端的 OAuth 跳转目标必须显式生产值。
@@ -68,7 +52,24 @@ jobs:
             exit 1
           fi
 
-      - name: Build and push image
+      # ---- GHCR（默认通道，GITHUB_TOKEN 免配置）----
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: GHCR metadata (tags, labels)
+        id: meta-ghcr
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/gaubee.com
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-,format=short
+
+      - name: Build and push to GHCR
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -76,7 +77,41 @@ jobs:
           push: true
           build-args: |
             VITE_AUTH_BASE=${{ secrets.VITE_AUTH_BASE || 'https://auth.gaubee.com' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-ghcr.outputs.tags }}
+          labels: ${{ steps.meta-ghcr.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ---- Docker Hub（可选通道，配置 secrets 后自动启用）----
+      - name: Log in to Docker Hub
+        if: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Docker Hub metadata (tags, labels)
+        id: meta-dockerhub
+        if: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+        uses: docker/metadata-action@v5
+        with:
+          images: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/gaubee.com
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-,format=short
+
+      - name: Push to Docker Hub
+        # 复用上一步的 GHA layer 缓存，第二次构建秒级完成
+        if: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            VITE_AUTH_BASE=${{ secrets.VITE_AUTH_BASE || 'https://auth.gaubee.com' }}
+          tags: ${{ steps.meta-dockerhub.outputs.tags }}
+          labels: ${{ steps.meta-dockerhub.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
