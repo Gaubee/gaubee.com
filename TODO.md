@@ -1142,3 +1142,26 @@ src/lib/apps/installable/github/state/
   src/lib/apps/installable/github/issue-api.ts   uploadIssueImage 可选 path/branch
   worker/src/index.ts                            /upload/image 可选 path/branch
 ```
+
+## 底部系统状态栏 + ICP 备案（2026-08-14）
+
+页面底部新增跨路由常驻的系统状态栏（与顶部 SystemStatusBar 对偶），承载备案号等站点级信息。
+
+### 改动
+
+- 新增 `src/lib/site/site.ts`：站点级展示常量单一事实源（GitHub 源码地址 + ICP 备案号/工信部链接）。
+- 新增 `src/lib/components/layout/SystemFooterBar.svelte`：
+  - 视觉对齐顶栏（glass-surface 毛玻璃 + border-t + z-shell-base），高度减半（h-4.5 = 18px）。
+  - 条目右对齐、分割线隔开：`GitHub | 闽ICP备17026139号-1`（均新窗口 + noopener noreferrer）。
+  - iOS 安全区让位（viewport-fit=cover 下 env(safe-area-inset-bottom)）。
+  - 头部注释记录未来演进（用户设想，未实现）：抽屉化（小手柄 + Sheet 向上展开）、
+    方案一「数据中转站」（全站功能数据建模为类剪贴板结构，卡片化存储）、
+    方案二「AI 入口」（个人 AI 助理对话，WebMCP 操作 GaubeeOS 内容）。
+- SPA 布局接入：`[...path]/+layout.svelte` 在 app-workspace 之后渲染 SystemFooterBar。
+- SSG 页脚（`/pages`）补备案号链接（国标要求：备案号链接工信部备案管理系统 beian.miit.gov.cn）。
+
+### 验证
+
+- 类型检查 0 错误 0 警告；单测 445 过（2 个 shell.test.ts 失败为预存环境噪声，已 stash 对照确认与本次无关）。
+- 走查（`tests/jules-scratch/footer-bar/`）13 项全过：贴底全宽、半高（18=36/2）、右对齐、
+  分割线、链接 href/target/rel、跨路由常驻、移动端贴底、SSG 页脚；亮/暗截图视觉确认。

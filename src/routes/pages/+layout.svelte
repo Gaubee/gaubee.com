@@ -3,6 +3,8 @@
 	不依赖 NavController/authStore，纯 SSR 友好。
 -->
 <script lang="ts">
+  import { SITE } from '$lib/site/site';
+
   let { children } = $props();
 </script>
 
@@ -28,6 +30,8 @@
   <footer class="border-t border-border">
     <div class="text-muted-foreground mx-auto max-w-3xl px-4 py-6 text-center text-xs">
       © Gaubee · 内容存于 GitHub，静态生成 · <a href="/" class="underline hover:text-foreground">在编辑器打开</a>
+      <!-- ICP 备案号（国家标准：链接工信部备案管理系统，见 $lib/site/site.ts） -->
+      · <a href={SITE.beian.url} target="_blank" rel="noopener noreferrer" class="underline hover:text-foreground">{SITE.beian.label}</a>
     </div>
   </footer>
 </div>
