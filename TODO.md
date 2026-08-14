@@ -1194,3 +1194,14 @@ GitHub Pages 保留（域名 DNS 由用户自行切换）。
 
 - 本地 arm64 构建 + 容器内全链路验证：SSG/SPA/深层路由全 200、备案号渲染、
   缓存头矩阵（内容 no-cache / immutable 1y）、md MIME、gzip、搜索索引可达。
+- GHCR 生产镜像（amd64）拉取复验全过 + VITE_AUTH_BASE 注入抽查；包为 public 匿名可拉。
+
+### Docker Hub 主通道（2026-08-14 追加，应对国内拉 ghcr 极慢）
+
+- `deploy-docker.yml` 双仓库发布：GHCR（始终）+ Docker Hub（配置 `DOCKERHUB_USERNAME`/
+  `DOCKERHUB_TOKEN` secrets 后启用，复用 GHA 层缓存，第二次构建秒级；未配置自动跳过）。
+  踩坑：`secrets` context 不能直接用于 step `if`（Unrecognized named-value），经 job env 中转。
+- `docker-compose.yml` 默认镜像切到 `docker.io/gaubee/gaubee.com:latest`（主通道），
+  ghcr 备用注释保留。
+- 服务器侧加速器：优先云厂商专属（阿里云 ACR 专属地址/腾讯云内网），公共兜底
+  daocloud/南大（详见 agents.md 部署架构段）。
