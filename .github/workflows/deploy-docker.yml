@@ -37,6 +37,7 @@ jobs:
     # 经 job env 中转后用 env 比较（官方推荐模式）。
     env:
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      PANEL_WEBHOOK_URL: ${{ secrets.PANEL_WEBHOOK_URL }}
     steps:
       - name: Checkout your repository using git
         uses: actions/checkout@v4
@@ -119,3 +120,15 @@ jobs:
           labels: ${{ steps.meta-dockerhub.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # ---- 服务器自动拉取（可选：1Panel 计划任务 Webhook）----
+      # 1Panel「计划任务」建 Shell 脚本任务（pull && up -d）并开启 Webhook 触发，
+      # 把任务详情里的 Webhook URL 配为 secret PANEL_WEBHOOK_URL。
+      # 注意：镜像推送后 registry 元数据偶有索引延迟，webhook 侧脚本带重试兜底。
+      - name: Notify server to pull (1Panel webhook)
+        if: ${{ env.PANEL_WEBHOOK_URL != '' }}
+        run: |
+          sleep 10   # 等 registry 元数据可见
+          curl -fsS --retry 3 --retry-delay 5 "${{ env.PANEL_WEBHOOK_URL }}" \
+            && echo "已通知服务器拉取" \
+            || echo "::warning::Webhook 通知失败（不影响镜像发布），请检查 1Panel 计划任务的 Webhook URL"
