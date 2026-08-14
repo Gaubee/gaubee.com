@@ -60,18 +60,25 @@
 - 使用 `pnpm -w run dev` 可以启动http服务
 - 使用 `pnpm -w run check` 来获取ts类型检查，使用`pnpm -w run check:watch`可以实时监控
 
-## 部署架构（2026-07-30）
+## 部署架构（2026-08-14 更新：双通道）
 
 ### 心智模型
 
 ```
 gaubee.com（zone 在 Cloudflare）
-├── 主站静态站 ── GitHub Pages（4 条 A + www CNAME，灰云 DNS-only）
-│                 证书由 GitHub 自动签发；不可橙云代理（会致 Pages 证书验证失败/404）
+├── 主站静态站（双通道，同一构建产物）
+│   ├── 国内服务器（备案合规主通道，2026-08-14 起）
+│   │   ghcr.io/gaubee/gaubee.com 镜像 → docker compose（nginx 托管 build/）
+│   │   DNS 将 gaubee.com A 记录切至国内服务器 IP（用户自行操作）
+│   └── GitHub Pages（保留通道，4 条 A + www CNAME，灰云 DNS-only）
+│       证书由 GitHub 自动签发；不可橙云代理（会致 Pages 证书验证失败/404）
 └── auth.gaubee.com ── Cloudflare Worker「gaubae-auth」
                       经 Workers Custom Domain 绑定（自动签边缘证书 + 建路由）
                       职责：/auth/github（OAuth 发起）+ /auth/github/callback + /upload/image
 ```
+
+主站域名不变（gaubee.com），前端直连 api.github.com + OAuth 跳 auth.gaubee.com，
+故主站迁移不影响 Worker 的 CORS 白名单与 OAuth 三方一致性。
 
 ### 三方一致性（不可调和约束）
 
@@ -79,7 +86,7 @@ Worker 用 `WORKER_ORIGIN` 构造 GitHub OAuth 的 `redirect_uri`，故「Worker
 
 ```
 1. worker/wrangler.toml   WORKER_ORIGIN                 ← Worker 自身认知
-2. 前端构建注入            VITE_AUTH_BASE（GitHub Secret） ← 前端跳转目标
+2. 前端构建注入            VITE_AUTH_BASE（GitHub Secret / Dockerfile ARG，默认 https://auth.gaubee.com）
 3. GitHub OAuth App       Authorization callback URL    ← GitHub 回跳目标
 ```
 
@@ -88,19 +95,35 @@ Worker 用 `WORKER_ORIGIN` 构造 GitHub OAuth 的 `redirect_uri`，故「Worker
 ### 关键约定
 
 - **Workers Custom Domain 的硬约束**：要求 zone 在 Cloudflare nameservers 上 active。不可用裸 CNAME 指向 `*.workers.dev`——workers.dev 默认域的边缘证书不覆盖 CNAME 进来的自定义主机名，会触发 `ERR_SSL_VERSION_OR_CIPHER_MISMATCH`。
-- **CI 防回退**：`.github/workflows/main.yml` 构建前校验 `VITE_AUTH_BASE` 非空且 `https://` 开头，否则 fail（防生产回退 localhost 静默上线）。
+- **CI 防回退**：`main.yml` 与 `deploy-docker.yml` 构建前校验 `VITE_AUTH_BASE`（若配置）非空且 `https://` 开头；Dockerfile 内置同校验（默认值即生产值）。
 - **协调切换窗口**：统一 `redirect_uri` 时，改 OAuth App callback → push 部署 Worker/前端 之间有几分钟中断窗口（旧前端跳旧域名但 callback 已改），选低峰。
 - **敏感变量不入库**：`.env` 已 gitignore；`GITHUB_CLIENT_*` 用 `wrangler secret put` 配置，不入仓库。
+- **Docker 镜像构建注意**（`Dockerfile`）：pnpm 锁 10.22.0（更新版 10.x 的 `--config.dangerouslyAllowAllBuilds` 与 `pnpm-workspace.yaml` 的 `onlyBuiltDependencies` 白名单互斥）；`.dockerignore` 严禁排除 `*.md`（`src/content/` 的 markdown 是内容本体）。
+- **GHCR 私有性**：GITHUB_TOKEN 推送的包默认 private；服务器拉取需 `docker login ghcr.io`（PAT 带 read:packages）或在 GitHub 网页将 package 设为 public。
+
+### 服务器部署（docker compose）
+
+```
+# 服务器上（compose 文件见仓库根 docker-compose.yml）
+docker compose pull && docker compose up -d   # 默认宿主端口 8080，PORT 可覆盖
+# 外层用自有 nginx/caddy 反代 8080 → 443 + TLS
+```
 
 ### 文件结构
 
 ```
 worker/
 ├── wrangler.toml              WORKER_ORIGIN / APP_ORIGIN / ENVIRONMENT（本地 + 生产两段）
-├── src/index.ts               Hono Worker：/auth/github + /callback + /upload/image
+└── src/index.ts               Hono Worker：/auth/github + /callback + /upload/image
+
+/（仓库根）
+├── Dockerfile                 静态站镜像（node:22-alpine pnpm build → nginx:alpine）
+├── docker-compose.yml         服务器部署入口（引用 GHCR 镜像，PORT 可覆盖）
+├── deploy/nginx.conf          容器 nginx 配置（SPA/SSG 兜底 + 缓存矩阵 + md MIME）
 └── .github/workflows/
-    ├── deploy-worker.yml       worker/ 变更 → wrangler-action 部署（--env production）
-    └── main.yml                前端 → GitHub Pages，注入 VITE_AUTH_BASE（带格式校验）
+    ├── deploy-worker.yml      worker/ 变更 → wrangler-action 部署（--env production）
+    ├── deploy-docker.yml      main push → 镜像构建推送 ghcr.io/gaubee/gaubee.com（amd64）
+    └── main.yml               前端 → GitHub Pages，注入 VITE_AUTH_BASE（带格式校验）
 ```
 
 ## 应用服务总线架构（2026-07-23）
