@@ -37,3 +37,6 @@ CHAT.md
 # Cloudflare Worker 本地状态
 .dev.vars
 tests/jules-scratch/**/screenshots/
+
+# Rust 构建产物
+static-server/target

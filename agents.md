@@ -68,7 +68,7 @@
 gaubee.com（zone 在 Cloudflare）
 ├── 主站静态站（双通道，同一构建产物）
 │   ├── 国内服务器（备案合规主通道，2026-08-14 起）
-│   │   ghcr.io/gaubee/gaubee.com 镜像 → docker compose（nginx 托管 build/）
+│   │   ghcr.io/gaubee/gaubee.com 镜像 → docker compose（自研 Rust 静态服务托管 build/）
 │   │   DNS 将 gaubee.com A 记录切至国内服务器 IP（用户自行操作）
 │   └── GitHub Pages（保留通道，4 条 A + www CNAME，灰云 DNS-only）
 │       证书由 GitHub 自动签发；不可橙云代理（会致 Pages 证书验证失败/404）
@@ -79,6 +79,17 @@ gaubee.com（zone 在 Cloudflare）
 
 主站域名不变（gaubee.com），前端直连 api.github.com + OAuth 跳 auth.gaubee.com，
 故主站迁移不影响 Worker 的 CORS 白名单与 OAuth 三方一致性。
+
+### 静态服务器（static-server/，2026-08-15：nginx → Rust）
+
+- **选型**：axum + tower-http（Pingora 是代理/LB 框架、无静态文件模块，不适用）。
+  `ServeDir`（path 安全 + MIME + 协商缓存）+ 两级 fallback（`{path}.html` 扁平 SSG →
+  SPA index.html）+ `CompressionLayer` gzip + middleware 缓存矩阵，~150 行。
+- **镜像**：三阶段（node 站点构建 → rust:1-alpine musl 编译 → **scratch** 运行时），
+  最终镜像 ≈ 15-25MB（nginx:alpine 的一半以下）；非 root（65532）+ 容器内 8080。
+- **scratch 无 shell**：不支持 exec 型 healthcheck，探活用 `/healthz` 路由（外层反代/1Panel）。
+- **依赖层缓存**：Cargo.lock 单独 COPY + dummy main 预编译，源码变更不重编依赖。
+- 退役的 `deploy/nginx.conf` 语义已逐条迁移（四级 try_files / 缓存矩阵 / .md MIME）。
 
 ### 三方一致性（不可调和约束）
 

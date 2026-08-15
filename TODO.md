@@ -1213,3 +1213,32 @@ GitHub Pages 保留（域名 DNS 由用户自行切换）。
 - Watchtower 轮询（备）：compose 内 `profiles: [auto-update]` 可选服务，label 过滤只更
   web 容器，默认不启动；`docker compose --profile auto-update up -d` 启用。
 - 验证：compose config 双模式 services 正确（默认仅 web / profile 加 watchtower）。
+
+## 静态服务器 Rust 化：nginx → axum + tower-http（2026-08-15）
+
+用户决策：主站容器内 nginx 换 Rust 自研（体积/自主可控）。经评估矫正：Pingora 是
+代理/LB 框架（无静态文件模块），Rust 静态服务的正解是 **axum + tower-http**。
+
+### 改动
+
+- 新增 `static-server/`（Cargo.toml + src/main.rs，~150 行）：
+  - `ServeDir`（path 穿越防护 + MIME + ETag/Last-Modified 协商缓存，全内置）
+  - 两级 fallback 复刻 nginx 四级 try_files：`{path}.html`（SSG 扁平格式）→ SPA index.html
+  - `CompressionLayer` gzip；middleware 缓存矩阵（默认 no-cache / `_app/immutable` 一年
+    immutable / `.md` 显式 text/markdown）
+  - `/healthz` 路由（scratch 镜像无 shell，探活走 HTTP）
+- `Dockerfile` 三阶段重构：node 站点构建 → rust:1-alpine musl 编译（Cargo.lock 依赖层
+  缓存）→ **scratch** 运行时（非 root 65532，容器内 8080）。镜像 ~15-25MB
+  （nginx:alpine 的一半以下）。
+- `docker-compose.yml`：容器内 8080（非 root 可绑）、去 exec healthcheck（scratch 无
+  shell，注释指向 /healthz）、保留 watchtower label。
+- `deploy/nginx.conf` 退役（语义逐条迁入 main.rs，文件暂留作对照）。
+
+### auth 服务（同轮决策）
+
+用户否决 bun runtime。auth 保持 Cloudflare Workers 部署不动（wrangler deploy 通道
+保留）；容器化迁移待后续单独决策。
+
+### 验证
+
+- `cargo check` 通过；scratch 镜像全链路验证（SSG/SPA/缓存矩阵/md MIME/gzip/healthz）。
