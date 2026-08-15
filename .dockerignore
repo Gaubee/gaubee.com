@@ -5,6 +5,8 @@ node_modules
 build
 .svelte-kit
 static/search-index
+# Rust 构建产物（本机 cargo check 会产生数 GB target/，严禁进构建上下文）
+static-server/target
 .git
 .github
 .vscode

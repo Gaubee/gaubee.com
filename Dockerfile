@@ -1,11 +1,9 @@
-# syntax=docker/dockerfile:1
 # ---------------------------------------------------------------------------
 # gaubee.com 静态站镜像（备案合规：部署到国内服务器自有 Docker）。
 #
-# 构建链与 CI（.github/workflows/main.yml）保持一致：
-#   pnpm install --frozen-lockfile → pnpm build（content:prepare + vite build）
-#   → adapter-static 输出 build/（SPA fallback=index.html + /pages SSG）
-# → nginx:alpine 托管。
+# 三阶段：node 站点构建 → Rust 静态服务器编译 → scratch 运行时（~15MB 级）。
+# 运行时为自研 Rust 静态服务（static-server/，axum + tower-http），
+# 查找/缓存/MIME 语义与退役的 nginx 方案逐条对齐（见 static-server/src/main.rs 头注）。
 #
 # VITE_AUTH_BASE 三方一致性约束（见 AGENTS.md「部署架构」）：
 #   默认生产值 https://auth.gaubee.com，与 worker/wrangler.toml WORKER_ORIGIN、
@@ -13,8 +11,8 @@
 #   docker build --build-arg VITE_AUTH_BASE=https://xxx .
 # ---------------------------------------------------------------------------
 
-# ---- 阶段 1：构建静态产物 ----
-FROM node:22-alpine AS build
+# ---- 阶段 1：构建静态站点产物 ----
+FROM node:22-alpine AS site
 WORKDIR /app
 
 # pnpm@10.22.0：与本地开发环境对齐（更新的 10.x 会因 onlyBuiltDependencies
@@ -42,9 +40,25 @@ RUN <<'EOS'
   pnpm build
 EOS
 
-# ---- 阶段 2：nginx 托管 ----
-FROM nginx:alpine
-COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/build /usr/share/nginx/html
+# ---- 阶段 2：编译 Rust 静态服务器（alpine musl 静态链接）----
+FROM rust:1-alpine AS server
+WORKDIR /build
+RUN apk add --no-cache musl-dev
+# 依赖层单独缓存：仅 Cargo.toml/Cargo.lock 变更才触发依赖重编
+COPY static-server/Cargo.toml static-server/Cargo.lock ./
+RUN mkdir src && echo 'fn main() {}' > src/main.rs \
+  && cargo build --release \
+  && rm -rf src target/release/deps/gaubee_static_server*
+COPY static-server/src ./src
+RUN touch src/main.rs && cargo build --release
 
-EXPOSE 80
+# ---- 阶段 3：scratch 运行时（二进制 + 站点产物，无 shell/无基础库）----
+FROM scratch
+COPY --from=server /build/target/release/gaubee-static-server /server
+COPY --from=site /app/build /srv
+
+# 非 root 运行（scratch 无 /etc/passwd，用数字 UID/GID；8080 非 root 可绑）
+USER 65532:65532
+ENV SERVER_ROOT=/srv PORT=8080
+EXPOSE 8080
+ENTRYPOINT ["/server"]

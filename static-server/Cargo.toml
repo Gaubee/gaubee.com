@@ -1,0 +1,20 @@
+[package]
+name = "gaubee-static-server"
+version = "0.1.0"
+edition = "2021"
+description = "gaubee.com 静态站服务（axum + tower-http，替代 nginx 容器）"
+
+[dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["fs", "compression-gzip"] }
+mime_guess = "2"
+
+# 体积优先（scratch 镜像）：LTO + strip + 单 codegen unit，
+# opt-level=2 在静态文件场景与 3 无感知差异
+[profile.release]
+lto = true
+strip = true
+codegen-units = 1
+opt-level = 2
