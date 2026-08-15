@@ -79,6 +79,9 @@
       .lqip {
         display: block;
         width: 100%;
+      }
+
+      .source {
         background-color: #050708;
       }
 
@@ -114,9 +117,12 @@
 
       .mode-grid {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        /* The figure owns a 1px border on both sides; 227px leaves a 225px CSS surface. */
+        grid-template-columns: repeat(2, 227px);
         gap: 8px;
+        justify-content: start;
         margin-top: 12px;
+        overflow-x: auto;
       }
 
       .mode-grid figure {
@@ -124,7 +130,7 @@
       }
 
       .mode-grid .lqip {
-        aspect-ratio: 4 / 3;
+        aspect-ratio: 3 / 4;
       }
 
       .mode-grid figcaption {
@@ -142,9 +148,6 @@
           padding: 12px;
         }
 
-        .mode-grid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
       }
     </style>
   </head>
@@ -152,10 +155,15 @@
     <h1>Paper LQIP, rendered by CSS</h1>
     <p>The right column is the seven-layer CSS decoder. It has no image, canvas, or JavaScript.</p>
 
-    <section class="case" aria-labelledby="portrait-title">
+    <section
+      class="case"
+      data-demo-case="portrait"
+      data-artifact="reference-fahrul-azmi-Q1l1ofdVYl4-unsplash-native"
+      aria-labelledby="portrait-title"
+    >
       <h2 id="portrait-title">Portrait source: the elected result is Dual-A9 mode 3</h2>
       <div class="comparison">
-        <figure>
+        <figure data-candidate="dual-3">
           <img
             class="source portrait"
             src="./assets/fahrul-azmi-Q1l1ofdVYl4-unsplash.jpg"
@@ -170,10 +178,15 @@
       </div>
     </section>
 
-    <section class="case" aria-labelledby="landscape-title">
+    <section
+      class="case"
+      data-demo-case="landscape"
+      data-artifact="reference-fahrul-azmi-Q1l1ofdVYl4-unsplash-counter-crop"
+      aria-labelledby="landscape-title"
+    >
       <h2 id="landscape-title">Centered landscape crop: the elected result is Dual-A9 mode 2</h2>
       <div class="comparison">
-        <figure>
+        <figure data-candidate="dual-2">
           <img
             class="source landscape"
             src="./assets/fahrul-azmi-Q1l1ofdVYl4-unsplash.jpg"
@@ -188,24 +201,30 @@
       </div>
     </section>
 
-    <section class="case" aria-labelledby="modes-title">
-      <h2 id="modes-title">Four decoder modes</h2>
+    <section
+      class="case"
+      data-demo-case="mode-grid"
+      data-artifact="reference-fahrul-azmi-Q1l1ofdVYl4-unsplash-native"
+      aria-labelledby="modes-title"
+    >
+      <h2 id="modes-title">Four decoder modes from one reference sample</h2>
+      <p>Fahrul Azmi / Unsplash, native portrait artifact; all four surfaces use the same 225 x 300 render geometry.</p>
       <div class="mode-grid">
-        <figure>
-          <div class="lqip" style="--lqip: #aaa23c28; --lqipm: 0"></div>
-          <figcaption>Paper single<br /><code>mode 0</code></figcaption>
+        <figure data-candidate="single-0">
+          <div class="lqip" style="--lqip: #6a9089e0; --lqipm: 0"></div>
+          <figcaption>Paper single<br /><code>#6a9089e0 / mode 0</code></figcaption>
         </figure>
-        <figure>
-          <div class="lqip" style="--lqip: #5965fa97; --lqipm: 1"></div>
-          <figcaption>Paper single, rotated source<br /><code>mode 1</code></figcaption>
+        <figure data-candidate="single-1">
+          <div class="lqip" style="--lqip: #a59489e0; --lqipm: 1"></div>
+          <figcaption>Paper single, rotated source<br /><code>#a59489e0 / mode 1</code></figcaption>
         </figure>
-        <figure>
-          <div class="lqip" style="--lqip: #2598eb5f; --lqipm: 2"></div>
-          <figcaption>Dual-A9<br /><code>mode 2</code></figcaption>
+        <figure data-candidate="dual-2">
+          <div class="lqip" style="--lqip: #25885fb3; --lqipm: 2"></div>
+          <figcaption>Dual-A9<br /><code>#25885fb3 / mode 2</code></figcaption>
         </figure>
-        <figure>
+        <figure data-candidate="dual-3">
           <div class="lqip" style="--lqip: #608c5fb3; --lqipm: 3"></div>
-          <figcaption>Dual-A9, rotated source<br /><code>mode 3</code></figcaption>
+          <figcaption>Dual-A9, rotated source<br /><code>#608c5fb3 / mode 3</code></figcaption>
         </figure>
       </div>
     </section>
