@@ -65,13 +65,11 @@
 ### 心智模型
 
 ```
-gaubee.com（zone 在 Cloudflare）
-├── 主站静态站（双通道，同一构建产物）
-│   ├── 国内服务器（备案合规主通道，2026-08-14 起）
-│   │   ghcr.io/gaubee/gaubee.com 镜像 → docker compose（自研 Rust 静态服务托管 build/）
-│   │   DNS 将 gaubee.com A 记录切至国内服务器 IP（用户自行操作）
-│   └── GitHub Pages（保留通道，4 条 A + www CNAME，灰云 DNS-only）
-│       证书由 GitHub 自动签发；不可橙云代理（会致 Pages 证书验证失败/404）
+gaubee.com（zone 在 Cloudflare，A 记录 → 国内服务器，灰云 DNS-only）
+├── 主站静态站（国内服务器单通道，2026-08-15 起）
+│   docker.io/gaubee/gaubee.com 镜像（Rust scratch）→ docker compose
+│   外层反代 8080 → 443 + TLS（1Panel 管）
+│   （GitHub Pages 部署已随 DNS 切换退役，最后部署版本留作灾备快照不再更新）
 └── auth.gaubee.com ── Cloudflare Worker「gaubae-auth」
                       经 Workers Custom Domain 绑定（自动签边缘证书 + 建路由）
                       职责：/auth/github（OAuth 发起）+ /auth/github/callback + /upload/image
@@ -106,7 +104,7 @@ Worker 用 `WORKER_ORIGIN` 构造 GitHub OAuth 的 `redirect_uri`，故「Worker
 ### 关键约定
 
 - **Workers Custom Domain 的硬约束**：要求 zone 在 Cloudflare nameservers 上 active。不可用裸 CNAME 指向 `*.workers.dev`——workers.dev 默认域的边缘证书不覆盖 CNAME 进来的自定义主机名，会触发 `ERR_SSL_VERSION_OR_CIPHER_MISMATCH`。
-- **CI 防回退**：`main.yml` 与 `deploy-docker.yml` 构建前校验 `VITE_AUTH_BASE`（若配置）非空且 `https://` 开头；Dockerfile 内置同校验（默认值即生产值）。
+- **CI 防回退**：`deploy-docker.yml` 构建前校验 `VITE_AUTH_BASE`（若配置）非空且 `https://` 开头；Dockerfile 内置同校验（默认值即生产值）。
 - **协调切换窗口**：统一 `redirect_uri` 时，改 OAuth App callback → push 部署 Worker/前端 之间有几分钟中断窗口（旧前端跳旧域名但 callback 已改），选低峰。
 - **敏感变量不入库**：`.env` 已 gitignore；`GITHUB_CLIENT_*` 用 `wrangler secret put` 配置，不入仓库。
 - **Docker 镜像构建注意**（`Dockerfile`）：pnpm 锁 10.22.0（更新版 10.x 的 `--config.dangerouslyAllowAllBuilds` 与 `pnpm-workspace.yaml` 的 `onlyBuiltDependencies` 白名单互斥）；`.dockerignore` 严禁排除 `*.md`（`src/content/` 的 markdown 是内容本体）。
@@ -151,8 +149,8 @@ worker/
 ├── deploy/nginx.conf          容器 nginx 配置（SPA/SSG 兜底 + 缓存矩阵 + md MIME）
 └── .github/workflows/
     ├── deploy-worker.yml      worker/ 变更 → wrangler-action 部署（--env production）
-    ├── deploy-docker.yml      main push → 镜像构建推送 ghcr.io/gaubee/gaubee.com（amd64）；配置 DOCKERHUB_* secrets 后双发 Docker Hub
-    └── main.yml               前端 → GitHub Pages，注入 VITE_AUTH_BASE（带格式校验）
+    └── deploy-docker.yml      main push → 镜像构建推送 ghcr.io/gaubee/gaubee.com（amd64）；配置 DOCKERHUB_* secrets 后双发 Docker Hub
+                                （main.yml Pages 部署已随 DNS 切换国内而退役删除，2026-08-15）
 ```
 
 ## 应用服务总线架构（2026-07-23）
