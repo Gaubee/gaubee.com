@@ -1242,3 +1242,9 @@ GitHub Pages 保留（域名 DNS 由用户自行切换）。
 ### 验证
 
 - `cargo check` 通过；scratch 镜像全链路验证（SSG/SPA/缓存矩阵/md MIME/gzip/healthz）。
+
+## GitHub Pages 部署退役（2026-08-15）
+
+DNS 已切国内服务器（阿里云北京），国内容器（Rust scratch 版）上线并验证
+（8080 /healthz 200）。Pages 通道的过渡期兜底价值消失，删除 `main.yml`；
+Pages 上最后部署版本留作灾备快照（不再更新）。前端发布单通道 = docker 镜像。
