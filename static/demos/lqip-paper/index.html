@@ -1,0 +1,218 @@
+<!--
+  Intent (2026-08-15; lqip-blurhash article demo):
+  1. Compare a real research source with the encoded CSS-only result.
+  2. Demonstrate the selected mode 2/3 payloads from the same source and crop.
+  3. Keep the page static: the LQIP surfaces use only #RRGGBBAA and --lqipm.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Paper LQIP CSS demo</title>
+    <link rel="stylesheet" href="./lqip.css" />
+    <style>
+      :root {
+        color-scheme: dark;
+        font:
+          14px/1.4 ui-sans-serif,
+          system-ui,
+          sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 18px;
+        background: #111619;
+        color: #edf0f1;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 20px;
+      }
+
+      h2 {
+        font-size: 14px;
+      }
+
+      p {
+        margin-top: 6px;
+        color: #aab7bc;
+      }
+
+      .case {
+        padding-block: 18px;
+        border-top: 1px solid #35434a;
+      }
+
+      .case:first-of-type {
+        margin-top: 18px;
+      }
+
+      .comparison {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 12px;
+      }
+
+      figure {
+        min-width: 0;
+        margin: 0;
+        overflow: hidden;
+        border: 1px solid #35434a;
+        border-radius: 6px;
+        background: #1b2327;
+      }
+
+      .source,
+      .lqip {
+        display: block;
+        width: 100%;
+        background-color: #050708;
+      }
+
+      .source {
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+      }
+
+      .portrait {
+        aspect-ratio: 3 / 4;
+      }
+
+      .landscape {
+        aspect-ratio: 3 / 2;
+      }
+
+      figcaption {
+        min-height: 58px;
+        padding: 8px;
+        color: #cbd6da;
+        font-size: 11px;
+      }
+
+      code {
+        color: #8fe1b0;
+        font:
+          11px/1.5 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+      }
+
+      .mode-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .mode-grid figure {
+        border-radius: 4px;
+      }
+
+      .mode-grid .lqip {
+        aspect-ratio: 4 / 3;
+      }
+
+      .mode-grid figcaption {
+        min-height: 54px;
+        font-size: 10px;
+      }
+
+      .note {
+        margin-top: 14px;
+        font-size: 11px;
+      }
+
+      @media (max-width: 540px) {
+        body {
+          padding: 12px;
+        }
+
+        .mode-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Paper LQIP, rendered by CSS</h1>
+    <p>The right column is the seven-layer CSS decoder. It has no image, canvas, or JavaScript.</p>
+
+    <section class="case" aria-labelledby="portrait-title">
+      <h2 id="portrait-title">Portrait source: the elected result is Dual-A9 mode 3</h2>
+      <div class="comparison">
+        <figure>
+          <img
+            class="source portrait"
+            src="./assets/fahrul-azmi-Q1l1ofdVYl4-unsplash.jpg"
+            alt="Portrait source photograph"
+          />
+          <figcaption>Source photograph<br />225 x 300</figcaption>
+        </figure>
+        <figure>
+          <div class="lqip portrait" style="--lqip: #608c5fb3; --lqipm: 3"></div>
+          <figcaption>CSS LQIP<br /><code>#608c5fb3 / mode 3</code></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="case" aria-labelledby="landscape-title">
+      <h2 id="landscape-title">Centered landscape crop: the elected result is Dual-A9 mode 2</h2>
+      <div class="comparison">
+        <figure>
+          <img
+            class="source landscape"
+            src="./assets/fahrul-azmi-Q1l1ofdVYl4-unsplash.jpg"
+            alt="Centered landscape crop of the source photograph"
+          />
+          <figcaption>Source photograph<br />225 x 150 centered crop</figcaption>
+        </figure>
+        <figure>
+          <div class="lqip landscape" style="--lqip: #2598eb5f; --lqipm: 2"></div>
+          <figcaption>CSS LQIP<br /><code>#2598eb5f / mode 2</code></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="case" aria-labelledby="modes-title">
+      <h2 id="modes-title">Four decoder modes</h2>
+      <div class="mode-grid">
+        <figure>
+          <div class="lqip" style="--lqip: #aaa23c28; --lqipm: 0"></div>
+          <figcaption>Paper single<br /><code>mode 0</code></figcaption>
+        </figure>
+        <figure>
+          <div class="lqip" style="--lqip: #5965fa97; --lqipm: 1"></div>
+          <figcaption>Paper single, rotated source<br /><code>mode 1</code></figcaption>
+        </figure>
+        <figure>
+          <div class="lqip" style="--lqip: #2598eb5f; --lqipm: 2"></div>
+          <figcaption>Dual-A9<br /><code>mode 2</code></figcaption>
+        </figure>
+        <figure>
+          <div class="lqip" style="--lqip: #608c5fb3; --lqipm: 3"></div>
+          <figcaption>Dual-A9, rotated source<br /><code>mode 3</code></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <p class="note">
+      Photo: Fahrul Azmi / Unsplash. Green election outlines belong to the research pages and are
+      intentionally absent here.
+    </p>
+  </body>
+</html>

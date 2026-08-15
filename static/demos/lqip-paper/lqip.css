@@ -1,0 +1,382 @@
+/*
+ * Intent (2026-08-15; user request: finalize Paper single and Dual-A9 modes):
+ * 1. Decode one #RRGGBBAA payload into the frozen six-cell Paper light field.
+ * 2. Decode modes 0/1 as one L6+a6+b6 Oklab colour and modes 2/3 as two A9 colours.
+ * 3. Map the +90 degree source encoding of odd modes back into original coordinates.
+ *
+ * The 32-bit payload stores ca..cf in R/G, mode in G bits 3..2, and the
+ * scheme-specific 18-bit colour field in G bits 1..0 plus B/A. --lqipm must
+ * equal the payload mode; CSS cannot compare those independently decoded values.
+ */
+
+@property --lqip {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: #00000000;
+}
+@property --lqipm {
+  syntax: "<integer>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.lqip {
+  /* r=ca|cb|cc|cd, g=ce|cf|mode2|colour-high2, b=colour-a, alpha=colour-b. */
+  /* Odd modes encode a +90deg source. The final base field is mapped back to
+   * the original vertical canvas; the light-field geometry has its own mapping
+   * below and must not determine the base-gradient axis. */
+  --lqipm-rotation: mod(var(--lqipm), 2);
+  --lqipm-scheme: round(down, calc(var(--lqipm) / 2));
+
+  --lqip-ca-clr: rgb(
+    from var(--lqip) calc(mod(round(down, r / 64), 4) * 51 + 51)
+      calc(mod(round(down, r / 64), 4) * 51 + 51) calc(mod(round(down, r / 64), 4) * 51 + 51) / 1
+  );
+  --lqip-cb-clr: rgb(
+    from var(--lqip) calc(mod(round(down, r / 16), 4) * 51 + 51)
+      calc(mod(round(down, r / 16), 4) * 51 + 51) calc(mod(round(down, r / 16), 4) * 51 + 51) / 1
+  );
+  --lqip-cc-clr: rgb(
+    from var(--lqip) calc(mod(round(down, r / 4), 4) * 51 + 51)
+      calc(mod(round(down, r / 4), 4) * 51 + 51) calc(mod(round(down, r / 4), 4) * 51 + 51) / 1
+  );
+  --lqip-cd-clr: rgb(
+    from var(--lqip) calc(mod(r, 4) * 51 + 51) calc(mod(r, 4) * 51 + 51) calc(mod(r, 4) * 51 + 51) /
+      1
+  );
+  --lqip-ce-clr: rgb(
+    from var(--lqip) calc(mod(round(down, g / 64), 4) * 51 + 51)
+      calc(mod(round(down, g / 64), 4) * 51 + 51) calc(mod(round(down, g / 64), 4) * 51 + 51) / 1
+  );
+  --lqip-cf-clr: rgb(
+    from var(--lqip) calc(mod(round(down, g / 16), 4) * 51 + 51)
+      calc(mod(round(down, g / 16), 4) * 51 + 51) calc(mod(round(down, g / 16), 4) * 51 + 51) / 1
+  );
+
+  /* CSS variables are resolved inside the rgb(from var(--lqip) ...) contexts below. */
+  --paper-single-code: calc(mod(g, 4) * 65536 + b * 256 + alpha * 255);
+  --paper-single-l: calc(round(down, var(--paper-single-code) / 4096) / 63 * 0.6 + 0.2);
+  --paper-single-a: calc(mod(round(down, var(--paper-single-code) / 64), 64) / 64 * 0.7 - 0.35);
+  --paper-single-lab-b: calc((mod(var(--paper-single-code), 64) + 1) / 64 * 0.7 - 0.35);
+
+  --paper-a-code: calc(mod(round(down, g / 2), 2) * 256 + b);
+  --paper-a-l: calc(round(down, var(--paper-a-code) / 64) / 7 * 0.6 + 0.2);
+  --paper-a-a: calc(mod(round(down, var(--paper-a-code) / 8), 8) / 8 * 0.7 - 0.35);
+  --paper-a-lab-b: calc((mod(var(--paper-a-code), 8) + 1) / 8 * 0.7 - 0.35);
+
+  --paper-b-code: calc(mod(g, 2) * 256 + alpha * 255);
+  --paper-b-l: calc(round(down, var(--paper-b-code) / 64) / 7 * 0.6 + 0.2);
+  --paper-b-a: calc(mod(round(down, var(--paper-b-code) / 8), 8) / 8 * 0.7 - 0.35);
+  --paper-b-lab-b: calc((mod(var(--paper-b-code), 8) + 1) / 8 * 0.7 - 0.35);
+
+  --paper-single-lms-l: calc(
+    var(--paper-single-l) + 0.3963377774 * var(--paper-single-a) + 0.2158037573 *
+      var(--paper-single-lab-b)
+  );
+  --paper-single-lms-m: calc(
+    var(--paper-single-l) - 0.1055613458 * var(--paper-single-a) - 0.0638541728 *
+      var(--paper-single-lab-b)
+  );
+  --paper-single-lms-s: calc(
+    var(--paper-single-l) - 0.0894841775 * var(--paper-single-a) - 1.291485548 *
+      var(--paper-single-lab-b)
+  );
+  --paper-a-lms-l: calc(
+    var(--paper-a-l) + 0.3963377774 * var(--paper-a-a) + 0.2158037573 * var(--paper-a-lab-b)
+  );
+  --paper-a-lms-m: calc(
+    var(--paper-a-l) - 0.1055613458 * var(--paper-a-a) - 0.0638541728 * var(--paper-a-lab-b)
+  );
+  --paper-a-lms-s: calc(
+    var(--paper-a-l) - 0.0894841775 * var(--paper-a-a) - 1.291485548 * var(--paper-a-lab-b)
+  );
+  --paper-b-lms-l: calc(
+    var(--paper-b-l) + 0.3963377774 * var(--paper-b-a) + 0.2158037573 * var(--paper-b-lab-b)
+  );
+  --paper-b-lms-m: calc(
+    var(--paper-b-l) - 0.1055613458 * var(--paper-b-a) - 0.0638541728 * var(--paper-b-lab-b)
+  );
+  --paper-b-lms-s: calc(
+    var(--paper-b-l) - 0.0894841775 * var(--paper-b-a) - 1.291485548 * var(--paper-b-lab-b)
+  );
+
+  --paper-single-r-linear: min(
+    1,
+    max(
+      0,
+      calc(
+        4.0767416621 * pow(var(--paper-single-lms-l), 3) - 3.3077115913 *
+          pow(var(--paper-single-lms-m), 3) + 0.2309699292 * pow(var(--paper-single-lms-s), 3)
+      )
+    )
+  );
+  --paper-single-g-linear: min(
+    1,
+    max(
+      0,
+      calc(
+        -1.2684380046 * pow(var(--paper-single-lms-l), 3) + 2.6097574011 *
+          pow(var(--paper-single-lms-m), 3) - 0.3413193965 * pow(var(--paper-single-lms-s), 3)
+      )
+    )
+  );
+  --paper-single-b-linear: min(
+    1,
+    max(
+      0,
+      calc(
+        -0.0041960863 * pow(var(--paper-single-lms-l), 3) - 0.7034186147 *
+          pow(var(--paper-single-lms-m), 3) + 1.707614701 * pow(var(--paper-single-lms-s), 3)
+      )
+    )
+  );
+  --paper-a-r-linear: min(
+    1,
+    max(
+      0,
+      calc(
+        4.0767416621 * pow(var(--paper-a-lms-l), 3) - 3.3077115913 * pow(var(--paper-a-lms-m), 3) +
+          0.2309699292 * pow(var(--paper-a-lms-s), 3)
+      )
+    )
+  );
+  --paper-a-g-linear: min(
+    1,
+    max(
+      0,
+      calc(
+        -1.2684380046 * pow(var(--paper-a-lms-l), 3) + 2.6097574011 * pow(var(--paper-a-lms-m), 3) -
+          0.3413193965 * pow(var(--paper-a-lms-s), 3)
+      )
+    )
+  );
+  --paper-a-b-linear: min(
+    1,
+    max(
+      0,
+      calc(
+        -0.0041960863 * pow(var(--paper-a-lms-l), 3) - 0.7034186147 * pow(var(--paper-a-lms-m), 3) +
+          1.707614701 * pow(var(--paper-a-lms-s), 3)
+      )
+    )
+  );
+  --paper-b-r-linear: min(
+    1,
+    max(
+      0,
+      calc(
+        4.0767416621 * pow(var(--paper-b-lms-l), 3) - 3.3077115913 * pow(var(--paper-b-lms-m), 3) +
+          0.2309699292 * pow(var(--paper-b-lms-s), 3)
+      )
+    )
+  );
+  --paper-b-g-linear: min(
+    1,
+    max(
+      0,
+      calc(
+        -1.2684380046 * pow(var(--paper-b-lms-l), 3) + 2.6097574011 * pow(var(--paper-b-lms-m), 3) -
+          0.3413193965 * pow(var(--paper-b-lms-s), 3)
+      )
+    )
+  );
+  --paper-b-b-linear: min(
+    1,
+    max(
+      0,
+      calc(
+        -0.0041960863 * pow(var(--paper-b-lms-l), 3) - 0.7034186147 * pow(var(--paper-b-lms-m), 3) +
+          1.707614701 * pow(var(--paper-b-lms-s), 3)
+      )
+    )
+  );
+
+  --paper-single-r-hi: min(
+    1,
+    max(0, round(up, calc(var(--paper-single-r-linear) / 0.0031308 - 1)))
+  );
+  --paper-single-g-hi: min(
+    1,
+    max(0, round(up, calc(var(--paper-single-g-linear) / 0.0031308 - 1)))
+  );
+  --paper-single-b-hi: min(
+    1,
+    max(0, round(up, calc(var(--paper-single-b-linear) / 0.0031308 - 1)))
+  );
+  --paper-a-r-hi: min(1, max(0, round(up, calc(var(--paper-a-r-linear) / 0.0031308 - 1))));
+  --paper-a-g-hi: min(1, max(0, round(up, calc(var(--paper-a-g-linear) / 0.0031308 - 1))));
+  --paper-a-b-hi: min(1, max(0, round(up, calc(var(--paper-a-b-linear) / 0.0031308 - 1))));
+  --paper-b-r-hi: min(1, max(0, round(up, calc(var(--paper-b-r-linear) / 0.0031308 - 1))));
+  --paper-b-g-hi: min(1, max(0, round(up, calc(var(--paper-b-g-linear) / 0.0031308 - 1))));
+  --paper-b-b-hi: min(1, max(0, round(up, calc(var(--paper-b-b-linear) / 0.0031308 - 1))));
+
+  --paper-single-r: calc(
+    12.92 * var(--paper-single-r-linear) * (1 - var(--paper-single-r-hi)) +
+      (1.055 * pow(var(--paper-single-r-linear), calc(1 / 2.4)) - 0.055) * var(--paper-single-r-hi)
+  );
+  --paper-single-g: calc(
+    12.92 * var(--paper-single-g-linear) * (1 - var(--paper-single-g-hi)) +
+      (1.055 * pow(var(--paper-single-g-linear), calc(1 / 2.4)) - 0.055) * var(--paper-single-g-hi)
+  );
+  --paper-single-srgb-b: calc(
+    12.92 * var(--paper-single-b-linear) * (1 - var(--paper-single-b-hi)) +
+      (1.055 * pow(var(--paper-single-b-linear), calc(1 / 2.4)) - 0.055) * var(--paper-single-b-hi)
+  );
+  --paper-a-r: calc(
+    12.92 * var(--paper-a-r-linear) * (1 - var(--paper-a-r-hi)) +
+      (1.055 * pow(var(--paper-a-r-linear), calc(1 / 2.4)) - 0.055) * var(--paper-a-r-hi)
+  );
+  --paper-a-g: calc(
+    12.92 * var(--paper-a-g-linear) * (1 - var(--paper-a-g-hi)) +
+      (1.055 * pow(var(--paper-a-g-linear), calc(1 / 2.4)) - 0.055) * var(--paper-a-g-hi)
+  );
+  --paper-a-srgb-b: calc(
+    12.92 * var(--paper-a-b-linear) * (1 - var(--paper-a-b-hi)) +
+      (1.055 * pow(var(--paper-a-b-linear), calc(1 / 2.4)) - 0.055) * var(--paper-a-b-hi)
+  );
+  --paper-b-r: calc(
+    12.92 * var(--paper-b-r-linear) * (1 - var(--paper-b-r-hi)) +
+      (1.055 * pow(var(--paper-b-r-linear), calc(1 / 2.4)) - 0.055) * var(--paper-b-r-hi)
+  );
+  --paper-b-g: calc(
+    12.92 * var(--paper-b-g-linear) * (1 - var(--paper-b-g-hi)) +
+      (1.055 * pow(var(--paper-b-g-linear), calc(1 / 2.4)) - 0.055) * var(--paper-b-g-hi)
+  );
+  --paper-b-srgb-b: calc(
+    12.92 * var(--paper-b-b-linear) * (1 - var(--paper-b-b-hi)) +
+      (1.055 * pow(var(--paper-b-b-linear), calc(1 / 2.4)) - 0.055) * var(--paper-b-b-hi)
+  );
+
+  --paper-base-single-clr: rgb(
+    from var(--lqip) calc(255 * var(--paper-single-r)) calc(255 * var(--paper-single-g))
+      calc(255 * var(--paper-single-srgb-b)) / 1
+  );
+  --paper-base-a-clr: rgb(
+    from var(--lqip) calc(255 * var(--paper-a-r)) calc(255 * var(--paper-a-g))
+      calc(255 * var(--paper-a-srgb-b)) / 1
+  );
+  --paper-base-b-clr: rgb(
+    from var(--lqip) calc(255 * var(--paper-b-r)) calc(255 * var(--paper-b-g))
+      calc(255 * var(--paper-b-srgb-b)) / 1
+  );
+  /* The encoder's base field is an Oklab interpolation. Keep the CSS endpoint
+   * selection in the same space; an sRGB mix creates a different hue path. */
+  --paper-base-start: color-mix(
+    in oklab,
+    var(--paper-base-single-clr) calc((1 - var(--lqipm-scheme)) * 100%),
+    var(--paper-base-a-clr) calc(var(--lqipm-scheme) * 100%)
+  );
+  --paper-base-end: color-mix(
+    in oklab,
+    var(--paper-base-single-clr) calc((1 - var(--lqipm-scheme)) * 100%),
+    var(--paper-base-b-clr) calc(var(--lqipm-scheme) * 100%)
+  );
+  /* A rotated source's vertical field returns as a horizontal field after CSS -90deg. */
+  --paper-base-angle: calc((1 - var(--lqipm-rotation)) * 180deg + var(--lqipm-rotation) * 90deg);
+
+  --lqip-stop10: 2%;
+  --lqip-stop20: 8%;
+  --lqip-stop30: 18%;
+  --lqip-stop40: 32%;
+  --paper-rx: calc((1 - var(--lqipm-rotation)) * 50% + var(--lqipm-rotation) * 75%);
+  --paper-ry: calc((1 - var(--lqipm-rotation)) * 75% + var(--lqipm-rotation) * 50%);
+  --paper-ca-x: calc((1 - var(--lqipm-rotation)) * 16.67% + var(--lqipm-rotation) * 25%);
+  --paper-ca-y: calc((1 - var(--lqipm-rotation)) * 25% + var(--lqipm-rotation) * 83.33%);
+  --paper-cb-x: calc((1 - var(--lqipm-rotation)) * 50% + var(--lqipm-rotation) * 25%);
+  --paper-cb-y: calc((1 - var(--lqipm-rotation)) * 25% + var(--lqipm-rotation) * 50%);
+  --paper-cc-x: calc((1 - var(--lqipm-rotation)) * 83.33% + var(--lqipm-rotation) * 25%);
+  --paper-cc-y: calc((1 - var(--lqipm-rotation)) * 25% + var(--lqipm-rotation) * 16.67%);
+  --paper-cd-x: calc((1 - var(--lqipm-rotation)) * 16.67% + var(--lqipm-rotation) * 75%);
+  --paper-cd-y: calc((1 - var(--lqipm-rotation)) * 75% + var(--lqipm-rotation) * 83.33%);
+  --paper-ce-x: calc((1 - var(--lqipm-rotation)) * 50% + var(--lqipm-rotation) * 75%);
+  --paper-ce-y: calc((1 - var(--lqipm-rotation)) * 75% + var(--lqipm-rotation) * 50%);
+  --paper-cf-x: calc((1 - var(--lqipm-rotation)) * 83.33% + var(--lqipm-rotation) * 75%);
+  --paper-cf-y: calc((1 - var(--lqipm-rotation)) * 75% + var(--lqipm-rotation) * 16.67%);
+
+  background-blend-mode:
+    hard-light, hard-light, hard-light, hard-light, hard-light, hard-light, normal;
+  background-image:
+    radial-gradient(
+      var(--paper-rx) var(--paper-ry) at var(--paper-ca-x) var(--paper-ca-y),
+      var(--lqip-ca-clr),
+      rgb(from var(--lqip-ca-clr) r g b / calc(100% - var(--lqip-stop10))) 10%,
+      rgb(from var(--lqip-ca-clr) r g b / calc(100% - var(--lqip-stop20))) 20%,
+      rgb(from var(--lqip-ca-clr) r g b / calc(100% - var(--lqip-stop30))) 30%,
+      rgb(from var(--lqip-ca-clr) r g b / calc(100% - var(--lqip-stop40))) 40%,
+      rgb(from var(--lqip-ca-clr) r g b / calc(var(--lqip-stop40))) 60%,
+      rgb(from var(--lqip-ca-clr) r g b / calc(var(--lqip-stop30))) 70%,
+      rgb(from var(--lqip-ca-clr) r g b / calc(var(--lqip-stop20))) 80%,
+      rgb(from var(--lqip-ca-clr) r g b / calc(var(--lqip-stop10))) 90%,
+      transparent
+    ),
+    radial-gradient(
+      var(--paper-rx) var(--paper-ry) at var(--paper-cb-x) var(--paper-cb-y),
+      var(--lqip-cb-clr),
+      rgb(from var(--lqip-cb-clr) r g b / calc(100% - var(--lqip-stop10))) 10%,
+      rgb(from var(--lqip-cb-clr) r g b / calc(100% - var(--lqip-stop20))) 20%,
+      rgb(from var(--lqip-cb-clr) r g b / calc(100% - var(--lqip-stop30))) 30%,
+      rgb(from var(--lqip-cb-clr) r g b / calc(100% - var(--lqip-stop40))) 40%,
+      rgb(from var(--lqip-cb-clr) r g b / calc(var(--lqip-stop40))) 60%,
+      rgb(from var(--lqip-cb-clr) r g b / calc(var(--lqip-stop30))) 70%,
+      rgb(from var(--lqip-cb-clr) r g b / calc(var(--lqip-stop20))) 80%,
+      rgb(from var(--lqip-cb-clr) r g b / calc(var(--lqip-stop10))) 90%,
+      transparent
+    ),
+    radial-gradient(
+      var(--paper-rx) var(--paper-ry) at var(--paper-cc-x) var(--paper-cc-y),
+      var(--lqip-cc-clr),
+      rgb(from var(--lqip-cc-clr) r g b / calc(100% - var(--lqip-stop10))) 10%,
+      rgb(from var(--lqip-cc-clr) r g b / calc(100% - var(--lqip-stop20))) 20%,
+      rgb(from var(--lqip-cc-clr) r g b / calc(100% - var(--lqip-stop30))) 30%,
+      rgb(from var(--lqip-cc-clr) r g b / calc(100% - var(--lqip-stop40))) 40%,
+      rgb(from var(--lqip-cc-clr) r g b / calc(var(--lqip-stop40))) 60%,
+      rgb(from var(--lqip-cc-clr) r g b / calc(var(--lqip-stop30))) 70%,
+      rgb(from var(--lqip-cc-clr) r g b / calc(var(--lqip-stop20))) 80%,
+      rgb(from var(--lqip-cc-clr) r g b / calc(var(--lqip-stop10))) 90%,
+      transparent
+    ),
+    radial-gradient(
+      var(--paper-rx) var(--paper-ry) at var(--paper-cd-x) var(--paper-cd-y),
+      var(--lqip-cd-clr),
+      rgb(from var(--lqip-cd-clr) r g b / calc(100% - var(--lqip-stop10))) 10%,
+      rgb(from var(--lqip-cd-clr) r g b / calc(100% - var(--lqip-stop20))) 20%,
+      rgb(from var(--lqip-cd-clr) r g b / calc(100% - var(--lqip-stop30))) 30%,
+      rgb(from var(--lqip-cd-clr) r g b / calc(100% - var(--lqip-stop40))) 40%,
+      rgb(from var(--lqip-cd-clr) r g b / calc(var(--lqip-stop40))) 60%,
+      rgb(from var(--lqip-cd-clr) r g b / calc(var(--lqip-stop30))) 70%,
+      rgb(from var(--lqip-cd-clr) r g b / calc(var(--lqip-stop20))) 80%,
+      rgb(from var(--lqip-cd-clr) r g b / calc(var(--lqip-stop10))) 90%,
+      transparent
+    ),
+    radial-gradient(
+      var(--paper-rx) var(--paper-ry) at var(--paper-ce-x) var(--paper-ce-y),
+      var(--lqip-ce-clr),
+      rgb(from var(--lqip-ce-clr) r g b / calc(100% - var(--lqip-stop10))) 10%,
+      rgb(from var(--lqip-ce-clr) r g b / calc(100% - var(--lqip-stop20))) 20%,
+      rgb(from var(--lqip-ce-clr) r g b / calc(100% - var(--lqip-stop30))) 30%,
+      rgb(from var(--lqip-ce-clr) r g b / calc(100% - var(--lqip-stop40))) 40%,
+      rgb(from var(--lqip-ce-clr) r g b / calc(var(--lqip-stop40))) 60%,
+      rgb(from var(--lqip-ce-clr) r g b / calc(var(--lqip-stop30))) 70%,
+      rgb(from var(--lqip-ce-clr) r g b / calc(var(--lqip-stop20))) 80%,
+      rgb(from var(--lqip-ce-clr) r g b / calc(var(--lqip-stop10))) 90%,
+      transparent
+    ),
+    radial-gradient(
+      var(--paper-rx) var(--paper-ry) at var(--paper-cf-x) var(--paper-cf-y),
+      var(--lqip-cf-clr),
+      rgb(from var(--lqip-cf-clr) r g b / calc(100% - var(--lqip-stop10))) 10%,
+      rgb(from var(--lqip-cf-clr) r g b / calc(100% - var(--lqip-stop20))) 20%,
+      rgb(from var(--lqip-cf-clr) r g b / calc(100% - var(--lqip-stop30))) 30%,
+      rgb(from var(--lqip-cf-clr) r g b / calc(100% - var(--lqip-stop40))) 40%,
+      rgb(from var(--lqip-cf-clr) r g b / calc(var(--lqip-stop40))) 60%,
+      rgb(from var(--lqip-cf-clr) r g b / calc(var(--lqip-stop30))) 70%,
+      rgb(from var(--lqip-cf-clr) r g b / calc(var(--lqip-stop20))) 80%,
+      rgb(from var(--lqip-cf-clr) r g b / calc(var(--lqip-stop10))) 90%,
+      transparent
+    ),
+    linear-gradient(
+      var(--paper-base-angle) in oklab,
+      var(--paper-base-start),
+      var(--paper-base-end)
+    );
+}
