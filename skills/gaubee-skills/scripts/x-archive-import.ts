@@ -50,7 +50,7 @@ async function main() {
     process.exit(1);
   }
 
-  const stats = { tweet: 0, like: 0, bookmark: 0, skipped: 0 };
+  const stats = { tweet: 0, like: 0, bookmark: 0, enriched: 0, skipped: 0 };
   const archiveDate = localDate();
 
   // 发帖（含全文；转发在归档里也是一条自己的 tweet，text 以 RT 开头）
@@ -105,7 +105,8 @@ async function main() {
     }
   }
 
-  // 点赞（只有 tweetId + 时间，文本留待浏览器增量补全）
+  // 点赞：档案自带 fullText（2026-10-05 实测 2188/2190，此前误标 "(archive)" 丢弃）——
+  // 新条目直接带正文；已有占位条目用档案正文富化；浏览器条目（有真实文本）不覆盖
   const likeFile = path.join(dir, "like.js");
   if (existsSync(likeFile)) {
     for (const e of await parseArchiveJs(likeFile)) {
@@ -115,15 +116,21 @@ async function main() {
         stats.skipped++;
         continue;
       }
+      const fullText: string = like.fullText ?? "";
       const existing = store.items[id];
       // 点赞不会覆盖已有分类（同一条 tweet 已因发帖/收藏入库时保留原 kind）
       if (existing) {
-        stats.skipped++;
+        if (existing.text === "(archive)" && fullText) {
+          existing.text = fullText;
+          stats.enriched++;
+        } else {
+          stats.skipped++;
+        }
         continue;
       }
       store.items[id] = {
         id,
-        text: "(archive)",
+        text: fullText || "(archive)",
         created_at: toIso(like.createdAt ?? ""),
         kind: "liked",
       };
@@ -160,7 +167,7 @@ async function main() {
   mkdirSync(SRC, { recursive: true });
   writeFileAtomic(storeFile, JSON.stringify(store, null, 1));
   console.log(
-    `archive 回灌完成（${archiveDate}）：+tweet ${stats.tweet}、+like ${stats.like}、+bookmark ${stats.bookmark}，跳过已有 ${stats.skipped}，库存 ${Object.keys(store.items).length}`,
+    `archive 回灌完成（${archiveDate}）：+tweet ${stats.tweet}、+like ${stats.like}、+bookmark ${stats.bookmark}、富化正文 ${stats.enriched}，跳过已有 ${stats.skipped}，库存 ${Object.keys(store.items).length}`,
   );
 }
 
