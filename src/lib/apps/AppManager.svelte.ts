@@ -68,6 +68,7 @@ export const SYSTEM_APP_IDS = [
   "account",
   "app-store",
   "theme",
+  "skill-graph",
 ] as const;
 
 /** 默认安装的应用 ID（可卸载）。 */

@@ -38,6 +38,7 @@ jobs:
     env:
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
       PANEL_WEBHOOK_URL: ${{ secrets.PANEL_WEBHOOK_URL }}
+      WATCHTOWER_WEBHOOK_URL: ${{ secrets.WATCHTOWER_WEBHOOK_URL }}
     steps:
       - name: Checkout your repository using git
         uses: actions/checkout@v4
@@ -121,14 +122,25 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # ---- 服务器自动拉取（可选：1Panel 计划任务 Webhook）----
-      # 1Panel「计划任务」建 Shell 脚本任务（pull && up -d）并开启 Webhook 触发，
-      # 把任务详情里的 Webhook URL 配为 secret PANEL_WEBHOOK_URL。
-      # 注意：镜像推送后 registry 元数据偶有索引延迟，webhook 侧脚本带重试兜底。
-      - name: Notify server to pull (1Panel webhook)
-        if: ${{ env.PANEL_WEBHOOK_URL != '' }}
+      # ---- 服务器自动拉取通知（二选一或都配，均未配则跳过）----
+      # 通道 A（不依赖 1Panel，推荐）：服务器 compose 里跑 watchtower sidecar
+      #   （挂 docker.sock，--http-api-enable + token），把
+      #   http://<server>:<port>/v1/update 配为 secret WATCHTOWER_WEBHOOK_URL。
+      #   watchtower 收到 POST 立即 pull + recreate；即使不配此 secret，
+      #   watchtower 的 --interval 轮询也是兜底（延迟 <= interval）。
+      # 通道 B（1Panel）：计划任务（pull && up -d）开 Webhook，配 secret PANEL_WEBHOOK_URL。
+      # 注意：镜像推送后 registry 元数据偶有索引延迟，通知侧带 sleep + 重试兜底。
+      - name: Notify server to pull
+        if: ${{ env.PANEL_WEBHOOK_URL != '' || env.WATCHTOWER_WEBHOOK_URL != '' }}
         run: |
           sleep 10   # 等 registry 元数据可见
-          curl -fsS --retry 3 --retry-delay 5 "${{ env.PANEL_WEBHOOK_URL }}" \
-            && echo "已通知服务器拉取" \
-            || echo "::warning::Webhook 通知失败（不影响镜像发布），请检查 1Panel 计划任务的 Webhook URL"
+          ok=1
+          if [[ -n "$WATCHTOWER_WEBHOOK_URL" ]]; then
+            curl -fsS --retry 3 --retry-delay 5 -X POST "${{ env.WATCHTOWER_WEBHOOK_URL }}" \
+              && echo "已通知 watchtower 拉取" || { echo "::warning::watchtower 通知失败（轮询兜底会补）"; ok=0; }
+          fi
+          if [[ -n "$PANEL_WEBHOOK_URL" ]]; then
+            curl -fsS --retry 3 --retry-delay 5 "${{ env.PANEL_WEBHOOK_URL }}" \
+              && echo "已通知 1Panel 计划任务拉取" || { echo "::warning::1Panel webhook 失败"; ok=0; }
+          fi
+          [ $ok -eq 1 ] || true

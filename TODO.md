@@ -1248,3 +1248,43 @@ GitHub Pages 保留（域名 DNS 由用户自行切换）。
 DNS 已切国内服务器（阿里云北京），国内容器（Rust scratch 版）上线并验证
 （8080 /healthz 200）。Pages 通道的过渡期兜底价值消失，删除 `main.yml`；
 Pages 上最后部署版本留作灾备快照（不再更新）。前端发布单通道 = docker 镜像。
+
+## skill-graph 系统应用：技能图谱 osapp（2026-10-04）
+
+kzf 指令：把 gaubee-skills 的技能 Graph 做成 gaubeeOS 的一个 osapp；数据静态、
+由 gaubee-skills 管道维护；页面按 world-class-designer 重新设计，力导向布局
+不得挤成一团；org（jixoai-labs 等）的项目必须入图。
+
+### 改动
+
+- 新增 `src/lib/apps/builtin/skill-graph.ts` + `src/lib/apps/views/SkillGraphView.svelte`
+  （id: skill-graph，category: system，/app/skill-graph）：
+  - 自绘 canvas 力导向引擎，针对「挤团」病灶的四处处方：星标层脱离弹簧系统
+    （1640 条边汇入单点 = hairball 病根，改为外围确定性环带纹理）、项目按
+    personal/org 角向聚簇（恒定强度锚力——锚力乘 alpha 会先于斥力死亡导致
+    整图漂出画布，v3 实测）、斥力 1/d 衰减（1/d² 在工作距离弱两个数量级，
+    v4 实测）+ 半径语义化碰撞力、默认只显示 usedBy>=2 的技术（长尾可开）。
+  - 搜索为「邻域高亮」而非隐藏（搜索后是死路属反模式）：命中 + 一跳邻域
+    常显带标签，其余压暗；过滤器为每帧拉取模式（effect 推送在 Svelte 5 下
+    有同步时序问题，实测废弃）。
+  - 交互：hover tooltip / 单击详情卡（毛玻璃）/ 双击取消 / 滚轮缩放 /
+    过滤 chips / 复位 / 采用时间线滑杆（基线日空态文案）。
+- 注册接线：`registry.ts` 四处、`AppManager.svelte.ts` SYSTEM_APP_IDS、
+  `desktop-layout.svelte.ts` 版本迁移 v2→v3（老用户桌面补进 skill-graph）。
+- 数据管道（gaubee-skills 仓库）：deps 抓取扩到 owner,collaborator,
+  organization_member（org 项目 292 仓入档）；tech-graph 嵌入采用时间线；
+  新增 sync-site-graph.ts 做 public 视图投影（私有仓节点/边整体剔除、
+  usedBy 重算、发布断言零 private 节点）→ `static/skill-graph/data.json`
+  （紧凑 JSON ~800KB，运行时 fetch，不进 bundle）。隐私红线：站点视图
+  仅公开仓信号；本地 tech-graph.html 不变仍含私有（仅限本地）。
+- `deploy-docker.yml`：服务器拉取通知双通道化（新增 WATCHTOWER_WEBHOOK_URL，
+  保留 PANEL_WEBHOOK_URL；均未配则 skip）。
+
+### 验证
+
+- `pnpm check` 0 错 0 警；server 420 测试中 418 绿（2 失败为 main 存量，
+  stash 实证与本次无关）；client 27/27 绿；`pnpm build` 绿。
+- 浏览器走查（vite preview + 内置浏览器）：默认视图三簇可分不挤团、
+  搜索 zod 邻域高亮正确；截图过 vision 子代理验收。
+- 已知坑（记录给后人）：vite preview 的 sirv 会缓存 build 目录，重建后必须
+  重启 preview；SW stale-while-revalidate 会让 reload 落后一个版本。

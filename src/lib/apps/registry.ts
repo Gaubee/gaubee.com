@@ -8,6 +8,7 @@ import { notificationsApp } from "./builtin/notifications";
 import { searchApp } from "./builtin/search";
 import { settingsApp } from "./builtin/settings";
 import { shoutApp } from "./builtin/shout";
+import { skillGraphApp } from "./builtin/skill-graph";
 import { themeApp } from "./builtin/theme";
 import { filesApp } from "./installable/files";
 // 可安装应用（动态 import，按需加载）
@@ -40,6 +41,7 @@ export function registerAllApps(): void {
   appManager.register(accountApp);
   appManager.register(appStoreApp);
   appManager.register(themeApp);
+  appManager.register(skillGraphApp);
 
   // 可安装应用（默认不安装，用户手动安装）
   appManager.register(githubApp);
@@ -62,6 +64,7 @@ export {
   accountApp,
   appStoreApp,
   themeApp,
+  skillGraphApp,
 };
 export { githubApp, githubEditorApp, terminalApp, filesApp };
 
@@ -77,6 +80,7 @@ export function getAllRegisteredApps(): AppEntry[] {
     accountApp,
     appStoreApp,
     themeApp,
+    skillGraphApp,
     githubApp,
     githubEditorApp,
     terminalApp,
