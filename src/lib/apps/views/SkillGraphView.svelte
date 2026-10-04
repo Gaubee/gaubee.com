@@ -419,69 +419,93 @@
 				ctx!.lineTo(nodes[e.t]!.x, nodes[e.t]!.y);
 				ctx!.stroke();
 			}
-			// 节点（user 最后画）
+			// 节点圆（user 最后画；标签统一画在其上——vision R2-A：标签曾被节点圆遮挡切字）
 			ctx!.textAlign = "center";
 			ctx!.textBaseline = "top";
 			const order: number[] = [];
 			for (let i = 0; i < nodes.length; i++) if (visible(i) && nodes[i]!.k !== 0) order.push(i);
 			for (let i = 0; i < nodes.length; i++) if (visible(i) && nodes[i]!.k === 0) order.push(i);
-			// 标签防碰撞（vision 验收 E 项：命中标签与中心标签堆叠不可读）：
-			// 世界坐标占位矩形，user 标签优先占位；其余标签 below→above→跳过
-			const labelRects: number[][] = [];
-			function placeLabel(text: string, nx: number, ny: number, r: number, fontPx: number, color: string): void {
-				ctx!.font = fontPx / scale + "px 'IBM Plex Sans Variable', sans-serif";
-				const tw = ctx!.measureText(text).width;
-				const th = fontPx;
-				const cands = [
-					[nx - tw / 2, ny + r + 3, nx + tw / 2, ny + r + 3 + th],
-					[nx - tw / 2, ny - r - 3 - th, nx + tw / 2, ny - r - 3],
-				];
-				for (const rc of cands) {
-					let hit = false;
-					for (const rr of labelRects) {
-						if (rc[0]! < rr[2]! && rc[2]! > rr[0]! && rc[1]! < rr[3]! && rc[3]! > rr[1]!) { hit = true; break; }
-					}
-					if (!hit) {
-						labelRects.push(rc);
-						ctx!.fillStyle = color;
-						ctx!.textAlign = "left";
-						ctx!.fillText(text, rc[0]!, rc[1]!);
-						ctx!.textAlign = "center";
-						return;
-					}
-				}
-			}
-			// user 标签最先占位（优先级最高，防被技术标签压住——vision E1）
-			const userIdx = nodes.findIndex((n) => n.k === 0);
-			if (userIdx >= 0 && visible(userIdx)) {
-				const un = nodes[userIdx]!;
-				placeLabel(un.label, un.x, un.y, un.r, 14, "oklch(0.94 0.01 260 / 0.95)");
-			}
-			// 搜索命中节点次优先（answer node 不能没名字，2026-10-04 复核补）
-			if (f.query) {
-				for (let m = 0; m < nodes.length; m++) {
-					const mn = nodes[m]!;
-					if (mn.k === 0 || !visible(m) || !matchQ(m)) continue;
-					placeLabel(mn.label, mn.x, mn.y, mn.r, 11, "oklch(0.94 0.01 260 / 0.95)");
-				}
+			function dimmed(i: number): boolean {
+				const dimByQ = !!f.query && !qActive.has(i);
+				const dimByFocus = focus >= 0 && focus !== i && !active.has(i) && !(f.query && qActive.has(i));
+				return dimByQ || dimByFocus;
 			}
 			for (const i of order) {
 				const n = nodes[i]!;
-				const dimByQ = !!f.query && !qActive.has(i);
-				const dimByFocus = focus >= 0 && focus !== i && !active.has(i) && !(f.query && qActive.has(i));
-				ctx!.globalAlpha = dimByQ || dimByFocus ? 0.12 : 1;
+				ctx!.globalAlpha = dimmed(i) ? 0.12 : 1;
 				ctx!.fillStyle = focus === i ? "oklch(0.8 0.15 80)" : n.k === 0 ? COLOR_USER : KIND_COLOR[n.k]!;
 				ctx!.beginPath();
 				ctx!.arc(n.x, n.y, radiusOf(n), 0, 6.283);
 				ctx!.fill();
 				if (n.k === 0) { ctx!.lineWidth = 2.5 / scale; ctx!.strokeStyle = "oklch(0.95 0.01 90 / 0.9)"; ctx!.stroke(); }
-				// 标签分级：技术低倍率只标头部（usedBy>=15），放大后放宽；项目放大才标
-				//（低倍率全标会糊成白雾，v1 实测）；搜索命中集常显；占位失败则跳过（防碰撞）
-				const labeled = n.k !== 0 && !(dimByQ || dimByFocus) && (i === focus || qActive.has(i) || (n.k === 3 ? (scale > 1.2 ? n.usedBy >= 8 : n.usedBy >= 15) : scale > 1.05));
-				if (labeled) {
-					placeLabel(n.label, n.x, n.y, radiusOf(n), 11, "oklch(0.94 0.01 260 / 0.92)");
-				}
 				ctx!.globalAlpha = 1;
+			}
+			// ---- 标签层（节点之上）：占位矩形互斥，4 槽位（下/上/远下/远上），行距 ≥ 字高。
+			//      标签在最上层，压在节点圆上也可读（vision R2-A 的病根是层级低，
+			//      节点圆障碍反而把低倍率标签全灭，R4/R5 实测已废弃） ----
+			const labelRects: number[][] = [];
+			function rectFree(x0: number, y0: number, x1: number, y1: number): boolean {
+				for (const rr of labelRects) {
+					if (x0 < rr[2]! && x1 > rr[0]! && y0 < rr[3]! && y1 > rr[1]!) return false;
+				}
+				return true;
+			}
+			function placeLabel(text: string, nx: number, ny: number, r: number, fontPx: number, color: string, force = false): void {
+				ctx!.font = fontPx / scale + "px 'IBM Plex Sans Variable', sans-serif";
+				// 碰撞检测在屏幕坐标系：文字恒定 fontPx 屏幕高，而世界坐标矩形会随缩放
+				// 缩水（R3 实测：低倍率下行距缩到 3-7px < 字高，字形相交的根因）
+				const twScreen = ctx!.measureText(text).width * scale;
+				const sx = nx * scale + ox, sy = ny * scale + oy, sr = r * scale;
+				const gap = 4, step = fontPx + 6;
+				const cands = [
+					[sx - twScreen / 2, sy + sr + gap, sx + twScreen / 2, sy + sr + gap + fontPx],
+					[sx - twScreen / 2, sy - sr - gap - fontPx, sx + twScreen / 2, sy - sr - gap],
+					[sx - twScreen / 2, sy + sr + gap + step, sx + twScreen / 2, sy + sr + gap + step + fontPx],
+					[sx - twScreen / 2, sy - sr - gap - step - fontPx, sx + twScreen / 2, sy - sr - gap - step],
+				];
+				for (const rc of cands) {
+					if (!rectFree(rc[0]!, rc[1]!, rc[2]!, rc[3]!)) continue;
+					labelRects.push(rc);
+					ctx!.fillStyle = color;
+					ctx!.textAlign = "left";
+					ctx!.fillText(text, (rc[0]! - ox) / scale, (rc[1]! - oy) / scale);
+					ctx!.textAlign = "center";
+					return;
+				}
+				// 强制回退：user/搜索命中等优先标签宁可轻微压点也不能没名字
+				//（低倍率密集区四槽全败时 rectFree 会全灭，2026-10-04 R3 实测）
+				if (force) {
+					const rc = cands[0]!;
+					labelRects.push(rc);
+					ctx!.fillStyle = color;
+					ctx!.textAlign = "left";
+					ctx!.fillText(text, (rc[0]! - ox) / scale, (rc[1]! - oy) / scale);
+					ctx!.textAlign = "center";
+				}
+			}
+			// 优先级：user > 搜索命中（answer node 必须有名字）> 常规分级标签；
+			// 优先标签 force 落位（低倍率密集区四槽可能全败）
+			const userIdx = nodes.findIndex((n) => n.k === 0);
+			if (userIdx >= 0 && visible(userIdx)) {
+				const un = nodes[userIdx]!;
+				placeLabel(un.label, un.x, un.y, un.r, 14, "oklch(0.96 0.01 260 / 0.98)", true);
+			}
+			if (f.query) {
+				for (let m = 0; m < nodes.length; m++) {
+					const mn = nodes[m]!;
+					if (mn.k === 0 || !visible(m) || !matchQ(m) || dimmed(m)) continue;
+					placeLabel(mn.label, mn.x, mn.y, mn.r, 11, "oklch(0.96 0.01 260 / 0.98)", true);
+				}
+			}
+			for (const i of order) {
+				const n = nodes[i]!;
+				if (n.k === 0 || dimmed(i)) continue;
+				// 命中节点已在优先级路径放置，跳过（否则画出两个 zod 标签，R6 实测）
+				if (f.query && matchQ(i)) continue;
+				// 标签分级：技术低倍率只标头部（usedBy>=15），放大后放宽；项目放大才标
+				//（低倍率全标会糊成白雾，v1 实测）；搜索命中邻域常显；占位失败则跳过
+				const labeled = i === focus || qActive.has(i) || (n.k === 3 ? (scale > 1.2 ? n.usedBy >= 8 : n.usedBy >= 15) : scale > 1.05);
+				if (labeled) placeLabel(n.label, n.x, n.y, radiusOf(n), 11, "oklch(0.94 0.01 260 / 0.92)");
 			}
 		}
 		function fitView(): void {
