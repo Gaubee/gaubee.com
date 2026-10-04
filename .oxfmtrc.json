@@ -5,6 +5,8 @@
     "build/",
     ".svelte-kit/",
     "src/lib/vfs/readonly-data.ts",
-    "static/search-index/"
+    "static/search-index/",
+    "static/skill-graph/**",
+    "skills/gaubee-skills/data/**"
   ]
 }
