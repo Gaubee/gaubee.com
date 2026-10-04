@@ -134,8 +134,9 @@ bun scripts/github-stars-fetch.ts                       # 星标全量快照
 bun scripts/github-stars-diff.ts                        # 星标变更
 bun scripts/github-commits-fetch.ts                     # 当日提交日志（含 compare 明细；可加 --date YYYY-MM-DD 回填，事件流仅覆盖近 ~2 周）
 bun scripts/github-deps-fetch.ts                        # 依赖全扫 + 新技术首见事件（约 250 请求）
-bun scripts/x-likes-fetch.ts                            # X 动态（posts/likes/bookmarks，browser 后端，增量）
+bun scripts/x-likes-fetch.ts                            # X 动态（posts/likes/bookmarks，browser 后端，增量；新条目自动下载图片/视频，--media-backfill N / --video-backfill N 补近期）
 bun scripts/x-archive-import.ts <归档data目录>           # X Data Archive 历史回灌（一次性）
+bun scripts/x-media-backfill.ts                         # 历史条目正文/媒体回灌（syndication 公开接口，免登录免 yt-dlp；幂等可续跑，--limit N 试跑，--max-gb 体积护栏默认 4.5）
 bun scripts/tech-graph-build.ts                         # 技能 Graph
 bun scripts/build-graph-page.ts                         # 技能 Graph 交互展示页
 bun scripts/sync-site-graph.ts                          # 图谱 public 视图 → gaubee.com static/skill-graph/data.json（站点 osapp 数据源；私有仓剔除+发布断言；deps 扫描含 org 后必须跑）
@@ -147,7 +148,8 @@ bun scripts/publish.ts <报告md> --slug <slug> --title <标题> --tags a,b   # 
 ```
 
 - **日报文体（2026-10-04 kzf 裁决）**：提交部分的核心是**每条工作流一句话总结"做了什么"**——必须读 changes 里的提交消息提炼（可跨仓库归组同一工作流），仓库与数字只作辅助信息，不得只罗列"N commits"。写作法则全文（蒸馏自 jixoai.com release-blog：changelog 风格、句级法则、修订门、AI-tell 查簇）见 `references/writing.md`；定稿前跑量化门禁 `node scripts/ai-tone-metrics.mjs`（lint reports/daily/*.md，RED 清零才放行；全绿仍需过 writing.md 的 R6 朗读）。
-- **X 动态条目化（2026-10-05 kzf 裁决）**：日报的 X 部分逐条成块——`**@作者**：中文一句话点题（英文内容翻译，中文内容精炼不歪曲）＋[原推文](https://x.com/作者/status/id)＋本地媒体`。理由：墙内读者打不开 X 链接与嵌入 iframe，媒体必须转存自己域名（`static/x-media/YYYY-MM/<tweetId>-<n>.<ext>`，x-likes-fetch 对新增条目自动下载，`--media-backfill N` 补历史；实测图片均值 163KB/张）。图片站内绝对路径 `/x-media/…` 逐张贴，无媒体不贴；不全文转贴推文（引述 + 链接 + 署名），视频 blob 播放器拿不到直链的条目标注「含视频，见原文」。媒体文件随日报发布单独提交（📷 前缀）。
+- **X 动态条目化（2026-10-05 kzf 裁决）**：日报的 X 部分逐条成块——`**@作者**：中文一句话点题（英文内容翻译，中文内容精炼不歪曲）＋[原推文](https://x.com/作者/status/id)＋本地媒体`。理由：墙内读者打不开 X 链接与嵌入 iframe，媒体必须转存自己域名（`static/x-media/YYYY-MM/<tweetId>-<n>.<ext>`，实测图片均值 163KB/张、720p 视频 3–12MB/条）。图片站内绝对路径 `/x-media/…` 逐张贴，无媒体不贴；不全文转贴推文（引述 + 链接 + 署名）。视频三条路：①时间线 DOM 拿到直链（gif）直接下；②blob 播放器 → 抽取器标 `hasVideo`，yt-dlp 兜底（软依赖，720p 上限）；③历史回灌走 syndication 接口的 mp4 变体直链（免 yt-dlp）。媒体文件随日报发布单独提交（📷 前缀）。
+- **X 历史回灌（2026-10-05）**：`x-media-backfill.ts` 走 `cdn.syndication.twimg.com/tweet-result`（公开 CDN，token 参数必填但值任意；429 退避 15s，礼貌限速 ~3.5 QPS）。正文 t.co 换真实链接、媒体占位链接剔除；全文优先（archive/browser DOM 截断版不倒灌）。幂等：条目处理过即标 `synChecked`；网络性失败不标记下次重试；推文删除计 `unavailable`。历史总量先 `--limit` 试跑再全量；媒体体积到护栏即停下载只留元数据（5G 外置存储裁决点，kzf 预留）。
 - 失败必须如实报告错误并停止/降级，禁止伪造成功；报告数字必须来自脚本输出。
 - 基线日分支：无上一份快照时 diff 输出 `BASELINE`——日报写「基线建立」，跳过对应插入。
 - 完成定义（绿门）：声称「可用」的命令当日必须实跑 exit 0；未实跑的陈述不写。
