@@ -323,8 +323,10 @@ async function main() {
         execFileSync(
           "yt-dlp",
           [
+            // 体积阶梯：≤98MB 里取最高 720p；超限降 480p；再不行取任意——单文件硬上限
+            // 100MB（GitHub push 拒收大文件，2026-10-05 实证 265MB 长视频）
             "-f",
-            "bv*[height<=720]+ba/b",
+            "bv*[height<=720][size<98M]+ba/b[height<=720][size<98M]/bv*[height<=480]+ba/b[height<=480]/b",
             "--no-playlist",
             "--merge-output-format",
             "mp4",

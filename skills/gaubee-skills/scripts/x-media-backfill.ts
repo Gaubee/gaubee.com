@@ -47,19 +47,29 @@ interface XStore {
 interface SynMedia {
   media_url_https?: string;
   type?: string;
-  video_info?: { variants?: { content_type?: string; url: string }[] };
+  video_info?: {
+    duration_millis?: number;
+    variants?: { content_type?: string; url: string; bitrate?: number }[];
+  };
 }
 
+/** 挑 mp4 变体：≤720p 里优先高码率，但预估体积（bitrate×duration）超 98MB 的降档
+ *  ——GitHub push 拒收 >100MB 单文件（2026-10-05 实证 265MB 长视频） */
 function pickMp4(videoInfo: SynMedia["video_info"]): string | null {
   const mp4 = (videoInfo?.variants ?? []).filter((v) => v.content_type === "video/mp4");
   if (!mp4.length) return null;
-  const withH = mp4.map((v) => ({
+  const durS = (videoInfo?.duration_millis ?? 0) / 1000;
+  const withMeta = mp4.map((v) => ({
     url: v.url,
     h: Number(v.url.match(/\/(\d+)x(\d+)\//)?.[2] ?? 0),
+    bitrate: (v as { bitrate?: number }).bitrate ?? 0,
   }));
-  const fit = withH.filter((v) => v.h > 0 && v.h <= 720);
-  const pool = fit.length ? fit : withH;
-  return pool.sort((a, b) => b.h - a.h)[0]!.url;
+  const estBytes = (v: { bitrate: number }) => (v.bitrate / 8) * durS;
+  const fit = withMeta.filter(
+    (v) => v.h > 0 && v.h <= 720 && (estBytes(v) === 0 || estBytes(v) < 98 * 1024 ** 2),
+  );
+  const pool = fit.length ? fit : withMeta.slice().sort((a, b) => estBytes(a) - estBytes(b));
+  return pool.sort((a, b) => (b.h - a.h) || (b.bitrate - a.bitrate))[0]!.url;
 }
 
 async function fetchSyn(id: string): Promise<any | null> {
