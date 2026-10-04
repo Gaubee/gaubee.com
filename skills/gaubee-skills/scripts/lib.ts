@@ -1,5 +1,6 @@
-import { renameSync, writeFileSync } from "node:fs";
+import { existsSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
+import path from "node:path";
 /**
  * lib.ts — gaubee-skills 共享基元
  *
@@ -15,6 +16,8 @@ import { homedir } from "node:os";
  */
 import path from "node:path";
 
+import { vaultHas, vaultPut, vaultUnlock } from "./vault.ts";
+
 /** skill 根（gaubee.com 仓库内）：代码、写作法则、报告 */
 export const ROOT = path.resolve(import.meta.dir, "..");
 /** 私有数据根（仓库外）：sources 私有信号源、本地 tech-graph、profile、research、.env */
@@ -24,11 +27,22 @@ export const DATA = path.join(DATA_ROOT, "data");
 /** 数据源分区根：DATA/sources/<source>/ */
 export const sourceDir = (source: string) => path.join(DATA, "sources", source);
 
-/** 原子写：先写 .tmp 再 rename，避免并发读取撕裂（2026-10-03 复核建议） */
+/** 原子写：先写 .tmp 再 rename，避免并发读取撕裂（2026-10-03 复核建议）。
+ *  DATA 之下的文件写入即镜像进加密 vault（2026-10-05 kzf 跨设备裁决）。 */
 export function writeFileAtomic(file: string, data: string): void {
   const tmp = `${file}.tmp`;
   writeFileSync(tmp, data);
   renameSync(tmp, file);
+  if (file.startsWith(`${DATA}${path.sep}`)) {
+    vaultPut(path.relative(DATA, file), Buffer.from(data, "utf8"));
+  }
+}
+
+// 新设备冷启动：vault 在而明文工作区不在 → 自动解锁（缺密钥/无 vault 时按未初始化处理）
+try {
+  if (vaultHas() && !existsSync(DATA)) vaultUnlock();
+} catch {
+  // 静默：脚本继续走明文工作区
 }
 
 /** 本地时区日期（YYYY-MM-DD）——不用 UTC，避免午夜附近错日 */

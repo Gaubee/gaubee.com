@@ -29,6 +29,8 @@ description: kzf（Gaubee）的工作信号活档案、技能 Graph 与个人工
 
 **两个根**（2026-10-05 迁移裁决）：本目录（仓库内）放代码/法则/报告；**私有数据根 `~/.gaubee-skills/`**（`GAUBEE_SKILLS_DATA` 可覆盖）放一切含私有信号的产物——下表的 `data/…` 全部指 `~/.gaubee-skills/data/…`，绝不进 git。
 
+**加密 vault（2026-10-05 跨设备方案，kzf 裁决）**：`~/.gaubee-skills/vault.enc.sqlite` 单文件 = bun:sqlite 每文件一行 AES-256-GCM 加密 blob（密钥从 .env 的 `GAUBEE_SKILLS_VAULT_KEY` scrypt 派生，零第三方依赖）。`lib.writeFileAtomic` 对 DATA 之下的写入**自动镜像加密**——写入即加密，无手动打包步骤；密文检查实证零明文泄漏。跨设备三步：①同步 vault 单文件（iCloud/Syncthing/私有 git 任选通道）＋从密码管理器取回 `.env`；②`bun scripts/vault.ts unlock` 恢复明文工作区（冷启动时 lib 导入也会自动解锁）；③照常干活，写入自动回灌 vault。`vault.ts lock` 清除明文工作区（`--keep` 保留；要"静态加密"就锁），`vault.ts status` 看状态，`vault.ts init` 生成密钥并首灌。
+
 | 路径                                          | 是什么                                                                        | 维护方式                           |
 | --------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------- |
 | `data/sources/<source>/`                      | 各信号源分区（见 §2 源注册表）                                                | 各源脚本写入                       |
