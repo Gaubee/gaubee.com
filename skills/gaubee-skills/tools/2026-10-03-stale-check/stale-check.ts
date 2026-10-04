@@ -10,6 +10,7 @@
  * 用法：bun stale-check.ts [--years 3] [--category <分类子串>] [--limit 20]
  */
 import path from "node:path";
+import { sourceDir } from "../../scripts/lib.ts";
 
 import { categorize } from "../../scripts/github-stars-categorize.ts";
 
@@ -45,7 +46,7 @@ function parseArgs(argv: string[]): Query {
 async function main() {
   const q = parseArgs(process.argv.slice(2));
   const file = Bun.file(
-    path.resolve(import.meta.dir, "../../data/sources/github-stars/stars.json"),
+    path.join(sourceDir("github-stars"), "stars.json"),
   );
   const snap = JSON.parse(await file.text()) as { count: number; repos: StarRepo[] };
 

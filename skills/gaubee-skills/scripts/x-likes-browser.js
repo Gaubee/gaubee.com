@@ -76,6 +76,8 @@ for (const s of STREAMS) {
               ),
             ];
             const video = [...new Set([...a.querySelectorAll('video[src*="video.twimg.com"], video source[src*="video.twimg.com"]')].map((v) => v.getAttribute("src") ?? ""))].filter(Boolean);
+            // blob 播放器拿不到直链，但「有视频」这个事实可以标记——交给 yt-dlp 解析
+            const hasVideo = video.length > 0 || !!a.querySelector('video, [data-testid="videoPlayer"]');
             return {
               id: m?.[2] ?? "",
               author: m?.[1] ?? "",
@@ -84,6 +86,7 @@ for (const s of STREAMS) {
               reposted: !!social && /repost|转发/i.test(social.textContent ?? ""),
               media,
               video,
+              hasVideo,
             };
           })
           .filter((t) => t.id),

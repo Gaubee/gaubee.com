@@ -10,6 +10,7 @@
  * 用法：bun stars-search.ts <关键词...> [--category <分类子串>] [--lang <语言>] [--limit 10]
  */
 import path from "node:path";
+import { sourceDir } from "../../scripts/lib.ts";
 
 import { categorize } from "../../scripts/github-stars-categorize.ts";
 
@@ -71,7 +72,7 @@ async function main() {
     process.exit(2);
   }
   const file = Bun.file(
-    path.resolve(import.meta.dir, "../../data/sources/github-stars/stars.json"),
+    path.join(sourceDir("github-stars"), "stars.json"),
   );
   const snap = JSON.parse(await file.text()) as { count: number; repos: StarRepo[] };
 

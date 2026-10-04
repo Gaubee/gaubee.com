@@ -11,10 +11,10 @@ import { execFileSync, execSync } from "node:child_process";
  * - 2. 增量：按 tweet id 对照 x.json 库存去重；新条目写 changes/<date>.json（kind: posted/reposted/liked/bookmarked）
  * - 3. 历史回灌走 scripts/x-archive-import.ts（官方 Data Archive，免费全量）
  *
- * 运行：bun scripts/x-likes-fetch.ts [--backend browser|xurl] [--user <username>] [--media-backfill N]
+ * 运行：bun scripts/x-likes-fetch.ts [--backend browser|xurl] [--user <username>] [--media-backfill N] [--video-backfill N]
  * 前置：ego-browser 已登录 x.com（browser 后端）；xurl 已授权 + 账户有积分（xurl 后端）
  */
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -32,8 +32,10 @@ interface Tweet {
   kind: "posted" | "reposted" | "liked" | "bookmarked";
   author?: string; // 原作者 @handle（点赞/收藏对象）
   media?: string[]; // 图片 URL（pbs.twimg.com，已归一 name=large）
-  video?: string[]; // 视频 mp4 直链（时间线 DOM 能拿到的；blob 播放器拿不到）
+  video?: string[]; // 视频 mp4 直链（时间线 DOM 能拿到的，如 gif；blob 播放器拿不到）
+  hasVideo?: boolean; // 有视频播放器（blob 源）——直链拿不到时交 yt-dlp 解析下载
   mediaLocal?: string[]; // 已下载的站内相对路径（x-media/YYYY-MM/…，2026-10-05 kzf：动态 event 媒体本地化）
+  videoLocal?: string[]; // yt-dlp 下载的视频（x-media/YYYY-MM/<id>-video.mp4）
 }
 
 interface StreamCursor {
@@ -158,6 +160,7 @@ function pullBrowser(username: string): Record<Stream, Tweet[]> {
       author: t.author ?? "",
       media: t.media ?? [],
       video: t.video ?? [],
+      hasVideo: t.hasVideo ?? false,
     }));
   }
   if (errors.some((e) => e.includes("not-logged-in"))) {
@@ -214,30 +217,63 @@ async function main() {
 
   for (const t of all) {
     const prev = store.items[t.id];
-    if (!prev || prev.text === "" || prev.text === "(archive)") store.items[t.id] = t;
-    else if (!prev.author && (t.author || t.media?.length)) {
-      // 富数据补全：旧条目缺 author/media，浏览器重扫时回填；text 取更长的版本
+    if (!prev) {
+      store.items[t.id] = t;
+    } else if (prev.text === "" || prev.text === "(archive)") {
+      store.items[t.id] = { ...t, mediaLocal: prev.mediaLocal, videoLocal: prev.videoLocal };
+    } else if (
+      (!prev.author && (t.author || t.media?.length || t.hasVideo)) ||
+      (t.hasVideo && !prev.hasVideo) ||
+      ((t.media?.length ?? 0) > 0 && !(prev.media?.length ?? 0))
+    ) {
+      // 富数据补全：旧条目缺 author/media/hasVideo，浏览器重扫时回填；text 取更长的版本
       //（archive 的 fullText 是全文，浏览器 DOM 文本截断在 400——不能让截断版倒灌）
       const text = (prev.text ?? "").length >= (t.text ?? "").length ? prev.text : t.text;
-      store.items[t.id] = { ...t, text, kind: prev.kind };
+      store.items[t.id] = {
+        ...t,
+        text,
+        kind: prev.kind,
+        author: t.author || prev.author,
+        media: t.media?.length ? t.media : prev.media,
+        video: t.video?.length ? t.video : prev.video,
+        mediaLocal: prev.mediaLocal,
+        videoLocal: prev.videoLocal,
+      };
     }
   }
   store.updated_at = new Date().toISOString();
 
   // ---- 媒体本地化（2026-10-05 kzf：动态 event 媒体进自己域名，墙内可读）----
   // 新条目自动下载；--media-backfill N 给最近 N 条缺本地的补（体积抽样/回填用）
+  // 视频：DOM 直链（gif）直接下；blob 播放器走 yt-dlp 兜底（--video-backfill N 补库存）
   let backfill = 0;
+  let videoBackfill = 0;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--media-backfill") backfill = Number.parseInt(argv[++i] ?? "0", 10) || 0;
+    else if (argv[i] === "--video-backfill") videoBackfill = Number.parseInt(argv[++i] ?? "0", 10) || 0;
   }
   const SITE = process.env.GAUBEE_SITE ?? path.resolve(import.meta.dir, "..", "..", "..");
   const mediaRoot = path.join(SITE, "static", "x-media");
-  const wantMedia: Tweet[] = fresh.filter((t) => (t.media?.length ?? 0) + (t.video?.length ?? 0) > 0);
+  const wantMedia: Tweet[] = fresh.filter(
+    (t) => (t.media?.length ?? 0) + (t.video?.length ?? 0) > 0 || t.hasVideo,
+  );
   if (backfill > 0) {
     const candidates = Object.values(store.items)
       .filter((t) => (t.media?.length ?? 0) > 0 && !(t.mediaLocal?.length ?? 0))
       .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
       .slice(0, backfill);
+    wantMedia.push(...candidates);
+  }
+  if (videoBackfill > 0) {
+    const candidates = Object.values(store.items)
+      .filter(
+        (t) =>
+          (t.hasVideo || (t.video?.length ?? 0) > 0) &&
+          !(t.videoLocal?.length ?? 0) &&
+          !(t.mediaLocal ?? []).some((p) => p.endsWith(".mp4")),
+      )
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+      .slice(0, videoBackfill);
     wantMedia.push(...candidates);
   }
   let mediaBytes = 0;
@@ -276,6 +312,43 @@ async function main() {
       locals.push(rel);
     }
     if (locals.length) t.mediaLocal = locals;
+
+    // 视频兜底：blob 播放器无直链 → yt-dlp（软依赖，未安装/失败仅 WARN，不阻塞管道）
+    const directVideo = (t.mediaLocal ?? []).some((p) => p.endsWith(".mp4"));
+    if ((t.hasVideo || (t.video?.length ?? 0) > 0) && !t.videoLocal && !directVideo) {
+      const statusUrl = `https://x.com/${t.author || store.user.username}/status/${t.id}`;
+      const absNoExt = path.join(SITE, "static", "x-media", month, `${t.id}-video`);
+      try {
+        mkdirSync(path.dirname(absNoExt), { recursive: true });
+        execFileSync(
+          "yt-dlp",
+          [
+            "-f",
+            "bv*[height<=720]+ba/b",
+            "--no-playlist",
+            "--merge-output-format",
+            "mp4",
+            "-o",
+            `${absNoExt}.%(ext)s`,
+            statusUrl,
+          ],
+          { stdio: ["pipe", "pipe", "pipe"], timeout: 300_000 },
+        );
+        for (const ext of ["mp4", "mkv", "webm"]) {
+          const absVideo = `${absNoExt}.${ext}`;
+          if (existsSync(absVideo)) {
+            t.videoLocal = [`x-media/${month}/${t.id}-video.${ext}`];
+            mediaBytes += statSync(absVideo).size;
+            mediaFiles++;
+            break;
+          }
+        }
+        if (!t.videoLocal) console.error(`WARN yt-dlp 无产物 ${statusUrl}`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`WARN yt-dlp 失败 ${statusUrl}：${msg.slice(0, 160).split("\n").pop()}`);
+      }
+    }
   }
   if (mediaFiles) console.error(`media: ${mediaFiles} 个文件 ${(mediaBytes / 1024 / 1024).toFixed(2)} MB → ${mediaRoot}`);
 
