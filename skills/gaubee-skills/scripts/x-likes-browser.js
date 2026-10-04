@@ -65,12 +65,25 @@ for (const s of STREAMS) {
             const social = a.querySelector('[data-testid="socialContext"]');
             const href = link?.getAttribute("href") ?? "";
             const m = href.match(/\/([^/]+)\/status\/(\d+)/);
+            // 媒体：推文图片（排除头像/缩进引用里的重复）；视频取 DOM 里能拿到的 mp4 源
+            const media = [
+              ...new Set(
+                [...a.querySelectorAll('img[src*="pbs.twimg.com/media"]')].map((im) => {
+                  const src = im.getAttribute("src") ?? "";
+                  // 统一压到 large 档：博客展示 ~1024px 足够，体积可控
+                  return src.includes("name=") ? src.replace(/name=[^&]+/, "name=large") : src;
+                }),
+              ),
+            ];
+            const video = [...new Set([...a.querySelectorAll('video[src*="video.twimg.com"], video source[src*="video.twimg.com"]')].map((v) => v.getAttribute("src") ?? ""))].filter(Boolean);
             return {
               id: m?.[2] ?? "",
               author: m?.[1] ?? "",
-              text: (textEl?.innerText ?? "").slice(0, 120),
+              text: (textEl?.innerText ?? "").slice(0, 400),
               created_at: time?.getAttribute("datetime") ?? "",
               reposted: !!social && /repost|转发/i.test(social.textContent ?? ""),
+              media,
+              video,
             };
           })
           .filter((t) => t.id),

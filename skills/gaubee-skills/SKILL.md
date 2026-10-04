@@ -147,6 +147,7 @@ bun scripts/publish.ts <报告md> --slug <slug> --title <标题> --tags a,b   # 
 ```
 
 - **日报文体（2026-10-04 kzf 裁决）**：提交部分的核心是**每条工作流一句话总结"做了什么"**——必须读 changes 里的提交消息提炼（可跨仓库归组同一工作流），仓库与数字只作辅助信息，不得只罗列"N commits"。写作法则全文（蒸馏自 jixoai.com release-blog：changelog 风格、句级法则、修订门、AI-tell 查簇）见 `references/writing.md`；定稿前跑量化门禁 `node scripts/ai-tone-metrics.mjs`（lint reports/daily/*.md，RED 清零才放行；全绿仍需过 writing.md 的 R6 朗读）。
+- **X 动态条目化（2026-10-05 kzf 裁决）**：日报的 X 部分逐条成块——`**@作者**：中文一句话点题（英文内容翻译，中文内容精炼不歪曲）＋[原推文](https://x.com/作者/status/id)＋本地媒体`。理由：墙内读者打不开 X 链接与嵌入 iframe，媒体必须转存自己域名（`static/x-media/YYYY-MM/<tweetId>-<n>.<ext>`，x-likes-fetch 对新增条目自动下载，`--media-backfill N` 补历史；实测图片均值 163KB/张）。图片站内绝对路径 `/x-media/…` 逐张贴，无媒体不贴；不全文转贴推文（引述 + 链接 + 署名），视频 blob 播放器拿不到直链的条目标注「含视频，见原文」。媒体文件随日报发布单独提交（📷 前缀）。
 - 失败必须如实报告错误并停止/降级，禁止伪造成功；报告数字必须来自脚本输出。
 - 基线日分支：无上一份快照时 diff 输出 `BASELINE`——日报写「基线建立」，跳过对应插入。
 - 完成定义（绿门）：声称「可用」的命令当日必须实跑 exit 0；未实跑的陈述不写。

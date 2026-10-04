@@ -11,10 +11,10 @@ import { execFileSync, execSync } from "node:child_process";
  * - 2. 增量：按 tweet id 对照 x.json 库存去重；新条目写 changes/<date>.json（kind: posted/reposted/liked/bookmarked）
  * - 3. 历史回灌走 scripts/x-archive-import.ts（官方 Data Archive，免费全量）
  *
- * 运行：bun scripts/x-likes-fetch.ts [--backend browser|xurl] [--user <username>]
+ * 运行：bun scripts/x-likes-fetch.ts [--backend browser|xurl] [--user <username>] [--media-backfill N]
  * 前置：ego-browser 已登录 x.com（browser 后端）；xurl 已授权 + 账户有积分（xurl 后端）
  */
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -30,6 +30,10 @@ interface Tweet {
   text: string;
   created_at: string; // ISO
   kind: "posted" | "reposted" | "liked" | "bookmarked";
+  author?: string; // 原作者 @handle（点赞/收藏对象）
+  media?: string[]; // 图片 URL（pbs.twimg.com，已归一 name=large）
+  video?: string[]; // 视频 mp4 直链（时间线 DOM 能拿到的；blob 播放器拿不到）
+  mediaLocal?: string[]; // 已下载的站内相对路径（x-media/YYYY-MM/…，2026-10-05 kzf：动态 event 媒体本地化）
 }
 
 interface StreamCursor {
@@ -151,6 +155,9 @@ function pullBrowser(username: string): Record<Stream, Tweet[]> {
       text: t.text ?? "",
       created_at: t.created_at ?? "",
       kind: t.reposted && s === "posts" ? "reposted" : KIND_OF[s],
+      author: t.author ?? "",
+      media: t.media ?? [],
+      video: t.video ?? [],
     }));
   }
   if (errors.some((e) => e.includes("not-logged-in"))) {
@@ -208,8 +215,70 @@ async function main() {
   for (const t of all) {
     const prev = store.items[t.id];
     if (!prev || prev.text === "" || prev.text === "(archive)") store.items[t.id] = t;
+    else if (!prev.author && (t.author || t.media?.length)) {
+      // 富数据补全：旧条目缺 author/media，浏览器重扫时回填；text 取更长的版本
+      //（archive 的 fullText 是全文，浏览器 DOM 文本截断在 400——不能让截断版倒灌）
+      const text = (prev.text ?? "").length >= (t.text ?? "").length ? prev.text : t.text;
+      store.items[t.id] = { ...t, text, kind: prev.kind };
+    }
   }
   store.updated_at = new Date().toISOString();
+
+  // ---- 媒体本地化（2026-10-05 kzf：动态 event 媒体进自己域名，墙内可读）----
+  // 新条目自动下载；--media-backfill N 给最近 N 条缺本地的补（体积抽样/回填用）
+  let backfill = 0;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--media-backfill") backfill = Number.parseInt(argv[++i] ?? "0", 10) || 0;
+  }
+  const SITE = process.env.GAUBEE_SITE ?? path.resolve(import.meta.dir, "..", "..", "..");
+  const mediaRoot = path.join(SITE, "static", "x-media");
+  const wantMedia: Tweet[] = fresh.filter((t) => (t.media?.length ?? 0) + (t.video?.length ?? 0) > 0);
+  if (backfill > 0) {
+    const candidates = Object.values(store.items)
+      .filter((t) => (t.media?.length ?? 0) > 0 && !(t.mediaLocal?.length ?? 0))
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+      .slice(0, backfill);
+    wantMedia.push(...candidates);
+  }
+  let mediaBytes = 0;
+  let mediaFiles = 0;
+  for (const t of wantMedia) {
+    const urls = [...(t.media ?? []), ...(t.video ?? [])];
+    const month = (t.created_at || `${localDate()}`).slice(0, 7).replace("-", "-");
+    const locals: string[] = [];
+    for (let i = 0; i < urls.length; i++) {
+      const url = urls[i]!;
+      const extMatch = url.match(/format=(\w+)/) ?? url.match(/\.(jpg|jpeg|png|webp|mp4)(?:\?|$)/);
+      const ext = extMatch ? extMatch[1]!.toLowerCase() : url.includes("video.twimg.com") ? "mp4" : "jpg";
+      const rel = path.join("x-media", month, `${t.id}-${i + 1}.${ext}`);
+      const abs = path.join(SITE, "static", rel);
+      if (!existsSync(abs)) {
+        try {
+          const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 gaubee-skills" } });
+          if (!res.ok) {
+            console.error(`WARN media ${res.status} ${url.slice(0, 80)}`);
+            continue;
+          }
+          const buf = new Uint8Array(await res.arrayBuffer());
+          if (buf.length < 2000) {
+            console.error(`WARN media too small (${buf.length}B) ${url.slice(0, 80)}`);
+            continue;
+          }
+          mkdirSync(path.dirname(abs), { recursive: true });
+          writeFileSync(abs, buf);
+          mediaBytes += buf.length;
+          mediaFiles++;
+        } catch (err) {
+          console.error(`WARN media fetch failed: ${err instanceof Error ? err.message : err}`);
+          continue;
+        }
+      }
+      locals.push(rel);
+    }
+    if (locals.length) t.mediaLocal = locals;
+  }
+  if (mediaFiles) console.error(`media: ${mediaFiles} 个文件 ${(mediaBytes / 1024 / 1024).toFixed(2)} MB → ${mediaRoot}`);
+
   mkdirSync(SRC, { recursive: true });
   writeFileAtomic(storeFile, JSON.stringify(store, null, 1));
 
