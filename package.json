@@ -48,6 +48,7 @@
     "marked": "^18.0.6",
     "marked-gfm-heading-id": "^4.1.4",
     "marked-highlight": "^2.2.4",
+    "microlighter": "^2.2.0",
     "minisearch": "^7.2.0",
     "mode-watcher": "^1.1.0",
     "photoswipe": "^5.4.4",
