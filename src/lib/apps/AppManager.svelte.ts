@@ -61,7 +61,7 @@ const STORAGE_KEY = "gaubee:os:apps";
 export const SYSTEM_APP_IDS = [
   "desktop",
   "articles",
-  "shout",
+  "event",
   "search",
   "settings",
   "notifications",

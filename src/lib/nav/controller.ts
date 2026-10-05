@@ -165,7 +165,7 @@ const STORAGE_KEY = "gaubee:os:nav-layout";
 // 默认值使用新路径（search/notifications 为 pop 浮层，不在 main/bottom tab）
 const DEFAULT_ALL_TABS = [
   "/app/articles",
-  "/app/shout",
+  "/app/event",
   "/app/settings",
   "/app/github",
   "/app/terminal",
@@ -173,7 +173,7 @@ const DEFAULT_ALL_TABS = [
 
 let tabRegistry: TabRegistry = {
   allTabs: [...DEFAULT_ALL_TABS],
-  defaultMainTabs: ["/app/articles", "/app/shout", "/app/settings"],
+  defaultMainTabs: ["/app/articles", "/app/event", "/app/settings"],
   defaultBottomTabs: ["/app/github", "/app/terminal"],
   popRoutes: ["/app/search", "/app/notifications"],
 };

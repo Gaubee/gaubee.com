@@ -2,7 +2,7 @@
  * 单页面 Route 工厂：为只有一个入口视图的 Activity 快速构造 RouteContract。
  *
  * 设计意图（2026-07-27）：
- * 大多数简单应用（settings/shout/theme/files/search 等）只有一个屏幕，
+ * 大多数简单应用（settings/event/theme/files/search 等）只有一个屏幕，
  * 不需要嵌套子路由。本工厂提供一个语义化的快捷入口，避免每个应用都写
  * defineRoute({ id, pattern: "", component: () => import(...) })。
  *

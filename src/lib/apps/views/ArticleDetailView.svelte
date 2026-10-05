@@ -96,7 +96,7 @@
 
   function backToList() {
     if (target?.collection === 'events') {
-      navController.navigateMain('/app/shout')
+      navController.navigateMain('/app/event')
     } else {
       navController.navigateMain('/app/articles')
     }
@@ -115,7 +115,7 @@
       onclick={backToList}
     >
       <ArrowLeftIcon class="size-4" />
-      <span>返回{post.collection === 'events' ? '说说' : '文章'}列表</span>
+      <span>返回{post.collection === 'events' ? '事件' : '文章'}列表</span>
     </button>
 
     <div class="xl:grid xl:grid-cols-[minmax(0,72ch)_14rem] xl:justify-center xl:gap-x-10">

@@ -1,5 +1,5 @@
 <!--
-	NewContentDialog：新建文章/说说的 Dialog 表单。
+	NewContentDialog：新建文章/事件的 Dialog 表单。
 
 	2026-07-28：取代旧的 FilesView.createNew（自动写 vfsStore + 跳 /app/editor）。
 	现在只生成路径 → 跳 GithubEditorApp 编辑（不预写文件，由编辑器创建）。
@@ -29,7 +29,7 @@
     open = $bindable(false),
     oncreated,
   }: {
-    /** 内容集合（articles=文章 / events=说说）。 */
+    /** 内容集合（articles=文章 / events=事件）。 */
     collection: 'articles' | 'events'
     /** Dialog 开关（双向）。 */
     open?: boolean
@@ -97,7 +97,7 @@
     }
   }
 
-  const label = $derived(collection === 'articles' ? '文章' : '说说')
+  const label = $derived(collection === 'articles' ? '文章' : '事件')
 </script>
 
 <Dialog bind:open onOpenChange={handleOpenChange}>

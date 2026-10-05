@@ -1,6 +1,6 @@
 /**
  * 正交意图：
- * 1. 原始需求（2026-07-21）：说说列表必须正确渲染 Markdown。
+ * 1. 原始需求（2026-07-21）：事件列表必须正确渲染 Markdown。
  * 2. 锁定内联预览的基础 Markdown 结构。
  */
 import { describe, expect, it } from "vitest";

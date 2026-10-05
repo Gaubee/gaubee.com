@@ -90,7 +90,7 @@ class ContentQuery {
     return opts?.limit ? entries.slice(0, opts.limit) : entries;
   }
 
-  /** 所有说说/事件（按 date 降序）。 */
+  /** 所有事件（按 date 降序）。 */
   listEvents(opts?: { limit?: number }): ContentEntry[] {
     const entries = pipelineExecutor.getEntries("events").slice().sort(byDateDesc);
     return opts?.limit ? entries.slice(0, opts.limit) : entries;

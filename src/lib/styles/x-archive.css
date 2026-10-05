@@ -2,7 +2,7 @@
  * x-archive.css — X 归档 event 的内容样式（归属：x-archive 内容，非全局表）。
  *
  * 消费方负责按需导入（谁渲染谁导入）：
- * - src/lib/apps/views/ShoutView.svelte（gaubeeOS 说说列表内联渲染）
+ * - src/lib/apps/views/EventView.svelte（gaubeeOS 事件列表内联渲染）
  * - src/routes/pages/article/[collection]/[stem]/+page.svelte（文章详情页）
  *
  * 选择器全部挂在 .x-arch-* 命名空间下（由 x-archive-events.ts 生成的 HTML 使用），

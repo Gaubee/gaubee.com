@@ -1,6 +1,6 @@
 <!--
 	标签云 Widget：桌面小组件，展示热门标签。
-	数据源 contentQuery（内容管道的 tags 处理器，统计所有文章/说说的标签频次）。点击跳转标签页。
+	数据源 contentQuery（内容管道的 tags 处理器，统计所有文章/事件的标签频次）。点击跳转标签页。
 -->
 <script lang="ts">
   import { contentQuery } from '$lib/content-pipeline/query.svelte'

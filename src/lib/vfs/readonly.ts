@@ -2,7 +2,7 @@
  * 只读虚拟文件系统（ReadonlyVFS）—— 构建时生成的静态数据。
  *
  * 设计目标：
- * - 存储构建时预解析的文章/说说数据（frontmatter + body）。
+ * - 存储构建时预解析的文章/事件数据（frontmatter + body）。
  * - 无需 IndexedDB / GitHub API，纯内存读取，零延迟。
  * - 数据由构建脚本（scripts/build-readonly-vfs.ts）从 src/content 生成。
  * - 只读：不提供 write/unlink/commit 等修改接口。

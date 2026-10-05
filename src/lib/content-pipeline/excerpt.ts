@@ -4,7 +4,7 @@
  * 替代项目内散落的 4 份 excerpt 实现：
  * - scripts/build-search-index.ts 的 createExcerpt（★ 基准实现，最完善）
  * - src/lib/apps/views/ArticlesView.svelte 的 body.slice(0,200).replace(/^#+\s*.+\n?/m,'')
- * - src/lib/apps/widget/RecentShoutsWidget.svelte 的 body.replace(/^#.*$/m,'').slice(0,40)
+ * - src/lib/apps/widget/RecentEventsWidget.svelte 的 body.replace(/^#.*$/m,'').slice(0,40)
  * - src/lib/views/ArticleView.svelte（无 excerpt，直接渲染 body）
  *
  * 规则（取 build-search-index.ts 的实现）：

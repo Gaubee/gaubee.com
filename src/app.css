@@ -250,11 +250,11 @@
  *
  * 图标实现：CSS ::after + mask（DOM 零增节点，SSG 同步生效），
  * background: currentColor → 自动跟随链接色/悬停态/暗色模式。
- * 作用域：.prose（文章详情 MarkdownViewer）与 .shout-markdown（说说列表 inline）。
+ * 作用域：.prose（文章详情 MarkdownViewer）与 .event-markdown（事件列表 inline）。
  * ------------------------------------------------------------------------- */
 
-/* shout-markdown 不走 prose，链接需补充基础样式以与正文统一 */
-.shout-markdown a {
+/* event-markdown 不走 prose，链接需补充基础样式以与正文统一 */
+.event-markdown a {
   color: var(--primary);
   font-weight: 500;
   text-decoration-line: underline;
@@ -264,7 +264,7 @@
 
 /* 外链尾部图标（lucide external-link path，mask 内 stroke=black 产生 alpha） */
 .prose a.md-link-external::after,
-.shout-markdown a.md-link-external::after {
+.event-markdown a.md-link-external::after {
   content: "";
   display: inline-block;
   width: 0.75em;

@@ -1,6 +1,6 @@
 <!--
 	AIBadge：AI 协作信息 badge（带 tooltip）。
-	展示文章/说说使用的 AI Agent/Model 信息。
+	展示文章/事件使用的 AI Agent/Model 信息。
 	用法：<AIBadge ai={["gpt-5.6-sol", "glm-5.2"]} />
 -->
 <script lang="ts">

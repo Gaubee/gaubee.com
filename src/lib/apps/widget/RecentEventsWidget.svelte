@@ -1,13 +1,13 @@
 <!--
-	最近说说 Widget：桌面小组件，展示最近 5 条说说摘要。
-	数据源 contentQuery（内容管道）。点击跳转说说详情。相对时间格式（今天/N 天前）。
+	最近事件 Widget：桌面小组件，展示最近 5 条事件摘要。
+	数据源 contentQuery（内容管道）。点击跳转事件详情。相对时间格式（今天/N 天前）。
 -->
 <script lang="ts">
   import { contentQuery } from '$lib/content-pipeline/query.svelte'
   import type { ContentEntry } from '$lib/content-pipeline/types'
   import { navController } from '$lib/nav/nav-controller-instance'
 
-  const shouts = $derived.by<ContentEntry[]>(() => {
+  const events = $derived.by<ContentEntry[]>(() => {
     void contentQuery.version
     return contentQuery.listEvents({ limit: 5 })
   })
@@ -33,11 +33,11 @@
 
 {#if loading}
   <p class="text-muted-foreground text-xs">加载中…</p>
-{:else if shouts.length === 0}
-  <p class="text-muted-foreground text-xs">暂无说说</p>
+{:else if events.length === 0}
+  <p class="text-muted-foreground text-xs">暂无事件</p>
 {:else}
   <ul class="widget-list">
-    {#each shouts as p (p.path)}
+    {#each events as p (p.path)}
       <li>
         <button class="widget-item" onclick={() => open(p)}>
           <span class="widget-item-preview">{preview(p)}</span>

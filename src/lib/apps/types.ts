@@ -38,7 +38,7 @@ import type { WidgetDeclaration } from "./widget/types";
 export type AppCategory = "system" | "default" | "installable";
 
 /** 应用分类说明：
- * - system:     系统内置，不可卸载（文章、说说、搜索、设置、通知、账户）
+ * - system:     系统内置，不可卸载（文章、事件、搜索、设置、通知、账户）
  * - default:    默认安装但可卸载（Github、Terminal、工作流）
  * - installable: 可选安装（写作）
  */

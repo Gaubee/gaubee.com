@@ -7,7 +7,7 @@ import { desktopApp } from "./builtin/desktop";
 import { notificationsApp } from "./builtin/notifications";
 import { searchApp } from "./builtin/search";
 import { settingsApp } from "./builtin/settings";
-import { shoutApp } from "./builtin/shout";
+import { eventApp } from "./builtin/event";
 import { skillGraphApp } from "./builtin/skill-graph";
 import { themeApp } from "./builtin/theme";
 import { filesApp } from "./installable/files";
@@ -34,7 +34,7 @@ export function registerAllApps(): void {
   // 系统应用（内置，不可卸载）。desktop 首位（默认首页 mainTabs[0]）。
   appManager.register(desktopApp);
   appManager.register(articlesApp);
-  appManager.register(shoutApp);
+  appManager.register(eventApp);
   appManager.register(searchApp);
   appManager.register(settingsApp);
   appManager.register(notificationsApp);
@@ -57,7 +57,7 @@ export function registerAllApps(): void {
 export {
   desktopApp,
   articlesApp,
-  shoutApp,
+  eventApp,
   searchApp,
   settingsApp,
   notificationsApp,
@@ -73,7 +73,7 @@ export function getAllRegisteredApps(): AppEntry[] {
   return [
     desktopApp,
     articlesApp,
-    shoutApp,
+    eventApp,
     searchApp,
     settingsApp,
     notificationsApp,
