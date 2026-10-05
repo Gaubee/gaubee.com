@@ -95,7 +95,20 @@ async function fetchSyn(id: string): Promise<any | null> {
   return undefined; // 网络性失败：不标记，下次重试
 }
 
-/** 清理推文正文：t.co 链接换成真实 URL，媒体占位链接直接删除 */
+/** syndication 返回的正文带 HTML 实体（&amp; &lt; &#39; 等），入库前解码为真实字符。
+ *  &amp; 放最后替换，避免 &amp;lt; 被二次解码。 */
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(Number.parseInt(n, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&gt;/g, ">")
+    .replace(/&lt;/g, "<")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&");
+}
+
+/** 清理推文正文：t.co 链接换成真实 URL，媒体占位链接直接删除，实体解码 */
 function cleanText(text: string, entities: any): string {
   let out = text;
   for (const u of entities?.urls ?? []) {
@@ -104,7 +117,7 @@ function cleanText(text: string, entities: any): string {
   for (const m of entities?.media ?? []) {
     if (m.url) out = out.replaceAll(m.url, "");
   }
-  return out.trim();
+  return decodeEntities(out.trim());
 }
 
 async function download(url: string, abs: string): Promise<number> {

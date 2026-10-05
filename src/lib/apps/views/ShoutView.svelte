@@ -11,6 +11,7 @@
   import { OWNER } from '$lib/github/client'
   import { authStore } from '$lib/auth/session.svelte'
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
+  import '$lib/styles/x-archive.css'
   import NewContentDialog from './NewContentDialog.svelte'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { Button } from '$lib/components/ui/button'
@@ -74,6 +75,25 @@
 
   function titleFor(shout: ContentEntry): string {
     return shout.metadata.title ?? shout.id.slug ?? '查看说说详情'
+  }
+
+  /**
+   * 长内容（归档 event、长日报）默认折叠时只渲染纯文本摘要：
+   * MarkdownViewer 全量解析几百条会拖垮信息流首帧，展开时才付解析成本。
+   * strip 标签后要解码实体——body 里的 &amp; 是合法转义，Svelte 插值会再逃逸一次。
+   */
+  function excerptOf(body: string): string {
+    const plain = body
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/[#>*`![\]()-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    return plain.length > 140 ? `${plain.slice(0, 140)}…` : plain
   }
 </script>
 
@@ -149,7 +169,11 @@
             </div>
 
             <div class:shout-collapsed={collapsible && !expanded} class="shout-markdown text-[15px] leading-6 text-foreground">
-              <MarkdownViewer markdown={shout.body} inline />
+              {#if !collapsible || expanded}
+                <MarkdownViewer markdown={shout.body} inline />
+              {:else}
+                <p class="text-muted-foreground">{excerptOf(shout.body)}</p>
+              {/if}
             </div>
 
             <div class="mt-3 flex items-center gap-3">

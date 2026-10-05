@@ -1,6 +1,8 @@
 <script lang="ts">
   import { photoswipe } from "$lib/photoswipe/action";
 
+  import "$lib/styles/x-archive.css";
+
   let { data } = $props();
   const article = $derived(data);
 

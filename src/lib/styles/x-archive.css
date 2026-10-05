@@ -1,0 +1,97 @@
+/*
+ * x-archive.css — X 归档 event 的内容样式（归属：x-archive 内容，非全局表）。
+ *
+ * 消费方负责按需导入（谁渲染谁导入）：
+ * - src/lib/apps/views/ShoutView.svelte（gaubeeOS 说说列表内联渲染）
+ * - src/routes/pages/article/[collection]/[stem]/+page.svelte（文章详情页）
+ *
+ * 选择器全部挂在 .x-arch-* 命名空间下（由 x-archive-events.ts 生成的 HTML 使用），
+ * 跟随主题令牌明暗自适应，不依赖全局 typography 预设。
+ */
+
+.x-arch-meta {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+.x-arch-item {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.x-arch-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.x-arch-kind {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 18px;
+  color: #fff;
+  background: var(--muted-foreground);
+}
+.x-arch-kind-liked { background: oklch(0.62 0.19 25); }
+.x-arch-kind-posted { background: oklch(0.55 0.16 260); }
+.x-arch-kind-reposted { background: oklch(0.6 0.14 150); }
+.x-arch-kind-bookmarked { background: oklch(0.6 0.12 85); }
+
+.x-arch-author {
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+}
+.x-arch-author:hover { color: var(--primary); }
+
+.x-arch-time {
+  color: var(--muted-foreground);
+}
+
+.x-arch-link {
+  margin-inline-start: auto;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  text-decoration: none;
+}
+.x-arch-link:hover { color: var(--primary); }
+
+.x-arch-text {
+  font-size: 15px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.x-arch-media {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+.x-arch-media:has(> :only-child) {
+  grid-template-columns: 1fr;
+}
+
+.x-arch-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.x-arch-video {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  border-radius: 10px;
+  background: #000;
+}
