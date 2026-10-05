@@ -34,6 +34,11 @@ export const eventApp: AppEntry = {
         entry: true,
         root: leafRoute("event", () => import("$lib/apps/views/EventView.svelte")),
       },
+      {
+        // 旧书签兼容：说说时代的路径别名
+        pattern: "/app/shout",
+        root: leafRoute("event", () => import("$lib/apps/views/EventView.svelte")),
+      },
     ],
     vfsOwnership: ["src/content/events/"],
     searchService: () => createFileSearchService({ appId: "event", appName: "事件" }),
