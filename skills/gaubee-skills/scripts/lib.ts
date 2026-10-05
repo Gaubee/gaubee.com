@@ -14,7 +14,6 @@ import path from "node:path";
  *   research）与凭据（.env）一律在仓库外 DATA_ROOT（默认 ~/.gaubee-skills，可用
  *   GAUBEE_SKILLS_DATA 覆盖）。数据目录绝不进 git。
  */
-import path from "node:path";
 
 import { vaultHas, vaultPut, vaultUnlock } from "./vault.ts";
 

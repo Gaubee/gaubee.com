@@ -9,3 +9,5 @@
 | 2026-10-03 | stale-check  | tools/2026-10-03-stale-check/  | 收藏保鲜检查：archived 与超 N 年未推送的仓库按分类盘点（首跑：119 archived / 138 stale@5y） | proposed |          |
 | 2026-10-04 | deps-why     | tools/2026-10-04-deps-why/     | “我在哪里用的 X？”——依赖按项目溯源（版本/分区/首见时间，存量如实标注）                      | proposed |          |
 | 2026-10-04 | star-at      | tools/2026-10-04-star-at/      | 收藏序号查询：order 字段第一个消费者（正查 #N / 反查仓库名）                                | proposed |          |
+| 2026-10-05 | x-media-audit | tools/2026-10-05-x-media-audit/ | X 媒体库对账：引用完整性（断链/孤儿）+ 本地化缺口 + 体积与 100MB push 风险榜（首跑：0 断链 0 孤儿、图片侧缺口 14、≥90MB 警戒 2） | proposed |          |
+| 2026-10-05 | x-search     | tools/2026-10-05-x-search/     | X 动态 3025 条速查：多关键词 AND + kind/作者/媒体/时间过滤 + --json 管道（--nolocal 与对账缺口口径互证） | proposed |          |
