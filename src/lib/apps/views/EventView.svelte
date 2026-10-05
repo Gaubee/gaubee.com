@@ -82,6 +82,11 @@
   function pickMonth(key: string): void {
     selectedMonth = key
     sheetOpen = false
+    // 切月重置滚动量（kzf 裁决 17）：新列表从头读
+    requestAnimationFrame(() => {
+      document.scrollingElement?.scrollTo({ top: 0 })
+      window.scrollTo({ top: 0 })
+    })
   }
 
   function hrefFor(entry: ContentEntry): string {

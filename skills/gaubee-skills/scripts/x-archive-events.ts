@@ -12,7 +12,7 @@
  *
  * 运行：bun scripts/x-archive-events.ts [--start 00026] [--dry]
  */
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, rmSync } from "node:fs";
 import path from "node:path";
 
 import { sourceDir } from "./lib.ts";
@@ -38,6 +38,7 @@ const KIND_LABEL: Record<Tweet["kind"], string> = {
   reposted: "转",
   bookmarked: "藏",
 };
+void KIND_LABEL; // 语义备查：icon 版徽标的文字对照（KIND_META.label）
 
 function escapeHtml(s: string): string {
   return s
@@ -99,10 +100,54 @@ interface AuthorInfo {
   avatar?: string;
 }
 
+/** kind → 有色图标（lucide path，kzf 2026-10-05 裁决：icon 替代文字） */
+const KIND_META: Record<Tweet["kind"], { label: string; paths: string[] }> = {
+  liked: {
+    label: "赞",
+    paths: ["M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"],
+  },
+  posted: {
+    label: "发",
+    paths: ["M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z", "m15 5 4 4"],
+  },
+  reposted: {
+    label: "转",
+    paths: ["m17 2 4 4-4 4", "M3 11v-1a4 4 0 0 1 4-4h14", "m7 22-4-4 4-4", "M21 13v1a4 4 0 0 1-4 4H3"],
+  },
+  bookmarked: {
+    label: "藏",
+    paths: ["m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"],
+  },
+};
+
+/** 正文富文本：``` 围栏转代码块（microlighter 高亮），URL 自动包裹成链接（kzf 裁决 12/13） */
+function richText(raw: string): string {
+  const parts: string[] = [];
+  const fenceRe = /```(?:\w+)?\n?([\s\S]*?)```/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = fenceRe.exec(raw))) {
+    if (m.index > last) parts.push(inlineText(raw.slice(last, m.index)));
+    parts.push(`<pre class="x-arch-code" data-language="js"><code>${escapeHtml(m[1].replace(/\n$/, ""))}</code></pre>`);
+    last = m.index + m[0].length;
+  }
+  if (last < raw.length) parts.push(inlineText(raw.slice(last)));
+  return parts.join("\n");
+}
+
+function inlineText(s: string): string {
+  const escaped = escapeHtml(s).replace(/\n/g, "<br />");
+  return escaped.replace(
+    /(https?:\/\/[^\s<]+)/g,
+    '<a href="$1" target="_blank" rel="noopener">$1</a>',
+  );
+}
+
 function itemCard(
   t: Tweet,
   authors: Record<string, AuthorInfo>,
   translations: Record<string, string>,
+  mediaMeta: Record<string, { w: number; h: number; ms?: number }>,
 ): string {
   const author = t.author || "gaubeebangeel";
   const statusUrl = `https://x.com/${author}/status/${t.id}`;
@@ -112,34 +157,41 @@ function itemCard(
   const avatarImg = avatar
     ? `<img class="x-arch-avatar" src="${escapeHtml(avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`
     : "";
+  const meta = KIND_META[t.kind];
+  const kindIcon =
+    `<span class="x-arch-kind x-arch-kind-${t.kind}" aria-label="${meta.label}" title="${meta.label}">` +
+    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">` +
+    meta.paths.map((d) => `<path d="${d}" />`).join("") +
+    `</svg></span>`;
+  const translation = translations[t.id];
+  // 译文切换器收进行头（kzf 裁决 15）：默认显示译文（checked），label 指向可切回的「原」
+  const langSwitch = translation
+    ? `<label for="xl-${t.id}" class="x-arch-lang-switch" title="切换原文/译文"><span class="x-arch-lang-zh">译</span><span class="x-arch-lang-orig">原</span></label>`
+    : "";
+  const langInput = translation ? `<input type="checkbox" id="xl-${t.id}" class="x-arch-lang-input" checked aria-label="切换原文/译文" />` : "";
   parts.push(
-    `    <div class="x-arch-head">${avatarImg}<span class="x-arch-kind x-arch-kind-${t.kind}">${KIND_LABEL[t.kind]}</span>` +
+    `    ${langInput}<div class="x-arch-head">${avatarImg}${kindIcon}` +
       `<a class="x-arch-author" href="https://x.com/${author}" target="_blank" rel="nofollow noopener">@${escapeHtml(author)}</a>` +
       `<span class="x-arch-time">${time}</span>` +
+      langSwitch +
       `<a class="x-arch-link" href="${statusUrl}" target="_blank" rel="noopener">原推文 ↗</a></div>`,
   );
-  const text = escapeHtml((t.text ?? "").trim());
-  const translation = translations[t.id];
-  if (text && translation) {
-    // 译文切换（kzf 2026-10-05 裁决：硬编码译文，CSS checkbox 切换原文/译文，零 JS）
-    const safeId = `xl-${t.id}`;
-    parts.push(
-      `    <div class="x-arch-lang">` +
-        `<input type="checkbox" id="${safeId}" class="x-arch-lang-input" aria-label="切换译文" />` +
-        `<label for="${safeId}" class="x-arch-lang-switch"><span class="x-arch-lang-zh">译文</span><span class="x-arch-lang-orig">原文</span></label>` +
-        `<div class="x-arch-text x-arch-orig">${text.replace(/\n/g, "<br />")}</div>` +
-        `<div class="x-arch-text x-arch-trans">${escapeHtml(translation).replace(/\n/g, "<br />")}</div>` +
-        `</div>`,
-    );
-  } else if (text) {
-    parts.push(`    <div class="x-arch-text">${text.replace(/\n/g, "<br />")}</div>`);
+  const origHtml = richText((t.text ?? "").trim());
+  if (origHtml && translation) {
+    parts.push(`    <div class="x-arch-text x-arch-orig">${origHtml}</div>`);
+    parts.push(`    <div class="x-arch-text x-arch-trans">${richText(translation)}</div>`);
+  } else if (origHtml) {
+    parts.push(`    <div class="x-arch-text">${origHtml}</div>`);
   }
   const imgs = (t.mediaLocal ?? []).filter((p) => !p.endsWith(".mp4"));
   if (imgs.length) {
     parts.push(`    <div class="x-arch-media">`);
-    for (const p of imgs) {
+    for (let i = 0; i < imgs.length; i++) {
+      const p = imgs[i]!;
+      const size = mediaMeta[p];
+      const dims = size ? ` width="${size.w}" height="${size.h}"` : "";
       parts.push(
-        `      <a href="/${p}" target="_blank" rel="noopener"><img class="x-arch-img" src="/${p}" alt="推文配图" loading="lazy" /></a>`,
+        `      <a href="/${p}" target="_blank" rel="noopener"><img class="x-arch-img" src="/${p}" alt="@${escapeHtml(author)} 的配图 ${i + 1}/${imgs.length}" loading="lazy" decoding="async"${dims} /></a>`,
       );
     }
     parts.push(`    </div>`);
@@ -147,8 +199,10 @@ function itemCard(
   const video = (t.videoLocal ?? [])[0];
   if (video) {
     const poster = t.posterLocal ? ` poster="/${t.posterLocal}"` : "";
+    const vsize = mediaMeta[video];
+    const dims = vsize ? ` width="${vsize.w}" height="${vsize.h}" data-duration="${Math.round((vsize.ms ?? 0) / 1000)}"` : "";
     parts.push(
-      `    <video class="x-arch-video" preload="none" playsinline${poster} src="/${video}"></video>`,
+      `    <video class="x-arch-video" preload="none" playsinline${poster} src="/${video}"${dims} aria-label="@${escapeHtml(author)} 的视频"></video>`,
     );
   }
   return `  <div class="x-arch-item">\n${parts.join("\n")}\n  </div>`;
@@ -176,6 +230,11 @@ async function main() {
   const translations: Record<string, string> = existsSync(translationsFile)
     ? JSON.parse(await Bun.file(translationsFile).text())
     : {};
+  // 媒体元数据（media-meta.ts 产物）：宽高挂进 HTML，布局稳定不跳动（kzf 裁决 16）
+  const mediaMetaFile = path.join(SRC, "media-meta.json");
+  const mediaMeta: Record<string, { w: number; h: number; ms?: number }> = existsSync(mediaMetaFile)
+    ? JSON.parse(await Bun.file(mediaMetaFile).text())
+    : {};
 
   // 已有策展日报覆盖的日期归档跳过（避免与策展层重复）：
   // signals-daily-（旧混合报）、github-daily-（GitHub 日报，2026-10-05 拆分）、x-daily-（X 日报）
@@ -185,13 +244,25 @@ async function main() {
       .filter(Boolean) as string[],
   );
 
-  // 现有最大编号
+  // 现有归档文件：day → 文件名（复用编号，保证同一日子永远只有一个文件）；
+  // 以及全目录最大编号（新日子从这里续号）
+  const existingByDay = new Map<string, string>();
   let maxNum = 0;
   for (const f of readdirSync(EVENTS_DIR)) {
+    const dayMatch = f.match(/^(\d{5})\.x-archive-(\d{4}-\d{2}-\d{2})\.md$/);
+    if (dayMatch) {
+      const n = Number(dayMatch[1]);
+      maxNum = Math.max(maxNum, n);
+      const day = dayMatch[2];
+      const prev = existingByDay.get(day);
+      // 同日多文件（历史编号漂移残留）时保留最小编号，其余在重建后由调用方清理
+      if (!prev || Number(prev.slice(0, 5)) > n) existingByDay.set(day, f);
+    }
     const m = f.match(/^(\d{5})\./);
     if (m) maxNum = Math.max(maxNum, Number(m[1]));
   }
-  let num = startNum || maxNum + 1;
+  const usedNums = new Set(readdirSync(EVENTS_DIR).map((f) => f.match(/^(\d{5})\./)?.[1]).filter(Boolean) as string[]);
+  let nextFree = maxNum + 1;
 
   // 按本地日期分组
   const byDay = new Map<string, Tweet[]>();
@@ -204,24 +275,41 @@ async function main() {
   }
   const days = [...byDay.keys()].filter((d) => !dailyCovered.has(d)).sort();
   console.error(
-    `有动态的日期 ${byDay.size} 天；跳过日报已覆盖 ${dailyCovered.size} 天；待生成 ${days.length} 天（编号 ${String(num).padStart(5, "0")} 起）`,
+    `有动态的日期 ${byDay.size} 天；跳过日报已覆盖 ${dailyCovered.size} 天；待生成 ${days.length} 天（新日子从 ${String(nextFree).padStart(5, "0")} 起续号）`,
   );
 
   let created = 0;
-  let skipped = 0;
+  let reused = 0;
+  // 历史编号漂移产生的同日多余文件（保留最小编号那份，其余删除）
+  for (const [day, kept] of existingByDay) {
+    const keptNum = kept.slice(0, 5);
+    for (const f of readdirSync(EVENTS_DIR)) {
+      const m = f.match(/^(\d{5})\.x-archive-([\d-]+)\.md$/);
+      if (m && m[2] === day && m[1] !== keptNum && !dry) {
+        rmSync(path.join(EVENTS_DIR, f));
+      }
+    }
+  }
   for (const day of days) {
     const items = byDay.get(day)!.sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
-    const file = path.join(EVENTS_DIR, `${String(num).padStart(5, "0")}.x-archive-${day}.md`);
-    if (existsSync(file)) {
-      skipped++;
-      num++;
-      continue;
+    // 复用既有编号（存在即强制重写，内容是派生数据）；新日子续号
+    const existing = existingByDay.get(day);
+    let numStr: string;
+    if (existing) {
+      numStr = existing.slice(0, 5);
+      reused++;
+    } else {
+      while (usedNums.has(String(nextFree).padStart(5, "0"))) nextFree++;
+      numStr = String(nextFree).padStart(5, "0");
+      usedNums.add(numStr);
+      nextFree++;
     }
+    const file = path.join(EVENTS_DIR, `${numStr}.x-archive-${day}.md`);
     const imgCount = items.reduce((n, t) => n + (t.mediaLocal ?? []).filter((p) => !p.endsWith(".mp4")).length, 0);
     const vidCount = items.reduce((n, t) => n + (t.videoLocal?.length ?? 0), 0);
     const contentTags = classifyTags(items);
     const tags = ["x-archive", ...contentTags];
-    const cards = items.map((t) => itemCard(t, authors, translations)).join("\n");
+    const cards = items.map((t) => itemCard(t, authors, translations, mediaMeta)).join("\n");
     const body = [
       "---",
       `title: "X 归档 ${day}"`,
@@ -242,9 +330,8 @@ async function main() {
       await Bun.write(file, body);
     }
     created++;
-    num++;
   }
-  console.error(`${dry ? "DRY" : "生成"} ${created} 个归档 event${skipped ? `，跳过已存在 ${skipped}` : ""}`);
+  console.error(`${dry ? "DRY" : "生成"} ${created} 个归档 event（复用编号 ${reused}）`);
 }
 
 main().catch((err) => {

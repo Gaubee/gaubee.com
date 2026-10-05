@@ -104,6 +104,11 @@ function enhanceTouch(video: HTMLVideoElement): () => void {
   wrap.appendChild(hud.root);
 
   video.removeAttribute("controls");
+  // 元数据前置（kzf 裁决 16）：生成器把时长挂在 data-duration，布局与进度条即刻可用
+  const hintedDuration = Number(video.dataset.duration ?? 0);
+  if (hintedDuration > 0) {
+    hud.barFill.style.width = `${video.currentTime > 0 ? (video.currentTime / hintedDuration) * 100 : 0}%`;
+  }
   video.addEventListener("timeupdate", () => {
     if (video.duration > 0) hud.barFill.style.width = `${(video.currentTime / video.duration) * 100}%`;
   });
@@ -224,10 +229,8 @@ function fmt(sec: number): string {
 }
 
 export function xvideo(node: HTMLElement): { destroy: () => void } {
-  const videos = Array.from(node.querySelectorAll("video"));
   const cleanups: (() => void)[] = [];
   const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
-
   const io = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
@@ -243,7 +246,10 @@ export function xvideo(node: HTMLElement): { destroy: () => void } {
     { threshold: [0, 0.6, 1] },
   );
 
-  for (const video of videos) {
+  const enhanced = new WeakSet<HTMLVideoElement>();
+  function enhance(video: HTMLVideoElement): void {
+    if (enhanced.has(video)) return;
+    enhanced.add(video);
     video.playsInline = true;
     video.setAttribute("playsinline", "");
     if (coarse) {
@@ -254,8 +260,17 @@ export function xvideo(node: HTMLElement): { destroy: () => void } {
     io.observe(video);
   }
 
+  // 首扫：详情页（SSG HTML）此刻就有 video；列表页（MarkdownViewer 在 $effect 里
+  // 渲染 HTML）此刻还没有——用 MutationObserver 等它们出现后再增强。
+  node.querySelectorAll("video").forEach(enhance);
+  const mo = new MutationObserver(() => {
+    node.querySelectorAll("video").forEach(enhance);
+  });
+  mo.observe(node, { childList: true, subtree: true });
+
   return {
     destroy() {
+      mo.disconnect();
       io.disconnect();
       for (const fn of cleanups) fn();
     },

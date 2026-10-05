@@ -41,17 +41,21 @@
 
 .x-arch-kind {
   flex: none;
-  padding: 1px 7px;
-  border-radius: 999px;
-  font-size: 12px;
-  line-height: 18px;
-  color: #fff;
-  background: var(--muted-foreground);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
 }
-.x-arch-kind-liked { background: oklch(0.62 0.19 25); }
-.x-arch-kind-posted { background: oklch(0.55 0.16 260); }
-.x-arch-kind-reposted { background: oklch(0.6 0.14 150); }
-.x-arch-kind-bookmarked { background: oklch(0.6 0.12 85); }
+.x-arch-kind svg {
+  width: 13px;
+  height: 13px;
+}
+.x-arch-kind-liked { color: oklch(0.62 0.19 25); background: oklch(0.62 0.19 25 / 14%); }
+.x-arch-kind-posted { color: oklch(0.55 0.16 260); background: oklch(0.55 0.16 260 / 14%); }
+.x-arch-kind-reposted { color: oklch(0.6 0.14 150); background: oklch(0.6 0.14 150 / 14%); }
+.x-arch-kind-bookmarked { color: oklch(0.6 0.12 85); background: oklch(0.6 0.12 85 / 14%); }
 
 .x-arch-author {
   font-weight: 600;
@@ -111,17 +115,17 @@
 }
 
 /* ---------------------------------------------------------------------------
- * 译文切换（硬编码译文，CSS checkbox hack，零 JS）
- * 结构：input.x-arch-lang-input + label.x-arch-lang-switch + .x-arch-orig + .x-arch-trans
- * 默认显示原文；勾选后显示译文。label 文案随状态互斥显示。
+ * 译文切换（裁决 15：默认显示译文，切换器收进行头）
+ * 结构：input 是 .x-arch-item 首个子节点；label 在 .x-arch-head 行内；
+ *       orig/trans 是 input 的后续兄弟节点（~ 选择器）。
  * ------------------------------------------------------------------------- */
 .x-arch-lang-input {
   display: none;
 }
-.x-arch-orig {
-  display: block;
-}
 .x-arch-trans {
+  display: none;
+}
+.x-arch-lang-orig {
   display: none;
 }
 .x-arch-lang-input:checked ~ .x-arch-orig {
@@ -130,15 +134,19 @@
 .x-arch-lang-input:checked ~ .x-arch-trans {
   display: block;
 }
+.x-arch-lang-input:checked ~ .x-arch-head .x-arch-lang-zh {
+  display: none;
+}
+.x-arch-lang-input:checked ~ .x-arch-head .x-arch-lang-orig {
+  display: inline;
+}
 .x-arch-lang-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin: 2px 0 6px;
-  padding: 2px 10px;
+  flex: none;
+  padding: 1px 8px;
   border: 1px solid var(--border);
   border-radius: 999px;
   font-size: 12px;
+  line-height: 16px;
   color: var(--muted-foreground);
   cursor: pointer;
   user-select: none;
@@ -147,70 +155,51 @@
   color: var(--primary);
   border-color: var(--primary);
 }
-.x-arch-lang-zh {
-  display: inline;
+
+/* ---------------------------------------------------------------------------
+ * 正文内链接与代码块（裁决 12/13）
+ * ------------------------------------------------------------------------- */
+.x-arch-text a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
 }
-.x-arch-lang-orig {
-  display: none;
+.x-arch-code {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.55;
 }
-.x-arch-lang-input:checked ~ .x-arch-lang-switch .x-arch-lang-zh {
-  display: none;
-}
-.x-arch-lang-input:checked ~ .x-arch-lang-switch .x-arch-lang-orig {
-  display: inline;
+.x-arch-code code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  white-space: pre;
 }
 
 /* ---------------------------------------------------------------------------
- * 视频播放增强（x-video.ts 自绘 HUD，仅触屏启用；桌面走原生 controls）
+ * microlighter 主题（CSS Custom Highlights API，light-dark 单文件适配明暗）
  * ------------------------------------------------------------------------- */
-.xv-wrap {
-  position: relative;
-  touch-action: none;
+[data-syntax-theme="gaubee"] {
+  color-scheme: light dark;
+  --syntax-background: light-dark(#f6f8fa, #12161c);
+  --syntax-foreground: light-dark(#1f2328, #e6edf3);
+  --syntax-comment: light-dark(#6e7781, #8b949e);
+  --syntax-keyword: light-dark(#cf222e, #ff7b72);
+  --syntax-operator: light-dark(#0550ae, #79c0ff);
+  --syntax-string: light-dark(#0a3069, #a5d6ff);
+  --syntax-constant: light-dark(#0550ae, #79c0ff);
+  --syntax-function: light-dark(#8250df, #d2a8ff);
+  --syntax-type: light-dark(#953800, #ffa657);
+  --syntax-variable: light-dark(#953800, #ffa657);
+  --syntax-property: light-dark(#0550ae, #79c0ff);
+  --syntax-tag: light-dark(#116329, #7ee787);
+  --syntax-selector: light-dark(#116329, #7ee787);
 }
-.xv-hud {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.xv-hud-text {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  padding: 6px 14px;
-  border-radius: 10px;
-  background: oklch(0 0 0 / 65%);
-  color: #fff;
-  font-size: 15px;
-  font-variant-numeric: tabular-nums;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.xv-mute {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 34px;
-  height: 34px;
-  border: 0;
-  border-radius: 999px;
-  background: oklch(0 0 0 / 55%);
-  color: #fff;
-  font-size: 16px;
-  line-height: 1;
-  pointer-events: auto;
-  cursor: pointer;
-}
-.xv-bar {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 3px;
-  background: oklch(1 0 0 / 25%);
-}
-.xv-bar-fill {
-  width: 0;
-  height: 100%;
-  background: var(--primary, #f43);
+[data-syntax-theme="gaubee"] .x-arch-code:has(code) {
+  background: var(--syntax-background);
+  color: var(--syntax-foreground);
 }

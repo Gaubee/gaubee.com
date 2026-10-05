@@ -8,10 +8,11 @@
 <script lang="ts">
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
   import { xvideo } from '$lib/player/x-video'
+  import { xhighlight } from '$lib/player/x-highlight'
 
   let { body }: { body: string } = $props()
 </script>
 
-<div class="event-markdown prose prose-sm dark:prose-invert max-w-none text-[15px] leading-6 text-foreground" use:xvideo>
+<div class="event-markdown prose prose-sm dark:prose-invert max-w-none text-[15px] leading-6 text-foreground" data-syntax-theme="gaubee" use:xvideo use:xhighlight>
   <MarkdownViewer markdown={body} inline />
 </div>
