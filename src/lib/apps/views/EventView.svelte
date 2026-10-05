@@ -165,10 +165,10 @@
       </aside>
 
       <!-- 当前月份的事件（移动端预留浮动按钮空间） -->
-      <div class="min-w-0 flex-1 divide-y divide-border pb-28 lg:pb-0">
+      <div class="min-w-0 flex-1 pb-28 lg:pb-0">
         {#each visible as entry (entry.path)}
-          <article class="py-5">
-            <div class="mb-2 flex min-w-0 items-center gap-2 text-sm">
+          <article class="border-border border-b py-5">
+            <div class="event-item-head text-sm sticky top-0 z-10 -mx-1 mb-2 flex min-w-0 items-center gap-2 bg-background px-1 py-1.5">
               <a
                 class="text-muted-foreground inline-flex shrink-0 items-center gap-1 hover:underline"
                 href={hrefFor(entry)}
@@ -188,7 +188,7 @@
                 <ArrowUpRightIcon class="size-3.5" />
               </a>
             </div>
-            <EventBody body={entry.body} href={hrefFor(entry)} onclick={(event) => openEvent(event, entry)} />
+            <EventBody body={entry.body} />
           </article>
         {/each}
       </div>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { photoswipe } from "$lib/photoswipe/action";
+  import { xvideo } from "$lib/player/x-video";
 
   import "$lib/styles/x-archive.css";
 
@@ -48,7 +49,7 @@
   </header>
 
   <!-- 正文（SSG 预渲染 HTML） -->
-  <div class="prose prose-sm dark:prose-invert max-w-none" use:photoswipe>
+  <div class="prose prose-sm dark:prose-invert max-w-none" use:photoswipe use:xvideo>
     {@html article.html}
   </div>
 

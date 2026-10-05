@@ -61,19 +61,79 @@ function hhmm(iso: string): string {
   return Number.isNaN(d.getTime()) ? "" : d.toTimeString().slice(0, 5);
 }
 
-function itemCard(t: Tweet): string {
+/** 内容 tag 分类器（kzf 2026-10-05 裁决：归档基于内容加合理 tag）。
+ *  按当日全部正文命中关键词计数，取最多的前 3 个；命中不足 1 次的规则不入选。 */
+const TAG_RULES: [RegExp, string][] = [
+  [/\b(rust|wasm|webassembly|zig|cargo|crab)\b|rust 代码|Rust 写/i, "rust"],
+  [/\b(react|svelte|vue|frontend|front-end|css|tailwind|html|browser|web api|canvas)\b/i, "frontend"],
+  [/\b(ai|llm|gpt|claude|gemini|agent|openai|anthropic|deepseek|moonbit|model|prompt|kimi|glm)\b|模型|智能体|大语言/i, "ai"],
+  [/\b(database|postgres|mysql|sqlite|redis|sql|duckdb|存储)\b/i, "database"],
+  [/\b(docker|kubernetes|k8s|self-?host|devops|deploy|server|nginx|vps)\b|自托管|部署/i, "devops"],
+  [/\b(apple|ios|macos|swift|iphone|ipad|vision ?pro|airpods)\b|苹果/i, "apple"],
+  [/\b(python|django|flask|pandas)\b/i, "python"],
+  [/\b(game|gameplay|游戏|扫雷|roguelike|像素)\b/i, "game"],
+  [/\b(design|动效|设计|typography|字体|icon|排版)\b/i, "design"],
+  [/\b(security|加密|encrypt|cve|密码学)\b/i, "security"],
+  [/\b(video|ffmpeg|player|播放器|视频)\b/i, "media"],
+  [/\b(mcp|skill|coding agent|cli|terminal|终端)\b/i, "agent-tooling"],
+];
+
+function classifyTags(items: Tweet[]): string[] {
+  const hits = new Map<string, number>();
+  for (const t of items) {
+    const text = `${t.text ?? ""}`;
+    for (const [re, tag] of TAG_RULES) {
+      const m = text.match(re);
+      if (m) hits.set(tag, (hits.get(tag) ?? 0) + m.length);
+    }
+  }
+  return [...hits.entries()]
+    .filter(([, n]) => n >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([tag]) => tag);
+}
+
+interface AuthorInfo {
+  name?: string;
+  avatar?: string;
+}
+
+function itemCard(
+  t: Tweet,
+  authors: Record<string, AuthorInfo>,
+  translations: Record<string, string>,
+): string {
   const author = t.author || "gaubeebangeel";
   const statusUrl = `https://x.com/${author}/status/${t.id}`;
   const time = hhmm(t.created_at);
   const parts: string[] = [];
+  const avatar = authors[author]?.avatar;
+  const avatarImg = avatar
+    ? `<img class="x-arch-avatar" src="${escapeHtml(avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`
+    : "";
   parts.push(
-    `    <div class="x-arch-head"><span class="x-arch-kind x-arch-kind-${t.kind}">${KIND_LABEL[t.kind]}</span>` +
-      `<a class="x-arch-author" href="https://x.com/${author}" rel="nofollow noopener">@${escapeHtml(author)}</a>` +
+    `    <div class="x-arch-head">${avatarImg}<span class="x-arch-kind x-arch-kind-${t.kind}">${KIND_LABEL[t.kind]}</span>` +
+      `<a class="x-arch-author" href="https://x.com/${author}" target="_blank" rel="nofollow noopener">@${escapeHtml(author)}</a>` +
       `<span class="x-arch-time">${time}</span>` +
-      `<a class="x-arch-link" href="${statusUrl}" rel="nofollow noopener">原推文 ↗</a></div>`,
+      `<a class="x-arch-link" href="${statusUrl}" target="_blank" rel="noopener">原推文 ↗</a></div>`,
   );
   const text = escapeHtml((t.text ?? "").trim());
-  if (text) parts.push(`    <div class="x-arch-text">${text.replace(/\n/g, "<br />")}</div>`);
+  const translation = translations[t.id];
+  if (text && translation) {
+    // 译文切换（kzf 2026-10-05 裁决：硬编码译文，CSS checkbox 切换原文/译文，零 JS）
+    const safeId = `xl-${t.id}`;
+    parts.push(
+      `    <div class="x-arch-lang">` +
+        `<input type="checkbox" id="${safeId}" class="x-arch-lang-input" aria-label="切换译文" />` +
+        `<label for="${safeId}" class="x-arch-lang-switch"><span class="x-arch-lang-zh">译文</span><span class="x-arch-lang-orig">原文</span></label>` +
+        `<div class="x-arch-text x-arch-orig">${text.replace(/\n/g, "<br />")}</div>` +
+        `<div class="x-arch-text x-arch-trans">${escapeHtml(translation).replace(/\n/g, "<br />")}</div>` +
+        `</div>`,
+    );
+  } else if (text) {
+    parts.push(`    <div class="x-arch-text">${text.replace(/\n/g, "<br />")}</div>`);
+  }
   const imgs = (t.mediaLocal ?? []).filter((p) => !p.endsWith(".mp4"));
   if (imgs.length) {
     parts.push(`    <div class="x-arch-media">`);
@@ -88,7 +148,7 @@ function itemCard(t: Tweet): string {
   if (video) {
     const poster = t.posterLocal ? ` poster="/${t.posterLocal}"` : "";
     parts.push(
-      `    <video class="x-arch-video" controls preload="none"${poster} src="/${video}"></video>`,
+      `    <video class="x-arch-video" preload="none" playsinline${poster} src="/${video}"></video>`,
     );
   }
   return `  <div class="x-arch-item">\n${parts.join("\n")}\n  </div>`;
@@ -106,6 +166,16 @@ async function main() {
   const store: { items: Record<string, Tweet> } = JSON.parse(
     await Bun.file(path.join(SRC, "x.json")).text(),
   );
+
+  // 作者头像（x-avatars.ts 产物，走外链）与硬编码译文（可渐进补充）
+  const authorsFile = path.join(SRC, "authors.json");
+  const authors: Record<string, AuthorInfo> = existsSync(authorsFile)
+    ? JSON.parse(await Bun.file(authorsFile).text())
+    : {};
+  const translationsFile = path.resolve(import.meta.dir, "..", "translations", "x-tweets.zh.json");
+  const translations: Record<string, string> = existsSync(translationsFile)
+    ? JSON.parse(await Bun.file(translationsFile).text())
+    : {};
 
   // 已有策展日报覆盖的日期归档跳过（避免与策展层重复）：
   // signals-daily-（旧混合报）、github-daily-（GitHub 日报，2026-10-05 拆分）、x-daily-（X 日报）
@@ -149,13 +219,15 @@ async function main() {
     }
     const imgCount = items.reduce((n, t) => n + (t.mediaLocal ?? []).filter((p) => !p.endsWith(".mp4")).length, 0);
     const vidCount = items.reduce((n, t) => n + (t.videoLocal?.length ?? 0), 0);
-    const cards = items.map(itemCard).join("\n");
+    const contentTags = classifyTags(items);
+    const tags = ["x-archive", ...contentTags];
+    const cards = items.map((t) => itemCard(t, authors, translations)).join("\n");
     const body = [
       "---",
       `title: "X 归档 ${day}"`,
       `date: "${day}"`,
       "tags:",
-      "  - x-archive",
+      ...tags.map((t) => `  - ${t}`),
       "---",
       "",
       `<div class="x-arch-meta">${items.length} 条动态 · 图 ${imgCount} · 视频 ${vidCount}</div>`,
