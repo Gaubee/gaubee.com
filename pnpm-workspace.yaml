@@ -2,6 +2,14 @@ packages:
   - "."
   - "worker"
 
+# pnpm >= 12 从这里读构建脚本白名单（bool）；pnpm 10（CI/Docker）忽略本段
+allowBuilds:
+  "@tailwindcss/oxide": true
+  esbuild: true
+  sharp: true
+  workerd: true
+
+# pnpm 10（CI/Docker）从这里读构建脚本白名单；pnpm >= 12 忽略本段
 onlyBuiltDependencies:
   - "@tailwindcss/oxide"
   - esbuild
