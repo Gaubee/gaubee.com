@@ -126,7 +126,13 @@ skip_to(pre: Ctx, target_offset) -> { next: Ctx }       // 快进：不产事件
       验证 `bytes=3221225472`。浏览器主线程 Long Task/真实页面 heap 仍需专用 preview
       性能机补测，详见 `phase3-performance.md`
 - [x] 3.6 COOP/COEP 影响评估：首发保持 Transferable；SAB 不随本轮部署
-- [ ] 3.7 双端走查 + vision 验收 + build/单测门禁（Agent 已完成 production preview 桌面/390px 走查、build 与聚焦单测；Owner vision/full e2e 验收仍待完成）
+- [x] 3.7 双端走查 + vision 验收 + build/单测门禁：修复流式 Worker 分批事件到达后树行模型未触发虚拟行刷新、默认展开在首批 root-only 事件时过早锁定，以及工具栏命令版本游标缺失；production preview 1.3MB e2e 已验证 `payload/items`、巨值预览上限和展开/收起。
+
+### 3.7 Owner vision 回归修复（2026-10-07）
+
+- 根因：流式 Worker 首批只产生根 `start` 事件，树组件在该批次将默认展开状态锁定；后续批次虽补齐模型，虚拟行模板没有读取批次版本，因此仍显示首批根行。
+- 修复：以 `streamVersion` 驱动行计数和行投影，延迟到根容器出现首个子项后默认展开；流式树接入 `jv-virtual-scroll`/`jv-virtual-row` 与 toolbar command，并补齐 `lastCommandVersion`。
+- 证据：`tests/json-viewer-stream.e2e.ts` 在 production preview 上通过，截图落在 `tests/jules-scratch/json-viewer/shots/p3-streaming-expanded-fixed.png`。
 
 ## 6. 验收标准
 

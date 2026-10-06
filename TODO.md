@@ -1335,7 +1335,7 @@ kzf 指令：开发 osapp jsonviewer，ZCode 做基础版，Codex 补充高级�
       分列记录耗时/RSS，3GB 两种谱形均验证 `bytes=3221225472`。浏览器主线程 Long Task、真实页面
       heap/打开耗时仍需专用 preview 性能机补测，详见 `phase3-performance.md`。
 - [x] 3.6：COOP/COEP 影响评估完成，首发保持 Transferable，SAB 不随本轮部署。
-- [ ] 3.7：Agent 已完成 production preview 桌面/390px 走查、build 与聚焦单测；Owner 视觉验收与完整 e2e 仍待完成。
+- [x] 3.7：完成 Owner vision 回归修复；production preview 1.3MB 流式 e2e 验证虚拟行、`payload/items`、巨值预览和展开/收起，截图已落盘。
 
 ### Phase 3 Codex 变更记录（2026-10-06）
 
@@ -1344,3 +1344,4 @@ kzf 指令：开发 osapp jsonviewer，ZCode 做基础版，Codex 补充高级�
 - 初级用户为何无感：现有树组件和同步 `readRows` 接口不变，懒读取仅为大文件窗口和后续值展开提供能力。
 - 3.5 基准补齐：新增 10/100/1024/3072MB 碎片型与巨值型临时文件生成器；MoonBit-wasm/native、JS fallback、JSON.parse 分列采样，native helper 用 UInt64 计算 3GB 尺寸并硬断言 `bytes=3221225472`。
 - 基准边界：Node worker 记录的是分块处理峰值，不冒充浏览器主线程 Long Task；真实 preview 性能矩阵留作后续专用机任务。
+- 流式树回归（2026-10-07）：Worker 分批事件曾只显示 root 行；已用 `streamVersion` 驱动行投影、延迟默认展开并接通 toolbar command。剩余 TODO：token 边界 Custom Highlight、专用 preview 性能机的 Long Task/heap 矩阵。
