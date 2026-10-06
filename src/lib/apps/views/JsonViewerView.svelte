@@ -35,6 +35,7 @@
 	import { readHistory, recordHistory, type JsonHistoryItem } from "./json-viewer/history";
 	import { formatJsonPath, queryJson, type QueryMatch, type QueryOutcome } from "./json-viewer/query";
 	import { inferJsonSchema, inferTypeScript, jsonToYaml, yamlToJson } from "./json-viewer/transform";
+	import { shortcutAction } from "./json-viewer/shortcuts";
 
 	// ---- 状态 ----
 	let inputText = $state("");
@@ -237,6 +238,28 @@
 	function formatHistoryDate(timestamp: number): string {
 		return new Date(timestamp).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 	}
+	function handleShortcut(event: KeyboardEvent): void {
+		const action = shortcutAction(event);
+		if (!action) return;
+		event.preventDefault();
+		switch (action) {
+			case "format":
+				format();
+				break;
+			case "minify":
+				minify();
+				break;
+			case "copy":
+				void copyInput();
+				break;
+			case "toggle-view":
+				view = view === "tree" ? "preview" : "tree";
+				break;
+			case "clear":
+				replaceInput("");
+				break;
+		}
+	}
 
 	function formatBytes(n: number): string {
 		if (n < 1024) return `${n} B`;
@@ -282,6 +305,8 @@
 	onDestroy(() => clearTimeout(copiedTimer));
 </script>
 
+<svelte:window onkeydown={handleShortcut} />
+
 <div class="relative flex h-full min-h-0 flex-col">
 	<!-- 工具栏：全部按钮带 title（渐进披露的引导层） -->
 	<div class="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1.5">
@@ -290,7 +315,7 @@
 			variant="ghost"
 			onclick={format}
 			disabled={!stats}
-			title="格式化为 2 空格缩进（写回输入区）"
+			title="格式化为 2 空格缩进（Cmd/Ctrl+Shift+F）"
 		>
 			<AlignLeft class="size-3.5" /><span class="hidden sm:inline">格式化</span>
 		</Button>
@@ -299,11 +324,11 @@
 			variant="ghost"
 			onclick={minify}
 			disabled={!stats}
-			title="压缩成单行（去掉所有空白，写回输入区）"
+			title="压缩成单行（Cmd/Ctrl+Shift+M）"
 		>
 			<Minimize2 class="size-3.5" /><span class="hidden sm:inline">压缩</span>
 		</Button>
-		<Button size="sm" variant="ghost" onclick={copyInput} disabled={!inputText} title="复制输入区内容">
+		<Button size="sm" variant="ghost" onclick={copyInput} disabled={!inputText} title="复制输入区内容（Cmd/Ctrl+Shift+C）">
 			{#if copied}<CopyCheck class="size-3.5 text-green-600" />{:else}<Copy class="size-3.5" />{/if}
 			<span class="hidden sm:inline">{copied ? "已复制" : "复制"}</span>
 		</Button>
@@ -315,7 +340,7 @@
 			<ChevronsDownUp class="size-3.5" /><span class="hidden sm:inline">收起</span>
 		</Button>
 		<span class="mx-1 h-4 w-px bg-border" aria-hidden="true"></span>
-		<Button size="sm" variant="ghost" onclick={() => replaceInput("")} disabled={!inputText} title="清空输入">
+		<Button size="sm" variant="ghost" onclick={() => replaceInput("")} disabled={!inputText} title="清空输入（Cmd/Ctrl+Shift+X）">
 			<Trash2 class="size-3.5" /><span class="hidden sm:inline">清空</span>
 		</Button>
 		<Button size="sm" variant="ghost" onclick={loadExample} title="填充一份覆盖所有类型的示例数据">
@@ -355,10 +380,10 @@
 		<div class="ml-auto">
 			<Tabs.Root value={view} onValueChange={(v) => (view = v as "tree" | "preview")}>
 				<Tabs.List class="h-7">
-					<Tabs.Trigger value="tree" class="h-6 px-2.5 text-xs" title="以可折叠的树浏览结构">
+					<Tabs.Trigger value="tree" class="h-6 px-2.5 text-xs" title="以可折叠的树浏览结构（Cmd/Ctrl+Shift+V 切换）">
 						树
 					</Tabs.Trigger>
-					<Tabs.Trigger value="preview" class="h-6 px-2.5 text-xs" title="格式化后的只读预览（带语法高亮）">
+					<Tabs.Trigger value="preview" class="h-6 px-2.5 text-xs" title="格式化后的只读预览（Cmd/Ctrl+Shift+V 切换）">
 						预览
 					</Tabs.Trigger>
 				</Tabs.List>
