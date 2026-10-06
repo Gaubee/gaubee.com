@@ -4,7 +4,10 @@ import { diffJson } from "./diff";
 
 describe("diffJson", () => {
   it("报告对象新增、删除和修改", () => {
-    const result = diffJson({ keep: 1, rename: "old", removed: true }, { keep: 1, rename: "new", added: 2 });
+    const result = diffJson(
+      { keep: 1, rename: "old", removed: true },
+      { keep: 1, rename: "new", added: 2 },
+    );
     expect(result).toEqual([
       { path: ["added"], pathText: "$.added", kind: "added", before: undefined, after: 2 },
       { path: ["removed"], pathText: "$.removed", kind: "removed", before: true, after: undefined },

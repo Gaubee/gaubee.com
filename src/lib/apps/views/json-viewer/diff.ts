@@ -75,7 +75,10 @@ function sameJsonValue(left: unknown, right: unknown): boolean {
     const a = left as Record<string, unknown>;
     const b = right as Record<string, unknown>;
     const keys = Object.keys(a);
-    return keys.length === Object.keys(b).length && keys.every((key) => Object.hasOwn(b, key) && sameJsonValue(a[key], b[key]));
+    return (
+      keys.length === Object.keys(b).length &&
+      keys.every((key) => Object.hasOwn(b, key) && sameJsonValue(a[key], b[key]))
+    );
   }
   return false;
 }

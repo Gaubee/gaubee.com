@@ -20,9 +20,12 @@ export interface VirtualTreeRow {
 /** 返回当前展开状态下的深度优先行列表。 */
 export function flattenJsonTree(value: unknown, openPaths: ReadonlySet<string>): VirtualTreeRow[] {
   const rows: VirtualTreeRow[] = [];
-  const stack: Array<{ path: JsonPathSegment[]; name: string | null; value: unknown; depth: number }> = [
-    { path: [], name: null, value, depth: 0 },
-  ];
+  const stack: Array<{
+    path: JsonPathSegment[];
+    name: string | null;
+    value: unknown;
+    depth: number;
+  }> = [{ path: [], name: null, value, depth: 0 }];
   while (stack.length > 0) {
     const current = stack.pop();
     if (!current) continue;
@@ -92,6 +95,7 @@ export function pathKey(path: readonly JsonPathSegment[]): string {
 
 function childEntries(value: unknown): Array<[JsonPathSegment, unknown]> {
   if (Array.isArray(value)) return value.map((child, index) => [index, child]);
-  if (value !== null && typeof value === "object") return Object.entries(value as Record<string, unknown>);
+  if (value !== null && typeof value === "object")
+    return Object.entries(value as Record<string, unknown>);
   return [];
 }
