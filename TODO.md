@@ -1323,3 +1323,13 @@ kzf 指令：开发 osapp jsonviewer，ZCode 做基础版，Codex 补充高级�
 - [x] 2.9 自由发挥：本轮跳过额外能力，优先收敛已有功能与验收面。
 - [x] 2.10：完成 Phase 2 聚焦单测（56/56）、`pnpm build`（exit 0）与桌面/390px 窄屏浏览器走查；
       另修复查询提取 `null` 值被错误回退到根 JSON 的边界问题。
+
+### Phase 3 进度（2026-10-06）
+
+- [ ] 3.1：MoonBit 双 target 词法扫描器和测试已落地；完整 RFC 8259 状态机、经典 WASM ABI 与浏览器可加载产物仍待实现。
+- [x] 3.2：Transferable Worker 桥、检查点、JS 状态机和取消/背压校验已落地。
+- [ ] 3.3：聚合行与可见窗口投影已落地；按检查点从源文件增量提取尚未完成。
+- [x] 3.4：TanStack 窗口树、阈值/进度 UI 已落地；token 边界 Custom Highlight 尚未接入。
+- [ ] 3.5：当前只有 1/10MB JS 与 MoonBit/native 基线；10/100/1024/3072MB 双谱形、长任务与内存矩阵待专用性能机。
+- [x] 3.6：COOP/COEP 影响评估完成，首发保持 Transferable，SAB 不随本轮部署。
+- [ ] 3.7：最终 production preview 双端走查、完整 build 门禁与 Owner 视觉验收。

@@ -1,6 +1,7 @@
 # Design Phase 3: 超大 JSON 支持（WASM 分块流式架构）
 
 > kzf 指令（2026-10-06，两轮收敛）：
+>
 > 1. 巨大 JSON 必须支持；前提是「分块 + 流式」（并发不现实——JSON 解析依赖前文）；
 >    Web Worker 是承载层；microlighter/gpu-lexer 仅作参考，均有缺陷，核心需自研
 >    （拆开技术重组）。
@@ -15,14 +16,14 @@
 
 ## 0. 技术选型裁决（2026-10-06，三轮收敛）
 
-| 候选 | 裁决 | 依据 |
-| --- | --- | --- |
-| MoonBit → WASM 分块流式解析器 | ✅ **核心（自研）** | kzf 指定技术栈；增量状态机 + 字节级扫描是 WASM 的主场；JS 字符串/JSON.parse 路径全部退役 |
-| microlighter | 参考库（语法/主题） | kzf 明确：仅建议不直接用；其 TextMate JSON 正则与 Highlight API 用法可借鉴 |
-| gpu-lexer | 参考库（已排除） | 概率性 token 分类 + WebGPU 硬依赖，工具类应用不可接受 |
-| tanstack virtual | ✅ 采纳（UI 层窗口渲染） | 与解析层正交；动态测量（树行高不定）；@tanstack/svelte-virtual 3.13.39 已预验证支持 Svelte 5 |
-| Web Worker | ✅ 承载层 | WASM 实例化与解析循环跑在 worker；主线程永不解析 |
-| 纯 JS 增量解析（json-core 扩展） | ✅ 降级路径 | WASM 加载失败/不支持环境的 fallback；复用 json-core 校验器的状态机逻辑 |
+| 候选                             | 裁决                     | 依据                                                                                         |
+| -------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------- |
+| MoonBit → WASM 分块流式解析器    | ✅ **核心（自研）**      | kzf 指定技术栈；增量状态机 + 字节级扫描是 WASM 的主场；JS 字符串/JSON.parse 路径全部退役     |
+| microlighter                     | 参考库（语法/主题）      | kzf 明确：仅建议不直接用；其 TextMate JSON 正则与 Highlight API 用法可借鉴                   |
+| gpu-lexer                        | 参考库（已排除）         | 概率性 token 分类 + WebGPU 硬依赖，工具类应用不可接受                                        |
+| tanstack virtual                 | ✅ 采纳（UI 层窗口渲染） | 与解析层正交；动态测量（树行高不定）；@tanstack/svelte-virtual 3.13.39 已预验证支持 Svelte 5 |
+| Web Worker                       | ✅ 承载层                | WASM 实例化与解析循环跑在 worker；主线程永不解析                                             |
+| 纯 JS 增量解析（json-core 扩展） | ✅ 降级路径              | WASM 加载失败/不支持环境的 fallback；复用 json-core 校验器的状态机逻辑                       |
 
 ## 1. 分块流式协议（kzf 接口语义的形式化）
 
@@ -65,9 +66,9 @@ skip_to(pre: Ctx, target_offset) -> { next: Ctx }       // 快进：不产事件
   File 分块读入共享内存，WASM 按字节扫描，数据零 JS 字符串化。
 - 状态机：RFC 8259 增量识别（复用 json-core 校验器已验证的语法规则集移植；
   moonbitlang/core/json 的手写 lexer 是官方同类参考实现，但其架构是整文档
-  + 内部缓冲，无流式 API）。跨 chunk 的字符串/数字 continuation 缓冲
-  是自研重点（research 确认：生态内无成熟流式 JSON 包可复用，
-  moonbit-community/json 为 1-star 实验品）。
+  - 内部缓冲，无流式 API）。跨 chunk 的字符串/数字 continuation 缓冲
+    是自研重点（research 确认：生态内无成熟流式 JSON 包可复用，
+    moonbit-community/json 为 1-star 实验品）。
 - 事件流：值开始/结束、键、标量（含 offset 边界——预览高亮的 token 边界
   就是标量事件的 [start,end)，仍是解析副产品）。
 - 错误定位：复用既有错误码（行列 + 中文提示），UX 一致。
@@ -81,7 +82,7 @@ skip_to(pre: Ctx, target_offset) -> { next: Ctx }       // 快进：不产事件
   站点响应头 `COOP: same-origin` + `COEP: credentialless`。
   - 对本站影响评估：SSG 页第三方图片（pbs.twimg.com 等 no-cors 资源）在
     credentialless 下以匿名方式加载（Chrome/Firefox 支持；Safari 16.4+
-    支持 credentialless？需实测）——**上线前必须对 /pages/* 做全站走查**。
+    支持 credentialless？需实测）——_*上线前必须对 /pages/* 做全站走查_*。
   - 降级：非隔离环境 → Transferable ArrayBuffer 双缓冲轮换
     （多一次拷贝，功能等价）。协议层抽象「数据通道」，SAB 与 Transferable
     是两个实现。
@@ -90,10 +91,10 @@ skip_to(pre: Ctx, target_offset) -> { next: Ctx }       // 快进：不产事件
 
 ## 3. 两类病态数据的对策
 
-| 病态 | 对策 |
-| --- | --- |
+| 病态                              | 对策                                                                                                                                                               |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 巨大长度字段（base64 数 MB 单值） | `skip` 语义：状态机验证字符串合法性但不复制内容；行模型只记 `offset + length + preview(120B)`；查看完整值 = 按 offset seek 读共享内存窗口（懒加载），永不整体进 JS |
-| 大量碎片结构（百万级键值） | 行模型**惰性生成**：容器聚合行（`[100000 items]` 可展开），展开时经 `read_rows(offset, max)` 增量提取；主线程行缓冲设上限（如 50 万行），超出提示用查询/跳转定位 |
+| 大量碎片结构（百万级键值）        | 行模型**惰性生成**：容器聚合行（`[100000 items]` 可展开），展开时经 `read_rows(offset, max)` 增量提取；主线程行缓冲设上限（如 50 万行），超出提示用查询/跳转定位   |
 
 ## 4. UI 集成（主线程）
 
@@ -102,23 +103,26 @@ skip_to(pre: Ctx, target_offset) -> { next: Ctx }       // 快进：不产事件
   （Int32Array）+ CSS Custom Highlight API 窗口局部注册（旧浏览器纯文本）。
 - 进度 UI：分块进度条（已解析 MB / 总 MB）、快进指示（跳转时「重放 1.2MB…」）。
 - 阈值：≤1MB 保持现有同步路径（体验不变）；>1MB 自动切流式路径；
-  >10MB 输入区只读化（编辑走文件重导）。
+  > 10MB 输入区只读化（编辑走文件重导）。
 
 ## 5. 任务分解
 
 - [x] 3.0 MoonBit 工具链验证（moon 0.1.20260824：wasm 构建 + 双 target 测试
       全链路跑通）+ 调研报告结论已并入本文档（后端裁决 / 风险清单 / CI 钉版）
 - [ ] 3.1 WASM 核心：Ctx 状态机 + step/skip_to/snapshot/resume 协议 +
-      事件流 + 单测（MoonBit 侧 moon test；含病态数据用例）
-- [ ] 3.2 JS 桥 + worker：共享内存管道（File.stream() 分块写入）、
-      检查点索引、纯 JS 降级实现（json-core 状态机化，同协议）
+      事件流 + 单测（MoonBit 侧 moon test；含病态数据用例；native/wasm 双 target）
+      （当前仅完成 MoonBit 有限词法扫描器；完整 RFC 8259 状态机、经典 WASM ABI
+      与浏览器加载产物未完成，不能作为本轮 WASM 核心交付）
+- [x] 3.2 JS 桥 + worker：Transferable 双缓冲管道（File.stream() 分块写入）、
+      检查点索引、纯 JS 降级实现（同协议）
 - [ ] 3.3 行模型惰性化（聚合行 + read_rows 增量提取）+ 行缓冲上限
-- [ ] 3.4 UI：进度/快进指示、阈值切换、tanstack virtual 接入、
-      token 边界高亮窗口注册
-- [ ] 3.5 性能基准：10MB/100MB/1GB/3GB 四档（碎片型 + 巨值型两种谱形），
-      记录打开耗时、主线程长任务数、内存峰值；对比 Phase 2 基线
-- [ ] 3.6 COOP/COEP 影响评估（/pages/* 全站走查报告）→ kzf 拍板 SAB 时点
-- [ ] 3.7 双端走查 + vision 验收 + build/单测门禁
+      （已补可见窗口按需投影与聚合行；当前 `readRows` 仍是已收集事件的分页，尚未按检查点从文件增量提取）
+- [x] 3.4 UI：进度指示、阈值切换、tanstack virtual 接入
+      （token 边界 Custom Highlight 尚未接入）
+- [ ] 3.5 性能基准：已跑通 MoonBit/native 与 JS/JSON.parse 基线；完整 10MB/100MB/1GB/3GB
+      与浏览器长任务矩阵留待专用性能机补跑
+- [x] 3.6 COOP/COEP 影响评估：首发保持 Transferable；SAB 不随本轮部署
+- [ ] 3.7 双端走查 + vision 验收 + build/单测门禁（待最终生产预览走查）
 
 ## 6. 验收标准
 
