@@ -111,14 +111,16 @@ export class AppManager {
     return this.allInstalled.filter((app) => app.defaultArea === "main" && !isEntryHidden(app));
   }
 
-  /** bottom 区的应用（entry activity 未隐藏）。 */
+  /** bottom 区的应用（隐藏导航的 bottom 应用仍可从全部应用打开）。 */
   get bottomApps(): InstalledApp[] {
-    return this.allInstalled.filter((app) => app.defaultArea === "bottom" && !isEntryHidden(app));
+    return this.allInstalled.filter((app) => app.defaultArea === "bottom");
   }
 
-  /** 所有已安装应用的 entry route（用于 NavController ALL_TABS，entry activity 未隐藏）。 */
+  /** 所有已安装应用的 entry route（底栏应用即使隐藏导航也需要注册到 NavController）。 */
   get allRoutes(): string[] {
-    return this.allInstalled.filter((app) => !isEntryHidden(app)).map((app) => getEntryRoute(app));
+    return this.allInstalled
+      .filter((app) => !isEntryHidden(app) || app.defaultArea === "bottom")
+      .map((app) => getEntryRoute(app));
   }
 
   /** 可卸载的应用（非系统内置）。 */

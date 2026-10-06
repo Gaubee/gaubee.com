@@ -66,7 +66,7 @@
   function launch(route: string, area: string) {
     if (area === 'pop') {
       navController.activatePop(route)
-    } else if (appManager.isEntryRouteVisible(route)) {
+    } else if (area === 'bottom' || appManager.isEntryRouteVisible(route)) {
       // 非隐藏 entry activity：openApp（加入任务栏 + 聚焦）
       // github-editor 例外：点桌面图标总是回首页（编辑器是多页面应用，
       // 用户期望从桌面启动器进入时看到首页而非上次的编辑工作区）

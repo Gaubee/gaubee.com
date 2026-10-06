@@ -142,7 +142,7 @@
   });
   function getAllBottomLoaders(): Array<{ tabId: TabId; loader: () => Promise<{ default: Component }> }> {
     return appManager.allInstalled
-      .filter((app) => app.defaultArea === "bottom" && !app.hiddenFromNav)
+      .filter((app) => app.defaultArea === "bottom")
       .map((app) => {
         const entryActivity = app.activities.find((a) => a.entry) ?? app.activities[0];
         return { tabId: app.route, loader: entryActivity.root.component };

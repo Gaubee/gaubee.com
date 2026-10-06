@@ -25,7 +25,7 @@
   function launch(route: string, area: string) {
     if (area === 'pop') {
       navController.activatePop(route)
-    } else if (appManager.isEntryRouteVisible(route)) {
+    } else if (area === 'bottom' || appManager.isEntryRouteVisible(route)) {
       navController.openApp(route)
     } else {
       navController.navigateMain(route)
