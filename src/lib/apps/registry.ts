@@ -4,10 +4,10 @@ import { appStoreApp } from "./builtin/app-store";
 import { articlesApp } from "./builtin/articles";
 // 系统应用（直接静态 import，打包进主代码）
 import { desktopApp } from "./builtin/desktop";
+import { eventApp } from "./builtin/event";
 import { notificationsApp } from "./builtin/notifications";
 import { searchApp } from "./builtin/search";
 import { settingsApp } from "./builtin/settings";
-import { eventApp } from "./builtin/event";
 import { geoRulesApp } from "./builtin/geo-rules";
 import { skillGraphApp } from "./builtin/skill-graph";
 import { themeApp } from "./builtin/theme";
@@ -15,6 +15,7 @@ import { filesApp } from "./installable/files";
 // 可安装应用（动态 import，按需加载）
 import { githubApp } from "./installable/github";
 import { githubEditorApp } from "./installable/github-editor";
+import { jsonViewerApp } from "./installable/json-viewer";
 import { terminalApp } from "./installable/terminal";
 /**
  * GaubeeOS 应用注册中心。
@@ -50,6 +51,7 @@ export function registerAllApps(): void {
   appManager.register(githubEditorApp);
   appManager.register(terminalApp);
   appManager.register(filesApp);
+  appManager.register(jsonViewerApp);
 
   // 初始化：恢复用户安装状态
   appManager.init();
@@ -69,7 +71,7 @@ export {
   skillGraphApp,
   geoRulesApp,
 };
-export { githubApp, githubEditorApp, terminalApp, filesApp };
+export { githubApp, githubEditorApp, terminalApp, filesApp, jsonViewerApp };
 
 /** 获取所有已注册应用。 */
 export function getAllRegisteredApps(): AppEntry[] {
@@ -89,6 +91,7 @@ export function getAllRegisteredApps(): AppEntry[] {
     githubEditorApp,
     terminalApp,
     filesApp,
+    jsonViewerApp,
   ];
 }
 

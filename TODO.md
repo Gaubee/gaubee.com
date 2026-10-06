@@ -1288,3 +1288,24 @@ kzf 指令：把 gaubee-skills 的技能 Graph 做成 gaubeeOS 的一个 osapp�
   搜索 zod 邻域高亮正确；截图过 vision 子代理验收。
 - 已知坑（记录给后人）：vite preview 的 sirv 会缓存 build 目录，重建后必须
   重启 preview；SW stale-while-revalidate 会让 reload 落后一个版本。
+
+## json-viewer 应用 Phase 1：基础版（2026-10-06）
+
+kzf 指令：开发 osapp jsonviewer，ZCode 做基础版，Codex 补充高级功能，目标
+「高级工程师喜欢用、初级工程师零学习成本」（渐进披露）。
+
+- 新增 `src/lib/apps/installable/json-viewer.ts` + `views/JsonViewerView.svelte` +
+  `views/json-viewer/`（json-core 纯逻辑 + 递归树节点），路由 /app/json-viewer，
+  category: default（默认安装可卸载）。
+- 自研轻量 JSON 校验器做错误定位（新版 V8 常见错误不再给 position，引擎消息
+  跨引擎不可靠）：行列精确 + 中文人话提示 + 出错行摘录；成功路径仍走 JSON.parse。
+- 交互：粘贴即看树（250ms 防抖）、拖入 .json 文件（window 级命中）、示例数据、
+  格式化/压缩/复制、树|预览双视图、统计条（大小/顶层类型/节点数/深度）、
+  全部展开/收起、长字符串截断展开、暗色双模式 oklch 着色。
+- CodeMirror 组件新增 lineNumbers/wide 可选 props（默认关，零回归）。
+- AppManager 默认应用增量迁移机制（DEFAULT_APP_IDS 新增应用对老用户一次性
+  补装，打标不覆盖主动卸载；修复 writeStorage 提前调用清空已安装列表的时序 bug）。
+- 验证：json-core 28 + 迁移 4 单测全过，client 31/31，pnpm build exit 0；
+  Playwright 走查 + vision 子代理两轮验收（首轮 4 fail 修复后 8/8 ALL PASS）。
+- Phase 2（Codex）：openspec/changes/add-json-viewer-app/tasks.md（路径查询/
+  转换/diff/历史/虚拟滚动/快捷键/CLI）。

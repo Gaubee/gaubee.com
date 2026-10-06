@@ -56,6 +56,8 @@ function cliToShellCommand(cli: CliCommand): Command {
 // ---------------------------------------------------------------------------
 
 const STORAGE_KEY = "gaubee:os:apps";
+/** 默认应用增量迁移标记（runDefaultAppMigrations）。 */
+const MIGRATIONS_KEY = "gaubee:os:apps-default-migrations";
 
 /** 系统内置应用 ID（不可卸载）。desktop 是系统级桌面应用（默认首页）。 */
 export const SYSTEM_APP_IDS = [
@@ -72,7 +74,13 @@ export const SYSTEM_APP_IDS = [
 ] as const;
 
 /** 默认安装的应用 ID（可卸载）。 */
-export const DEFAULT_APP_IDS = ["github", "github-editor", "terminal", "files"] as const;
+export const DEFAULT_APP_IDS = [
+  "github",
+  "github-editor",
+  "terminal",
+  "files",
+  "json-viewer",
+] as const;
 
 export type SystemAppId = (typeof SYSTEM_APP_IDS)[number];
 export type DefaultAppId = (typeof DEFAULT_APP_IDS)[number];
@@ -81,7 +89,7 @@ export type DefaultAppId = (typeof DEFAULT_APP_IDS)[number];
 // 状态
 // ---------------------------------------------------------------------------
 
-class AppManager {
+export class AppManager {
   /** 所有已注册的应用（静态 manifest）。 */
   private registry = new Map<string, AppEntry>();
 
@@ -209,7 +217,12 @@ class AppManager {
       }
     }
 
+    const migrated = this.runDefaultAppMigrations(installed);
+
     this.installedIds = installed;
+    // 迁移补装的持久化必须在 installedIds 赋值之后（writeStorage 读 state 字段，
+    // 提前调用会把 init 前的空列表写进 localStorage，清掉老用户的已安装应用）
+    if (migrated) this.writeStorage();
     this.syncSearchServices();
     this.syncServices();
     this.syncSettingsSections();
@@ -297,6 +310,48 @@ class AppManager {
   }
 
   // ---- 持久化 ----
+
+  /**
+   * 增量默认应用迁移：DEFAULT_APP_IDS 新增应用时，为老用户一次性补装。
+   *
+   * 背景：init() 只对首次访问（无持久化）安装默认应用，老用户永远看不到新默认应用
+   * （skill-graph 上线时曾被迫做桌面布局版本迁移）。每条迁移带唯一 tag，执行一次即
+   * 打标（localStorage），之后用户主动卸载不会被再次补装。
+   * 未来新增默认应用时在此追加一条即可。
+   */
+  private runDefaultAppMigrations(installed: string[]): boolean {
+    if (typeof localStorage === "undefined") return false;
+    const migrations: ReadonlyArray<{ id: string; tag: string }> = [
+      { id: "json-viewer", tag: "add-json-viewer@2026-10-06" },
+    ];
+    let done: string[] = [];
+    try {
+      const raw = localStorage.getItem(MIGRATIONS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as unknown;
+        if (Array.isArray(parsed) && parsed.every((i) => typeof i === "string")) {
+          done = parsed;
+        }
+      }
+    } catch {
+      done = [];
+    }
+    let changed = false;
+    for (const m of migrations) {
+      if (done.includes(m.tag)) continue;
+      if (this.registry.has(m.id) && !installed.includes(m.id)) installed.push(m.id);
+      done.push(m.tag);
+      changed = true;
+    }
+    if (changed) {
+      try {
+        localStorage.setItem(MIGRATIONS_KEY, JSON.stringify(done));
+      } catch {
+        // ignore（隐私模式等）
+      }
+    }
+    return changed;
+  }
 
   private readStorage(): string[] | null {
     if (typeof localStorage === "undefined") return null;

@@ -23,7 +23,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
   import { EditorState, type Extension } from '@codemirror/state'
-  import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/view'
+  import { EditorView, keymap, lineNumbers, placeholder as cmPlaceholder } from '@codemirror/view'
   import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
   import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
   import { languages } from '@codemirror/language-data'
@@ -41,6 +41,10 @@
     /** 文件路径（GithubEditor 按扩展名选语言）。
      *  不传或为 .md 时用 markdown + WYSIWYG；其它扩展名用对应语言包（无 WYSIWYG）。 */
     filePath = '',
+    /** 显示行号槽（默认关：markdown 写作不需要；代码/JSON 场景开）。 */
+    lineNumbers: showLineNumbers = false,
+    /** 取消 72ch 写作限宽，内容撑满容器（工具类场景用）。 */
+    wide = false,
     onInput,
     onSave,
     /** 命令式 API 载体（父组件创建并传入，组件挂载时填充 insertText 方法）。 */
@@ -51,6 +55,8 @@
     readonly?: boolean
     placeholder?: string
     filePath?: string
+    lineNumbers?: boolean
+    wide?: boolean
     onInput?: (value: string) => void
     onSave?: () => void
     api?: CodeMirrorApi
@@ -109,6 +115,7 @@
       syntaxHighlighting(editorHighlightStyle),
     ]
     if (placeholder) exts.push(cmPlaceholder(placeholder))
+    if (showLineNumbers) exts.push(lineNumbers())
 
     // 语言选择：filePath 为空或 .md → markdown + WYSIWYG；其它 → 按扩展名选语言包
     const langExt = filePath ? langByPath(filePath) : null
@@ -200,7 +207,7 @@
   })
 </script>
 
-<div class="codemirror-host h-full overflow-auto" bind:this={host}></div>
+<div class="codemirror-host h-full overflow-auto" class:wide bind:this={host}></div>
 
 <style>
   :global(.codemirror-host .cm-editor) {
@@ -215,9 +222,14 @@
   :global(.codemirror-host .cm-editor.cm-focused) {
     outline: none;
   }
-  :global(.codemirror-host .cm-editor .cm-content) {
+  :global(.codemirror-host .cm-content) {
     max-width: 72ch;
     margin: 0 auto;
     padding-bottom: 40vh;
+  }
+  /* wide 模式（工具类场景）：取消写作限宽 */
+  :global(.codemirror-host.wide .cm-content) {
+    max-width: none;
+    margin: 0;
   }
 </style>

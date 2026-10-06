@@ -1,0 +1,325 @@
+<!--
+	JSON 查看器视图（osapp: json-viewer）。
+
+	渐进披露：默认路径只有「粘贴 → 看树」；工具栏按钮全部带 title tooltip，
+	初级用户可以无视高级能力而不受干扰。纯逻辑在 ./json-viewer/json-core.ts
+	（server project 可测），本组件只做编排。文件拖入监听 window（全窗口命中，
+	用户无需瞄准输入区）。
+-->
+<script lang="ts">
+	import { onDestroy } from "svelte";
+	import {
+		AlignLeft,
+		ChevronsDownUp,
+		ChevronsUpDown,
+		Copy,
+		CopyCheck,
+		FileJson,
+		Minimize2,
+		Trash2,
+	} from "@lucide/svelte";
+	import { Button } from "$lib/components/ui/button";
+	import * as Tabs from "$lib/components/ui/tabs";
+	import CodeMirror from "$lib/editor/CodeMirror.svelte";
+	import { copyText } from "$lib/utils/clipboard";
+
+	import { buildStats, EXAMPLE_JSON, parseJson, type ParseOutcome } from "./json-viewer/json-core";
+	import JsonTreeNode from "./json-viewer/JsonTreeNode.svelte";
+
+	// ---- 状态 ----
+	let inputText = $state("");
+	/** 程序化写回计数：变化时 CodeMirror 重载 doc（用户打字时不回写，避免反馈循环）。 */
+	let docVersion = $state(0);
+	/** 防抖解析结果（text 与值同源，防 250ms 间隙内输入变化的错位）。 */
+	let parsed = $state<{ text: string; outcome: ParseOutcome } | null>(null);
+	let parseSeq = $state(0);
+	let view = $state<"tree" | "preview">("tree");
+	/** 树展开/收起广播（version 递增触发所有节点对齐）。 */
+	let treeCommand = $state({ version: 0, open: true });
+	let copied = $state(false);
+	let dragDepth = $state(0);
+	let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+
+	// ---- 防抖解析（spec R2：≤300ms）----
+	$effect(() => {
+		const text = inputText;
+		if (text.trim() === "") {
+			parsed = null;
+			return;
+		}
+		const timer = setTimeout(() => {
+			parsed = { text, outcome: parseJson(text) };
+			parseSeq += 1;
+		}, 250);
+		return () => clearTimeout(timer);
+	});
+
+	/** 解析成功的聚合（值 + 对应文本），供树/预览/统计同源消费。 */
+	const okResult = $derived.by<{ text: string; value: unknown } | null>(() => {
+		const p = parsed;
+		if (!p || !p.outcome.ok) return null;
+		return { text: p.text, value: p.outcome.value };
+	});
+	const parseError = $derived.by(() => {
+		const p = parsed;
+		return p && !p.outcome.ok ? p.outcome.error : null;
+	});
+	const stats = $derived(okResult ? buildStats(okResult.value, okResult.text) : null);
+	/** 大 JSON（>2000 节点）默认只展开第一层，防渲染雪崩；展开交给用户。 */
+	const defaultOpen = $derived(stats ? stats.nodeCount <= 2000 : true);
+	const topTypeName = $derived.by(() => {
+		if (!stats) return "";
+		return {
+			object: "对象",
+			array: "数组",
+			string: "字符串",
+			number: "数字",
+			boolean: "布尔",
+			null: "null",
+		}[stats.topType];
+	});
+
+	// ---- 动作 ----
+	function replaceInput(text: string): void {
+		inputText = text;
+		docVersion += 1;
+	}
+	function format(): void {
+		if (okResult) replaceInput(JSON.stringify(okResult.value, null, 2));
+	}
+	function minify(): void {
+		if (okResult) replaceInput(JSON.stringify(okResult.value));
+	}
+	async function copyInput(): Promise<void> {
+		if (!inputText) return;
+		try {
+			await copyText(inputText);
+			copied = true;
+			clearTimeout(copiedTimer);
+			copiedTimer = setTimeout(() => (copied = false), 1500);
+		} catch {
+			// 剪贴板不可用（权限/非安全上下文）：静默失败，数据在输入区可见可手动复制
+		}
+	}
+	function collapseAll(): void {
+		treeCommand = { version: treeCommand.version + 1, open: false };
+	}
+	function expandAll(): void {
+		treeCommand = { version: treeCommand.version + 1, open: true };
+	}
+	function loadExample(): void {
+		replaceInput(EXAMPLE_JSON);
+	}
+
+	function formatBytes(n: number): string {
+		if (n < 1024) return `${n} B`;
+		if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+		return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+	}
+
+	// ---- 文件拖入（window 级，全窗口命中；$effect 清理函数负责解绑）----
+	$effect(() => {
+		const hasFiles = (e: DragEvent) =>
+			Array.from(e.dataTransfer?.types ?? []).includes("Files");
+		const onDragEnter = (e: DragEvent) => {
+			if (!hasFiles(e)) return;
+			e.preventDefault();
+			dragDepth += 1;
+		};
+		const onDragOver = (e: DragEvent) => {
+			if (hasFiles(e)) e.preventDefault();
+		};
+		const onDragLeave = (e: DragEvent) => {
+			if (!hasFiles(e)) return;
+			dragDepth = Math.max(0, dragDepth - 1);
+		};
+		const onDrop = (e: DragEvent) => {
+			if (!hasFiles(e)) return;
+			e.preventDefault();
+			dragDepth = 0;
+			const file = e.dataTransfer?.files?.[0];
+			if (file) void file.text().then((text) => replaceInput(text));
+		};
+		window.addEventListener("dragenter", onDragEnter);
+		window.addEventListener("dragover", onDragOver);
+		window.addEventListener("dragleave", onDragLeave);
+		window.addEventListener("drop", onDrop);
+		return () => {
+			window.removeEventListener("dragenter", onDragEnter);
+			window.removeEventListener("dragover", onDragOver);
+			window.removeEventListener("dragleave", onDragLeave);
+			window.removeEventListener("drop", onDrop);
+		};
+	});
+
+	onDestroy(() => clearTimeout(copiedTimer));
+</script>
+
+<div class="relative flex h-full min-h-0 flex-col">
+	<!-- 工具栏：全部按钮带 title（渐进披露的引导层） -->
+	<div class="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1.5">
+		<Button
+			size="sm"
+			variant="ghost"
+			onclick={format}
+			disabled={!stats}
+			title="格式化为 2 空格缩进（写回输入区）"
+		>
+			<AlignLeft class="size-3.5" /><span class="hidden sm:inline">格式化</span>
+		</Button>
+		<Button
+			size="sm"
+			variant="ghost"
+			onclick={minify}
+			disabled={!stats}
+			title="压缩成单行（去掉所有空白，写回输入区）"
+		>
+			<Minimize2 class="size-3.5" /><span class="hidden sm:inline">压缩</span>
+		</Button>
+		<Button size="sm" variant="ghost" onclick={copyInput} disabled={!inputText} title="复制输入区内容">
+			{#if copied}<CopyCheck class="size-3.5 text-green-600" />{:else}<Copy class="size-3.5" />{/if}
+			<span class="hidden sm:inline">{copied ? "已复制" : "复制"}</span>
+		</Button>
+		<span class="mx-1 h-4 w-px bg-border" aria-hidden="true"></span>
+		<Button size="sm" variant="ghost" onclick={expandAll} disabled={!stats} title="展开所有层级">
+			<ChevronsUpDown class="size-3.5" /><span class="hidden sm:inline">展开</span>
+		</Button>
+		<Button size="sm" variant="ghost" onclick={collapseAll} disabled={!stats} title="收起到第一层">
+			<ChevronsDownUp class="size-3.5" /><span class="hidden sm:inline">收起</span>
+		</Button>
+		<span class="mx-1 h-4 w-px bg-border" aria-hidden="true"></span>
+		<Button size="sm" variant="ghost" onclick={() => replaceInput("")} disabled={!inputText} title="清空输入">
+			<Trash2 class="size-3.5" /><span class="hidden sm:inline">清空</span>
+		</Button>
+		<Button size="sm" variant="ghost" onclick={loadExample} title="填充一份覆盖所有类型的示例数据">
+			<FileJson class="size-3.5" /><span class="hidden sm:inline">示例</span>
+		</Button>
+
+		<div class="ml-auto">
+			<Tabs.Root value={view} onValueChange={(v) => (view = v as "tree" | "preview")}>
+				<Tabs.List class="h-7">
+					<Tabs.Trigger value="tree" class="h-6 px-2.5 text-xs" title="以可折叠的树浏览结构">
+						树
+					</Tabs.Trigger>
+					<Tabs.Trigger value="preview" class="h-6 px-2.5 text-xs" title="格式化后的只读预览（带语法高亮）">
+						预览
+					</Tabs.Trigger>
+				</Tabs.List>
+			</Tabs.Root>
+		</div>
+	</div>
+
+	<!-- 主区：桌面左右分栏，窄屏上下堆叠 -->
+	<div class="flex min-h-0 flex-1 flex-col lg:flex-row">
+		<!-- 输入 pane -->
+		<div class="flex h-44 shrink-0 flex-col border-b lg:h-auto lg:w-1/2 lg:border-b-0 lg:border-r">
+			<CodeMirror
+				doc={inputText}
+				docId={String(docVersion)}
+				filePath="data.json"
+				lineNumbers={true}
+				wide={true}
+				placeholder="把 JSON 粘贴到这里，或点击上方「示例」试试；也可以直接把 .json 文件拖进窗口"
+				onInput={(value) => (inputText = value)}
+			/>
+		</div>
+
+		<!-- 结果 pane -->
+		<div class="min-h-0 flex-1 overflow-auto p-3">
+			{#if !inputText.trim()}
+				<!-- 空态：初级用户的起点 -->
+				<div
+					class="flex h-full flex-col items-center justify-center gap-3 text-center text-muted-foreground"
+				>
+					<FileJson class="size-10 opacity-40" aria-hidden="true" />
+					<p class="max-w-xs text-sm leading-relaxed">
+						在左侧粘贴一段 JSON，立刻看到结构化的树视图。<br />
+						不知道从哪开始？<button
+							type="button"
+							class="text-primary underline underline-offset-2"
+							onclick={loadExample}>加载示例数据</button
+						>
+					</p>
+				</div>
+			{:else if parseError}
+				<!-- 错误卡：行列 + 人话原因 + 出错行摘录（Svelte 文本插值自动转义，无 XSS） -->
+				<div class="mx-auto max-w-xl pt-6" role="alert">
+					<div class="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+						<div class="flex items-start gap-2.5">
+							<span
+								class="mt-0.5 inline-block size-2 shrink-0 rounded-full bg-destructive"
+								aria-hidden="true"></span>
+							<div class="min-w-0 flex-1">
+								<p class="text-sm font-medium text-destructive">
+									{#if parseError.line > 0}
+										第 {parseError.line} 行 第 {parseError.column} 列
+									{:else}
+										解析失败
+									{/if}
+								</p>
+								<p class="mt-1 text-sm">{parseError.message}</p>
+								{#if parseError.excerpt}
+									<pre
+										class="mt-2 overflow-x-auto rounded bg-muted/60 p-2 font-mono text-xs leading-relaxed">{parseError.excerpt}</pre>
+								{/if}
+							</div>
+						</div>
+					</div>
+				</div>
+			{:else if okResult && stats}
+				{#if view === "tree"}
+					<div class="jv-tree">
+						{#key parseSeq}
+							<JsonTreeNode name={null} value={okResult.value} {defaultOpen} command={treeCommand} />
+						{/key}
+					</div>
+				{:else}
+					<div class="h-full min-h-0">
+					<CodeMirror
+						doc={JSON.stringify(okResult.value, null, 2)}
+						docId={`preview:${parseSeq}`}
+						filePath="data.json"
+						lineNumbers={true}
+						wide={true}
+						readonly={true}
+					/>
+					</div>
+				{/if}
+			{/if}
+		</div>
+	</div>
+
+	<!-- 统计条 -->
+	<div
+		class="flex shrink-0 items-center gap-2 border-t px-3 py-1 text-xs text-muted-foreground"
+	>
+		{#if stats}
+			<span title="原始文本大小">{formatBytes(stats.bytes)}</span>
+			<span aria-hidden="true">·</span>
+			<span title="顶层值的类型">{topTypeName}</span>
+			<span aria-hidden="true">·</span>
+			<span title="所有键值与元素的总数">{stats.nodeCount} 个节点</span>
+			<span aria-hidden="true">·</span>
+			<span title="最大嵌套层数">深度 {stats.maxDepth}</span>
+		{:else if parseError}
+			<span class="text-destructive">无法解析（详见错误提示）</span>
+		{:else}
+			<span>等待输入</span>
+		{/if}
+	</div>
+
+	<!-- 拖拽遮罩 -->
+	{#if dragDepth > 0}
+		<div
+			class="pointer-events-none absolute inset-0 z-30 flex items-center justify-center border-2 border-dashed border-primary bg-background/80"
+		>
+			<p class="text-sm font-medium text-primary">松开导入文件</p>
+		</div>
+	{/if}
+</div>
+
+<style>
+	.jv-tree {
+		font-family: var(--font-mono, ui-monospace, monospace);
+	}
+</style>
