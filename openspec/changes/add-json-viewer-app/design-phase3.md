@@ -109,10 +109,11 @@ skip_to(pre: Ctx, target_offset) -> { next: Ctx }       // 快进：不产事件
 
 - [x] 3.0 MoonBit 工具链验证（moon 0.1.20260824：wasm 构建 + 双 target 测试
       全链路跑通）+ 调研报告结论已并入本文档（后端裁决 / 风险清单 / CI 钉版）
-- [ ] 3.1 WASM 核心：Ctx 状态机 + step/skip_to/snapshot/resume 协议 +
-      事件流 + 单测（MoonBit 侧 moon test；含病态数据用例；native/wasm 双 target）
-      （当前仅完成 MoonBit 有限词法扫描器；完整 RFC 8259 状态机、经典 WASM ABI
-      与浏览器加载产物未完成，不能作为本轮 WASM 核心交付）
+- [x] 3.1 WASM 核心：Ctx 状态机 + step/skip_to/snapshot/resume 协议 +
+      事件流 + 单测（MoonBit 侧 moon test；含病态数据用例；native/wasm 双 target）。
+      已完成 RFC 8259 增量状态机、深度 2000/巨值预览上限、UTF-8/转义碎片错误定位，
+      以及经典 wasm shared-memory ptr+len ABI（内联 `i32.load8_u` 适配器）；
+      Node 共享内存实例化与 `json_stream_step` 四参数实测通过。
 - [x] 3.2 JS 桥 + worker：Transferable 双缓冲管道（File.stream() 分块写入）、
       检查点索引、纯 JS 降级实现（同协议）
 - [ ] 3.3 行模型惰性化（聚合行 + read_rows 增量提取）+ 行缓冲上限

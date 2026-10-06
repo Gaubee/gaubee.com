@@ -14,8 +14,7 @@ test "bench chunked scanner 1MB" (it : @bench.T) {
       } else {
         benchmark_source.length()
       }
-      let (next, _) = step(ctx, benchmark_source, pos, limit)
-      ctx = next
+      ctx = step(ctx, benchmark_source, pos, limit).next
       pos = limit
     }
     it.keep(ctx.offset)

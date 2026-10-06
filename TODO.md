@@ -1326,7 +1326,7 @@ kzf 指令：开发 osapp jsonviewer，ZCode 做基础版，Codex 补充高级�
 
 ### Phase 3 进度（2026-10-06）
 
-- [ ] 3.1：MoonBit 双 target 词法扫描器和测试已落地；完整 RFC 8259 状态机、经典 WASM ABI 与浏览器可加载产物仍待实现。
+- [x] 3.1：MoonBit 双 target RFC 8259 增量状态机、事件流、病态输入测试与经典 wasm shared-memory ptr+len ABI 已落地；Node 共享内存加载实测通过。
 - [x] 3.2：Transferable Worker 桥、检查点、JS 状态机和取消/背压校验已落地。
 - [ ] 3.3：聚合行与可见窗口投影已落地；按检查点从源文件增量提取尚未完成。
 - [x] 3.4：TanStack 窗口树、阈值/进度 UI 已落地；token 边界 Custom Highlight 尚未接入。

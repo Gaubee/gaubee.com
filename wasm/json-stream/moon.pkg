@@ -1,3 +1,22 @@
 import {
+  "gaubee/json-stream/core",
+  "moonbitlang/core/ref",
+}
+
+import {
   "moonbitlang/core/bench",
 } for "test"
+
+pkgtype(kind: "foreign_library")
+
+options(
+  link: {
+    "wasm": {
+      "exports": ["abi_version", "abi_step"],
+      "shared-memory": true,
+      "memory-limits": { "min": 16, "max": 65536 },
+      "import-memory": { "module": "env", "name": "memory" },
+      "export-memory-name": "memory",
+    },
+  },
+)
