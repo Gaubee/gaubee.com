@@ -164,13 +164,19 @@ function itemCard(
     meta.paths.map((d) => `<path d="${d}" />`).join("") +
     `</svg></span>`;
   const translation = translations[t.id];
-  // 译文切换器收进行头（kzf 裁决 15）：默认显示译文（checked），label 指向可切回的「原」
-  const langSwitch = translation
-    ? `<label for="xl-${t.id}" class="x-arch-lang-switch" title="切换原文/译文"><span class="x-arch-lang-zh">译</span><span class="x-arch-lang-orig">原</span></label>`
+  // 译文切换（kzf 裁决 15 + 2026-10-06 走查）：双段 toggle 组（译|原），双 radio 零 JS，
+  // 默认选中「译」；name 按推文 id 隔离，避免跨条目互斥
+  const langInputs = translation
+    ? `<input type="radio" name="xl-${t.id}" id="xl-${t.id}-zh" class="x-arch-lang-input x-arch-lang-input-zh" checked aria-label="显示译文" />` +
+      `<input type="radio" name="xl-${t.id}" id="xl-${t.id}-orig" class="x-arch-lang-input x-arch-lang-input-orig" aria-label="显示原文" />`
     : "";
-  const langInput = translation ? `<input type="checkbox" id="xl-${t.id}" class="x-arch-lang-input" checked aria-label="切换原文/译文" />` : "";
+  const langSwitch = translation
+    ? `<span class="x-arch-lang-switch" role="group" aria-label="切换原文/译文">` +
+      `<label for="xl-${t.id}-zh" class="x-arch-lang-opt x-arch-lang-zh">译</label>` +
+      `<label for="xl-${t.id}-orig" class="x-arch-lang-opt x-arch-lang-orig">原</label></span>`
+    : "";
   parts.push(
-    `    ${langInput}<div class="x-arch-head">${avatarImg}${kindIcon}` +
+    `    ${langInputs}<div class="x-arch-head">${avatarImg}${kindIcon}` +
       `<a class="x-arch-author" href="https://x.com/${author}" target="_blank" rel="nofollow noopener">@${escapeHtml(author)}</a>` +
       `<span class="x-arch-time">${time}</span>` +
       langSwitch +

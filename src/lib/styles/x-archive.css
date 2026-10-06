@@ -115,45 +115,60 @@
 }
 
 /* ---------------------------------------------------------------------------
- * 译文切换（裁决 15：默认显示译文，切换器收进行头）
- * 结构：input 是 .x-arch-item 首个子节点；label 在 .x-arch-head 行内；
- *       orig/trans 是 input 的后续兄弟节点（~ 选择器）。
+ * 译文切换（裁决 15 + 2026-10-06 走查：双段 toggle 组，零 JS）
+ * 结构：两个 radio 是 .x-arch-item 首子节点（name 按推文 id 隔离，默认「译」选中）；
+ *       .x-arch-lang-switch 在 .x-arch-head 行内，两段 label；orig/trans 是 radio 的
+ *       后续兄弟节点（~ 选择器）。选中「原」= .x-arch-lang-input-orig:checked。
  * ------------------------------------------------------------------------- */
 .x-arch-lang-input {
   display: none;
 }
-.x-arch-trans {
+.x-arch-orig {
   display: none;
 }
-.x-arch-lang-orig {
-  display: none;
-}
-.x-arch-lang-input:checked ~ .x-arch-orig {
-  display: none;
-}
-.x-arch-lang-input:checked ~ .x-arch-trans {
+.x-arch-lang-input-orig:checked ~ .x-arch-orig {
   display: block;
 }
-.x-arch-lang-input:checked ~ .x-arch-head .x-arch-lang-zh {
+.x-arch-lang-input-orig:checked ~ .x-arch-trans {
   display: none;
-}
-.x-arch-lang-input:checked ~ .x-arch-head .x-arch-lang-orig {
-  display: inline;
 }
 .x-arch-lang-switch {
   flex: none;
-  padding: 1px 8px;
+  display: inline-flex;
+  align-items: stretch;
   border: 1px solid var(--border);
   border-radius: 999px;
+  overflow: hidden;
+  user-select: none;
+}
+.x-arch-lang-opt {
+  padding: 1px 8px;
   font-size: 12px;
   line-height: 16px;
   color: var(--muted-foreground);
   cursor: pointer;
-  user-select: none;
 }
-.x-arch-lang-switch:hover {
+.x-arch-lang-opt + .x-arch-lang-opt {
+  border-left: 1px solid var(--border);
+}
+/* 默认「译」段高亮；切到「原」后互换 */
+.x-arch-lang-zh {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.x-arch-lang-input-orig:checked ~ .x-arch-head .x-arch-lang-zh {
+  background: transparent;
+  color: var(--muted-foreground);
+}
+.x-arch-lang-input-orig:checked ~ .x-arch-head .x-arch-lang-orig {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.x-arch-lang-input-orig:not(:checked) ~ .x-arch-head .x-arch-lang-orig:hover {
   color: var(--primary);
-  border-color: var(--primary);
+}
+.x-arch-lang-input-orig:checked ~ .x-arch-head .x-arch-lang-zh:hover {
+  color: var(--primary);
 }
 
 /* ---------------------------------------------------------------------------

@@ -18,6 +18,7 @@
   import { authStore } from '$lib/auth/session.svelte'
   import NewContentDialog from './NewContentDialog.svelte'
   import EventBody from './EventBody.svelte'
+  import { resetScrollFrom } from '$lib/utils/scroll'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { Button } from '$lib/components/ui/button'
   import MessageSquareIcon from '@lucide/svelte/icons/message-square'
@@ -79,15 +80,19 @@
   const visible = $derived(events.filter((e) => monthKeyOf(e.date) === currentMonth))
   let sheetOpen = $state(false)
 
+  /** 列表容器（滚动重置的遍历起点；真实滚动容器是 AreaOutlet 层，非 window）。 */
+  let listEl = $state<HTMLElement | undefined>()
+
   function pickMonth(key: string): void {
     selectedMonth = key
     sheetOpen = false
-    // 切月重置滚动量（kzf 裁决 17）：新列表从头读
-    requestAnimationFrame(() => {
-      document.scrollingElement?.scrollTo({ top: 0 })
-      window.scrollTo({ top: 0 })
-    })
   }
+
+  // 切月重置滚动量（kzf 裁决 17 / 2026-10-06 走查）：$effect 在 DOM 更新后执行
+  $effect(() => {
+    void currentMonth
+    resetScrollFrom(listEl)
+  })
 
   function hrefFor(entry: ContentEntry): string {
     return `/article/${entry.collection}/${entry.id.stem}`
@@ -99,7 +104,7 @@
   }
 
   function titleFor(entry: ContentEntry): string {
-    return entry.metadata.title ?? entry.id.slug ?? '查看事件详情'
+    return entry.title || entry.id.slug
   }
 
   function formatDate(date: Date): string {
@@ -170,7 +175,7 @@
       </aside>
 
       <!-- 当前月份的事件（移动端预留浮动按钮空间） -->
-      <div class="min-w-0 flex-1 pb-28 lg:pb-0">
+      <div bind:this={listEl} class="min-w-0 flex-1 pb-28 lg:pb-0">
         {#each visible as entry (entry.path)}
           <article class="border-border border-b py-5">
             <div class="event-item-head text-sm sticky top-0 z-10 -mx-1 mb-2 flex min-w-0 items-center gap-2 bg-background px-1 py-1.5">

@@ -22,7 +22,9 @@
     return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
   }
   function preview(p: ContentEntry): string {
-    // 统一管道 excerpt（已去 markdown 符号），取前 40 字
+    // 报告类 event 有 title（spec R2：GitHub 日报：2026-10-04），优先展示；
+    // 归档/碎碎念回退统一管道 excerpt（已去 markdown 符号），取前 40 字
+    if (p.title) return p.title
     const text = p.excerpt.trim()
     return text.slice(0, 40) || '(无内容)'
   }

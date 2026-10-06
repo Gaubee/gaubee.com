@@ -84,9 +84,14 @@ bun scripts/build-graph-page.ts     # → data/tech-graph.html 交互展示页�
 报告发布 = 在站点仓库新增 event（短评），push main 后 CI 构建镜像、1Panel 自动拉取上线（站点 `agents.md` 部署链）。
 
 ```sh
-bun scripts/publish.ts <报告md> --slug signals-daily-2026-10-04 --title "信号日报 2026-10-04" --tags signals,daily
+bun scripts/publish.ts <报告md> --slug <slug> --title "<标题>" --tags signals,daily
 # 先 --dry 干跑确认；正式发布会自动：序号自增（如 00023.gaubee-xxx.md）+ front-matter（title/date/tags）+ 显式路径 add + 📰 中文提交 + push origin main
 ```
+
+**title 规范（2026-10-06 kzf 裁决，全角冒号，事件应用「最近事件」widget 按 title 展示）**：
+GitHub 日报 `GitHub 日报：2026-10-04`；X 日报 `X 日报：2026-10-05`；
+GitHub 周报 `GitHub 周报：2026-09-28～2026-10-04`；GitHub 月报 `GitHub 月报：2026-09`；
+GitHub 年报 `GitHub 年报：2026`。
 
 护栏（脚本内置，勿绕过）：站点必须在 main 分支、无未提交的跟踪文件改动、不落后远端，否则中止；只 add 本次生成的单个文件。日报/周报正文写作时**不要用本机绝对路径**（会被发布到公开网站）；站内引用一律写可公开的相对描述。
 

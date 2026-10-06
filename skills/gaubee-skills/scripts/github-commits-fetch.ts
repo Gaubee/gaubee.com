@@ -77,13 +77,17 @@ async function main() {
 
   const me = (await ghJson("/user")) as { login: string };
   const login = me.login;
-  // 可选 --date YYYY-MM-DD 回填历史日（默认今天）；事件流只保留最近 ~14 天，太老的日期抓不到
+  // 可选 --date YYYY-MM-DD 回填历史日（默认今天）；事件流只保留最近 ~14 天，太老的日期抓不到。
+  // 兼容两种传参：位置参数（2026-10-05）或 --date 2026-10-05（2026-10-06 实证：文档写 --date
+  // 而脚本只读 argv[2]，传 --date 会 exit 2）
   const today = localDate();
   let target = today;
-  const dateArg = process.argv[2];
+  const argv = process.argv.slice(2);
+  const di = argv.indexOf("--date");
+  const dateArg = di > -1 ? argv[di + 1] : argv[0];
   if (dateArg) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateArg) || dateArg > today) {
-      console.error(`--date 需为不晚于今天的 YYYY-MM-DD（收到：${dateArg}）`);
+      console.error(`日期需为不晚于今天的 YYYY-MM-DD（位置参数或 --date <date>；收到：${dateArg}）`);
       process.exit(2);
     }
     target = dateArg;

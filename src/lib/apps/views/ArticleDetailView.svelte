@@ -12,6 +12,9 @@
   import { OWNER } from '$lib/github/client'
   import { authStore } from '$lib/auth/session.svelte'
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
+  import { xvideo } from '$lib/player/x-video'
+  import { xhighlight } from '$lib/player/x-highlight'
+  import { resetScrollFrom } from '$lib/utils/scroll'
   import TocTree from './TocTree.svelte'
   import { Badge } from '$lib/components/ui/badge'
   import { Button } from '$lib/components/ui/button'
@@ -23,6 +26,9 @@
   import ClockIcon from '@lucide/svelte/icons/clock'
   import TagIcon from '@lucide/svelte/icons/tag'
   import SquarePenIcon from '@lucide/svelte/icons/square-pen'
+
+  // 事件内容自持样式（x-arch-* 卡片/视频 HUD/译文切换），谁渲染谁导入（样式自治裁决）
+  import '$lib/styles/x-archive.css'
 
   /** 当前登录用户是否为仓库本人（显示编辑入口）。 */
   const isOwner = $derived(
@@ -101,6 +107,12 @@
       navController.navigateMain('/app/articles')
     }
   }
+
+  // 切篇重置滚动量（2026-10-06 走查）：上一篇/下一篇/搜索跳转都换 stem，DOM 更新后归零
+  $effect(() => {
+    void post?.id.stem
+    resetScrollFrom(articleContentEl)
+  })
 </script>
 
 <div class="mx-auto max-w-[78rem] px-4 py-6 sm:px-6 lg:px-8">
@@ -164,8 +176,15 @@
           {/if}
         </header>
 
-        <!-- 正文：bind this 给 TocTree 用作 ScrollSpy 的 container -->
-        <article bind:this={articleContentEl} class="article-content prose dark:prose-invert prose-zinc max-w-none">
+        <!-- 正文：bind this 给 TocTree 用作 ScrollSpy 的 container；
+             xvideo/xhighlight 增强（自动播放/单实例/手势、代码高亮）与列表同源 -->
+        <article
+          bind:this={articleContentEl}
+          use:xvideo
+          use:xhighlight
+          data-syntax-theme="gaubee"
+          class="article-content prose dark:prose-invert prose-zinc max-w-none"
+        >
           <MarkdownViewer markdown={post.body} />
         </article>
 
