@@ -7,7 +7,7 @@
 	用户无需瞄准输入区）。
 -->
 <script lang="ts">
-	import { onDestroy } from "svelte";
+ import { onDestroy, onMount } from "svelte";
 	import {
 		AlignLeft,
 		ArrowLeftRight,
@@ -17,6 +17,7 @@
 		CopyCheck,
 		FileJson,
 		GitCompareArrows,
+		History,
 		Minimize2,
 		Search,
 		Trash2,
@@ -30,6 +31,7 @@
 	import { buildStats, EXAMPLE_JSON, parseJson, type ParseOutcome } from "./json-viewer/json-core";
 	import JsonTreeNode from "./json-viewer/JsonTreeNode.svelte";
 	import { diffJson, type JsonDiffEntry } from "./json-viewer/diff";
+	import { readHistory, recordHistory, type JsonHistoryItem } from "./json-viewer/history";
 	import { formatJsonPath, queryJson, type QueryMatch, type QueryOutcome } from "./json-viewer/query";
 	import { inferJsonSchema, inferTypeScript, jsonToYaml, yamlToJson } from "./json-viewer/transform";
 
@@ -59,8 +61,14 @@
 	let diffRight = $state("");
 	let diffResult = $state<JsonDiffEntry[] | null>(null);
 	let diffError = $state("");
+	let historyOpen = $state(false);
+	let historyItems = $state<JsonHistoryItem[]>([]);
 	let dragDepth = $state(0);
 	let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+
+	onMount(() => {
+		if (typeof localStorage !== "undefined") historyItems = readHistory(localStorage);
+	});
 
 	// ---- 防抖解析（spec R2：≤300ms）----
 	$effect(() => {
@@ -74,6 +82,12 @@
 			parseSeq += 1;
 		}, 250);
 		return () => clearTimeout(timer);
+	});
+
+	$effect(() => {
+		const current = parsed;
+		if (!current?.outcome.ok || typeof localStorage === "undefined") return;
+		historyItems = recordHistory(localStorage, current.text);
 	});
 
 	/** 解析成功的聚合（值 + 对应文本），供树/预览/统计同源消费。 */
@@ -210,6 +224,17 @@
 	async function copyDiffPath(entry: JsonDiffEntry): Promise<void> {
 		await copyText(entry.pathText);
 	}
+	function openHistory(): void {
+		if (typeof localStorage !== "undefined") historyItems = readHistory(localStorage);
+		historyOpen = true;
+	}
+	function restoreHistory(item: JsonHistoryItem): void {
+		replaceInput(item.content);
+		historyOpen = false;
+	}
+	function formatHistoryDate(timestamp: number): string {
+		return new Date(timestamp).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+	}
 
 	function formatBytes(n: number): string {
 		if (n < 1024) return `${n} B`;
@@ -321,6 +346,9 @@
 		>
 			<GitCompareArrows class="size-3.5" /><span class="hidden sm:inline">对比</span>
 		</Button>
+		<Button size="sm" variant="ghost" onclick={openHistory} title="查看最近打开的 10 条 JSON">
+			<History class="size-3.5" /><span class="hidden sm:inline">历史</span>
+		</Button>
 
 		<div class="ml-auto">
 			<Tabs.Root value={view} onValueChange={(v) => (view = v as "tree" | "preview")}>
@@ -384,9 +412,26 @@
 										解析失败
 									{/if}
 								</p>
+								<p class="mt-1 text-sm">{parseError.message}</p>
 								<p class="mt-1 text-xs text-muted-foreground">
 									建议：{parseError.suggestion}
-								</p>
+									</p>
+									{#if historyItems.length > 0}
+										<div class="mt-3 w-full max-w-sm text-left">
+											<p class="mb-1 text-xs font-medium text-muted-foreground">最近打开</p>
+											{#each historyItems.slice(0, 3) as item}
+												<button
+													type="button"
+													class="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-muted"
+													onclick={() => restoreHistory(item)}
+													title="恢复这条 JSON"
+												>
+													<span class="truncate font-mono">{item.content.slice(0, 48)}</span>
+													<span class="shrink-0 text-muted-foreground">{formatHistoryDate(item.savedAt)}</span>
+												</button>
+											{/each}
+										</div>
+									{/if}
 								{#if parseError.excerpt}
 									<pre
 										class="mt-2 overflow-x-auto rounded bg-muted/60 p-2 font-mono text-xs leading-relaxed">{parseError.excerpt}</pre>
@@ -641,6 +686,34 @@
 					{/if}
 				</div>
 			{/if}
+		</Dialog.Content>
+	</Dialog.Root>
+
+	<Dialog.Root bind:open={historyOpen}>
+		<Dialog.Content class="max-h-[80vh] max-w-xl overflow-hidden">
+			<Dialog.Header>
+				<Dialog.Title>最近打开</Dialog.Title>
+				<Dialog.Description>最近保存的 10 条 JSON，只保存在当前浏览器。</Dialog.Description>
+			</Dialog.Header>
+			<div class="max-h-[55vh] overflow-auto rounded-md border">
+				{#if historyItems.length === 0}
+					<p class="p-4 text-sm text-muted-foreground">还没有历史记录。</p>
+				{:else}
+					{#each historyItems as item}
+						<button
+							type="button"
+							class="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left last:border-b-0 hover:bg-muted"
+							onclick={() => restoreHistory(item)}
+							title="恢复这条 JSON"
+						>
+							<span class="min-w-0 flex-1 truncate font-mono text-xs">{item.content.slice(0, 80)}</span>
+							<span class="shrink-0 text-xs text-muted-foreground">
+								{formatHistoryDate(item.savedAt)} · {formatBytes(item.bytes)}
+							</span>
+						</button>
+					{/each}
+				{/if}
+			</div>
 		</Dialog.Content>
 	</Dialog.Root>
 </div>
