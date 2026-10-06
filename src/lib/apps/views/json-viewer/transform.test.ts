@@ -29,6 +29,29 @@ describe("TypeScript 类型推断", () => {
   it("复杂键名使用引号", () => {
     expect(inferTypeScript({ "display-name": 1 })).toContain('"display-name": number;');
   });
+
+  it("根数组生成 item interface", () => {
+    const result = inferTypeScript([{ name: "Ada" }]);
+    expect(result).toContain("interface RootItem");
+    expect(result).toContain("type Root = RootItem[];");
+    expect(result).toContain("name: string;");
+  });
+
+  it("异构对象数组合并字段并标记可选键", () => {
+    const result = inferTypeScript([{ a: 1 }, { b: "x" }]);
+    expect(result).toContain("interface RootItem");
+    expect(result).toContain("a?: number;");
+    expect(result).toContain("b?: string;");
+    expect(result).toContain("type Root = RootItem[];");
+  });
+
+  it("同名异形嵌套接口自动编号，大小写冲突不覆盖", () => {
+    const result = inferTypeScript({ a: { value: 1 }, A: { value: "x" } });
+    expect(result).toContain("a: RootA");
+    expect(result).toContain("A: RootA2");
+    expect(result).toContain("interface RootA {");
+    expect(result).toContain("interface RootA2 {");
+  });
 });
 
 describe("JSON Schema 推断", () => {
