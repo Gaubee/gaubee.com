@@ -19,3 +19,6 @@ worker
 !.env.example
 .dev.vars
 .DS_Store
+
+# cdn-media 子仓：manifest 与打包工具，非站点构建输入
+cdn-media

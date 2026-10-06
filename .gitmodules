@@ -1,0 +1,3 @@
+[submodule "cdn-media"]
+	path = cdn-media
+	url = https://github.com/Gaubee/cdn-media.gaubee.com.git
