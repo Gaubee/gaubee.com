@@ -74,7 +74,7 @@ pub struct SourcesCfg {
     pub allow: Vec<String>,
 }
 
-#[derive(Deserialize, Clone, Debug, Default)]
+#[derive(Deserialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct CacheCfg {
     /// 缓存目录（A3 bind mount：宿主预创建并 chown 65532:65532）
@@ -89,6 +89,28 @@ pub struct CacheCfg {
     /// 超过该大小的对象透传不落盘（pinned 例外常驻）
     #[serde(default = "default_large_object")]
     pub large_object_bytes: u64,
+    /// 完整性严格模式（R3；r5 P1-7）：true = 回源先缓冲全量（≤max_buffer_bytes）
+    /// 校验 sha256 通过后才响应（immutable 可承诺）；false（默认）= 流式 tee
+    /// （响应头 no-store——校验通过前不承诺 immutable，失败拒缓存）
+    #[serde(default)]
+    pub strict_integrity: bool,
+    /// 严格模式缓冲上限（字节，默认 128MB）：超过该大小的对象严格模式下
+    /// 退化为透传（no-store），绝不无界缓冲
+    #[serde(default = "default_max_buffer")]
+    pub max_buffer_bytes: u64,
+}
+
+impl Default for CacheCfg {
+    fn default() -> Self {
+        Self {
+            dir: default_cache_dir(),
+            high_bytes: default_high(),
+            low_bytes: default_low(),
+            large_object_bytes: default_large_object(),
+            strict_integrity: false,
+            max_buffer_bytes: default_max_buffer(),
+        }
+    }
 }
 
 fn default_cache_dir() -> String {
@@ -102,6 +124,9 @@ fn default_low() -> u64 {
 }
 fn default_large_object() -> u64 {
     52_428_800
+}
+fn default_max_buffer() -> u64 {
+    134_217_728
 }
 
 #[derive(Deserialize, Clone, Debug, Default)]
@@ -145,7 +170,8 @@ fn default_admin_port() -> u16 {
 #[derive(Deserialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct MediaCfg {
-    /// 默认 mediaBase（A8：默认同源；本字段为 Phase 2 geo 回退预留）
+    /// 默认 mediaBase（A8：默认同源；Phase 2 前不消费——本字段仅解析不读，
+    /// Phase 2 geo 回退时才启用）
     #[serde(default = "default_media_base")]
     pub base: String,
 }
@@ -201,7 +227,7 @@ pub fn load(env: &dyn EnvSource) -> Result<Config, String> {
         .map_err(|e| format!("读取配置 {path:?} 失败：{e}（修复：检查文件存在与可读权限）"))?;
     let mut cfg: Config = toml::from_str(&raw)
         .map_err(|e| format!("解析配置 {path:?} 失败：{e}（修复：对照 config.example.toml 检查字段名与类型）"))?;
-    apply_env_overrides(&mut cfg, env);
+    apply_env_overrides(&mut cfg, env)?;
     cfg.validate()?;
     Ok(cfg)
 }
@@ -254,6 +280,27 @@ impl Config {
         if self.cache.high_bytes == 0 {
             return Err("cache.high_bytes 不能为 0".to_owned());
         }
+        // r5 P1-14：非法值一律启动失败（不静默回退）
+        if self.manifest.refresh_interval_secs == 0 {
+            return Err("manifest.refresh_interval_secs = 0 非法（修复：≥1 秒，建议 300）".to_owned());
+        }
+        if self.admin.port == 0 {
+            return Err("admin.port = 0 非法（修复：改为有效监听端口，如 8081）".to_owned());
+        }
+        if self.cache.dir.is_empty() {
+            return Err("cache.dir 为空（修复：配置绝对路径，如 /media-cache）".to_owned());
+        }
+        if !PathBuf::from(&self.cache.dir).is_absolute() {
+            return Err(format!(
+                "cache.dir 必须是绝对路径（当前：{:?}；修复：如 /media-cache）",
+                self.cache.dir
+            ));
+        }
+        if self.cache.max_buffer_bytes == 0 {
+            return Err(
+                "cache.max_buffer_bytes 不能为 0（修复：如 134217728 即 128MB）".to_owned()
+            );
+        }
         for k in &self.pinned.keys {
             if let Err(e) = validate_key(k) {
                 return Err(format!("pinned.keys 含非法 key {k:?}：{e}"));
@@ -285,14 +332,19 @@ fn is_loopback_url(url: &str) -> bool {
         || url.starts_with("http://[::1]:")
 }
 
-fn apply_env_overrides(cfg: &mut Config, env: &dyn EnvSource) {
+/// env 覆盖：解析失败一律返回 Err（启动即败），绝不静默忽略（r5 P1-14）
+fn apply_env_overrides(cfg: &mut Config, env: &dyn EnvSource) -> Result<(), String> {
     if let Some(v) = env.get("MEDIA_CACHE_DIR") {
         cfg.cache.dir = v;
     }
     if let Some(v) = env.get("ADMIN_PORT") {
-        if let Ok(p) = v.parse() {
-            cfg.admin.port = p;
+        let p: u16 = v
+            .parse()
+            .map_err(|_| format!("ADMIN_PORT={v:?} 解析失败（修复：必须是 1-65535 的整数）"))?;
+        if p == 0 {
+            return Err("ADMIN_PORT=0 非法（修复：改为有效监听端口）".to_owned());
         }
+        cfg.admin.port = p;
     }
     if let Some(v) = env.get("CDN_GITHUB_TOKEN") {
         cfg.github.token = v;
@@ -300,6 +352,7 @@ fn apply_env_overrides(cfg: &mut Config, env: &dyn EnvSource) {
     if let Some(v) = env.get("CDN_ADMIN_TOKEN") {
         cfg.admin.token = v;
     }
+    Ok(())
 }
 
 /// 媒体 key 校验（唯一入口，pinned 与请求路径共用）：
@@ -353,13 +406,16 @@ mod tests {
     #[test]
     fn example_config_parses_and_validates() {
         let mut cfg: Config = toml::from_str(EXAMPLE).expect("example 配置必须可解析");
-        apply_env_overrides(&mut cfg, &MapEnv(HashMap::new()));
+        apply_env_overrides(&mut cfg, &MapEnv(HashMap::new())).expect("env 覆盖应成功");
         cfg.validate().expect("example 配置必须通过校验");
         assert_eq!(cfg.version, 1);
         assert_eq!(cfg.cache.high_bytes, 524_288_000);
         assert_eq!(cfg.cache.low_bytes, 314_572_800);
         assert_eq!(cfg.sources.allow, vec!["x".to_owned()]);
         assert_eq!(cfg.admin.port, 8081);
+        // r5 P1-7：严格模式默认关闭、缓冲上限默认 128MB
+        assert!(!cfg.cache.strict_integrity, "strict_integrity 默认必须为 false");
+        assert_eq!(cfg.cache.max_buffer_bytes, 134_217_728);
     }
 
     #[test]
@@ -369,10 +425,40 @@ mod tests {
         env.insert("ADMIN_PORT".to_owned(), "9099".to_owned());
         env.insert("CDN_ADMIN_TOKEN".to_owned(), "sekrit".to_owned());
         let mut cfg: Config = toml::from_str(EXAMPLE).unwrap();
-        apply_env_overrides(&mut cfg, &MapEnv(env));
+        apply_env_overrides(&mut cfg, &MapEnv(env)).expect("env 覆盖应成功");
         assert_eq!(cfg.cache.dir, "/tmp/x-cache");
         assert_eq!(cfg.admin.port, 9099);
         assert_eq!(cfg.admin.token, "sekrit");
+    }
+
+    /// r5 P1-14：env 解析失败必须 die，绝不静默忽略
+    #[test]
+    fn env_admin_port_parse_failure_dies() {
+        let mut cfg: Config = toml::from_str(EXAMPLE).unwrap();
+        let mut env = HashMap::new();
+        env.insert("ADMIN_PORT".to_owned(), "not-a-port".to_owned());
+        let err = apply_env_overrides(&mut cfg, &MapEnv(env)).expect_err("解析失败必须报错");
+        assert!(err.contains("ADMIN_PORT"), "错误信息必须指认字段：{err}");
+        let mut env = HashMap::new();
+        env.insert("ADMIN_PORT".to_owned(), "0".to_owned());
+        let err = apply_env_overrides(&mut cfg, &MapEnv(env)).expect_err("port=0 必须报错");
+        assert!(err.contains("ADMIN_PORT"));
+    }
+
+    /// r5 P1-14：非法值矩阵全部启动失败
+    #[test]
+    fn rejects_invalid_values() {
+        let cases: Vec<(&str, String)> = vec![
+            ("refresh_interval_secs=0", EXAMPLE.replacen("refresh_interval_secs = 300", "refresh_interval_secs = 0", 1)),
+            ("admin.port=0", EXAMPLE.replacen("port = 8081", "port = 0", 1)),
+            ("cache.dir empty", EXAMPLE.replacen("dir = \"/media-cache\"", "dir = \"\"", 1)),
+            ("cache.dir relative", EXAMPLE.replacen("dir = \"/media-cache\"", "dir = \"media-cache\"", 1)),
+            ("max_buffer_bytes=0", EXAMPLE.replacen("max_buffer_bytes = 134217728   # 128MB", "max_buffer_bytes = 0", 1)),
+        ];
+        for (what, raw) in cases {
+            let cfg: Config = toml::from_str(&raw).expect("解析应成功（校验层拒绝）");
+            assert!(cfg.validate().is_err(), "{what} 必须被校验拒绝");
+        }
     }
 
     #[test]

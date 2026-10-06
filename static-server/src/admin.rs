@@ -16,7 +16,7 @@ use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
 use tokio::sync::Semaphore;
 
-use crate::media::{fetch_object_to_cache, MediaCtx};
+use crate::media::{warm_one, MediaCtx, WarmOutcome};
 
 /// 单次 warm 请求 key 数上限（A5 限 key）
 const WARM_MAX_KEYS: usize = 10_000;
@@ -102,6 +102,15 @@ pub async fn warm(
     let mut targets: Vec<(String, crate::manifest::MediaObject)> = Vec::new();
     if body.keys.is_empty() {
         for (k, o) in index.objects.iter() {
+            let source = k.split('/').next().unwrap_or("");
+            // r5 P0-4：默认目标也必须过 sources.allow 与空/非法 key 过滤
+            //（manifest 键集不能默认信任为白名单内）
+            if !ctx.cfg.sources.allow.iter().any(|s| s == source) {
+                continue;
+            }
+            if crate::config::validate_key(k).is_err() {
+                continue;
+            }
             let pinned = ctx.cfg.pinned.keys.iter().any(|p| p == k);
             if pinned || o.size <= ctx.cfg.cache.large_object_bytes {
                 targets.push((k.clone(), o.clone()));
@@ -109,6 +118,12 @@ pub async fn warm(
         }
     } else {
         for k in &body.keys {
+            if crate::config::validate_key(k).is_err() {
+                return json_resp(
+                    StatusCode::BAD_REQUEST,
+                    serde_json::json!({"error": "invalid_key", "key": k}),
+                );
+            }
             match index.lookup(k) {
                 Some(o) => {
                     let source = k.split('/').next().unwrap_or("");
@@ -130,7 +145,11 @@ pub async fn warm(
         }
     }
 
-    let budget = body.max_bytes.unwrap_or(ctx.cfg.cache.high_bytes);
+    // r5 P0-4：warm 预算不得超过 high 水位（缓存配额由 admission 硬保证）
+    let budget = body
+        .max_bytes
+        .unwrap_or(ctx.cfg.cache.high_bytes)
+        .min(ctx.cfg.cache.high_bytes);
     let cached_bytes = Arc::new(AtomicU64::new(0));
     let counters = WarmCounters::default();
     let sem = Arc::new(Semaphore::new(WARM_CONCURRENCY));
@@ -143,7 +162,7 @@ pub async fn warm(
         let counters = counters.clone();
         let cached_bytes = cached_bytes.clone();
         let pinned = ctx.cfg.pinned.keys.iter().any(|p| p == &key);
-        // 预算前置判定（并发下允许少量越过，总量有界即可）
+        // 预算前置判定（并发下允许少量越过，总量硬界由 admission 保证）
         if cached_bytes.load(Ordering::Relaxed) + obj.size > budget {
             counters.skipped_budget.fetch_add(1, Ordering::Relaxed);
             continue;
@@ -151,16 +170,19 @@ pub async fn warm(
         let key2 = key.clone();
         joins.spawn(async move {
             let _permit = sem.acquire().await;
-            if ctx.cache.lookup(&key).is_some() {
-                counters.already.fetch_add(1, Ordering::Relaxed);
-                return;
-            }
-            match fetch_object_to_cache(&ctx, &index, &key, &obj, pinned).await {
-                Ok(_) => {
+            // r5 P0-4：warm 与 serve 共用 per-key single-flight + admission 预留
+            match warm_one(&ctx, &index, &key, &obj, pinned).await {
+                WarmOutcome::AlreadyCached => {
+                    counters.already.fetch_add(1, Ordering::Relaxed);
+                }
+                WarmOutcome::Warmed => {
                     cached_bytes.fetch_add(obj.size, Ordering::Relaxed);
                     counters.warmed.fetch_add(1, Ordering::Relaxed);
                 }
-                Err(e) => {
+                WarmOutcome::NoRoom => {
+                    counters.skipped_budget.fetch_add(1, Ordering::Relaxed);
+                }
+                WarmOutcome::Failed(e) => {
                     eprintln!("[cdn-media] warm 失败 {key2}：{e}");
                     counters.failed.fetch_add(1, Ordering::Relaxed);
                 }
@@ -213,6 +235,8 @@ pub async fn stats(State(ctx): State<Arc<MediaCtx>>) -> Response {
                 "pinned_objects": s.pinned_objects,
                 "pinned_bytes": s.pinned_bytes,
                 "poisoned_active": ctx.cache.poisoned_count(),
+                "undiscardable": s.undiscardable,
+                "inflight_reserved": s.inflight_reserved,
             },
             "manifest": {
                 "loaded": gen.is_some(),

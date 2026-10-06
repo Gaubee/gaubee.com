@@ -5,13 +5,20 @@
 //!   （内存 last_touch 即时更新，磁盘 mtime 超 TOUCH_THROTTLE 才写一次）
 //! - 重启恢复：启动扫描目录，按文件 mtime 重建 LRU 顺序，超 high 逐出到 low
 //! - 入缓存必先 sha256 校验（校验逻辑在 media.rs 的取流路径），失败标 poisoned
-//!   拒缓存；poisoned 带过期窗口，到期自动重取
-//! - 并发同 key miss 去重：per-key tokio Mutex（single-flight；后到者等锁后重查缓存）
-//! - 磁盘满/超水位：拒绝入缓存仅透传（make_room 返回 false，由调用方走透传）
+//!   拒缓存；poisoned 带过期窗口，任何 map 访问顺带 TTL 清扫（防高基数无界）
+//! - 并发同 key miss 去重：per-key tokio Mutex（single-flight；后到者等锁后重查缓存）；
+//!   锁释放且无其他持有者后从锁表摘除（防高基数 key 无界增长）
+//! - admission 原子预留（r5 P0-4）：入缓存前先预留字节（投影预算 = total + inflight，
+//!   与逐出在同一把锁内判定），成功 commit 转正入账、失败/丢弃自动归还——并发 N 个
+//!   miss 不可能同时过检查突破 high
+//! - 逐出次序（r5 P1-11）：先删文件、成功才摘账；删除失败保留 entry 并标
+//!   undiscardable（字节继续计入配额、拒绝新 admission 的腾位），下次 admission
+//!   重试删除直到恢复
+//! - 磁盘满/超水位：拒绝入缓存仅透传（admission 返回 None，由调用方走透传）
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
 
 /// 命中节流：内存即时记账，磁盘 mtime 至少间隔此窗口才更新一次
@@ -22,6 +29,8 @@ pub const POISONED_TTL: Duration = Duration::from_secs(30);
 struct Entry {
     size: u64,
     pinned: bool,
+    /// 逐出删除失败标记（r5 P1-11）：字节保留在账上，等待下次删除重试（恢复）
+    undiscardable: bool,
     last_touch: Instant,
     last_disk_touch: Instant,
 }
@@ -30,6 +39,9 @@ struct Entry {
 struct CacheInner {
     entries: HashMap<String, Entry>,
     total: u64,
+    /// admission 预留中（已过 admission、尚未 commit/release）的字节数：
+    /// 投影预算 = total + inflight，防止并发 miss 同时过检查突破 high（r5 P0-4）
+    inflight: u64,
 }
 
 pub struct DiskCache {
@@ -38,7 +50,7 @@ pub struct DiskCache {
     low: u64,
     inner: Mutex<CacheInner>,
     /// 并发同 key miss 去重：等待者拿锁后重查缓存（后到者排队）
-    inflight: Mutex<HashMap<String, std::sync::Arc<tokio::sync::Mutex<()>>>>,
+    inflight_locks: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     poisoned: Mutex<HashMap<String, Instant>>,
 }
 
@@ -68,6 +80,7 @@ impl DiskCache {
                 Entry {
                     size: *size,
                     pinned: pinned.contains(key),
+                    undiscardable: false,
                     last_touch: last,
                     last_disk_touch: last,
                 },
@@ -81,7 +94,7 @@ impl DiskCache {
             high,
             low,
             inner: Mutex::new(inner),
-            inflight: Mutex::new(HashMap::new()),
+            inflight_locks: Mutex::new(HashMap::new()),
             poisoned: Mutex::new(HashMap::new()),
         };
         if cache.total() > cache.high {
@@ -149,61 +162,204 @@ impl DiskCache {
         self.root.join("tmp").join(format!("{flat}.{nanos}.part"))
     }
 
-    /// 并发同 key miss 去重：返回 per-key 互斥锁句柄，调用方 await lock 后重查缓存
-    pub async fn lock_key(&self, key: &str) -> std::sync::Arc<tokio::sync::Mutex<()>> {
-        let handle = {
-            let mut m = self.inflight.lock().unwrap();
-            m.entry(key.to_owned())
-                .or_insert_with(|| std::sync::Arc::new(tokio::sync::Mutex::new(())))
-                .clone()
-        };
-        handle
+    // ---- admission 原子预留（r5 P0-4） ----
+
+    /// 入缓存许可：在 inner 互斥锁内一步完成「投影预算检查（total + inflight + incoming
+    /// ≤ high）+ 按需 LRU 逐出 + 预留字节」。返回 None = 拒绝入缓存（调用方透传）。
+    /// 许可必须以 [`Reservation::commit`]（转正入账）或 Drop（归还）收口。
+    pub fn admit(self: &Arc<Self>, key: &str, incoming: u64) -> Option<Reservation> {
+        let mut inner = self.inner.lock().unwrap();
+        if incoming > self.high {
+            return None;
+        }
+        if !self.make_room_locked(&mut inner, incoming, key) {
+            return None;
+        }
+        inner.inflight += incoming;
+        Some(Reservation {
+            cache: self.clone(),
+            key: key.to_owned(),
+            bytes: incoming,
+            done: false,
+        })
     }
 
-    /// 腾位：projection 总量（含 incoming）超 high 时按 LRU 逐出到 low；
-    /// pinned 与 incoming key 自身不逐出。返回 false = 拒绝入缓存（调用方透传）。
-    pub fn make_room(&self, incoming: u64, key: &str) -> bool {
-        let mut inner = self.inner.lock().unwrap();
-        if inner.total + incoming <= self.high {
-            return true;
-        }
-        loop {
-            if inner.total + incoming <= self.high {
-                return true;
-            }
-            // 最老优先（last_touch 最小）；pinned 与本 key 不逐出
-            let victim = inner
-                .entries
-                .iter()
-                .filter(|(k, e)| !e.pinned && k.as_str() != key)
-                .min_by_key(|(_, e)| e.last_touch)
-                .map(|(k, _)| k.clone());
-            match victim {
-                Some(v) => {
-                    let (removed, path) = {
-                        let e = inner.entries.remove(&v).unwrap();
-                        inner.total -= e.size;
-                        (e.size, self.root.join(&v))
-                    };
-                    if let Err(e) = std::fs::remove_file(&path) {
-                        eprintln!("[cdn-media] 逐出失败 {}: {e}", path.display());
-                    }
-                    let _ = removed;
-                }
+    /// 腾位至投影预算（total + inflight + incoming ≤ high）：
+    /// 逐出先删文件、成功才摘账（r5 P1-11）；删除失败保留 entry 并标 undiscardable，
+    /// 本次调用内换下一个候选（attempted 去重），绝不卡死在单个不可删条目上。
+    /// 返回 false = 无法腾出足够空间。
+    fn make_room_locked(&self, inner: &mut CacheInner, incoming: u64, key: &str) -> bool {
+        let mut attempted: HashSet<String> = HashSet::new();
+        while inner.total + inner.inflight + incoming > self.high {
+            match self.remove_victim_locked(inner, key, &mut attempted) {
+                // 无候选（全 pinned / 全部删除失败）
                 None => return false,
+                // 删除失败 → 换下一个候选继续
+                Some(false) => continue,
+                Some(true) => {}
+            }
+        }
+        true
+    }
+
+    /// 选最老候选并尝试删除（r5 P1-11 次序硬约束：先删文件、成功才摘账）。
+    /// 返回 None = 无候选者；Some(false) = 删除失败（entry 保留记账、标 undiscardable、
+    /// attempted 排除）；Some(true) = 已删除并摘账。
+    fn remove_victim_locked(
+        &self,
+        inner: &mut CacheInner,
+        key: &str,
+        attempted: &mut HashSet<String>,
+    ) -> Option<bool> {
+        // 最老优先（last_touch 最小）；pinned、incoming key 自身与本次已失败的条目不选
+        let victim = inner
+            .entries
+            .iter()
+            .filter(|(k, e)| !e.pinned && k.as_str() != key && !attempted.contains(k.as_str()))
+            .min_by_key(|(_, e)| e.last_touch)
+            .map(|(k, _)| k.clone());
+        let v = victim?;
+        attempted.insert(v.clone());
+        let path = self.root.join(&v);
+        match std::fs::remove_file(&path) {
+            Ok(()) => {
+                let e = inner.entries.remove(&v).expect("victim entry 在场");
+                inner.total -= e.size;
+                Some(true)
+            }
+            Err(err) => {
+                if let Some(entry) = inner.entries.get_mut(&v) {
+                    entry.undiscardable = true;
+                }
+                eprintln!(
+                    "[cdn-media] 逐出删除失败（保留记账，标 undiscardable）{}: {err}",
+                    path.display()
+                );
+                Some(false)
             }
         }
     }
 
-    /// 安装完成（rename 已由调用方做）后登记入账
-    pub fn register(&self, key: &str, size: u64, pinned: bool) {
+    /// 启动/恢复期逐出到 low（pinned 与删除失败者除外）
+    fn evict_to_low(&self) {
         let mut inner = self.inner.lock().unwrap();
+        let mut attempted: HashSet<String> = HashSet::new();
+        while inner.total > self.low {
+            match self.remove_victim_locked(&mut inner, "", &mut attempted) {
+                None => {
+                    eprintln!(
+                        "[cdn-media] 水位 {}/{} 无法继续逐出（全部为 pinned 或删除失败 undiscardable）",
+                        inner.total, self.high
+                    );
+                    return;
+                }
+                Some(false) => continue,
+                Some(true) => {}
+            }
+        }
+    }
+
+    // ---- per-key single-flight（r5 P1-12：锁表防无界） ----
+
+    /// 并发同 key miss 去重：返回持有型锁守卫（await 后独占持锁）；
+    /// 守卫释放且无其他持有者后自动从锁表摘除该 entry。
+    pub async fn lock_key(&self, key: &str) -> KeyLockGuard<'_> {
+        let handle = self
+            .inflight_locks
+            .lock()
+            .unwrap()
+            .entry(key.to_owned())
+            .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+            .clone();
+        let guard = Some(handle.clone().lock_owned().await);
+        KeyLockGuard {
+            cache: self,
+            key: key.to_owned(),
+            handle,
+            guard,
+        }
+    }
+
+    // ---- poisoned 标记（r5 P1-12：任何访问顺带 TTL 清扫，防高基数无界） ----
+
+    pub fn is_poisoned(&self, key: &str) -> bool {
+        let mut p = self.poisoned.lock().unwrap();
+        sweep_poisoned(&mut p);
+        p.contains_key(key)
+    }
+
+    pub fn mark_poisoned(&self, key: &str) {
+        let mut p = self.poisoned.lock().unwrap();
+        sweep_poisoned(&mut p);
+        p.insert(key.to_owned(), Instant::now());
+    }
+
+    pub fn poisoned_count(&self) -> usize {
+        let mut p = self.poisoned.lock().unwrap();
+        sweep_poisoned(&mut p);
+        p.len()
+    }
+
+    pub fn stats(&self) -> CacheStats {
+        let inner = self.inner.lock().unwrap();
+        {
+            let mut p = self.poisoned.lock().unwrap();
+            sweep_poisoned(&mut p);
+        }
+        CacheStats {
+            objects: inner.entries.len(),
+            bytes: inner.total,
+            high: self.high,
+            low: self.low,
+            pinned_objects: inner.entries.values().filter(|e| e.pinned).count(),
+            pinned_bytes: inner.entries.values().filter(|e| e.pinned).map(|e| e.size).sum(),
+            undiscardable: inner.entries.values().filter(|e| e.undiscardable).count(),
+            inflight_reserved: inner.inflight,
+        }
+    }
+
+    #[cfg(test)]
+    fn inflight_locks_len(&self) -> usize {
+        self.inflight_locks.lock().unwrap().len()
+    }
+
+    #[cfg(test)]
+    fn force_poisoned_expiry_for_test(&self) {
+        let mut p = self.poisoned.lock().unwrap();
+        // 以「TTL 窗口之外」的截止线清扫：全部现存时间戳都超窗
+        let cutoff = Instant::now() + POISONED_TTL;
+        p.retain(|_, t| cutoff.duration_since(*t) < POISONED_TTL);
+    }
+}
+
+fn sweep_poisoned(p: &mut HashMap<String, Instant>) {
+    let now = Instant::now();
+    p.retain(|_, t| now.duration_since(*t) < POISONED_TTL);
+}
+
+/// admission 预留守卫：admit 时在缓存互斥锁内预留字节（全局投影预算的一部分），
+/// 成功 [`Reservation::commit`] 转正为正式入账，失败/丢弃经 Drop 自动归还——
+/// 即使调用方在中途 return/panic 也不会泄漏预算（r5 P0-4）。
+pub struct Reservation {
+    cache: Arc<DiskCache>,
+    key: String,
+    bytes: u64,
+    done: bool,
+}
+
+impl Reservation {
+    /// 安装完成（rename 已由调用方做）后转正：预留转正式入账
+    pub fn commit(mut self, size: u64, pinned: bool) {
+        self.done = true;
+        let mut inner = self.cache.inner.lock().unwrap();
+        inner.inflight = inner.inflight.saturating_sub(self.bytes);
         let now = Instant::now();
         if let Some(old) = inner.entries.insert(
-            key.to_owned(),
+            self.key.clone(),
             Entry {
                 size,
                 pinned,
+                undiscardable: false,
                 last_touch: now,
                 last_disk_touch: now,
             },
@@ -212,60 +368,38 @@ impl DiskCache {
         }
         inner.total += size;
     }
+}
 
-    fn evict_to_low(&self) {
-        let mut inner = self.inner.lock().unwrap();
-        while inner.total > self.low {
-            let victim = inner
-                .entries
-                .iter()
-                .filter(|(_, e)| !e.pinned)
-                .min_by_key(|(_, e)| e.last_touch)
-                .map(|(k, _)| k.clone());
-            match victim {
-                Some(v) => {
-                    let e = inner.entries.remove(&v).unwrap();
-                    inner.total -= e.size;
-                    let _ = std::fs::remove_file(self.root.join(&v));
-                }
-                None => {
-                    eprintln!(
-                        "[cdn-media] 水位 {}/{} 无法继续逐出（全部为 pinned）",
-                        inner.total, self.high
-                    );
-                    return;
-                }
-            }
+impl Drop for Reservation {
+    fn drop(&mut self) {
+        if !self.done {
+            let mut inner = self.cache.inner.lock().unwrap();
+            inner.inflight = inner.inflight.saturating_sub(self.bytes);
         }
     }
+}
 
-    pub fn is_poisoned(&self, key: &str) -> bool {
-        let mut p = self.poisoned.lock().unwrap();
-        let now = Instant::now();
-        p.retain(|_, t| now.duration_since(*t) < POISONED_TTL);
-        p.contains_key(key)
-    }
+/// per-key single-flight 持有型守卫（r5 P1-12）：Drop 时先释放锁，再在锁表互斥锁内
+/// 判定「无其他持有者」后摘表——高基数 key 场景下锁表不无界。
+pub struct KeyLockGuard<'a> {
+    cache: &'a DiskCache,
+    key: String,
+    handle: Arc<tokio::sync::Mutex<()>>,
+    /// Option 以便 Drop 内显式先释放锁再做计数判定
+    guard: Option<tokio::sync::OwnedMutexGuard<()>>,
+}
 
-    pub fn mark_poisoned(&self, key: &str) {
-        self.poisoned
-            .lock()
-            .unwrap()
-            .insert(key.to_owned(), Instant::now());
-    }
-
-    pub fn poisoned_count(&self) -> usize {
-        self.poisoned.lock().unwrap().len()
-    }
-
-    pub fn stats(&self) -> CacheStats {
-        let inner = self.inner.lock().unwrap();
-        CacheStats {
-            objects: inner.entries.len(),
-            bytes: inner.total,
-            high: self.high,
-            low: self.low,
-            pinned_objects: inner.entries.values().filter(|e| e.pinned).count(),
-            pinned_bytes: inner.entries.values().filter(|e| e.pinned).map(|e| e.size).sum(),
+impl Drop for KeyLockGuard<'_> {
+    fn drop(&mut self) {
+        // 先释放锁（唤醒等待者）
+        drop(self.guard.take());
+        // 持表锁期间不可能出现新的克隆（lock_key 克隆需持同一把表锁）：
+        // 强计数 == 2（表 + 自身 handle）即无任何等待者 → 摘表
+        let mut m = self.cache.inflight_locks.lock().unwrap();
+        if Arc::strong_count(&self.handle) == 2
+            && m.get(&self.key).is_some_and(|h| Arc::ptr_eq(h, &self.handle))
+        {
+            m.remove(&self.key);
         }
     }
 }
@@ -278,6 +412,10 @@ pub struct CacheStats {
     pub low: u64,
     pub pinned_objects: usize,
     pub pinned_bytes: u64,
+    /// 删除失败暂不可逐出的对象数（r5 P1-11 观测面）
+    pub undiscardable: usize,
+    /// admission 预留中（未转正）的字节数（r5 P0-4 观测面）
+    pub inflight_reserved: u64,
 }
 
 fn touch_mtime(path: &Path) {
@@ -349,26 +487,136 @@ mod tests {
         std::fs::remove_dir_all(&root).ok();
     }
 
+    /// r5 P0-4：N 个不同 key 并发 miss，admission 原子预留保证投影总量不超 high
+    #[tokio::test]
+    async fn concurrent_admission_never_exceeds_high() {
+        let root = tmp_root("admission");
+        let cache = Arc::new(DiskCache::recover(&root, 1000, 500, &HashSet::new()).unwrap());
+        let mut joins = Vec::new();
+        for i in 0..8 {
+            let cache = cache.clone();
+            joins.push(tokio::spawn(async move {
+                let key = format!("k{i}.bin");
+                // admit 与 commit 之间刻意 await，制造「多笔预留同时在册」的并发窗口
+                let Some(res) = cache.admit(&key, 400) else {
+                    return 0u64;
+                };
+                tokio::task::yield_now().await;
+                let path = cache.path_for(&key);
+                std::fs::write(&path, vec![b'x'; 400]).unwrap();
+                res.commit(400, false);
+                400
+            }));
+        }
+        let mut committed = 0u64;
+        for j in joins {
+            committed += j.await.unwrap();
+        }
+        assert!(
+            committed <= 1000,
+            "admission 预算被突破：committed={committed} > high=1000"
+        );
+        assert_eq!(cache.total(), committed, "账面 total 必须与实际转正一致");
+        let st = cache.stats();
+        assert_eq!(st.inflight_reserved, 0, "全部转正后预留必须清零");
+        // 预算回笼后新 admission 可用（失败路径归还已生效）
+        assert!(cache.admit("late.bin", 400).is_some(), "预算回笼后应可再入");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// r5 P0-4：预留 Drop 归还——admit 后不 commit，预算必须可回收
+    #[tokio::test]
+    async fn reservation_release_on_drop() {
+        let root = tmp_root("resdrop");
+        let cache = Arc::new(DiskCache::recover(&root, 1000, 500, &HashSet::new()).unwrap());
+        {
+            let _res = cache.admit("a.bin", 600).expect("首次可预留");
+            assert_eq!(cache.stats().inflight_reserved, 600);
+            // 预算被预留占住：600+600 > 1000 → 拒绝
+            assert!(cache.admit("b.bin", 600).is_none(), "预留必须计入投影预算");
+        } // _res Drop → 归还
+        assert_eq!(cache.stats().inflight_reserved, 0, "Drop 必须归还预留");
+        assert!(cache.admit("b.bin", 600).is_some(), "归还后可再预留");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// r5 P1-11：先删文件后摘账；删除失败保留 entry（undiscardable）并拒绝腾位，
+    /// 权限恢复后重试删除成功（恢复）
     #[test]
-    fn make_room_skips_pinned_and_refuses_when_impossible() {
-        let root = tmp_root("pinned");
-        write_file(&root.join("p.txt"), 400);
-        set_mtime(&root.join("p.txt"), 100);
-        write_file(&root.join("q.txt"), 400);
-        set_mtime(&root.join("q.txt"), 50);
-        let mut pinned = HashSet::new();
-        pinned.insert("p.txt".to_owned());
-        let cache = DiskCache::recover(&root, 1000, 500, &pinned).unwrap();
+    fn eviction_file_first_keeps_entry_on_delete_failure() {
+        let root = tmp_root("evictfail");
+        write_file(&root.join("sub").join("old.bin"), 400);
+        set_mtime(&root.join("sub").join("old.bin"), 100);
+        write_file(&root.join("new.bin"), 400);
+        set_mtime(&root.join("new.bin"), 50);
+        let cache = Arc::new(DiskCache::recover(&root, 1000, 500, &HashSet::new()).unwrap());
         assert_eq!(cache.total(), 800);
 
-        // incoming 300：需要逐出（800+300 > 1000），p 不可逐出 → 逐 q → 400+300=700 ≤ 1000
-        assert!(cache.make_room(300, "new.bin"));
-        assert!(cache.lookup("q.txt").is_none());
-        assert!(cache.lookup("p.txt").is_some());
+        // sub 目录转只读 → old.bin 不可删
+        use std::os::unix::fs::PermissionsExt;
+        let mut ro = std::fs::metadata(root.join("sub")).unwrap().permissions();
+        ro.set_mode(0o555);
+        std::fs::set_permissions(root.join("sub"), ro).unwrap();
 
-        // incoming 700：pinned 400 + 700 = 1100 > 1000，无非 pinned 可逐 → 拒绝
-        assert!(!cache.make_room(700, "big.bin"));
-        // 本 key 在册时不逐出自己
+        // incoming 400：1200 > 1000 → 先试删 old.bin（失败，保留）→ 再删 new.bin → 400+400=800 ≤ 1000
+        let res = cache.admit("fresh.bin", 400).expect("逐出 new.bin 后应可入");
+        res.commit(400, false);
+        assert!(
+            cache.lookup("sub/old.bin").is_some(),
+            "删除失败的 entry 必须保留（文件仍在、记账仍在）"
+        );
+        assert_eq!(cache.stats().undiscardable, 1, "undiscardable 必须可观测");
+        assert!(cache.lookup("new.bin").is_none(), "可删的 new.bin 已被逐出");
+        assert_eq!(cache.total(), 800);
+
+        // 恢复权限 → 下次 admission 重试删除 old.bin 成功（恢复）
+        let mut rw = std::fs::metadata(root.join("sub")).unwrap().permissions();
+        rw.set_mode(0o755);
+        std::fs::set_permissions(root.join("sub"), rw).unwrap();
+        let res2 = cache.admit("fresh2.bin", 400).expect("恢复后应可入");
+        res2.commit(400, false);
+        assert!(cache.lookup("sub/old.bin").is_none(), "恢复后 undiscardable 被重试逐出");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// r5 P1-12：锁表释放即摘——高基数 key 下锁表不无界
+    #[tokio::test]
+    async fn lock_table_cleans_after_release() {
+        let root = tmp_root("locktable");
+        let cache = Arc::new(DiskCache::recover(&root, 1000, 500, &HashSet::new()).unwrap());
+        for i in 0..1000 {
+            let g = cache.lock_key(&format!("k{i}")).await;
+            assert_eq!(cache.inflight_locks_len(), 1, "持锁期间恰有一个表项");
+            drop(g);
+            assert_eq!(cache.inflight_locks_len(), 0, "释放且无等待者后必须摘表（第 {i} 个）");
+        }
+        // 并发等待场景：等待者在场时表项保留，全部释放后摘除
+        let g1 = cache.lock_key("shared").await;
+        let cache2 = cache.clone();
+        let j = tokio::spawn(async move {
+            let g2 = cache2.lock_key("shared").await;
+            assert_eq!(cache2.inflight_locks_len(), 1, "等待者在场时表项保留");
+            drop(g2);
+        });
+        // g1 释放后 g2 才拿到锁
+        drop(g1);
+        j.await.unwrap();
+        assert_eq!(cache.inflight_locks_len(), 0, "全部释放后摘表");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// r5 P1-12：poisoned map TTL 清扫——高基数 key 下不无界
+    #[test]
+    fn poisoned_map_sweeps_expired() {
+        let root = tmp_root("poison-sweep");
+        let cache = DiskCache::recover(&root, 1000, 500, &HashSet::new()).unwrap();
+        for i in 0..1000 {
+            cache.mark_poisoned(&format!("p{i}"));
+        }
+        assert_eq!(cache.poisoned_count(), 1000);
+        cache.force_poisoned_expiry_for_test();
+        assert_eq!(cache.poisoned_count(), 0, "过期 poisoned 必须被清扫");
+        assert!(!cache.is_poisoned("p0"));
         std::fs::remove_dir_all(&root).ok();
     }
 
@@ -415,6 +663,25 @@ mod tests {
             0,
             "遗留 .part 必须被清理"
         );
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// admission 拒绝路径：incoming 超 high 直接拒绝；全 pinned 不可逐出拒绝
+    #[test]
+    fn admission_refuses_when_room_cannot_be_made() {
+        let root = tmp_root("admit-refuse");
+        write_file(&root.join("p.txt"), 400);
+        set_mtime(&root.join("p.txt"), 100);
+        let mut pinned = HashSet::new();
+        pinned.insert("p.txt".to_owned());
+        let cache = Arc::new(DiskCache::recover(&root, 1000, 500, &pinned).unwrap());
+        assert_eq!(cache.total(), 400);
+        // pinned 400 + incoming 700 = 1100 > 1000，无非 pinned 可逐 → 拒绝
+        assert!(cache.admit("big.bin", 700).is_none());
+        // incoming 自身超 high → 直接拒绝
+        assert!(cache.admit("huge.bin", 2000).is_none());
+        // incoming 300：400+300=700 ≤ 1000 → 允许
+        assert!(cache.admit("ok.bin", 300).is_some());
         std::fs::remove_dir_all(&root).ok();
     }
 }

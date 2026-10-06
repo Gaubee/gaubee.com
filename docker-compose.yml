@@ -40,11 +40,15 @@ services:
       # cdn-base 配置（A9）：只读挂载，不进 scratch 镜像；文件缺失/非法启动即败。
       # 首次部署：cp config.example.toml config.toml 后再 up（本仓库已 gitignore config.toml）
       - ./config.toml:/config.toml:ro
-      # 媒体缓存（A3 bind mount，强烈建议启用：默认落在容器可写层，重建即丢）：
-      #   1) 宿主预创建目录并交还给容器内 UID 65532（scratch 无 useradd）：
-      #        mkdir -p /opt/gaubee/media-cache && chown 65532:65532 /opt/gaubee/media-cache
-      #   2) 取消下行注释：
-      # - /opt/gaubee/media-cache:/media-cache
+      # 媒体缓存（A3 bind mount，r5 P0-1 已默认启用）：
+      #   env 强制 MEDIA_CACHE_DIR=/media-cache 且镜像以 USER 65532 运行——不挂载则
+      #   缓存落容器可写层（容器重建即丢，启动探针还可能因可写层异常直接失败）。
+      #   首次部署（宿主预创建目录并交还容器内 UID；scratch 无 shell，不能 exec chown）：
+      #     sudo mkdir -p /opt/gaubee/media-cache && sudo chown 65532:65532 /opt/gaubee/media-cache
+      #   本地开发/其他宿主路径：用 compose.override.yml 覆盖（示例）——
+      #     services.web.volumes: ["/your/host/dir:/media-cache"]
+      #     并同步覆盖 environment.MEDIA_CACHE_DIR；或直接改下行左半路径
+      - /opt/gaubee/media-cache:/media-cache
     environment:
       # 配置文件路径（对应上方只读挂载）
       CDN_CONFIG: /config.toml

@@ -27,6 +27,9 @@ mod media;
 /// 仅测试用本地 staging 卷核对 offset 定位语义
 #[cfg(test)]
 mod ustar;
+/// 测试专用支撑：本地 raw mock 上游 + 测试 Config（仅测试构建编译）
+#[cfg(test)]
+mod test_support;
 
 use std::collections::HashSet;
 use std::convert::Infallible;
@@ -62,10 +65,23 @@ async fn run() {
         }
     };
     let root = PathBuf::from(env::var("SERVER_ROOT").unwrap_or_else(|_| "/srv".into()));
-    let port: u16 = env::var("PORT")
-        .ok()
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(8080);
+    // r5 P1-14：env 解析失败一律启动即败，绝不静默回退默认值
+    let port: u16 = match env::var("PORT") {
+        Ok(raw) => {
+            let cleaned = raw.trim();
+            if cleaned.is_empty() {
+                8080
+            } else {
+                cleaned.parse().unwrap_or_else(|_| {
+                    eprintln!(
+                        "[cdn-base] PORT={raw:?} 解析失败，启动即败。修复：PORT 必须是 1-65535 的整数"
+                    );
+                    std::process::exit(1);
+                })
+            }
+        }
+        Err(_) => 8080,
+    };
 
     // 2. 缓存恢复 + 磁盘启动强校验（A3：可写探针 / 剩余空间 ≥ high×1.2 / 水位合法）
     let pinned: HashSet<String> = cfg.pinned.keys.iter().cloned().collect();
@@ -198,19 +214,33 @@ async fn run() {
 
     let main_handle =
         tokio::spawn(async move { axum::serve(listener, app).await.expect("server error") });
-    let admin_handle = admin_listener.map(|l| {
-        tokio::spawn(async move { axum::serve(l, admin_app).await.expect("admin server error") })
-    });
-    // 任一 listener 退出（含 panic）即整体退出
-    if let Some(h) = admin_handle {
-        if h.await.is_err() {
-            eprintln!("[cdn-base] admin listener 异常退出");
-            std::process::exit(1);
+    // r5 P1-15：tokio::select! 同时等双 listener——任一结束（含 panic 产生的 JoinError）
+    // 即 abort 另一任务并整体退出，不再允许单 listener 孤儿存活
+    match admin_listener {
+        Some(l) => {
+            let mut main_handle = main_handle;
+            let mut admin_handle = tokio::spawn(async move {
+                axum::serve(l, admin_app).await.expect("admin server error")
+            });
+            tokio::select! {
+                r = &mut main_handle => {
+                    eprintln!("[cdn-base] main listener 先行退出（{r:?}）：abort admin 任务并整体退出");
+                    admin_handle.abort();
+                    std::process::exit(1);
+                }
+                r = &mut admin_handle => {
+                    eprintln!("[cdn-base] admin listener 先行退出（{r:?}）：abort main 任务并整体退出");
+                    main_handle.abort();
+                    std::process::exit(1);
+                }
+            }
         }
-    }
-    if main_handle.await.is_err() {
-        eprintln!("[cdn-base] main listener 异常退出");
-        std::process::exit(1);
+        None => {
+            if main_handle.await.is_err() {
+                eprintln!("[cdn-base] main listener 异常退出");
+                std::process::exit(1);
+            }
+        }
     }
 }
 

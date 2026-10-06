@@ -39,6 +39,12 @@ high_bytes = 524288000    # 500MB
 low_bytes = 314572800     # 300MB
 # 超过该大小的对象回源透传不落盘（pinned 例外常驻）
 large_object_bytes = 52428800  # 50MB
+# 完整性严格模式（R3）：true = 回源先缓冲全量（不超过 max_buffer_bytes）校验 sha256
+# 通过后才响应（可承诺 immutable）；false（默认）= 流式回源，响应头 no-store
+#（校验通过前不承诺 immutable，校验失败拒缓存，客户端重试即得正确副本）
+strict_integrity = false
+# 严格模式缓冲上限（字节）：超过该大小的对象严格模式下退化为透传（no-store）
+max_buffer_bytes = 134217728   # 128MB
 
 [pinned]
 # 常驻 key（canonical media key，计入总容量；合计超 high_bytes 启动失败）

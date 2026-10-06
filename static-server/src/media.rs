@@ -4,17 +4,20 @@
 //! no-cache 头（8080 主路由改造见 main.rs）。
 //!
 //! 分层决策（对每个 miss）：
-//! - size ≤ large_object_bytes（默认 50MB）或 pinned → 入缓存路径。无 Range 时
-//!   stream-through：tee 临时文件流式回客户端（immutable 头），流毕校验 sha256
-//!   通过才原子 rename 入缓存，失败标 poisoned 拒缓存；有 Range 时整对象取回
-//!   校验入缓存后本地伺服 206/416
-//! - 超阈值 / 超水位 / poisoned / 腾位失败 → 透传不落盘：边传边 hash（整对象），
-//!   失败标 poisoned；响应头无缓存承诺（R3：no-store，客户端重试即得正确副本），
-//!   Range 透传把上游卷坐标改写为对象坐标的 Content-Range
+//! - size ≤ large_object_bytes（默认 50MB）或 pinned → 入缓存路径，先过缓存
+//!   admission 原子预留（r5 P0-4：per-key single-flight + 全局投影预算）。无 Range
+//!   且非严格模式时 stream-through：tee 临时文件流式回客户端（响应头 no-store——
+//!   校验通过前不承诺 immutable，r5 P1-7），流毕校验 sha256 通过才原子 rename 入
+//!   缓存，失败标 poisoned 拒缓存；有 Range 或严格模式（strict_integrity，且对象
+//!   ≤ max_buffer_bytes）时整对象取回校验入缓存后本地伺服 200/206/416（可承诺
+//!   immutable）；严格模式超缓冲上限 → 透传
+//! - 超阈值 / 超水位 / poisoned / 腾位失败 / 严格模式超上限 → 透传不落盘：边传边
+//!   hash（整对象），失败标 poisoned；响应头无缓存承诺（R3：no-store，客户端重试
+//!   即得正确副本），Range 透传把上游卷坐标改写为对象坐标的 Content-Range
 //!
-//! 响应头（命中/入缓存路径）：Cache-Control: public, max-age=31536000, immutable、
-//! Accept-Ranges: bytes、Content-Type（manifest content_type）、精确 Content-Length。
-//! HEAD miss 不回源，用 manifest 元数据合成 200。
+//! 响应头（命中/已验证入缓存路径）：Cache-Control: public, max-age=31536000,
+//! immutable、Accept-Ranges: bytes、Content-Type（manifest content_type）、精确
+//! Content-Length。HEAD miss 不回源，用 manifest 元数据合成 200。
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -189,24 +192,46 @@ pub async fn serve(State(ctx): State<Arc<MediaCtx>>, req: Request<Body>) -> Resp
     let pinned = ctx.cfg.pinned.keys.iter().any(|k| k == &canonical);
     let cacheable = obj.size <= ctx.cfg.cache.large_object_bytes || pinned;
 
-    if cacheable {
-        // single-flight：并发同 key miss 只有一个回源者，其余等锁后重查缓存
-        let gate = ctx.cache.lock_key(&canonical).await;
-        let _guard = gate.lock().await;
+    // r5 P1-7：严格完整性模式——回源先缓冲全量（≤max_buffer_bytes）校验通过再响应；
+    // 超上限对象严格模式下退化为透传（no-store），绝不流式伺服未校验字节
+    let strict = ctx.cfg.cache.strict_integrity;
+    let strict_unbufferable = strict && obj.size > ctx.cfg.cache.max_buffer_bytes;
+    if strict_unbufferable {
+        eprintln!(
+            "[cdn-media] 严格模式且对象超缓冲上限，透传 {canonical}（{n} 字节，no-store）",
+            n = obj.size
+        );
+    }
+
+    if cacheable && !strict_unbufferable {
+        // single-flight（r5 P0-4）：并发同 key miss 只有一个回源者，其余等锁后重查缓存；
+        // lock_key 返回持有型守卫（await 后独占持锁，释放即摘表）
+        let _guard = ctx.cache.lock_key(&canonical).await;
         if let Some(path) = ctx.cache.lookup(&canonical) {
             return serve_local(&path, obj.size, &obj.content_type, &range).await;
         }
-        if !ctx.cache.is_poisoned(&canonical) && ctx.cache.make_room(obj.size, &canonical) {
-            if range == RangeSpec::None {
-                return stream_through_tee(&ctx, &index, &canonical, &obj, pinned).await;
-            }
-            // Range miss：整对象取回校验入缓存后本地伺服 206/416
-            match fetch_object_to_cache(&ctx, &index, &canonical, &obj, pinned).await {
-                Ok(path) => return serve_local(&path, obj.size, &obj.content_type, &range).await,
-                Err(e) => {
-                    eprintln!("[cdn-media] 取回失败 {canonical}：{e}");
-                    return err_json(StatusCode::BAD_GATEWAY, "upstream_error", Some(&canonical));
+        if !ctx.cache.is_poisoned(&canonical) {
+            // admission 原子预留（r5 P0-4）：预留失败 = 超水位/腾位失败 → 透传
+            if let Some(res) = ctx.cache.admit(&canonical, obj.size) {
+                // 有 Range 或严格模式：整对象取回校验入缓存后本地伺服 200/206/416
+                if range != RangeSpec::None || strict {
+                    match fetch_object_to_cache(&ctx, &index, &canonical, &obj, pinned, res).await {
+                        Ok(path) => {
+                            return serve_local(&path, obj.size, &obj.content_type, &range).await
+                        }
+                        Err(e) => {
+                            eprintln!("[cdn-media] 取回失败 {canonical}：{e}");
+                            return err_json(
+                                StatusCode::BAD_GATEWAY,
+                                "upstream_error",
+                                Some(&canonical),
+                            );
+                        }
+                    }
                 }
+                // 无 Range 非严格：stream-through tee——响应头 no-store（校验通过前
+                // 不承诺 immutable，r5 P1-7），流毕校验通过才入缓存
+                return stream_through_tee(&ctx, &index, &canonical, &obj, pinned, res).await;
             }
         }
         // 超水位拒绝入缓存 / poisoned → 落入透传
@@ -330,22 +355,27 @@ async fn serve_local(path: &std::path::Path, size: u64, ct: &str, range: &RangeS
     resp
 }
 
-/// stream-through（≤阈值 miss、无 Range）：tee 临时文件流式回客户端，
-/// 流毕校验 sha256 → 原子 rename 入缓存；失败标 poisoned、临时文件丢弃
+/// stream-through（≤阈值 miss、无 Range、非严格模式）：tee 临时文件流式回客户端，
+/// 流毕校验 sha256 → 原子 rename 入缓存；失败标 poisoned、临时文件丢弃。
+/// 响应头 no-store（r5 P1-7）：字节尚未校验，不承诺 immutable——校验通过前客户端
+/// 不得缓存，失败重试即得正确副本
 async fn stream_through_tee(
     ctx: &Arc<MediaCtx>,
     index: &Arc<ManifestIndex>,
     key: &str,
     obj: &MediaObject,
     pinned: bool,
+    res: crate::cache::Reservation,
 ) -> Response {
     let Some(url) = index.object_url(&ctx.cfg.github.repo, obj) else {
+        drop(res);
         return err_json(StatusCode::BAD_GATEWAY, "volume_unresolved", Some(key));
     };
     let tmp = ctx.cache.new_tmp_path(key);
     let file = match tokio::fs::File::create(&tmp).await {
         Ok(f) => f,
         Err(e) => {
+            drop(res);
             eprintln!("[cdn-media] 临时文件创建失败 {}：{e}", tmp.display());
             ctx.cache.mark_poisoned(key);
             return err_json(StatusCode::BAD_GATEWAY, "cache_io_error", Some(key));
@@ -354,7 +384,11 @@ async fn stream_through_tee(
     let resp = match object_fetch(&ctx.http, &ctx.cfg.github.token, &url, obj, None).await {
         Ok(r) => r,
         Err(e) => {
+            drop(res);
             let _ = std::fs::remove_file(&tmp);
+            if matches!(e, FetchError::Integrity(_)) {
+                ctx.cache.mark_poisoned(key);
+            }
             eprintln!("[cdn-media] 回源失败 {key}：{e}");
             return err_json(StatusCode::BAD_GATEWAY, "upstream_error", Some(key));
         }
@@ -372,28 +406,39 @@ async fn stream_through_tee(
         expect_sha: obj.sha256.to_ascii_lowercase(),
         size: obj.size,
         pinned,
+        // r5 P0-4：预留随状态机走——finish 转正、abort/Drop 归还
+        res: Some(res),
         done: false,
     };
     let body = Body::from_stream(futures_util::stream::unfold(state, |mut st| async move {
         match st.upstream.next().await {
             Some(Ok(chunk)) => {
                 st.hasher.update(&chunk);
+                // r5 P1-9：写盘前 checked 投影——超长/溢出立即中止（删 tmp+poisoned），
+                // 绝不把越界字节落到临时文件
+                let projected = match st.written.checked_add(chunk.len() as u64) {
+                    Some(p) if p <= st.size => p,
+                    _ => {
+                        st.abort(
+                            "上游超长",
+                            &format!("written={} chunk={} expect={}", st.written, chunk.len(), st.size),
+                        )
+                        .await;
+                        return Some((Err("upstream over-length".into()), st));
+                    }
+                };
                 if let Some(f) = st.file.as_mut() {
                     if let Err(e) = f.write_all(&chunk).await {
                         st.abort("临时文件写入失败", &e.to_string()).await;
                         return Some((Err(Box::new(e) as BoxError), st));
                     }
                 }
-                st.written += chunk.len() as u64;
+                st.written = projected;
                 // 关键：不能等流 EOF（None）才终验——hyper 发满 Content-Length 后
                 // 不再轮询 body，Drop 兜底会把临时文件当失败清理。对象长度在
                 // manifest 里是已知常量，收满即终验+入缓存。
                 if st.written == st.size {
                     st.finish().await;
-                } else if st.written > st.size {
-                    st.abort("上游超长", &format!("written={} expect={}", st.written, st.size))
-                        .await;
-                    return Some((Err("upstream over-length".into()) as Result<bytes::Bytes, BoxError>, st));
                 }
                 Some((Ok(chunk), st))
             }
@@ -414,13 +459,10 @@ async fn stream_through_tee(
             }
         }
     }));
-    // 头部先行（immutable；流毕才校验——失败仅服务端拒缓存并标 poisoned）
+    // 头部先行：no-store（r5 P1-7，非严格 tee 校验通过前不承诺 immutable）
     let mut resp = Response::new(body);
     let h = resp.headers_mut();
-    h.insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static("public, max-age=31536000, immutable"),
-    );
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     h.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
     if let Ok(v) = HeaderValue::from_str(&obj.content_type) {
         h.insert(header::CONTENT_TYPE, v);
@@ -431,7 +473,8 @@ async fn stream_through_tee(
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
-/// tee 流状态机：Drop 兜底清理临时文件（客户端断连导致流被丢弃时）
+/// tee 流状态机：Drop 兜底清理临时文件（客户端断连导致流被丢弃时）；
+/// admission 预留随状态机走——finish 转正、abort/Drop 归还（r5 P0-4）
 struct TeeState {
     upstream: std::pin::Pin<Box<dyn futures_util::Stream<Item = Result<bytes::Bytes, reqwest::Error>> + Send>>,
     file: Option<tokio::fs::File>,
@@ -444,6 +487,7 @@ struct TeeState {
     expect_sha: String,
     size: u64,
     pinned: bool,
+    res: Option<crate::cache::Reservation>,
     done: bool,
 }
 
@@ -451,6 +495,7 @@ impl TeeState {
     async fn abort(&mut self, why: &str, detail: &str) {
         self.done = true;
         self.file = None;
+        // res（预留）随 Drop 归还
         let _ = std::fs::remove_file(&self.tmp);
         eprintln!("[cdn-media] {why} {}：{detail}（标 poisoned 拒缓存）", self.key);
         self.cache.mark_poisoned(&self.key);
@@ -480,16 +525,22 @@ impl TeeState {
             self.cache.mark_poisoned(&self.key);
             return;
         }
+        // r5 P1-10：create_dir_all/rename 失败统一删 tmp + poisoned（finally 风格收口）
         if let Some(parent) = self.final_path.parent() {
             if let Err(e) = tokio::fs::create_dir_all(parent).await {
-                eprintln!("[cdn-media] 缓存目录创建失败：{e}");
+                eprintln!(
+                    "[cdn-media] 缓存目录创建失败：{e}（删 tmp + poisoned）"
+                );
                 let _ = std::fs::remove_file(&self.tmp);
+                self.cache.mark_poisoned(&self.key);
                 return;
             }
         }
         match tokio::fs::rename(&self.tmp, &self.final_path).await {
             Ok(()) => {
-                self.cache.register(&self.key, self.size, self.pinned);
+                if let Some(res) = self.res.take() {
+                    res.commit(self.size, self.pinned);
+                }
                 eprintln!(
                     "[cdn-media] 缓存入账 {key}（{n} 字节）",
                     key = self.key,
@@ -497,8 +548,12 @@ impl TeeState {
                 );
             }
             Err(e) => {
-                eprintln!("[cdn-media] 原子 rename 失败 {}：{e}", self.tmp.display());
+                eprintln!(
+                    "[cdn-media] 原子 rename 失败 {}：{e}（删 tmp + poisoned）",
+                    self.tmp.display()
+                );
                 let _ = std::fs::remove_file(&self.tmp);
+                self.cache.mark_poisoned(&self.key);
             }
         }
     }
@@ -508,6 +563,7 @@ impl Drop for TeeState {
     fn drop(&mut self) {
         if !self.done {
             self.file = None;
+            // res（预留）随 Drop 归还
             let _ = std::fs::remove_file(&self.tmp);
             self.cache.mark_poisoned(&self.key);
         }
@@ -518,20 +574,92 @@ fn hex_bytes(b: &[u8]) -> String {
     b.iter().map(|x| format!("{x:02x}")).collect()
 }
 
-/// 整对象取回→校验→入缓存（Range miss / warm 共用）
+/// 上游回源错误分类（r5 P1-8）：
+/// - Transient：网络/HTTP 状态层问题（可重试，不必然损坏）
+/// - Integrity：上游返回与请求不符（206 区间/长度不匹配、offset 溢出等）——
+///   按上游错误处理：poisoned + 透传失败
+#[derive(Debug)]
+pub enum FetchError {
+    Transient(String),
+    Integrity(String),
+}
+
+impl std::fmt::Display for FetchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FetchError::Transient(m) => write!(f, "{m}"),
+            FetchError::Integrity(m) => write!(f, "integrity: {m}"),
+        }
+    }
+}
+
+/// r5 P1-9：写盘前投影校验（tee / 整对象取回 / 透传共用）——返回 Err = 超长或
+/// checked_add 溢出，调用方必须立即中止（删 tmp + poisoned）
+fn project_chunk(written: u64, chunk_len: usize, expect: u64) -> Result<u64, String> {
+    match written.checked_add(chunk_len as u64) {
+        Some(p) if p <= expect => Ok(p),
+        _ => Err(format!(
+            "上游超长：written={written} chunk={chunk_len} expect={expect}"
+        )),
+    }
+}
+
+/// 整对象安装入缓存（r5 P1-10）：create_dir_all + 原子 rename + 预留转正——
+/// 任何失败统一删 tmp + poisoned（finally 风格收口，杜绝孤儿 tmp 与账实不符）
+async fn install_into_cache(
+    ctx: &Arc<MediaCtx>,
+    key: &str,
+    tmp: &std::path::Path,
+    res: crate::cache::Reservation,
+    pinned: bool,
+    size: u64,
+) -> Result<std::path::PathBuf, String> {
+    let final_path = ctx.cache.path_for(key);
+    let result = async {
+        if let Some(parent) = final_path.parent() {
+            tokio::fs::create_dir_all(parent)
+                .await
+                .map_err(|e| format!("缓存目录创建失败：{e}"))?;
+        }
+        tokio::fs::rename(tmp, &final_path)
+            .await
+            .map_err(|e| format!("rename 失败：{e}"))?;
+        Ok(final_path.clone())
+    }
+    .await;
+    match result {
+        Ok(p) => {
+            res.commit(size, pinned);
+            eprintln!("[cdn-media] 缓存入账 {key}（{n} 字节）", n = size);
+            Ok(p)
+        }
+        Err(e) => {
+            let _ = std::fs::remove_file(tmp);
+            ctx.cache.mark_poisoned(key);
+            Err(e)
+        }
+    }
+}
+
+/// 整对象取回→校验→入缓存（Range miss / 严格模式 / warm 共用）。
+/// 调用方必须先 `cache.admit` 取得预留（r5 P0-4）。
 pub async fn fetch_object_to_cache(
     ctx: &Arc<MediaCtx>,
     index: &Arc<ManifestIndex>,
     key: &str,
     obj: &MediaObject,
     pinned: bool,
+    res: crate::cache::Reservation,
 ) -> Result<std::path::PathBuf, String> {
     let url = index
         .object_url(&ctx.cfg.github.repo, obj)
         .ok_or_else(|| format!("卷未解析：{}", obj.volume))?;
     let tmp = ctx.cache.new_tmp_path(key);
     let fetch = async {
-        let resp = object_fetch(&ctx.http, &ctx.cfg.github.token, &url, obj, None).await?;
+        let resp =
+            object_fetch(&ctx.http, &ctx.cfg.github.token, &url, obj, None)
+                .await
+                .map_err(|e| e.to_string())?;
         let mut file = tokio::fs::File::create(&tmp)
             .await
             .map_err(|e| format!("临时文件创建失败：{e}"))?;
@@ -541,10 +669,11 @@ pub async fn fetch_object_to_cache(
         while let Some(item) = stream.next().await {
             let chunk = item.map_err(|e| format!("回源流中断：{e}"))?;
             hasher.update(&chunk);
+            // r5 P1-9：写盘前 checked 投影，超长立即中止（Err 路径统一删 tmp+poisoned）
+            written = project_chunk(written, chunk.len(), obj.size)?;
             file.write_all(&chunk)
                 .await
                 .map_err(|e| format!("临时文件写入失败：{e}"))?;
-            written += chunk.len() as u64;
         }
         file.flush().await.map_err(|e| format!("flush 失败：{e}"))?;
         drop(file);
@@ -558,20 +687,7 @@ pub async fn fetch_object_to_cache(
         Ok(())
     };
     match fetch.await {
-        Ok(()) => {
-            let final_path = ctx.cache.path_for(key);
-            if let Some(parent) = final_path.parent() {
-                tokio::fs::create_dir_all(parent)
-                    .await
-                    .map_err(|e| format!("缓存目录创建失败：{e}"))?;
-            }
-            tokio::fs::rename(&tmp, &final_path)
-                .await
-                .map_err(|e| format!("rename 失败：{e}"))?;
-            ctx.cache.register(key, obj.size, pinned);
-            eprintln!("[cdn-media] 缓存入账 {key}（{n} 字节）", n = obj.size);
-            Ok(final_path)
-        }
+        Ok(()) => install_into_cache(ctx, key, &tmp, res, pinned, obj.size).await,
         Err(e) => {
             let _ = std::fs::remove_file(&tmp);
             ctx.cache.mark_poisoned(key);
@@ -580,16 +696,99 @@ pub async fn fetch_object_to_cache(
     }
 }
 
-/// 对象字节范围回源：总是携带对象坐标 Range（上游若回 200 = 整卷 → 拒绝，防误拉百 MB 卷）
+/// warm/取回结果（serve cacheable 分支与 admin::warm 共用路径，r5 P0-4）
+#[derive(Debug)]
+pub enum WarmOutcome {
+    AlreadyCached,
+    Warmed,
+    /// admission 拒绝（超水位/腾位失败）或 poisoned 窗口内
+    NoRoom,
+    Failed(String),
+}
+
+/// 单 key 预热/取回公共路径（r5 P0-4）：per-key single-flight 门 → 缓存重查 →
+/// poisoned 检查 → admission 原子预留 → 整对象取回校验入缓存。
+/// admin::warm 与 serve 的取回分支都收敛到同一 admission/single-flight 语义。
+pub async fn warm_one(
+    ctx: &Arc<MediaCtx>,
+    index: &Arc<ManifestIndex>,
+    key: &str,
+    obj: &MediaObject,
+    pinned: bool,
+) -> WarmOutcome {
+    // lock_key 守卫即锁：await 返回后独占持锁
+    let _guard = ctx.cache.lock_key(key).await;
+    if ctx.cache.lookup(key).is_some() {
+        return WarmOutcome::AlreadyCached;
+    }
+    if ctx.cache.is_poisoned(key) {
+        return WarmOutcome::NoRoom;
+    }
+    let Some(res) = ctx.cache.admit(key, obj.size) else {
+        return WarmOutcome::NoRoom;
+    };
+    match fetch_object_to_cache(ctx, index, key, obj, pinned, res).await {
+        Ok(_) => WarmOutcome::Warmed,
+        Err(e) => WarmOutcome::Failed(e),
+    }
+}
+
+/// r5 P1-8：精确校验上游 206 的 Content-Range 区间与 Content-Length 与请求一致；
+/// 不一致 = Integrity 错误（poisoned + 失败）
+fn validate_upstream_206(
+    resp: reqwest::Response,
+    start: u64,
+    end: u64,
+    expect_len: u64,
+) -> Result<reqwest::Response, FetchError> {
+    let integrity = |m: String| FetchError::Integrity(m);
+    let cr = resp
+        .headers()
+        .get(reqwest::header::CONTENT_RANGE)
+        .and_then(|v| v.to_str().ok())
+        .ok_or_else(|| integrity("206 响应缺 Content-Range".to_owned()))?;
+    let expect_prefix = format!("bytes {start}-{end}/");
+    if !cr.starts_with(&expect_prefix) {
+        return Err(integrity(format!(
+            "Content-Range 与请求不一致：got={cr:?} want={expect_prefix:?}*"
+        )));
+    }
+    let cl = resp
+        .headers()
+        .get(reqwest::header::CONTENT_LENGTH)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.parse::<u64>().ok())
+        .ok_or_else(|| integrity("206 响应缺 Content-Length 或非法".to_owned()))?;
+    if cl != expect_len {
+        return Err(integrity(format!(
+            "Content-Length 与请求不一致：got={cl} want={expect_len}"
+        )));
+    }
+    Ok(resp)
+}
+
+/// 对象字节范围回源：总是携带对象坐标 Range（上游若回 200 = 整卷 → 拒绝，防误拉百 MB 卷）。
+/// 206 响应必须通过 Content-Range/Content-Length 精确校验（r5 P1-8）；offset 计算全部
+/// checked_add，畸形 manifest 数据不得回绕成错误区间
 async fn object_fetch(
     http: &reqwest::Client,
     token: &str,
     url: &str,
     obj: &MediaObject,
     sub_range: Option<(u64, u64)>,
-) -> Result<reqwest::Response, String> {
+) -> Result<reqwest::Response, FetchError> {
     let (a, b) = sub_range.unwrap_or((0, obj.size.saturating_sub(1)));
-    let range_value = format!("bytes={}-{}", obj.offset + a, obj.offset + b);
+    let integrity = |m: String| FetchError::Integrity(m);
+    let start = obj
+        .offset
+        .checked_add(a)
+        .ok_or_else(|| integrity(format!("offset 溢出：offset={} + a={a}", obj.offset)))?;
+    let end = obj
+        .offset
+        .checked_add(b)
+        .ok_or_else(|| integrity(format!("offset 溢出：offset={} + b={b}", obj.offset)))?;
+    let expect_len = b - a + 1;
+    let range_value = format!("bytes={start}-{end}");
     let mut last_err = String::new();
     for attempt in 0..=OBJECT_RETRY_DELAYS_SECS.len() {
         if attempt > 0 {
@@ -608,10 +807,12 @@ async fn object_fetch(
             Ok(resp) => {
                 let status = resp.status();
                 if status == reqwest::StatusCode::PARTIAL_CONTENT {
-                    return Ok(resp);
+                    return validate_upstream_206(resp, start, end, expect_len);
                 }
                 if status == reqwest::StatusCode::NOT_FOUND || status == reqwest::StatusCode::GONE {
-                    return Err(format!("asset 已不存在（HTTP {status}，不重试）：{url}"));
+                    return Err(FetchError::Transient(format!(
+                        "asset 已不存在（HTTP {status}，不重试）：{url}"
+                    )));
                 }
                 last_err = format!("HTTP {status}（期望 206）");
             }
@@ -620,7 +821,9 @@ async fn object_fetch(
             }
         }
     }
-    Err(format!("对象回源重试耗尽：{range_value}：{last_err}"))
+    Err(FetchError::Transient(format!(
+        "对象回源重试耗尽：{range_value}：{last_err}"
+    )))
 }
 
 /// 透传（>阈值 / 超水位 / poisoned / 腾位失败）：不落盘。
@@ -645,6 +848,10 @@ async fn pass_through(
     let resp = match object_fetch(&ctx.http, &ctx.cfg.github.token, &url, obj, sub).await {
         Ok(r) => r,
         Err(e) => {
+            // r5 P1-8：上游 206 与请求不符 = Integrity → poisoned + 透传失败
+            if matches!(e, FetchError::Integrity(_)) {
+                ctx.cache.mark_poisoned(key);
+            }
             eprintln!("[cdn-media] 透传回源失败 {key}：{e}");
             return err_json(StatusCode::BAD_GATEWAY, "upstream_error", Some(key));
         }
@@ -666,7 +873,10 @@ async fn pass_through(
         )
     });
     let body = Body::from_stream(HashedStream {
-        inner: Box::pin(resp.bytes_stream()),
+        inner: Box::pin(
+            resp.bytes_stream()
+                .map(|r| r.map_err(|e| Box::new(e) as BoxError)),
+        ),
         state,
     });
 
@@ -689,10 +899,11 @@ async fn pass_through(
 }
 
 /// 包装透传流：整对象场景在收满 size 字节时做 sha256 终验，失败标 poisoned
-///（响应已出且无缓存承诺，客户端重试即得正确副本）
+///（响应已出且无缓存承诺，客户端重试即得正确副本）；
+/// received 超出 expect（checked 投影）也 poisoned 并终止流（r5 P1-9）。
+/// inner 错误类型泛化为 BoxError（reqwest 错误在构造处 map），测试可用内存流直喂
 struct HashedStream {
-    inner:
-        std::pin::Pin<Box<dyn futures_util::Stream<Item = Result<bytes::Bytes, reqwest::Error>> + Send>>,
+    inner: std::pin::Pin<Box<dyn futures_util::Stream<Item = Result<bytes::Bytes, BoxError>> + Send>>,
     state: Option<(Sha256, String, String, Arc<DiskCache>, u64, u64)>,
 }
 
@@ -705,13 +916,40 @@ impl futures_util::Stream for HashedStream {
     ) -> std::task::Poll<Option<Self::Item>> {
         match self.inner.as_mut().poll_next(cx) {
             std::task::Poll::Ready(Some(Ok(chunk))) => {
-                if let Some((h, _, _, _, received, expect_size)) = self.state.as_mut() {
-                    use sha2::Digest;
-                    h.update(&chunk);
-                    *received += chunk.len() as u64;
-                    if *received == *expect_size {
-                        // 收满即终验：hyper 发满 Content-Length 后不再轮询
-                        let (h, expect, key, cache, _, _) = self.state.take().unwrap();
+                // r5 P1-9：写前 checked 投影——超长/溢出 → poisoned + 终止流
+                let overlong = match self.state.as_mut() {
+                    Some((h, _, _, _, received, expect_size)) => {
+                        use sha2::Digest;
+                        h.update(&chunk);
+                        match received.checked_add(chunk.len() as u64) {
+                            Some(p) if p <= *expect_size => {
+                                *received = p;
+                                false
+                            }
+                            _ => true,
+                        }
+                    }
+                    None => false,
+                };
+                if overlong {
+                    if let Some((h, _expect, key, cache, received, expect_size)) = self.state.take() {
+                        let actual = hex_bytes(&h.finalize());
+                        eprintln!(
+                            "[cdn-media] 透传上游超长 {key}：received={} chunk={} expect={expect_size} actual={actual}（标 poisoned，终止流）",
+                            received,
+                            chunk.len()
+                        );
+                        cache.mark_poisoned(&key);
+                    }
+                    return std::task::Poll::Ready(Some(Err(
+                        "upstream over-length".into()
+                    )));
+                }
+                let filled =
+                    matches!(self.state.as_ref(), Some((_, _, _, _, received, expect_size)) if received == expect_size);
+                if filled {
+                    // 收满即终验：hyper 发满 Content-Length 后不再轮询
+                    if let Some((h, expect, key, cache, _, _)) = self.state.take() {
                         let actual = hex_bytes(&h.finalize());
                         if actual != expect {
                             eprintln!(
@@ -727,7 +965,7 @@ impl futures_util::Stream for HashedStream {
                 if let Some((_, _, key, cache, _, _)) = self.state.take() {
                     cache.mark_poisoned(&key);
                 }
-                std::task::Poll::Ready(Some(Err(Box::new(e))))
+                std::task::Poll::Ready(Some(Err(e)))
             }
             std::task::Poll::Ready(None) => {
                 // 上游提前断流（未收满）——终验没机会执行，标 poisoned
@@ -750,6 +988,16 @@ impl futures_util::Stream for HashedStream {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::{HashMap, HashSet};
+    use std::sync::Arc;
+
+    use crate::cache::DiskCache;
+    use crate::manifest::{ManifestIndex, ManifestSource};
+    use crate::test_support::{
+        sha256_hex, spawn_object_mock, ObjectMockState,
+    };
+
+    // ---- 纯函数矩阵 ----
 
     #[test]
     fn range_matrix() {
@@ -788,5 +1036,372 @@ mod tests {
         assert!(parse_media_path("/cdn-media/x/a\\b").is_err());
         assert!(parse_media_path("/cdn-media/UPPER/a.jpg").is_err());
         assert!(parse_media_path("/other/x/a.jpg").is_err());
+    }
+
+    /// r5 P1-9：写盘前 checked 投影矩阵
+    #[test]
+    fn project_chunk_matrix() {
+        assert_eq!(project_chunk(0, 10, 100).unwrap(), 10);
+        assert_eq!(project_chunk(90, 10, 100).unwrap(), 100, "恰好收满允许");
+        assert!(project_chunk(91, 10, 100).is_err(), "超长必须拒绝");
+        assert!(project_chunk(u64::MAX, 1, u64::MAX).is_err(), "溢出必须拒绝");
+        assert!(project_chunk(0, 5, 0).is_err(), "expect=0 时任何 chunk 都超长");
+    }
+
+    // ---- mock 上游基座 ----
+
+    const VOLUME: &str = "vol-test.tar";
+
+    async fn test_ctx(name: &str) -> (Arc<MediaCtx>, std::path::PathBuf) {
+        let cache_root = std::env::temp_dir().join(format!("cdn-media-test-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&cache_root);
+        let cfg = Arc::new(crate::test_support::test_config_default_cache(
+            "http://127.0.0.1:9/manifest/current.json".to_owned(),
+            cache_root.display().to_string(),
+        ));
+        let manifest = Arc::new(ManifestSource::new(cfg.clone()));
+        let cache = Arc::new(DiskCache::recover(
+            &cache_root,
+            cfg.cache.high_bytes,
+            cfg.cache.low_bytes,
+            &HashSet::new(),
+        )
+        .unwrap());
+        let ctx = Arc::new(MediaCtx {
+            cfg,
+            manifest,
+            cache,
+            http: MediaCtx::new_client(),
+        });
+        (ctx, cache_root)
+    }
+
+    fn test_index(url_base: &str) -> Arc<ManifestIndex> {
+        Arc::new(ManifestIndex::new_for_test(
+            1,
+            HashMap::from([(VOLUME.to_owned(), 42u64)]),
+            url_base.to_owned(),
+        ))
+    }
+
+    fn test_obj(body: &[u8]) -> MediaObject {
+        MediaObject {
+            volume: VOLUME.to_owned(),
+            offset: 512,
+            size: body.len() as u64,
+            sha256: sha256_hex(body),
+            content_type: "image/jpeg".to_owned(),
+        }
+    }
+
+    fn tmp_dir_of(root: &std::path::Path) -> std::path::PathBuf {
+        root.join("tmp")
+    }
+
+    fn assert_tmp_empty(root: &std::path::Path) {
+        assert_eq!(
+            std::fs::read_dir(tmp_dir_of(root)).map(|d| d.count()).unwrap_or(0),
+            0,
+            "tmp/ 必须无残留 .part"
+        );
+    }
+
+    // ---- r5 P1-8：上游 206 精确校验 ----
+
+    #[tokio::test]
+    async fn object_fetch_206_exact_match_ok() {
+        let body = b"abc".to_vec();
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState::ok_206(
+            "bytes 512-514/2048".to_owned(),
+            body,
+        )));
+        let addr = spawn_object_mock(st.clone()).await;
+        let (ctx, root) = test_ctx("fetch-ok").await;
+        let obj = test_obj(b"abc");
+        let url = format!("http://{addr}/repos/test/cdn-media.test/releases/assets/42");
+        let resp = object_fetch(&ctx.http, "", &url, &obj, None)
+            .await
+            .expect("精确匹配的 206 必须通过");
+        assert_eq!(resp.status(), reqwest::StatusCode::PARTIAL_CONTENT);
+        assert_eq!(
+            st.lock().unwrap().last_range.lock().unwrap().as_deref(),
+            Some("bytes=512-514"),
+            "请求 Range 必须是对象坐标（offset+sub）"
+        );
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[tokio::test]
+    async fn object_fetch_206_wrong_content_range_rejected() {
+        let body = b"abc".to_vec();
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState {
+            status: 206,
+            content_range: Some("bytes 999-1001/2048".to_owned()),
+            content_length: None,
+            body: body.clone(),
+            ..Default::default()
+        }));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = test_ctx("fetch-wrong-cr").await;
+        let obj = test_obj(&body);
+        let url = format!("http://{addr}/repos/test/cdn-media.test/releases/assets/42");
+        let err = object_fetch(&ctx.http, "", &url, &obj, None)
+            .await
+            .expect_err("Content-Range 不符必须拒绝");
+        assert!(matches!(err, FetchError::Integrity(_)), "必须是 Integrity：{err:?}");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[tokio::test]
+    async fn object_fetch_206_wrong_content_length_rejected() {
+        let body = b"abc".to_vec();
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState {
+            status: 206,
+            content_range: Some("bytes 512-514/2048".to_owned()),
+            content_length: Some("2".to_owned()),
+            body,
+            ..Default::default()
+        }));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = test_ctx("fetch-wrong-cl").await;
+        let obj = test_obj(b"abc");
+        let url = format!("http://{addr}/repos/test/cdn-media.test/releases/assets/42");
+        let err = object_fetch(&ctx.http, "", &url, &obj, None)
+            .await
+            .expect_err("Content-Length 不符必须拒绝");
+        assert!(matches!(err, FetchError::Integrity(_)), "{err:?}");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[tokio::test]
+    async fn object_fetch_206_missing_content_range_rejected() {
+        let body = b"abc".to_vec();
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState {
+            status: 206,
+            content_range: None,
+            content_length: None,
+            body,
+            ..Default::default()
+        }));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = test_ctx("fetch-no-cr").await;
+        let obj = test_obj(b"abc");
+        let url = format!("http://{addr}/repos/test/cdn-media.test/releases/assets/42");
+        let err = object_fetch(&ctx.http, "", &url, &obj, None)
+            .await
+            .expect_err("缺 Content-Range 必须拒绝");
+        assert!(matches!(err, FetchError::Integrity(_)), "{err:?}");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// r5 P1-8：offset checked_add——畸形 manifest 数据不得回绕成错误区间
+    #[tokio::test]
+    async fn object_fetch_offset_overflow_is_integrity_without_request() {
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState::ok_206(
+            "bytes 0-0/1".to_owned(),
+            b"a".to_vec(),
+        )));
+        let addr = spawn_object_mock(st.clone()).await;
+        let (ctx, root) = test_ctx("fetch-overflow").await;
+        let mut obj = test_obj(b"abc");
+        obj.offset = u64::MAX;
+        let url = format!("http://{addr}/repos/test/cdn-media.test/releases/assets/42");
+        let err = object_fetch(&ctx.http, "", &url, &obj, None)
+            .await
+            .expect_err("offset 溢出必须拒绝");
+        assert!(matches!(err, FetchError::Integrity(_)), "{err:?}");
+        assert_eq!(st.lock().unwrap().hits(), 0, "溢出必须在发请求前拦截");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    // ---- P1-10 / P0-4：取回→安装→清理 ----
+
+    #[tokio::test]
+    async fn fetch_object_to_cache_roundtrip() {
+        let body = b"hello-object-bytes".to_vec();
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState::ok_206(
+            format!("bytes 512-{}/2048", 512 + body.len() - 1),
+            body.clone(),
+        )));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = test_ctx("roundtrip").await;
+        let index = test_index(&format!("http://{addr}"));
+        let obj = test_obj(&body);
+        let key = "x/2020-01/roundtrip.jpg";
+        let res = ctx.cache.admit(key, obj.size).expect("admission 应通过");
+        let path = fetch_object_to_cache(&ctx, &index, key, &obj, false, res)
+            .await
+            .expect("取回安装必须成功");
+        assert_eq!(std::fs::read(&path).unwrap(), body, "落盘字节与上游一致");
+        assert!(ctx.cache.lookup(key).is_some(), "必须入账可命中");
+        assert_eq!(ctx.cache.total(), body.len() as u64);
+        assert!(!ctx.cache.is_poisoned(key));
+        assert_tmp_empty(&root);
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[tokio::test]
+    async fn fetch_object_to_cache_sha_mismatch_poisons() {
+        // 与预期对象等长但内容不同 → 头校验通过、sha 校验失败
+        let expect_plain = b"expected-other-content";
+        let body = vec![b'X'; expect_plain.len()];
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState::ok_206(
+            format!("bytes 512-{}/2048", 512 + body.len() - 1),
+            body,
+        )));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = test_ctx("sha-bad").await;
+        let index = test_index(&format!("http://{addr}"));
+        let obj = test_obj(b"expected-other-content");
+        let key = "x/2020-01/shabad.jpg";        let res = ctx.cache.admit(key, obj.size).expect("admission 应通过");
+        let err = fetch_object_to_cache(&ctx, &index, key, &obj, false, res)
+            .await
+            .expect_err("sha 不符必须失败");
+        assert!(err.contains("sha256"), "{err}");
+        assert!(ctx.cache.lookup(key).is_none(), "损坏数据不得入缓存");
+        assert!(ctx.cache.is_poisoned(key), "必须标 poisoned");
+        assert_tmp_empty(&root);
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// r5 P1-10：rename 失败（目标被目录占位）→ 统一删 tmp + poisoned
+    #[tokio::test]
+    async fn fetch_object_to_cache_rename_failure_cleans() {
+        let body = b"payload".to_vec();
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState::ok_206(
+            format!("bytes 512-{}/2048", 512 + body.len() - 1),
+            body,
+        )));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = test_ctx("rename-fail").await;
+        let index = test_index(&format!("http://{addr}"));
+        let obj = test_obj(b"payload");
+        let key = "x/2020-01/renameme.jpg";
+        // 目标位置被空目录占位 → rename 必败（EISDIR/ENOTDIR）
+        std::fs::create_dir_all(ctx.cache.path_for(key)).unwrap();
+        let res = ctx.cache.admit(key, obj.size).expect("admission 应通过");
+        let err = fetch_object_to_cache(&ctx, &index, key, &obj, false, res)
+            .await
+            .expect_err("rename 失败必须报错");
+        assert!(err.contains("rename"), "{err}");
+        assert!(ctx.cache.lookup(key).is_none());
+        assert!(ctx.cache.is_poisoned(key), "安装失败必须标 poisoned");
+        assert_tmp_empty(&root);
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// r5 P0-4：重复 warm 同 key 只回源一次（single-flight + 缓存重查）
+    #[tokio::test]
+    async fn warm_one_single_flight_single_fetch() {
+        let body = b"warm-payload".to_vec();
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState::ok_206(
+            format!("bytes 512-{}/2048", 512 + body.len() - 1),
+            body,
+        )));
+        let addr = spawn_object_mock(st.clone()).await;
+        let (ctx, root) = test_ctx("warm-single").await;
+        let index = test_index(&format!("http://{addr}"));
+        let obj = test_obj(b"warm-payload");
+        let key = "x/2020-01/warm.jpg";
+
+        let (a, b) = tokio::join!(
+            warm_one(&ctx, &index, key, &obj, false),
+            warm_one(&ctx, &index, key, &obj, false),
+        );
+        for o in [&a, &b] {
+            assert!(!matches!(o, WarmOutcome::Failed(_)), "warm 不应失败：{o:?}");
+        }
+        let outcomes = [std::mem::discriminant(&a), std::mem::discriminant(&b)];
+        assert!(
+            outcomes.contains(&std::mem::discriminant(&WarmOutcome::Warmed))
+                && outcomes.contains(&std::mem::discriminant(&WarmOutcome::AlreadyCached)),
+            "并发同 key warm 必须一次 Warmed 一次 AlreadyCached：{a:?} {b:?}"
+        );
+        // 第三次（顺序）也必须 AlreadyCached，不回源
+        assert!(matches!(warm_one(&ctx, &index, key, &obj, false).await, WarmOutcome::AlreadyCached));
+        assert_eq!(st.lock().unwrap().hits(), 1, "重复 warm 同 key 只回源一次");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    // ---- r5 P1-7：tee 响应头 no-store + 校验后入缓存 ----
+
+    #[tokio::test]
+    async fn tee_serves_no_store_and_caches_after_verify() {
+        let body = b"tee-payload-bytes".to_vec();
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState::ok_206(
+            format!("bytes 512-{}/2048", 512 + body.len() - 1),
+            body.clone(),
+        )));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = test_ctx("tee-ok").await;
+        let index = test_index(&format!("http://{addr}"));
+        let obj = test_obj(&body);
+        let key = "x/2020-01/tee.jpg";
+        let res = ctx.cache.admit(key, obj.size).expect("admission 应通过");
+        let resp = stream_through_tee(&ctx, &index, key, &obj, false, res).await;
+        assert_eq!(resp.headers().get("cache-control").unwrap(), "no-store", "tee 头不得承诺 immutable");
+        assert_eq!(resp.headers().get("content-length").unwrap(), &obj.size.to_string());
+        let got = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .expect("body 必须完整送达客户端");
+        assert_eq!(&got[..], &body[..]);
+        // 流毕校验通过 → 入缓存
+        assert!(ctx.cache.lookup(key).is_some(), "校验通过必须入缓存");
+        assert_eq!(ctx.cache.total(), body.len() as u64);
+        assert_tmp_empty(&root);
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[tokio::test]
+    async fn tee_sha_mismatch_delivers_but_never_caches() {
+        // 与预期对象等长但内容不同 → 头校验通过、流毕 sha 校验失败
+        let expect_plain = b"expected-torrent-of-other-bytes";
+        let body = vec![b'X'; expect_plain.len()];
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState::ok_206(
+            format!("bytes 512-{}/2048", 512 + body.len() - 1),
+            body.clone(),
+        )));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = test_ctx("tee-bad").await;
+        let index = test_index(&format!("http://{addr}"));
+        let obj = test_obj(b"expected-torrent-of-other-bytes");
+        let key = "x/2020-01/teebad.jpg";
+        let res = ctx.cache.admit(key, obj.size).expect("admission 应通过");
+        let resp = stream_through_tee(&ctx, &index, key, &obj, false, res).await;
+        assert_eq!(resp.headers().get("cache-control").unwrap(), "no-store");
+        let got = axum::body::to_bytes(resp.into_body(), usize::MAX).await.expect("no-store 下坏字节仍如实送达");
+        assert_eq!(got.len(), body.len());
+        assert!(ctx.cache.lookup(key).is_none(), "校验失败不得入缓存");
+        assert!(ctx.cache.is_poisoned(key));
+        assert_tmp_empty(&root);
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// r5 P1-9：透传流 received 超 expect → poisoned + 流终止（内存流直喂）
+    #[tokio::test]
+    async fn hashed_stream_over_length_poisons() {
+        let (ctx, root) = test_ctx("hashed-over").await;
+        let key = "x/2020-01/over.jpg";
+        let make_chunk = || -> Result<bytes::Bytes, BoxError> {
+            Ok(bytes::Bytes::from(vec![b'x'; 300]))
+        };
+        let mut stream = HashedStream {
+            inner: Box::pin(futures_util::stream::iter(vec![make_chunk(), make_chunk()])),
+            state: Some((
+                Sha256::new(),
+                sha256_hex(b"whatever"),
+                key.to_owned(),
+                ctx.cache.clone(),
+                0,
+                500,
+            )),
+        };
+        use futures_util::StreamExt;
+        let first = stream.next().await.expect("第一块应正常送达");
+        assert!(first.is_ok());
+        let second = stream.next().await.expect("超长块应以错误终止");
+        assert!(second.is_err(), "超长必须终止流");
+        assert!(ctx.cache.is_poisoned(key), "超长必须标 poisoned");
+        std::fs::remove_dir_all(&root).ok();
     }
 }

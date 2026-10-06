@@ -32,7 +32,13 @@
 ### R3 cdn-base（static-server 内建模块，不新建服务）
 
 - bounded pull-through：high 500MB / low 300MB 水位，超 high 按 LRU 逐出到 low。
-- stream-through：回源时 tee 临时文件流式回客户端，完成后原子 rename 入缓存。
+- stream-through：回源时 tee 临时文件流式回客户端，收满即 sha256 终验、原子 rename 入缓存；
+  **校验通过前回源响应发 `cache-control: no-store`**（不承诺 immutable，r5 裁决），命中/
+  严格模式才 immutable；`strict_integrity`（默认关，缓冲上限 128MB）为先缓冲校验再伺服。
+- admission 原子预留：投影预算（total+inflight+incoming ≤ high）在锁内一步检查+逐出+预留，
+  成功转正/失败 Drop 归还——并发 miss 不可能同时过检查；warm 复用同一 admission/
+  single-flight/allow 过滤，预算 min(max_bytes, high)；逐出以文件删除成功为准摘账，
+  失败标 undiscardable 拒绝腾位。
 - **缓存卷持久化**：`MEDIA_CACHE_DIR` 独立于只读 SERVER_ROOT；容器以可写卷挂载（UID 65532
   可写）；启动校验目录/剩余空间/水位；重启后缓存与 LRU 顺序可恢复。
 - 不可变内容：无过期/无 revalidation，缓存生命周期只有 LRU 逐出。
