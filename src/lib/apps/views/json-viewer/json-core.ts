@@ -37,6 +37,8 @@ export interface JsonErrorInfo {
   code: JsonErrorCode;
   /** 中文提示（面向初级工程师的可读层）。 */
   message: string;
+  /** 面向修复动作的简短建议。 */
+  suggestion: string;
   /** 1-based；0 表示未知。 */
   line: number;
   /** 1-based；0 表示未知。 */
@@ -168,7 +170,52 @@ function makeError(
   message: string,
 ): JsonErrorInfo {
   const { line, column } = lineColOf(text, index);
-  return { code, message, line, column, excerpt: excerptAt(text, line, column) };
+  return {
+    code,
+    message,
+    suggestion: suggestFix(code, message, text, index),
+    line,
+    column,
+    excerpt: excerptAt(text, line, column),
+  };
+}
+
+/** 把语法错误翻译成下一步可执行的修复动作。 */
+function suggestFix(code: JsonErrorCode, message: string, text: string, index: number): string {
+  if (message.includes("单引号") || message.includes("中文引号")) {
+    return '把字符串或键名两侧的引号替换为英文双引号（"）。';
+  }
+  if (code === "EXPECTED_KEY" && text[index] === "}") {
+    return "对象最后一项后多了一个逗号，请删除这个逗号。";
+  }
+  if (code === "EXPECTED_VALUE" && text[index] === "]") {
+    return "数组最后一项后多了一个逗号，请删除这个逗号。";
+  }
+  if (message.includes("缺少逗号")) {
+    return "在相邻的键值或数组元素之间补一个逗号（,）。";
+  }
+  if (message.includes("没有闭合") || message.includes("缺少收尾")) {
+    return "检查末尾是否补齐对应的右括号或双引号。";
+  }
+  if (message.includes("括号不匹配")) {
+    return "检查花括号 {} 与方括号 [] 是否成对、顺序正确。";
+  }
+  if (code === "EXPECTED_COLON") {
+    return "在键名后补一个冒号（:），再填写它对应的值。";
+  }
+  if (code === "INVALID_ESCAPE" || code === "BARE_CONTROL_IN_STRING") {
+    return "字符串里的反斜杠和换行需要使用 JSON 转义写法，例如 \\n。";
+  }
+  if (code === "INVALID_NUMBER") {
+    return "检查数字格式：不要有前导零，小数点和指数后必须跟数字。";
+  }
+  if (code === "TRAILING_CONTENT") {
+    return "JSON 只能包含一个根值，请删除根值后面的多余内容。";
+  }
+  if (code === "TOO_DEEP") {
+    return "减少嵌套层级，或先拆分数据后分别查看。";
+  }
+  return "从定位的行列开始检查括号、逗号和引号是否完整。";
 }
 
 function lineColOf(text: string, index: number): { line: number; column: number } {

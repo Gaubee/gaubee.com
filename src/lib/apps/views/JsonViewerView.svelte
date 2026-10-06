@@ -258,6 +258,9 @@
 									{/if}
 								</p>
 								<p class="mt-1 text-sm">{parseError.message}</p>
+								<p class="mt-1 text-xs text-muted-foreground">
+									建议：{parseError.suggestion}
+								</p>
 								{#if parseError.excerpt}
 									<pre
 										class="mt-2 overflow-x-auto rounded bg-muted/60 p-2 font-mono text-xs leading-relaxed">{parseError.excerpt}</pre>

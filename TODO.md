@@ -1309,3 +1309,8 @@ kzf 指令：开发 osapp jsonviewer，ZCode 做基础版，Codex 补充高级�
   Playwright 走查 + vision 子代理两轮验收（首轮 4 fail 修复后 8/8 ALL PASS）。
 - Phase 2（Codex）：openspec/changes/add-json-viewer-app/tasks.md（路径查询/
   转换/diff/历史/虚拟滚动/快捷键/CLI）。
+
+### Phase 2 进度（2026-10-06）
+
+- [x] 2.5 错误人话化：错误卡提供常见语法问题的中文修复建议，纯逻辑单测覆盖。
+- [ ] 2.1 / 2.2 / 2.3 / 2.4 / 2.6 / 2.7 / 2.8 / 2.9 / 2.10：按 OpenSpec 清单继续推进。

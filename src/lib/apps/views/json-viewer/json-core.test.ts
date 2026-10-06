@@ -55,6 +55,7 @@ describe("parseJson 错误定位", () => {
     expect(err.code).toBe("EXPECTED_KEY");
     expect(err.line).toBe(1);
     expect(err.column).toBe(9);
+    expect(err.suggestion).toContain("多了一个逗号");
   });
 
   it("多行输入的行号", () => {
@@ -136,6 +137,13 @@ describe("parseJson 错误定位", () => {
     const err = expectError("{'a': 1}");
     expect(err.code).toBe("EXPECTED_KEY");
     expect(err.message).toContain("双引号");
+    expect(err.suggestion).toContain("替换为英文双引号");
+  });
+
+  it("缺逗号给出可执行建议", () => {
+    const err = expectError('{"a": 1 "b": 2}');
+    expect(err.code).toBe("EXPECTED_COMMA_OR_CLOSE");
+    expect(err.suggestion).toContain("补一个逗号");
   });
 
   it("值结束后多余内容", () => {
