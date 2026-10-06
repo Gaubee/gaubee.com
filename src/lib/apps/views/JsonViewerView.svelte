@@ -32,7 +32,11 @@
 	import JsonTreeNode from "./json-viewer/JsonTreeNode.svelte";
 	import JsonVirtualTree from "./json-viewer/JsonVirtualTree.svelte";
 	import { diffJson, type JsonDiffEntry } from "./json-viewer/diff";
-	import { readHistory, recordHistory, type JsonHistoryItem } from "./json-viewer/history";
+	import {
+		createHistoryScheduler,
+		readHistory,
+		type JsonHistoryItem,
+	} from "./json-viewer/history";
 	import { formatJsonPath, queryJson, type QueryMatch, type QueryOutcome } from "./json-viewer/query";
 	import { inferJsonSchema, inferTypeScript, jsonToYaml, yamlToJson } from "./json-viewer/transform";
 	import { isJsonViewerActive, shortcutAction } from "./json-viewer/shortcuts";
@@ -66,12 +70,28 @@
 	let diffError = $state("");
 	let historyOpen = $state(false);
 	let historyItems = $state<JsonHistoryItem[]>([]);
+	let historyScheduler: ReturnType<typeof createHistoryScheduler> | undefined;
 	let dragDepth = $state(0);
 	let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 	const appContext = useApp();
 
 	onMount(() => {
-		if (typeof localStorage !== "undefined") historyItems = readHistory(localStorage);
+		if (typeof localStorage === "undefined") return;
+		historyItems = readHistory(localStorage);
+		historyScheduler = createHistoryScheduler(localStorage, {
+			onRecorded: (items) => (historyItems = items),
+		});
+		const flushHistory = () => historyScheduler?.flush();
+		const onVisibilityChange = () => {
+			if (document.visibilityState === "hidden") flushHistory();
+		};
+		window.addEventListener("blur", flushHistory);
+		document.addEventListener("visibilitychange", onVisibilityChange);
+		return () => {
+			window.removeEventListener("blur", flushHistory);
+			document.removeEventListener("visibilitychange", onVisibilityChange);
+			flushHistory();
+		};
 	});
 
 	// ---- 防抖解析（spec R2：≤300ms）----
@@ -90,8 +110,8 @@
 
 	$effect(() => {
 		const current = parsed;
-		if (!current?.outcome.ok || typeof localStorage === "undefined") return;
-		historyItems = recordHistory(localStorage, current.text);
+		if (!current?.outcome.ok) return;
+		historyScheduler?.schedule(current.text);
 	});
 
 	/** 解析成功的聚合（值 + 对应文本），供树/预览/统计同源消费。 */
@@ -232,6 +252,7 @@
 		await copyText(entry.pathText);
 	}
 	function openHistory(): void {
+		historyScheduler?.flush();
 		if (typeof localStorage !== "undefined") historyItems = readHistory(localStorage);
 		historyOpen = true;
 	}
@@ -307,10 +328,19 @@
 		};
 	});
 
-	onDestroy(() => clearTimeout(copiedTimer));
+	onDestroy(() => {
+		historyScheduler?.flush();
+		clearTimeout(copiedTimer);
+	});
 </script>
 
-<div class="relative flex h-full min-h-0 flex-col" onkeydown={handleShortcut}>
+<div
+	class="relative flex h-full min-h-0 flex-col"
+	role="application"
+	aria-label="JSON 查看器"
+	tabindex="-1"
+	onkeydown={handleShortcut}
+>
 	<!-- 工具栏：全部按钮带 title（渐进披露的引导层） -->
 	<div class="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1.5">
 		<Button

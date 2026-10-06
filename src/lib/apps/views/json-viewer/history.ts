@@ -18,6 +18,7 @@ export interface JsonHistoryItem {
 
 export const JSON_HISTORY_KEY = "gaubee:json-viewer:history";
 export const JSON_HISTORY_LIMIT = 10;
+export const JSON_HISTORY_MAX_BYTES = 256 * 1024;
 
 /** 从存储读取并清理损坏/过期数据。 */
 export function readHistory(
@@ -46,6 +47,7 @@ export function recordHistory(
   limit = JSON_HISTORY_LIMIT,
 ): JsonHistoryItem[] {
   if (content.trim() === "") return readHistory(storage, limit);
+  if (utf8ByteLength(content) > JSON_HISTORY_MAX_BYTES) return readHistory(storage, limit);
   const previous = readHistory(storage, limit).filter((item) => item.content !== content);
   const item: JsonHistoryItem = {
     id: `${savedAt}-${content.length}`,
@@ -60,6 +62,48 @@ export function recordHistory(
     // 隐私模式/配额不足时，当前输入仍可正常使用。
   }
   return next;
+}
+
+export interface HistorySchedulerOptions {
+  /** 防抖时长，默认 2 秒。 */
+  delayMs?: number;
+  onRecorded?: (items: JsonHistoryItem[]) => void;
+}
+
+/** 将历史落盘从输入解析链路中移出，避免每次打字同步写 localStorage。 */
+export function createHistoryScheduler(
+  storage: HistoryStorage,
+  options: HistorySchedulerOptions = {},
+): { schedule: (content: string, savedAt?: number) => void; flush: () => JsonHistoryItem[] } {
+  const delayMs = options.delayMs ?? 2000;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let pending: { content: string; savedAt: number } | null = null;
+
+  const clearTimer = () => {
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    timer = undefined;
+  };
+  const flush = (): JsonHistoryItem[] => {
+    clearTimer();
+    const current = pending;
+    pending = null;
+    if (!current) return readHistory(storage);
+    const items = recordHistory(storage, current.content, current.savedAt);
+    options.onRecorded?.(items);
+    return items;
+  };
+  const schedule = (content: string, savedAt = Date.now()): void => {
+    clearTimer();
+    if (content.trim() === "" || utf8ByteLength(content) > JSON_HISTORY_MAX_BYTES) {
+      pending = null;
+      return;
+    }
+    pending = { content, savedAt };
+    timer = setTimeout(flush, delayMs);
+  };
+
+  return { schedule, flush };
 }
 
 /** 删除单条记录。 */
@@ -82,4 +126,8 @@ function isHistoryItem(value: unknown): value is JsonHistoryItem {
     typeof item.savedAt === "number" &&
     typeof item.bytes === "number"
   );
+}
+
+function utf8ByteLength(content: string): number {
+  return new TextEncoder().encode(content).length;
 }
