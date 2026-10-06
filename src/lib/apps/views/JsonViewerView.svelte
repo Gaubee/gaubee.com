@@ -106,7 +106,9 @@
 	const selectedQueryMatch = $derived(
 		queryResult?.ok ? (queryResult.matches[selectedQueryIndex] ?? null) : null,
 	);
-	const displayValue = $derived(queryExtracted?.value ?? okResult?.value ?? null);
+	const displayValue = $derived(
+		queryExtracted ? queryExtracted.value : (okResult?.value ?? null),
+	);
 	const useVirtualTree = $derived(stats ? stats.nodeCount > 5000 : false);
 	/** 大 JSON（>2000 节点）默认只展开第一层，防渲染雪崩；展开交给用户。 */
 	const defaultOpen = $derived(stats ? stats.nodeCount <= 2000 : true);

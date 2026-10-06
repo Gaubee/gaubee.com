@@ -1321,4 +1321,5 @@ kzf 指令：开发 osapp jsonviewer，ZCode 做基础版，Codex 补充高级�
 - [x] 2.7 快捷键：格式化、压缩、复制、视图切换和清空均支持 Cmd/Ctrl+Shift 组合键。
 - [x] 2.8 CLI：Terminal PATH 提供 json validate/format/minify，支持 stdin 和文件参数。
 - [x] 2.9 自由发挥：本轮跳过额外能力，优先收敛已有功能与验收面。
-- [ ] 2.10：完成 Phase 2 聚焦单测、build 与浏览器走查。
+- [x] 2.10：完成 Phase 2 聚焦单测（56/56）、`pnpm build`（exit 0）与桌面/390px 窄屏浏览器走查；
+      另修复查询提取 `null` 值被错误回退到根 JSON 的边界问题。
