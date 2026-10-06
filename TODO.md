@@ -1317,4 +1317,5 @@ kzf 指令：开发 osapp jsonviewer，ZCode 做基础版，Codex 补充高级�
 - [x] 2.2 转换菜单：JSON/YAML、TypeScript 类型和 JSON Schema 推断。
 - [x] 2.3 diff 对比：双栏 JSON 输入与键级新增/删除/修改结果。
 - [x] 2.4 历史记录：localStorage 最近 10 条，空态和 Dialog 均可恢复。
-- [ ] 2.6 / 2.7 / 2.8 / 2.9 / 2.10：按 OpenSpec 清单继续推进。
+- [x] 2.6 大文件虚拟滚动：超过 5000 节点切换窗口化树渲染。
+- [ ] 2.7 / 2.8 / 2.9 / 2.10：按 OpenSpec 清单继续推进。

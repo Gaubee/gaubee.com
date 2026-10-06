@@ -30,6 +30,7 @@
 
 	import { buildStats, EXAMPLE_JSON, parseJson, type ParseOutcome } from "./json-viewer/json-core";
 	import JsonTreeNode from "./json-viewer/JsonTreeNode.svelte";
+	import JsonVirtualTree from "./json-viewer/JsonVirtualTree.svelte";
 	import { diffJson, type JsonDiffEntry } from "./json-viewer/diff";
 	import { readHistory, recordHistory, type JsonHistoryItem } from "./json-viewer/history";
 	import { formatJsonPath, queryJson, type QueryMatch, type QueryOutcome } from "./json-viewer/query";
@@ -105,6 +106,7 @@
 		queryResult?.ok ? (queryResult.matches[selectedQueryIndex] ?? null) : null,
 	);
 	const displayValue = $derived(queryExtracted?.value ?? okResult?.value ?? null);
+	const useVirtualTree = $derived(stats ? stats.nodeCount > 5000 : false);
 	/** 大 JSON（>2000 节点）默认只展开第一层，防渲染雪崩；展开交给用户。 */
 	const defaultOpen = $derived(stats ? stats.nodeCount <= 2000 : true);
 	const topTypeName = $derived.by(() => {
@@ -444,13 +446,21 @@
 				{#if view === "tree"}
 					<div class="jv-tree">
 						{#key parseSeq}
-							<JsonTreeNode
-								name={null}
-								value={displayValue}
-								{defaultOpen}
-								command={treeCommand}
-								highlightPath={queryExtracted ? null : selectedQueryMatch?.path}
-							/>
+							{#if useVirtualTree}
+								<JsonVirtualTree
+									value={displayValue}
+									command={treeCommand}
+									highlightPath={queryExtracted ? null : selectedQueryMatch?.path}
+								/>
+							{:else}
+								<JsonTreeNode
+									name={null}
+									value={displayValue}
+									{defaultOpen}
+									command={treeCommand}
+									highlightPath={queryExtracted ? null : selectedQueryMatch?.path}
+								/>
+							{/if}
 						{/key}
 					</div>
 				{:else}
