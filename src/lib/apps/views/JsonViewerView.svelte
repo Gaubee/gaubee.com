@@ -16,15 +16,18 @@
 		CopyCheck,
 		FileJson,
 		Minimize2,
+		Search,
 		Trash2,
 	} from "@lucide/svelte";
 	import { Button } from "$lib/components/ui/button";
+	import * as Dialog from "$lib/components/ui/dialog";
 	import * as Tabs from "$lib/components/ui/tabs";
 	import CodeMirror from "$lib/editor/CodeMirror.svelte";
 	import { copyText } from "$lib/utils/clipboard";
 
 	import { buildStats, EXAMPLE_JSON, parseJson, type ParseOutcome } from "./json-viewer/json-core";
 	import JsonTreeNode from "./json-viewer/JsonTreeNode.svelte";
+	import { formatJsonPath, queryJson, type QueryMatch, type QueryOutcome } from "./json-viewer/query";
 
 	// ---- 状态 ----
 	let inputText = $state("");
@@ -37,6 +40,11 @@
 	/** 树展开/收起广播（version 递增触发所有节点对齐）。 */
 	let treeCommand = $state({ version: 0, open: true });
 	let copied = $state(false);
+	let queryOpen = $state(false);
+	let queryText = $state("$");
+	let queryResult = $state<QueryOutcome | null>(null);
+	let selectedQueryIndex = $state(0);
+	let queryExtracted = $state<QueryMatch | null>(null);
 	let dragDepth = $state(0);
 	let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -65,6 +73,10 @@
 		return p && !p.outcome.ok ? p.outcome.error : null;
 	});
 	const stats = $derived(okResult ? buildStats(okResult.value, okResult.text) : null);
+	const selectedQueryMatch = $derived(
+		queryResult?.ok ? (queryResult.matches[selectedQueryIndex] ?? null) : null,
+	);
+	const displayValue = $derived(queryExtracted?.value ?? okResult?.value ?? null);
 	/** 大 JSON（>2000 节点）默认只展开第一层，防渲染雪崩；展开交给用户。 */
 	const defaultOpen = $derived(stats ? stats.nodeCount <= 2000 : true);
 	const topTypeName = $derived.by(() => {
@@ -83,6 +95,13 @@
 	function replaceInput(text: string): void {
 		inputText = text;
 		docVersion += 1;
+		queryResult = null;
+		queryExtracted = null;
+	}
+	function handleInput(text: string): void {
+		inputText = text;
+		queryResult = null;
+		queryExtracted = null;
 	}
 	function format(): void {
 		if (okResult) replaceInput(JSON.stringify(okResult.value, null, 2));
@@ -109,6 +128,21 @@
 	}
 	function loadExample(): void {
 		replaceInput(EXAMPLE_JSON);
+	}
+	function openQuery(): void {
+		queryOpen = true;
+		if (okResult) runQuery();
+	}
+	function runQuery(): void {
+		if (!okResult) return;
+		queryResult = queryJson(okResult.value, queryText);
+		selectedQueryIndex = 0;
+		queryExtracted = null;
+	}
+	function extractQueryResult(): void {
+		if (!selectedQueryMatch) return;
+		queryExtracted = selectedQueryMatch;
+		queryOpen = false;
 	}
 
 	function formatBytes(n: number): string {
@@ -194,6 +228,16 @@
 		<Button size="sm" variant="ghost" onclick={loadExample} title="填充一份覆盖所有类型的示例数据">
 			<FileJson class="size-3.5" /><span class="hidden sm:inline">示例</span>
 		</Button>
+		<span class="mx-1 h-4 w-px bg-border" aria-hidden="true"></span>
+		<Button
+			size="sm"
+			variant="ghost"
+			onclick={openQuery}
+			disabled={!stats}
+			title="按 JSONPath 查询（例如 $.user.contacts[0]）"
+		>
+			<Search class="size-3.5" /><span class="hidden sm:inline">查询</span>
+		</Button>
 
 		<div class="ml-auto">
 			<Tabs.Root value={view} onValueChange={(v) => (view = v as "tree" | "preview")}>
@@ -220,7 +264,7 @@
 				lineNumbers={true}
 				wide={true}
 				placeholder="把 JSON 粘贴到这里，或点击上方「示例」试试；也可以直接把 .json 文件拖进窗口"
-				onInput={(value) => (inputText = value)}
+				onInput={handleInput}
 			/>
 		</div>
 
@@ -257,7 +301,6 @@
 										解析失败
 									{/if}
 								</p>
-								<p class="mt-1 text-sm">{parseError.message}</p>
 								<p class="mt-1 text-xs text-muted-foreground">
 									建议：{parseError.suggestion}
 								</p>
@@ -273,7 +316,13 @@
 				{#if view === "tree"}
 					<div class="jv-tree">
 						{#key parseSeq}
-							<JsonTreeNode name={null} value={okResult.value} {defaultOpen} command={treeCommand} />
+							<JsonTreeNode
+								name={null}
+								value={displayValue}
+								{defaultOpen}
+								command={treeCommand}
+								highlightPath={queryExtracted ? null : selectedQueryMatch?.path}
+							/>
 						{/key}
 					</div>
 				{:else}
@@ -319,6 +368,68 @@
 			<p class="text-sm font-medium text-primary">松开导入文件</p>
 		</div>
 	{/if}
+
+	<Dialog.Root bind:open={queryOpen}>
+		<Dialog.Content class="max-h-[85vh] max-w-2xl overflow-hidden">
+			<Dialog.Header>
+				<Dialog.Title>查询 JSON</Dialog.Title>
+				<Dialog.Description>输入 JSONPath 子集，例如 $.user.contacts[0] 或 $..name。</Dialog.Description>
+			</Dialog.Header>
+			<div class="flex gap-2">
+				<input
+					class="min-w-0 flex-1 rounded-md border bg-background px-3 py-2 font-mono text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					aria-label="JSONPath 查询表达式"
+					bind:value={queryText}
+					onkeydown={(event) => {
+						if (event.key === "Enter") runQuery();
+					}}
+				/>
+				<Button type="button" onclick={runQuery} title="执行查询（Enter）">运行</Button>
+			</div>
+			{#if queryResult && !queryResult.ok}
+				<p class="mt-3 rounded-md bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+					{queryResult.error}
+				</p>
+			{:else if queryResult?.ok}
+				<div class="mt-3 grid min-h-0 gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+					<div class="max-h-72 overflow-auto rounded-md border p-1 lg:max-h-[50vh]">
+						{#if queryResult.matches.length === 0}
+							<p class="p-3 text-sm text-muted-foreground">没有匹配结果。</p>
+						{:else}
+							{#each queryResult.matches as match, index}
+								<button
+									type="button"
+									class="flex w-full flex-col items-start rounded px-2 py-1.5 text-left text-xs hover:bg-muted"
+									class:bg-muted={index === selectedQueryIndex}
+									onclick={() => (selectedQueryIndex = index)}
+								>
+									<span class="font-mono text-primary">{formatJsonPath(match.path)}</span>
+									<span class="max-w-full truncate text-muted-foreground">{String(match.value)}</span>
+								</button>
+							{/each}
+						{/if}
+					</div>
+					<div class="min-h-32 overflow-auto rounded-md border bg-muted/20 p-2">
+						{#if selectedQueryMatch}
+							<p class="mb-2 text-xs text-muted-foreground">
+								已选：<span class="font-mono text-primary">{formatJsonPath(selectedQueryMatch.path)}</span>
+							</p>
+							<JsonTreeNode name={null} value={selectedQueryMatch.value} defaultOpen={true} />
+						{:else}
+							<p class="text-sm text-muted-foreground">选择一个结果预览。</p>
+						{/if}
+					</div>
+				</div>
+				<Dialog.Footer>
+					{#if selectedQueryMatch}
+						<Button type="button" variant="secondary" onclick={extractQueryResult} title="把选中的结果替换为当前树根">
+							提取为新树
+						</Button>
+					{/if}
+				</Dialog.Footer>
+			{/if}
+		</Dialog.Content>
+	</Dialog.Root>
 </div>
 
 <style>

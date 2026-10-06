@@ -18,6 +18,7 @@
 	import { ChevronRight } from "@lucide/svelte";
 
 	import { valueTypeOf } from "./json-core";
+	import type { JsonPathSegment } from "./query";
 
 	interface Props {
 		/** 键名；根节点为 null。 */
@@ -26,6 +27,10 @@
 		defaultOpen?: boolean;
 		/** 展开/收起广播：父组件递增 version 触发所有节点对齐到 open。 */
 		command?: { version: number; open: boolean };
+		/** 当前查询选中的路径；命中节点以背景色强调。 */
+		highlightPath?: readonly JsonPathSegment[] | null;
+		/** 当前节点在根 JSON 中的路径。 */
+		path?: readonly JsonPathSegment[];
 	}
 
 	let {
@@ -33,6 +38,8 @@
 		value,
 		defaultOpen = true,
 		command = { version: 0, open: true },
+		highlightPath = null,
+		path = [],
 	}: Props = $props();
 
 	let open = $state(defaultOpen);
@@ -61,12 +68,18 @@
 			? JSON.stringify(raw.slice(0, LONG_STRING)).slice(1, -1)
 			: JSON.stringify(raw).slice(1, -1);
 	});
+	const isHighlighted = $derived(
+		highlightPath !== null &&
+		highlightPath.length === path.length &&
+		highlightPath.every((segment, index) => segment === path[index]),
+	);
 </script>
 
 {#if isContainer && hasChildren}
 	<div>
 		<button
 			type="button"
+			class:jv-highlight={isHighlighted}
 			class="jv-row jv-toggle"
 			onclick={() => (open = !open)}
 			aria-expanded={open}
@@ -80,20 +93,27 @@
 		{#if open}
 			<div class="jv-children">
 				{#each entries as [k, v] (k)}
-					<Self name={k} value={v} {defaultOpen} {command} />
+					<Self
+						name={k}
+						value={v}
+						{defaultOpen}
+						{command}
+						highlightPath={highlightPath}
+						path={[...path, kind === "array" ? Number(k) : k]}
+					/>
 				{/each}
 			</div>
 		{/if}
 	</div>
 {:else if isContainer}
 	<!-- 空对象/空数组：内联展示，不可折叠 -->
-	<div class="jv-row">
+	<div class:jv-highlight={isHighlighted} class="jv-row">
 		<span class="jv-chevron-spacer"></span>
 		{#if name !== null}<span class="jv-key">{name}</span><span class="jv-punct">:</span>{/if}
 		<span class="jv-punct">{kind === "object" ? "{}" : "[]"}</span>
 	</div>
 {:else}
-	<div class="jv-row">
+	<div class:jv-highlight={isHighlighted} class="jv-row">
 		<span class="jv-chevron-spacer"></span>
 		{#if name !== null}<span class="jv-key">{name}</span><span class="jv-punct">:</span>{/if}
 		{#if kind === "string"}
@@ -141,6 +161,10 @@
 	}
 	.jv-row:not(.jv-toggle):hover {
 		background: color-mix(in oklch, var(--muted) 40%, transparent);
+	}
+	.jv-highlight {
+		background: color-mix(in oklch, var(--primary) 18%, transparent);
+		box-shadow: inset 2px 0 var(--primary);
 	}
 	.jv-toggle:hover {
 		background: color-mix(in oklch, var(--muted) 55%, transparent);
