@@ -87,8 +87,17 @@ vi.mock("$lib/os/services", () => ({
 
 const { vfs } = await import("$lib/vfs/vfs");
 const { metaClear, _resetMetaDbForTest } = await import("$lib/vfs/meta-store");
-const { runLine, tokenize, resolvePath, prettyCwd, tabComplete } = await import("./shell");
-import type { CommandContext } from "./shell";
+const {
+  runLine,
+  tokenize,
+  resolvePath,
+  prettyCwd,
+  tabComplete,
+  registerPathCommand,
+  unregisterPathCommand,
+} = await import("./shell");
+import type { Command, CommandContext } from "./shell";
+const { jsonCommands } = await import("../apps/views/json-viewer/cli-commands");
 
 function freshIndexedDB() {
   globalThis.indexedDB = new IDBFactory();
@@ -364,6 +373,40 @@ describe("runLine - 基础命令", () => {
     const { ctx } = makeCtx();
     const res = await runLine(ctx, "");
     expect(res.exit).toBe(0);
+  });
+});
+
+describe("runLine - PATH 复合命令", () => {
+  it("通过 PATH 分发 json validate 并消费 stdin", async () => {
+    const { ctx, out } = makeCtx();
+    const cli = jsonCommands[0];
+    const command: Command = {
+      name: cli.name,
+      usage: cli.usage,
+      description: cli.description,
+      run: async (shellCtx, args) =>
+        (
+          await cli.run(
+            {
+              cwd: shellCtx.cwd,
+              stdin: shellCtx.stdin,
+              write: shellCtx.write,
+              writeErr: shellCtx.writeErr,
+              clear: shellCtx.clear,
+            },
+            args,
+          )
+        ).exit,
+    };
+    ctx.stdin = '{"ok":true}';
+    registerPathCommand(command);
+    try {
+      const result = await runLine(ctx, "json validate -");
+      expect(result.exit).toBe(0);
+      expect(text(out)).toContain("JSON 合法");
+    } finally {
+      unregisterPathCommand(command.name);
+    }
   });
 });
 
