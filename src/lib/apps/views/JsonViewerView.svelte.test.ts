@@ -5,7 +5,10 @@
 import { mount, tick, unmount } from "svelte";
 import { describe, expect, it, vi } from "vitest";
 
+import JsonStreamTree from "./json-viewer/JsonStreamTree.svelte";
 import JsonVirtualTree from "./json-viewer/JsonVirtualTree.svelte";
+import { initialStreamCtx, step } from "./json-viewer/stream-protocol";
+import { StreamRowModel } from "./json-viewer/stream-rows";
 import JsonViewerView from "./JsonViewerView.svelte";
 
 function nextFrame(): Promise<void> {
@@ -51,6 +54,29 @@ describe("JsonVirtualTree 组件", () => {
     await nextFrame();
     const value = target.querySelector<HTMLElement>(".jv-value");
     expect(value?.textContent).toBe(`"${"x".repeat(120)}…"`);
+    await unmount(component);
+    target.remove();
+  });
+});
+
+describe("JsonStreamTree 组件", () => {
+  it("按虚拟窗口挂载聚合行，而不是一次性渲染所有碎片", async () => {
+    const target = document.createElement("div");
+    target.style.height = "520px";
+    target.style.width = "900px";
+    document.body.append(target);
+    const model = new StreamRowModel({ aggregateThreshold: 2 });
+    const result = step(initialStreamCtx(), `[${"0,".repeat(5_000)}0]`);
+    expect(result.error).toBeUndefined();
+    model.append(result.events);
+    const component = mount(JsonStreamTree, { target, props: { model } });
+    await tick();
+    await nextFrame();
+    expect(target.querySelectorAll(".jv-stream-row").length).toBeLessThan(100);
+    target.querySelector<HTMLButtonElement>(".jv-stream-toggle")?.click();
+    await tick();
+    await nextFrame();
+    expect(target.textContent).toContain("5001 items");
     await unmount(component);
     target.remove();
   });

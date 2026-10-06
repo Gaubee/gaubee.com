@@ -37,6 +37,7 @@
 	} from "./json-viewer/json-core";
 	import JsonTreeNode from "./json-viewer/JsonTreeNode.svelte";
 	import JsonVirtualTree from "./json-viewer/JsonVirtualTree.svelte";
+	import JsonStreamTree from "./json-viewer/JsonStreamTree.svelte";
 	import { diffJson, type JsonDiffEntry } from "./json-viewer/diff";
 	import {
 		createHistoryScheduler,
@@ -47,6 +48,9 @@
 	import { formatJsonPath, queryJson, type QueryMatch, type QueryOutcome } from "./json-viewer/query";
 	import { inferJsonSchema, inferTypeScript, jsonToYaml, yamlToJson } from "./json-viewer/transform";
 	import { isJsonViewerActive, shortcutAction } from "./json-viewer/shortcuts";
+	import { STREAM_READONLY_THRESHOLD, STREAM_THRESHOLD } from "./json-viewer/stream-protocol";
+	import { runStreamFile, type StreamProgress } from "./json-viewer/stream-client";
+	import { StreamRowModel } from "./json-viewer/stream-rows";
 	import { useApp } from "$lib/app-scaffold";
 
 	// ---- 状态 ----
@@ -56,6 +60,12 @@
 	/** 防抖解析结果（text 与值同源，防 250ms 间隙内输入变化的错位）。 */
 	let parsed = $state<{ text: string; outcome: ParseOutcome } | null>(null);
 	let parseSeq = $state(0);
+	let streamModel = $state.raw<StreamRowModel | null>(null);
+	let streamProgress = $state<StreamProgress | null>(null);
+	let streamError = $state<string | null>(null);
+	let streamVersion = $state(0);
+	let streamAbort: AbortController | undefined;
+	let streamFile = $state<Blob | null>(null);
 	let view = $state<"tree" | "preview">("tree");
 	/** 树展开/收起广播（version 递增触发所有节点对齐）。 */
 	let treeCommand = $state({ version: 0, open: true });
@@ -105,10 +115,42 @@
 	$effect(() => {
 		const text = inputText;
 		if (text.trim() === "") {
+			if (streamFile) return;
 			parsed = null;
+			streamModel = null;
+			streamProgress = null;
+			streamError = null;
 			return;
 		}
+		if (streamFile) return;
+		if (new TextEncoder().encode(text).byteLength > STREAM_THRESHOLD) {
+			parsed = null;
+			streamAbort?.abort();
+			const controller = new AbortController();
+			streamAbort = controller;
+			const model = new StreamRowModel();
+			streamModel = model;
+			streamProgress = null;
+			streamError = null;
+			void runStreamFile(new Blob([text], { type: "application/json" }), {
+				signal: controller.signal,
+				collectEvents: false,
+				onEvents: (events) => {
+					model.append(events);
+					streamModel = model;
+					streamVersion += 1;
+				},
+				onProgress: (progress) => (streamProgress = progress),
+				onCheckpoint: (checkpoint) => model.addCheckpoint(checkpoint),
+			}).catch((error: unknown) => {
+				if (!controller.signal.aborted) streamError = error instanceof Error ? error.message : "流式解析失败";
+			});
+			return () => controller.abort();
+		}
 		const timer = setTimeout(() => {
+			streamModel = null;
+			streamProgress = null;
+			streamError = null;
 			parsed = { text, outcome: parseJson(text) };
 			parseSeq += 1;
 		}, 250);
@@ -155,15 +197,48 @@
 
 	// ---- 动作 ----
 	function replaceInput(text: string): void {
+		streamFile = null;
 		inputText = text;
 		docVersion += 1;
 		queryResult = null;
 		queryExtracted = null;
 	}
 	function handleInput(text: string): void {
+		streamFile = null;
+		streamAbort?.abort();
 		inputText = text;
 		queryResult = null;
 		queryExtracted = null;
+	}
+	function importFile(file: Blob): void {
+		if (file.size <= STREAM_THRESHOLD) {
+			void file.text().then((text) => replaceInput(text));
+			return;
+		}
+		streamFile = file;
+		inputText = `[流式文件：${formatBytes(file.size)}]`;
+		docVersion += 1;
+		parsed = null;
+		streamAbort?.abort();
+		const controller = new AbortController();
+		streamAbort = controller;
+		const model = new StreamRowModel();
+		streamModel = model;
+		streamProgress = null;
+		streamError = null;
+		void runStreamFile(file, {
+			signal: controller.signal,
+			collectEvents: false,
+			onEvents: (events) => {
+				model.append(events);
+				streamModel = model;
+				streamVersion += 1;
+			},
+			onProgress: (progress) => (streamProgress = progress),
+			onCheckpoint: (checkpoint) => model.addCheckpoint(checkpoint),
+		}).catch((error: unknown) => {
+			if (!controller.signal.aborted) streamError = error instanceof Error ? error.message : "流式解析失败";
+		});
 	}
 	function format(): void {
 		if (okResult) replaceInput(JSON.stringify(okResult.value, null, 2));
@@ -344,7 +419,7 @@
 			e.preventDefault();
 			dragDepth = 0;
 			const file = e.dataTransfer?.files?.[0];
-			if (file) void file.text().then((text) => replaceInput(text));
+			if (file) importFile(file);
 		};
 		window.addEventListener("dragenter", onDragEnter);
 		window.addEventListener("dragover", onDragOver);
@@ -461,6 +536,7 @@
 				filePath="data.json"
 				lineNumbers={true}
 				wide={true}
+				readonly={streamFile !== null || new TextEncoder().encode(inputText).byteLength > STREAM_READONLY_THRESHOLD}
 				placeholder="把 JSON 粘贴到这里，或点击上方「示例」试试；也可以直接把 .json 文件拖进窗口"
 				onInput={handleInput}
 			/>
@@ -482,6 +558,21 @@
 							onclick={loadExample}>加载示例数据</button
 						>
 					</p>
+				</div>
+			{:else if streamModel}
+				<div class="flex h-full min-h-0 flex-1 flex-col gap-2">
+					{#if streamError}
+						<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive" role="alert">{streamError}</div>
+					{:else}
+						<div class="flex items-center gap-2 text-xs text-muted-foreground" role="status">
+							<span>流式解析</span>
+							<progress class="h-1.5 flex-1" max={streamProgress?.totalBytes ?? 1} value={streamProgress?.loadedBytes ?? 0}></progress>
+							<span>{formatBytes(streamProgress?.loadedBytes ?? 0)} / {formatBytes(streamProgress?.totalBytes ?? 0)}</span>
+						</div>
+						{#key streamVersion}
+							<JsonStreamTree model={streamModel} />
+						{/key}
+					{/if}
 				</div>
 			{:else if parseError}
 				<!-- 错误卡：行列 + 人话原因 + 出错行摘录（Svelte 文本插值自动转义，无 XSS） -->
@@ -568,7 +659,9 @@
 	<div
 		class="flex shrink-0 items-center gap-2 border-t px-3 py-1 text-xs text-muted-foreground"
 	>
-		{#if stats}
+		{#if streamProgress}
+			<span>流式解析 · {formatBytes(streamProgress.loadedBytes)} / {formatBytes(streamProgress.totalBytes)}</span>
+		{:else if stats}
 			<span title="原始文本大小">{formatBytes(stats.bytes)}</span>
 			<span aria-hidden="true">·</span>
 			<span title="顶层值的类型">{topTypeName}</span>
