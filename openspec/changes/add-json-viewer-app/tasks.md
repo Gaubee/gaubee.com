@@ -31,7 +31,7 @@
 
 - [x] 2.1 路径查询（JSONPath 子集：$ . [] * .. 递归），查询结果高亮 + 提取为
       新树；工具栏「查询」入口，placeholder 带示例
-- [ ] 2.2 转换菜单：JSON ↔ YAML（js-yaml）、生成 TypeScript 类型、JSON Schema
+- [x] 2.2 转换菜单：JSON ↔ YAML（js-yaml）、生成 TypeScript 类型、JSON Schema
       推断；结果进 Dialog 可复制
 - [ ] 2.3 diff 对比模式（两份 JSON，键级 diff 视图）
 - [ ] 2.4 历史记录：localStorage 最近 10 条（内容 + 时间 + 大小），空态展示
@@ -63,3 +63,10 @@
 - 为什么：高级工程师可以在大 JSON 中快速定位深层字段，避免手动展开大量节点。
 - 初级用户为何无感：查询只占工具栏一个带示例 tooltip 的入口，默认粘贴和树视图不增加
   额外控件；关闭 Dialog 即回到原路径。
+
+### 2.2 转换菜单（2026-10-06）
+
+- 做了什么：复用现有 js-yaml 实现 JSON↔YAML，新增 TypeScript interface 推断和 JSON
+  Schema（draft 2020-12）推断；转换结果在 Dialog 中只读展示并可复制，YAML 可导回输入区。
+- 为什么：同一份响应可以直接用于配置、类型声明和接口文档，减少手工重复建模。
+- 初级用户为何无感：转换收纳在带 tooltip 的工具栏入口，默认树视图没有额外字段和设置。

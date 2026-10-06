@@ -10,6 +10,7 @@
 	import { onDestroy } from "svelte";
 	import {
 		AlignLeft,
+		ArrowLeftRight,
 		ChevronsDownUp,
 		ChevronsUpDown,
 		Copy,
@@ -28,6 +29,7 @@
 	import { buildStats, EXAMPLE_JSON, parseJson, type ParseOutcome } from "./json-viewer/json-core";
 	import JsonTreeNode from "./json-viewer/JsonTreeNode.svelte";
 	import { formatJsonPath, queryJson, type QueryMatch, type QueryOutcome } from "./json-viewer/query";
+	import { inferJsonSchema, inferTypeScript, jsonToYaml, yamlToJson } from "./json-viewer/transform";
 
 	// ---- 状态 ----
 	let inputText = $state("");
@@ -45,6 +47,11 @@
 	let queryResult = $state<QueryOutcome | null>(null);
 	let selectedQueryIndex = $state(0);
 	let queryExtracted = $state<QueryMatch | null>(null);
+	let transformOpen = $state(false);
+	let transformMode = $state<"yaml" | "json" | "typescript" | "schema">("yaml");
+	let transformOutput = $state("");
+	let transformError = $state("");
+	let yamlSource = $state("");
 	let dragDepth = $state(0);
 	let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -144,6 +151,37 @@
 		queryExtracted = selectedQueryMatch;
 		queryOpen = false;
 	}
+	function openTransform(): void {
+		if (!okResult) return;
+		yamlSource = inputText;
+		transformOpen = true;
+		generateTransform();
+	}
+	function generateTransform(): void {
+		transformError = "";
+		if (transformMode === "yaml") {
+			if (okResult) transformOutput = jsonToYaml(okResult.value);
+			return;
+		}
+		if (transformMode === "json") {
+			const result = yamlToJson(yamlSource);
+			if (!result.ok) {
+				transformOutput = "";
+				transformError = result.error;
+				return;
+			}
+			transformOutput = JSON.stringify(result.value, null, 2);
+			return;
+		}
+		if (!okResult) return;
+		transformOutput =
+			transformMode === "typescript"
+				? inferTypeScript(okResult.value)
+				: JSON.stringify(inferJsonSchema(okResult.value), null, 2);
+	}
+	async function copyTransform(): Promise<void> {
+		if (transformOutput) await copyText(transformOutput);
+	}
 
 	function formatBytes(n: number): string {
 		if (n < 1024) return `${n} B`;
@@ -237,6 +275,15 @@
 			title="按 JSONPath 查询（例如 $.user.contacts[0]）"
 		>
 			<Search class="size-3.5" /><span class="hidden sm:inline">查询</span>
+		</Button>
+		<Button
+			size="sm"
+			variant="ghost"
+			onclick={openTransform}
+			disabled={!stats}
+			title="转换为 YAML、TypeScript 类型或 JSON Schema"
+		>
+			<ArrowLeftRight class="size-3.5" /><span class="hidden sm:inline">转换</span>
 		</Button>
 
 		<div class="ml-auto">
@@ -428,6 +475,73 @@
 					{/if}
 				</Dialog.Footer>
 			{/if}
+		</Dialog.Content>
+	</Dialog.Root>
+
+	<Dialog.Root bind:open={transformOpen}>
+		<Dialog.Content class="max-h-[85vh] max-w-3xl overflow-hidden">
+			<Dialog.Header>
+				<Dialog.Title>转换与推断</Dialog.Title>
+				<Dialog.Description>把当前 JSON 转成常用格式，或从 YAML 导入为 JSON。</Dialog.Description>
+			</Dialog.Header>
+			<div class="flex flex-wrap gap-1 rounded-md bg-muted/50 p-1">
+				{#each [
+					["yaml", "JSON → YAML"],
+					["json", "YAML → JSON"],
+					["typescript", "TypeScript 类型"],
+					["schema", "JSON Schema"],
+				] as [mode, label]}
+					<button
+						type="button"
+						class="rounded px-2.5 py-1.5 text-xs transition-colors hover:bg-background"
+						class:bg-background={transformMode === mode}
+						class:font-medium={transformMode === mode}
+						onclick={() => {
+							transformMode = mode as typeof transformMode;
+							generateTransform();
+						}}
+					>
+						{label}
+					</button>
+				{/each}
+			</div>
+			{#if transformMode === "json"}
+				<textarea
+					class="mt-3 h-32 w-full resize-y rounded-md border bg-background p-3 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					aria-label="YAML 输入"
+					bind:value={yamlSource}
+					oninput={generateTransform}
+					placeholder="粘贴 YAML…"
+				></textarea>
+			{/if}
+			{#if transformError}
+				<p class="mt-3 rounded-md bg-destructive/10 p-3 text-xs text-destructive" role="alert">
+					{transformError}
+				</p>
+			{/if}
+			<textarea
+				class="mt-3 h-64 w-full resize-y rounded-md border bg-muted/20 p-3 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				aria-label="转换结果"
+				readonly
+				value={transformOutput}
+			></textarea>
+			<Dialog.Footer>
+				<Button type="button" variant="secondary" onclick={copyTransform} disabled={!transformOutput} title="复制转换结果">
+					<Copy class="size-3.5" />复制结果
+				</Button>
+				{#if transformMode === "json" && transformOutput && !transformError}
+					<Button
+						type="button"
+						onclick={() => {
+							replaceInput(transformOutput);
+							transformOpen = false;
+						}}
+						title="用转换结果替换输入区"
+					>
+						导入 JSON
+					</Button>
+				{/if}
+			</Dialog.Footer>
 		</Dialog.Content>
 	</Dialog.Root>
 </div>
