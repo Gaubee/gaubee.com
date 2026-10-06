@@ -57,6 +57,24 @@ describe("JsonVirtualTree 组件", () => {
 });
 
 describe("JsonViewerView 历史落盘", () => {
+  it("未处于激活应用上下文时不监听窗口级快捷键", async () => {
+    const target = document.createElement("div");
+    target.style.height = "700px";
+    document.body.append(target);
+    const component = mount(JsonViewerView, { target });
+    await tick();
+    const event = new KeyboardEvent("keydown", {
+      key: "v",
+      ctrlKey: true,
+      shiftKey: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    await unmount(component);
+    target.remove();
+  });
+
   it("解析成功后等待防抖才写入 localStorage", async () => {
     vi.useFakeTimers();
     localStorage.clear();
