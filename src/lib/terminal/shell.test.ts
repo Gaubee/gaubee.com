@@ -23,7 +23,8 @@ vi.mock("$lib/github/client", () => ({
   commitChanges: mockCommitChanges,
 }));
 
-vi.mock("$app/environment", () => ({ browser: true }));
+// Terminal server project 没有 window；避免认证模块启动浏览器刷新副作用。
+vi.mock("$app/environment", () => ({ browser: false }));
 
 // mock ZenFS 单例：getFs 返回共享的 zenfs（用 InMemory 后端，每测试 fresh）。
 vi.mock("$lib/fs/zenfs-instance", () => ({
