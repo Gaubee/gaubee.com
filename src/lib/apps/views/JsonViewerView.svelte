@@ -35,7 +35,8 @@
 	import { readHistory, recordHistory, type JsonHistoryItem } from "./json-viewer/history";
 	import { formatJsonPath, queryJson, type QueryMatch, type QueryOutcome } from "./json-viewer/query";
 	import { inferJsonSchema, inferTypeScript, jsonToYaml, yamlToJson } from "./json-viewer/transform";
-	import { shortcutAction } from "./json-viewer/shortcuts";
+	import { isJsonViewerActive, shortcutAction } from "./json-viewer/shortcuts";
+	import { useApp } from "$lib/app-scaffold";
 
 	// ---- 状态 ----
 	let inputText = $state("");
@@ -67,6 +68,7 @@
 	let historyItems = $state<JsonHistoryItem[]>([]);
 	let dragDepth = $state(0);
 	let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+	const appContext = useApp();
 
 	onMount(() => {
 		if (typeof localStorage !== "undefined") historyItems = readHistory(localStorage);
@@ -241,6 +243,7 @@
 		return new Date(timestamp).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 	}
 	function handleShortcut(event: KeyboardEvent): void {
+		if (!isJsonViewerActive(appContext?.pathname)) return;
 		const action = shortcutAction(event);
 		if (!action) return;
 		event.preventDefault();
@@ -307,9 +310,7 @@
 	onDestroy(() => clearTimeout(copiedTimer));
 </script>
 
-<svelte:window onkeydown={handleShortcut} />
-
-<div class="relative flex h-full min-h-0 flex-col">
+<div class="relative flex h-full min-h-0 flex-col" onkeydown={handleShortcut}>
 	<!-- 工具栏：全部按钮带 title（渐进披露的引导层） -->
 	<div class="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1.5">
 		<Button
