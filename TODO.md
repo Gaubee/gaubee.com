@@ -1331,7 +1331,9 @@ kzf 指令：开发 osapp jsonviewer，ZCode 做基础版，Codex 补充高级�
 - [x] 3.3：行模型保留 50 万行上限；新增按最近检查点二分恢复的 `readRowsIncremental` 源窗口重放，
       以及巨值字段 `readValueWindow` 受限懒读取；同步 `readRows` 行分页保持兼容。
 - [x] 3.4：TanStack 窗口树、阈值/进度 UI 已落地；token 边界 Custom Highlight 尚未接入。
-- [ ] 3.5：当前只有 1/10MB JS 与 MoonBit/native 基线；10/100/1024/3072MB 双谱形、长任务与内存矩阵待专用性能机。
+- [x] 3.5：完成 10/100/1024/3072MB 双谱形基准；MoonBit-wasm/native、JS fallback、JSON.parse
+      分列记录耗时/RSS，3GB 两种谱形均验证 `bytes=3221225472`。浏览器主线程 Long Task、真实页面
+      heap/打开耗时仍需专用 preview 性能机补测，详见 `phase3-performance.md`。
 - [x] 3.6：COOP/COEP 影响评估完成，首发保持 Transferable，SAB 不随本轮部署。
 - [ ] 3.7：Agent 已完成 production preview 桌面/390px 走查、build 与聚焦单测；Owner 视觉验收与完整 e2e 仍待完成。
 
@@ -1340,3 +1342,5 @@ kzf 指令：开发 osapp jsonviewer，ZCode 做基础版，Codex 补充高级�
 - 3.3 做了什么：流式行模型绑定原始 Blob；按源字节 offset 选择最近 Ctx 检查点，分块重放并只保留请求窗口；巨值通过 offset/end 读取不超过 1 MiB 的窗口。
 - 为什么：碎片型输入不再要求主线程一次缓存所有行，巨值字段也不会因为预览以外的读取而整体复制。
 - 初级用户为何无感：现有树组件和同步 `readRows` 接口不变，懒读取仅为大文件窗口和后续值展开提供能力。
+- 3.5 基准补齐：新增 10/100/1024/3072MB 碎片型与巨值型临时文件生成器；MoonBit-wasm/native、JS fallback、JSON.parse 分列采样，native helper 用 UInt64 计算 3GB 尺寸并硬断言 `bytes=3221225472`。
+- 基准边界：Node worker 记录的是分块处理峰值，不冒充浏览器主线程 Long Task；真实 preview 性能矩阵留作后续专用机任务。

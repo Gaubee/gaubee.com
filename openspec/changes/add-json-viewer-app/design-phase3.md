@@ -121,8 +121,10 @@ skip_to(pre: Ctx, target_offset) -> { next: Ctx }       // 快进：不产事件
       `readValueWindow` 按巨值 offset/end 读取受限窗口，保留同步 `readRows` 行分页兼容）
 - [x] 3.4 UI：进度指示、阈值切换、tanstack virtual 接入
       （token 边界 Custom Highlight 尚未接入）
-- [ ] 3.5 性能基准：已跑通 MoonBit/native 与 JS/JSON.parse 基线；完整 10MB/100MB/1GB/3GB
-      与浏览器长任务矩阵留待专用性能机补跑
+- [x] 3.5 性能基准：完成 10/100/1024/3072MB 碎片型与巨值型样本；MoonBit-wasm、
+      MoonBit-native、JS fallback、JSON.parse 分列记录耗时/RSS，3GB 两种谱形均精确
+      验证 `bytes=3221225472`。浏览器主线程 Long Task/真实页面 heap 仍需专用 preview
+      性能机补测，详见 `phase3-performance.md`
 - [x] 3.6 COOP/COEP 影响评估：首发保持 Transferable；SAB 不随本轮部署
 - [ ] 3.7 双端走查 + vision 验收 + build/单测门禁（Agent 已完成 production preview 桌面/390px 走查、build 与聚焦单测；Owner vision/full e2e 验收仍待完成）
 
