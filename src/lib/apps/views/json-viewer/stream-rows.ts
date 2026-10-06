@@ -228,6 +228,17 @@ export class StreamRowModel {
     return roots.reduce((total, id) => total + this.#visibleCountOf(id, openIds), 0);
   }
 
+  /** Return container and aggregate ids used by the tree toolbar commands. */
+  expandableIds(): number[] {
+    return this.#rows.flatMap((row) =>
+      row.childCount >= this.#aggregateThreshold
+        ? [row.id, -row.id - 1]
+        : row.childCount > 0
+          ? [row.id]
+          : [],
+    );
+  }
+
   #visibleCountOf(id: number, openIds: ReadonlySet<number>): number {
     const row = this.#byId.get(id);
     if (!row || !openIds.has(id) || row.aggregate || row.childCount === 0) return 1;

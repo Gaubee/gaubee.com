@@ -469,10 +469,10 @@
 			<span class="hidden sm:inline">{copied ? "已复制" : "复制"}</span>
 		</Button>
 		<span class="mx-1 h-4 w-px bg-border" aria-hidden="true"></span>
-		<Button size="sm" variant="ghost" onclick={expandAll} disabled={!stats} title="展开所有层级">
+		<Button size="sm" variant="ghost" onclick={expandAll} disabled={!stats && !streamModel} title="展开所有层级">
 			<ChevronsUpDown class="size-3.5" /><span class="hidden sm:inline">展开</span>
 		</Button>
-		<Button size="sm" variant="ghost" onclick={collapseAll} disabled={!stats} title="收起到第一层">
+		<Button size="sm" variant="ghost" onclick={collapseAll} disabled={!stats && !streamModel} title="收起到第一层">
 			<ChevronsDownUp class="size-3.5" /><span class="hidden sm:inline">收起</span>
 		</Button>
 		<span class="mx-1 h-4 w-px bg-border" aria-hidden="true"></span>
@@ -570,9 +570,7 @@
 							<progress class="h-1.5 flex-1" max={streamProgress?.totalBytes ?? 1} value={streamProgress?.loadedBytes ?? 0}></progress>
 							<span>{formatBytes(streamProgress?.loadedBytes ?? 0)} / {formatBytes(streamProgress?.totalBytes ?? 0)}</span>
 						</div>
-						{#key streamVersion}
-							<JsonStreamTree model={streamModel} />
-						{/key}
+						<JsonStreamTree model={streamModel} command={treeCommand} version={streamVersion} />
 					{/if}
 				</div>
 			{:else if parseError}

@@ -7,19 +7,42 @@
 	import { createVirtualizer } from "@tanstack/svelte-virtual";
 	import type { StreamRow, StreamRowModel } from "./stream-rows";
 
-	interface Props { model: StreamRowModel }
+	interface Props {
+		model: StreamRowModel;
+		command?: { version: number; open: boolean };
+		version?: number;
+	}
 
-	let { model }: Props = $props();
+	let { model, command = { version: 0, open: true }, version = 0 }: Props = $props();
 	let scrollEl: HTMLDivElement;
 	let openIds = $state<Set<number>>(new Set());
 	let lastCount = -1;
+	let lastCommandVersion = 0;
+	let defaultOpened = $state(false);
 	const virtualizer = createVirtualizer<HTMLDivElement, HTMLDivElement>({
 		count: 0,
 		getScrollElement: () => scrollEl,
 		estimateSize: () => 26,
 		overscan: 8,
 	});
-	const rows = $derived(model.visibleCount(openIds));
+	const rows = $derived.by(() => {
+		void version;
+		return model.visibleCount(openIds);
+	});
+
+	$effect(() => {
+		void version;
+		if (!defaultOpened && model.size > 0) {
+			const root = model.visibleRows(new Set(), 0, 1).rows[0];
+			if (root && (root.childCount > 0 || (root.kind !== "object" && root.kind !== "array"))) {
+				if (root.childCount > 0) openIds = new Set([root.id]);
+				defaultOpened = true;
+			}
+		}
+		if (command.version === 0 || command.version === lastCommandVersion) return;
+		lastCommandVersion = command.version;
+		openIds = command.open ? new Set(model.expandableIds()) : new Set();
+	});
 
 	$effect(() => {
 		if (rows !== lastCount) {
@@ -52,13 +75,13 @@
 	}
 </script>
 
-<div class="jv-stream-scroll" bind:this={scrollEl} role="tree" aria-label="JSON 流式树">
-	<div class="jv-stream-spacer" style={`height: ${$virtualizer.getTotalSize()}px`}>
+	<div class="jv-stream-scroll jv-virtual-scroll" bind:this={scrollEl} role="tree" aria-label="JSON 流式树">
+		<div class="jv-stream-spacer" style={`height: ${$virtualizer.getTotalSize()}px`}>
 		{#each $virtualizer.getVirtualItems() as item (item.key)}
-			{@const row = model.visibleRows(openIds, item.index, 1).rows[0]}
+			{@const row = version >= 0 ? model.visibleRows(openIds, item.index, 1).rows[0] : undefined}
 			{#if row}
-				<div
-					class="jv-stream-row"
+					<div
+						class="jv-stream-row jv-virtual-row"
 					style={`transform: translateY(${item.start}px); padding-left: ${row.depth * 1.25 + 0.25}rem`}
 					role="treeitem"
 					aria-selected="false"
