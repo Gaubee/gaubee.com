@@ -16,6 +16,7 @@
 		Copy,
 		CopyCheck,
 		FileJson,
+		GitCompareArrows,
 		Minimize2,
 		Search,
 		Trash2,
@@ -28,6 +29,7 @@
 
 	import { buildStats, EXAMPLE_JSON, parseJson, type ParseOutcome } from "./json-viewer/json-core";
 	import JsonTreeNode from "./json-viewer/JsonTreeNode.svelte";
+	import { diffJson, type JsonDiffEntry } from "./json-viewer/diff";
 	import { formatJsonPath, queryJson, type QueryMatch, type QueryOutcome } from "./json-viewer/query";
 	import { inferJsonSchema, inferTypeScript, jsonToYaml, yamlToJson } from "./json-viewer/transform";
 
@@ -52,6 +54,11 @@
 	let transformOutput = $state("");
 	let transformError = $state("");
 	let yamlSource = $state("");
+	let diffOpen = $state(false);
+	let diffLeft = $state("");
+	let diffRight = $state("");
+	let diffResult = $state<JsonDiffEntry[] | null>(null);
+	let diffError = $state("");
 	let dragDepth = $state(0);
 	let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -182,6 +189,27 @@
 	async function copyTransform(): Promise<void> {
 		if (transformOutput) await copyText(transformOutput);
 	}
+	function openDiff(): void {
+		diffLeft = inputText;
+		diffRight = "";
+		diffResult = null;
+		diffError = "";
+		diffOpen = true;
+	}
+	function runDiff(): void {
+		try {
+			const left = JSON.parse(diffLeft) as unknown;
+			const right = JSON.parse(diffRight) as unknown;
+			diffResult = diffJson(left, right);
+			diffError = "";
+		} catch (error) {
+			diffResult = null;
+			diffError = error instanceof Error ? error.message : "两侧都必须是合法 JSON";
+		}
+	}
+	async function copyDiffPath(entry: JsonDiffEntry): Promise<void> {
+		await copyText(entry.pathText);
+	}
 
 	function formatBytes(n: number): string {
 		if (n < 1024) return `${n} B`;
@@ -284,6 +312,14 @@
 			title="转换为 YAML、TypeScript 类型或 JSON Schema"
 		>
 			<ArrowLeftRight class="size-3.5" /><span class="hidden sm:inline">转换</span>
+		</Button>
+		<Button
+			size="sm"
+			variant="ghost"
+			onclick={openDiff}
+			title="对比两份 JSON 的键级差异"
+		>
+			<GitCompareArrows class="size-3.5" /><span class="hidden sm:inline">对比</span>
 		</Button>
 
 		<div class="ml-auto">
@@ -542,6 +578,69 @@
 					</Button>
 				{/if}
 			</Dialog.Footer>
+		</Dialog.Content>
+	</Dialog.Root>
+
+	<Dialog.Root bind:open={diffOpen}>
+		<Dialog.Content class="max-h-[88vh] max-w-4xl overflow-hidden">
+			<Dialog.Header>
+				<Dialog.Title>对比 JSON</Dialog.Title>
+				<Dialog.Description>粘贴左右两份 JSON，按键和数组下标查看新增、删除与修改。</Dialog.Description>
+			</Dialog.Header>
+			<div class="grid gap-3 md:grid-cols-2">
+				<label class="grid gap-1 text-xs font-medium">
+					<span>原始 JSON</span>
+					<textarea
+						class="h-40 w-full resize-y rounded-md border bg-background p-3 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						bind:value={diffLeft}
+						aria-label="原始 JSON"
+					></textarea>
+				</label>
+				<label class="grid gap-1 text-xs font-medium">
+					<span>新 JSON</span>
+					<textarea
+						class="h-40 w-full resize-y rounded-md border bg-background p-3 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						bind:value={diffRight}
+						aria-label="新 JSON"
+					></textarea>
+				</label>
+			</div>
+			<div class="flex justify-end">
+				<Button type="button" onclick={runDiff} title="执行 JSON 对比">开始对比</Button>
+			</div>
+			{#if diffError}
+				<p class="rounded-md bg-destructive/10 p-3 text-xs text-destructive" role="alert">{diffError}</p>
+			{:else if diffResult}
+				<div class="max-h-64 overflow-auto rounded-md border">
+					{#if diffResult.length === 0}
+						<p class="p-4 text-sm text-muted-foreground">两份 JSON 没有差异。</p>
+					{:else}
+						{#each diffResult as entry}
+							<div class="grid gap-1 border-b px-3 py-2 text-xs last:border-b-0 sm:grid-cols-[minmax(0,0.9fr)_auto_minmax(0,1fr)] sm:items-center">
+								<button
+									type="button"
+									class="truncate text-left font-mono text-primary underline-offset-2 hover:underline"
+									onclick={() => copyDiffPath(entry)}
+									title="复制路径"
+								>
+									{entry.pathText}
+								</button>
+								<span
+									class:text-green-600={entry.kind === "added"}
+									class:text-red-600={entry.kind === "removed"}
+									class:text-amber-600={entry.kind === "changed"}
+									class="font-medium"
+								>
+									{entry.kind === "added" ? "新增" : entry.kind === "removed" ? "删除" : "修改"}
+								</span>
+								<span class="truncate text-muted-foreground">
+									{entry.kind === "added" ? `+ ${String(entry.after)}` : entry.kind === "removed" ? `− ${String(entry.before)}` : `${String(entry.before)} → ${String(entry.after)}`}
+								</span>
+							</div>
+						{/each}
+					{/if}
+				</div>
+			{/if}
 		</Dialog.Content>
 	</Dialog.Root>
 </div>
