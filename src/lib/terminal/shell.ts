@@ -127,7 +127,9 @@ export interface CommandContext {
   /** 输出错误（ANSI 红色，不带换行）。 */
   writeErr: (s: string) => void;
   /** 请求清屏（clear 命令用）。 */
-  clear: () => void;
+	clear: () => void;
+	/** 可选标准输入，供 PATH 命令消费。 */
+	stdin?: string;
 }
 
 /** 命令退出码（0 = 成功）。 */
@@ -569,7 +571,7 @@ export async function runLine(ctx: CommandContext, line: string): Promise<RunRes
   const name = args[0];
 
   // git 作为聚合命令分发到 gitSubcommandMap（命令实现归属 github 应用）
-  if (name === "git") {
+	if (name === "git") {
     const sub = args[1] ?? "status";
     const submap = await getGitSubmap();
     const target = submap.get(sub);
@@ -579,7 +581,15 @@ export async function runLine(ctx: CommandContext, line: string): Promise<RunRes
           Term.newline,
       );
       return { exit: 1, newCwd: null };
-    }
+	}
+
+	// PATH 命令允许用“命令 子命令”声明（例如 json validate），保持 CLI manifest
+	// 的命名空间清晰，同时仍通过 Terminal 的统一注册表执行。
+	const compound = args[1] ? getRegistry().get(`${name} ${args[1]}`) : undefined;
+	if (compound) {
+		const exit = await compound.run(ctx, args);
+		return { exit, newCwd: null };
+	}
     // 重写 args 让目标命令看到正确 argv：[git, sub, ...rest]
     const rest = [name, sub, ...args.slice(2)];
     // CliCommand.run 返回 { exit, newCwd }；git 命令不改 cwd

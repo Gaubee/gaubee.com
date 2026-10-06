@@ -40,7 +40,7 @@
       括号等）映射为中文提示 + 修复建议
 - [x] 2.6 大文件：树虚拟滚动（>5000 节点时启用），保证滚动 60fps
 - [x] 2.7 快捷键：格式化/压缩/复制/视图切换/清空（tooltip 标注）
-- [ ] 2.8 CLI：cliCommands 声明 `json validate|format|minify`（stdin/文件参数，
+- [x] 2.8 CLI：cliCommands 声明 `json validate|format|minify`（stdin/文件参数，
       接入 Terminal PATH）
 - [ ] 2.9 Codex 自由发挥（可选）：认为能显著提升高级工程师体验的其它能力，
       但每项必须附「初级用户无感」说明
@@ -98,3 +98,10 @@
   和清空；工具栏 tooltip 明确标注组合键。
 - 为什么：熟悉键盘流的工程师可在输入区保持焦点完成高频操作。
 - 初级用户为何无感：快捷键是可选捷径，按钮仍然完整可见，默认操作无需记忆键位。
+
+### 2.8 CLI（2026-10-06）
+
+- 做了什么：manifest 声明 `json validate`、`json format`、`json minify`，支持标准输入和
+  VFS 文件参数；Terminal 增加复合 PATH 命令分发，AppManager 初始化恢复时也会注册 CLI。
+- 为什么：终端用户可以把 JSON 校验/格式化纳入日常脚本流，不必打开 UI。
+- 初级用户为何无感：能力只存在于 Terminal PATH，不改变 JSON 查看器默认界面。

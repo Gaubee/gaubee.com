@@ -9,6 +9,7 @@ import { leafRoute } from "$lib/router";
 import FileJson from "@lucide/svelte/icons/file-json";
 
 import type { AppEntry } from "../types";
+import { jsonCommands } from "../views/json-viewer/cli-commands";
 
 export const jsonViewerApp: AppEntry = {
   manifest: {
@@ -25,6 +26,7 @@ export const jsonViewerApp: AppEntry = {
       },
     ],
     vfsOwnership: [],
+    cliCommands: jsonCommands,
     description: "粘贴即看的 JSON 树视图与校验工具",
     longDescription:
       "把任意 JSON 粘贴进来，立刻得到可折叠浏览的树视图：类型着色、实时校验（错误精确到行列）、格式化/压缩/复制、大小与深度统计。支持直接拖入 .json 文件。",

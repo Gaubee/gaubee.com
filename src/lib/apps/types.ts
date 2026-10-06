@@ -56,7 +56,9 @@ export interface CliCommandContext {
   /** 输出错误文本（红色 ANSI）。 */
   writeErr: (s: string) => void;
   /** 清屏。 */
-  clear: () => void;
+	clear: () => void;
+	/** 可选标准输入；Terminal 当前无管道时为空，测试/未来管道可注入。 */
+	stdin?: string;
 }
 
 /** CLI 命令定义。 */

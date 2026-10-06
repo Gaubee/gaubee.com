@@ -225,6 +225,7 @@ export class AppManager {
     if (migrated) this.writeStorage();
     this.syncSearchServices();
     this.syncServices();
+    this.syncCliCommands();
     this.syncSettingsSections();
     this.syncWidgets();
     this.syncAppMenus();
@@ -256,14 +257,7 @@ export class AppManager {
     this.registerAppMenus(entry.manifest);
     this.registerContentPipelines(entry.manifest);
 
-    // 注册 CLI 命令到 PATH
-    if (entry.manifest.cliCommands) {
-      for (const cli of entry.manifest.cliCommands) {
-        pathManager.register(id, cli);
-        // 同时注册到 shell 命令注册表
-        registerPathCommand(cliToShellCommand(cli));
-      }
-    }
+    this.registerCliCommands(entry);
 
     return true;
   }
@@ -396,6 +390,22 @@ export class AppManager {
     for (const id of this.installedIds) {
       const entry = this.registry.get(id);
       if (entry) this.registerServices(entry);
+    }
+  }
+
+  /** 将已安装应用声明的 CLI 投影到 PATH（初始化恢复与实时安装共用）。 */
+  private syncCliCommands(): void {
+    for (const id of this.installedIds) {
+      const entry = this.registry.get(id);
+      if (entry) this.registerCliCommands(entry);
+    }
+  }
+
+  private registerCliCommands(entry: AppEntry): void {
+    if (!entry.manifest.cliCommands) return;
+    for (const cli of entry.manifest.cliCommands) {
+      pathManager.register(entry.manifest.id, cli);
+      registerPathCommand(cliToShellCommand(cli));
     }
   }
 

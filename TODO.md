@@ -1319,4 +1319,5 @@ kzf 指令：开发 osapp jsonviewer，ZCode 做基础版，Codex 补充高级�
 - [x] 2.4 历史记录：localStorage 最近 10 条，空态和 Dialog 均可恢复。
 - [x] 2.6 大文件虚拟滚动：超过 5000 节点切换窗口化树渲染。
 - [x] 2.7 快捷键：格式化、压缩、复制、视图切换和清空均支持 Cmd/Ctrl+Shift 组合键。
-- [ ] 2.8 / 2.9 / 2.10：按 OpenSpec 清单继续推进。
+- [x] 2.8 CLI：Terminal PATH 提供 json validate/format/minify，支持 stdin 和文件参数。
+- [ ] 2.9 / 2.10：按 OpenSpec 清单继续推进。
