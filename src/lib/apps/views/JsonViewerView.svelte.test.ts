@@ -37,6 +37,23 @@ describe("JsonVirtualTree 组件", () => {
     await unmount(component);
     target.remove();
   });
+
+  it("虚拟树截断超长字符串预览", async () => {
+    const target = document.createElement("div");
+    target.style.height = "520px";
+    target.style.width = "900px";
+    document.body.append(target);
+    const component = mount(JsonVirtualTree, {
+      target,
+      props: { value: { payload: "x".repeat(5_000_000) } },
+    });
+    await tick();
+    await nextFrame();
+    const value = target.querySelector<HTMLElement>(".jv-value");
+    expect(value?.textContent).toBe(`"${"x".repeat(120)}…"`);
+    await unmount(component);
+    target.remove();
+  });
 });
 
 describe("JsonViewerView 历史落盘", () => {
@@ -58,5 +75,84 @@ describe("JsonViewerView 历史落盘", () => {
     target.remove();
     localStorage.clear();
     vi.useRealTimers();
+  });
+
+  it("历史 Dialog 提供点击恢复和删除入口", async () => {
+    localStorage.setItem(
+      "gaubee:json-viewer:history",
+      JSON.stringify([{ id: "1", content: '{"ok":true}', savedAt: 1, bytes: 11 }]),
+    );
+    const target = document.createElement("div");
+    target.style.height = "700px";
+    document.body.append(target);
+    const component = mount(JsonViewerView, { target });
+    await tick();
+    target.querySelector<HTMLButtonElement>('button[title="查看最近打开的 10 条 JSON"]')?.click();
+    await tick();
+    expect(document.querySelector('button[title="点击恢复"]')).not.toBeNull();
+    const remove = document.querySelector<HTMLButtonElement>('button[title="删除这条历史"]');
+    expect(remove).not.toBeNull();
+    remove?.click();
+    await tick();
+    expect(JSON.parse(localStorage.getItem("gaubee:json-viewer:history") ?? "[]")).toEqual([]);
+    await unmount(component);
+    target.remove();
+    localStorage.clear();
+  });
+
+  it("diff Dialog 使用结构化解析错误和修复建议", async () => {
+    const target = document.createElement("div");
+    target.style.height = "700px";
+    document.body.append(target);
+    const component = mount(JsonViewerView, { target });
+    await tick();
+    target.querySelector<HTMLButtonElement>('button[title="对比两份 JSON 的键级差异"]')?.click();
+    await tick();
+    const left = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="原始 JSON"]');
+    const right = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="新 JSON"]');
+    expect(left).not.toBeNull();
+    expect(right).not.toBeNull();
+    if (!left || !right) return;
+    left.value = '{"a":1,}';
+    left.dispatchEvent(new Event("input", { bubbles: true }));
+    right.value = "{}";
+    right.dispatchEvent(new Event("input", { bubbles: true }));
+    document.querySelector<HTMLButtonElement>('button[title="执行 JSON 对比"]')?.click();
+    await tick();
+    const alert = document.querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain("原始 JSON");
+    expect(alert?.textContent).toContain("建议");
+    await unmount(component);
+    target.remove();
+  });
+
+  it("YAML 循环引用在转换 Dialog 中显示人话错误", async () => {
+    const target = document.createElement("div");
+    target.style.height = "700px";
+    document.body.append(target);
+    const component = mount(JsonViewerView, { target });
+    await tick();
+    target.querySelector<HTMLButtonElement>('button[title^="填充一份"]')?.click();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    target
+      .querySelector<HTMLButtonElement>(
+        'button[title="转换为 YAML、TypeScript 类型或 JSON Schema"]',
+      )
+      ?.click();
+    await tick();
+    const yamlTab = [...document.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "YAML → JSON",
+    );
+    yamlTab?.click();
+    await tick();
+    const input = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="YAML 输入"]');
+    expect(input).not.toBeNull();
+    if (!input) return;
+    input.value = "self: &root\n  value: *root";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await tick();
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain("循环引用");
+    await unmount(component);
+    target.remove();
   });
 });

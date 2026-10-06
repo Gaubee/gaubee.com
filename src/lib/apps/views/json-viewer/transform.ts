@@ -23,8 +23,15 @@ export function jsonToYaml(value: unknown): string {
 /** 将 YAML 解析为可供 JSON 树消费的值。 */
 export function yamlToJson(text: string): YamlParseOutcome | YamlParseError {
   try {
-    return { ok: true, value: load(text) };
+    const value = load(text);
+    if (JSON.stringify(value) === undefined) {
+      return { ok: false, error: "YAML 结果不是可转换的 JSON 值" };
+    }
+    return { ok: true, value };
   } catch (error) {
+    if (error instanceof TypeError && error.message.toLowerCase().includes("circular")) {
+      return { ok: false, error: "YAML 包含循环引用，无法转换为 JSON" };
+    }
     return { ok: false, error: error instanceof Error ? error.message : "YAML 解析失败" };
   }
 }

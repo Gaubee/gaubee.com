@@ -15,6 +15,11 @@ describe("YAML 转换", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("unexpected end");
   });
+
+  it("拒绝 YAML 循环引用并返回人话错误", () => {
+    const result = yamlToJson("self: &root\n  value: *root");
+    expect(result).toEqual({ ok: false, error: "YAML 包含循环引用，无法转换为 JSON" });
+  });
 });
 
 describe("TypeScript 类型推断", () => {

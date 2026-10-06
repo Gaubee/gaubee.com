@@ -17,6 +17,24 @@ export interface VirtualTreeRow {
   isContainer: boolean;
 }
 
+export const VIRTUAL_LONG_STRING = 120;
+
+/** 虚拟树标量预览与普通树保持一致，避免超长字符串撑爆行宽。 */
+export function formatVirtualScalar(
+  value: unknown,
+  kind: JsonValueType = valueTypeOf(value),
+): string {
+  if (kind === "string") {
+    const raw = value as string;
+    if (raw.length > VIRTUAL_LONG_STRING) {
+      return `${JSON.stringify(raw.slice(0, VIRTUAL_LONG_STRING)).slice(0, -1)}…"`;
+    }
+    return JSON.stringify(raw);
+  }
+  if (kind === "null") return "null";
+  return String(value);
+}
+
 /** 返回当前展开状态下的深度优先行列表。 */
 export function flattenJsonTree(value: unknown, openPaths: ReadonlySet<string>): VirtualTreeRow[] {
   const rows: VirtualTreeRow[] = [];

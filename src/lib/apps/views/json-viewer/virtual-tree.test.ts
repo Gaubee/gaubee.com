@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { containerPaths, flattenJsonTree, pathKey, visibleRange } from "./virtual-tree";
+import {
+  containerPaths,
+  flattenJsonTree,
+  formatVirtualScalar,
+  pathKey,
+  visibleRange,
+} from "./virtual-tree";
 
 const value = { users: [{ name: "Ada" }, { name: "Grace" }], count: 2 };
 
@@ -33,5 +39,12 @@ describe("visibleRange", () => {
 
   it("边界不超出总行数", () => {
     expect(visibleRange(3, 0, 100)).toEqual({ start: 0, end: 3, offsetTop: 0, totalHeight: 78 });
+  });
+});
+
+describe("formatVirtualScalar", () => {
+  it("截断超过 120 字符的字符串预览", () => {
+    const result = formatVirtualScalar("x".repeat(121));
+    expect(result).toBe(`"${"x".repeat(120)}…"`);
   });
 });

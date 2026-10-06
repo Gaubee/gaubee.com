@@ -5,13 +5,13 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 
-	import { valueTypeOf } from "./json-core";
 	import type { JsonPathSegment } from "./query";
 	import {
 		containerPaths,
 		flattenJsonTree,
 		pathKey,
 		visibleRange,
+		formatVirtualScalar,
 		type VirtualTreeRow,
 	} from "./virtual-tree";
 
@@ -66,11 +66,6 @@
 		);
 	}
 
-	function formatScalar(value: unknown, kind: ReturnType<typeof valueTypeOf>): string {
-		if (kind === "string") return JSON.stringify(value);
-		if (kind === "null") return "null";
-		return String(value);
-	}
 </script>
 
 <div
@@ -107,7 +102,7 @@
 					<span class="jv-count">{row.childCount}</span>
 					{#if !openPaths.has(row.pathKey)}<span class="jv-punct">{kind === "object" ? "}" : "]"}</span>{/if}
 				{:else}
-					<span class={`jv-value jv-${kind}`}>{formatScalar(row.value, kind)}</span>
+					<span class={`jv-value jv-${kind}`}>{formatVirtualScalar(row.value, kind)}</span>
 				{/if}
 			</div>
 		{/each}

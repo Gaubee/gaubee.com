@@ -28,13 +28,20 @@
 	import CodeMirror from "$lib/editor/CodeMirror.svelte";
 	import { copyText } from "$lib/utils/clipboard";
 
-	import { buildStats, EXAMPLE_JSON, parseJson, type ParseOutcome } from "./json-viewer/json-core";
+	import {
+		buildStats,
+		EXAMPLE_JSON,
+		parseJson,
+		type JsonErrorInfo,
+		type ParseOutcome,
+	} from "./json-viewer/json-core";
 	import JsonTreeNode from "./json-viewer/JsonTreeNode.svelte";
 	import JsonVirtualTree from "./json-viewer/JsonVirtualTree.svelte";
 	import { diffJson, type JsonDiffEntry } from "./json-viewer/diff";
 	import {
 		createHistoryScheduler,
 		readHistory,
+		removeHistory,
 		type JsonHistoryItem,
 	} from "./json-viewer/history";
 	import { formatJsonPath, queryJson, type QueryMatch, type QueryOutcome } from "./json-viewer/query";
@@ -218,7 +225,14 @@
 				transformError = result.error;
 				return;
 			}
-			transformOutput = JSON.stringify(result.value, null, 2);
+			try {
+				const output = JSON.stringify(result.value, null, 2);
+				if (output === undefined) throw new TypeError("YAML 结果不是可转换的 JSON 值");
+				transformOutput = output;
+			} catch (error) {
+				transformOutput = "";
+				transformError = error instanceof Error ? error.message : "YAML 结果无法转换为 JSON";
+			}
 			return;
 		}
 		if (!okResult) return;
@@ -238,15 +252,23 @@
 		diffOpen = true;
 	}
 	function runDiff(): void {
-		try {
-			const left = JSON.parse(diffLeft) as unknown;
-			const right = JSON.parse(diffRight) as unknown;
-			diffResult = diffJson(left, right);
-			diffError = "";
-		} catch (error) {
+		const left = parseJson(diffLeft);
+		if (!left.ok) {
 			diffResult = null;
-			diffError = error instanceof Error ? error.message : "两侧都必须是合法 JSON";
+			diffError = formatJsonError("原始 JSON", left.error);
+			return;
 		}
+		const right = parseJson(diffRight);
+		if (!right.ok) {
+			diffResult = null;
+			diffError = formatJsonError("新 JSON", right.error);
+			return;
+		}
+		diffResult = diffJson(left.value, right.value);
+		diffError = "";
+	}
+	function formatJsonError(label: string, error: JsonErrorInfo): string {
+		return `${label}：${error.line > 0 ? `第 ${error.line} 行第 ${error.column} 列，` : ""}${error.message}。建议：${error.suggestion}`;
 	}
 	async function copyDiffPath(entry: JsonDiffEntry): Promise<void> {
 		await copyText(entry.pathText);
@@ -259,6 +281,10 @@
 	function restoreHistory(item: JsonHistoryItem): void {
 		replaceInput(item.content);
 		historyOpen = false;
+	}
+	function deleteHistory(item: JsonHistoryItem): void {
+		if (typeof localStorage === "undefined") return;
+		historyItems = removeHistory(localStorage, item.id);
 	}
 	function formatHistoryDate(timestamp: number): string {
 		return new Date(timestamp).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -485,7 +511,7 @@
 												type="button"
 												class="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-muted"
 												onclick={() => restoreHistory(item)}
-												title="恢复这条 JSON"
+												title="点击恢复"
 											>
 												<span class="truncate font-mono">{item.content.slice(0, 48)}</span>
 												<span class="shrink-0 text-muted-foreground">{formatHistoryDate(item.savedAt)}</span>
@@ -588,7 +614,7 @@
 					{queryResult.error}
 				</p>
 			{:else if queryResult?.ok}
-				<div class="mt-3 grid min-h-0 gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+				<div class="mt-3 grid min-h-0 gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(240px,1.1fr)]">
 					<div class="max-h-72 overflow-auto rounded-md border p-1 lg:max-h-[50vh]">
 						{#if queryResult.matches.length === 0}
 							<p class="p-3 text-sm text-muted-foreground">没有匹配结果。</p>
@@ -606,7 +632,7 @@
 							{/each}
 						{/if}
 					</div>
-					<div class="min-h-32 overflow-auto rounded-md border bg-muted/20 p-2">
+					<div class="min-h-32 min-w-0 overflow-auto rounded-md border bg-muted/20 p-2">
 						{#if selectedQueryMatch}
 							<p class="mb-2 text-xs text-muted-foreground">
 								已选：<span class="font-mono text-primary">{formatJsonPath(selectedQueryMatch.path)}</span>
@@ -769,17 +795,28 @@
 					<p class="p-4 text-sm text-muted-foreground">还没有历史记录。</p>
 				{:else}
 					{#each historyItems as item}
-						<button
-							type="button"
-							class="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left last:border-b-0 hover:bg-muted"
-							onclick={() => restoreHistory(item)}
-							title="恢复这条 JSON"
-						>
-							<span class="min-w-0 flex-1 truncate font-mono text-xs">{item.content.slice(0, 80)}</span>
+						<div class="flex items-center gap-2 border-b px-3 py-2 last:border-b-0 hover:bg-muted">
+							<button
+								type="button"
+								class="min-w-0 flex-1 truncate text-left font-mono text-xs"
+								onclick={() => restoreHistory(item)}
+								title="点击恢复"
+							>
+								{item.content.slice(0, 80)}
+							</button>
 							<span class="shrink-0 text-xs text-muted-foreground">
 								{formatHistoryDate(item.savedAt)} · {formatBytes(item.bytes)}
 							</span>
-						</button>
+							<button
+								type="button"
+								class="shrink-0 rounded p-1 text-muted-foreground hover:bg-background hover:text-destructive"
+								onclick={() => deleteHistory(item)}
+								title="删除这条历史"
+								aria-label="删除这条历史"
+							>
+								<Trash2 class="size-3.5" />
+							</button>
+						</div>
 					{/each}
 				{/if}
 			</div>
