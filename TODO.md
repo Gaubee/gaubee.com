@@ -1332,4 +1332,4 @@ kzf 指令：开发 osapp jsonviewer，ZCode 做基础版，Codex 补充高级�
 - [x] 3.4：TanStack 窗口树、阈值/进度 UI 已落地；token 边界 Custom Highlight 尚未接入。
 - [ ] 3.5：当前只有 1/10MB JS 与 MoonBit/native 基线；10/100/1024/3072MB 双谱形、长任务与内存矩阵待专用性能机。
 - [x] 3.6：COOP/COEP 影响评估完成，首发保持 Transferable，SAB 不随本轮部署。
-- [ ] 3.7：最终 production preview 双端走查、完整 build 门禁与 Owner 视觉验收。
+- [ ] 3.7：Agent 已完成 production preview 桌面/390px 走查、build 与聚焦单测；Owner 视觉验收与完整 e2e 仍待完成。

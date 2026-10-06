@@ -122,7 +122,7 @@ skip_to(pre: Ctx, target_offset) -> { next: Ctx }       // 快进：不产事件
 - [ ] 3.5 性能基准：已跑通 MoonBit/native 与 JS/JSON.parse 基线；完整 10MB/100MB/1GB/3GB
       与浏览器长任务矩阵留待专用性能机补跑
 - [x] 3.6 COOP/COEP 影响评估：首发保持 Transferable；SAB 不随本轮部署
-- [ ] 3.7 双端走查 + vision 验收 + build/单测门禁（待最终生产预览走查）
+- [ ] 3.7 双端走查 + vision 验收 + build/单测门禁（Agent 已完成 production preview 桌面/390px 走查、build 与聚焦单测；Owner vision/full e2e 验收仍待完成）
 
 ## 6. 验收标准
 
