@@ -7,7 +7,7 @@
 	用户无需瞄准输入区）。
 -->
 <script lang="ts">
- import { onDestroy, onMount } from "svelte";
+	import { onDestroy, onMount } from "svelte";
 	import {
 		AlignLeft,
 		ArrowLeftRight,
@@ -286,6 +286,10 @@
 				break;
 		}
 	}
+	function shortcutScope(node: HTMLElement): { destroy: () => void } {
+		node.addEventListener("keydown", handleShortcut);
+		return { destroy: () => node.removeEventListener("keydown", handleShortcut) };
+	}
 
 	function formatBytes(n: number): string {
 		if (n < 1024) return `${n} B`;
@@ -336,10 +340,7 @@
 
 <div
 	class="relative flex h-full min-h-0 flex-col"
-	role="application"
-	aria-label="JSON 查看器"
-	tabindex="-1"
-	onkeydown={handleShortcut}
+	use:shortcutScope
 >
 	<!-- 工具栏：全部按钮带 title（渐进披露的引导层） -->
 	<div class="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1.5">
@@ -475,23 +476,23 @@
 								<p class="mt-1 text-sm">{parseError.message}</p>
 								<p class="mt-1 text-xs text-muted-foreground">
 									建议：{parseError.suggestion}
-									</p>
-									{#if historyItems.length > 0}
-										<div class="mt-3 w-full max-w-sm text-left">
-											<p class="mb-1 text-xs font-medium text-muted-foreground">最近打开</p>
-											{#each historyItems.slice(0, 3) as item}
-												<button
-													type="button"
-													class="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-muted"
-													onclick={() => restoreHistory(item)}
-													title="恢复这条 JSON"
-												>
-													<span class="truncate font-mono">{item.content.slice(0, 48)}</span>
-													<span class="shrink-0 text-muted-foreground">{formatHistoryDate(item.savedAt)}</span>
-												</button>
-											{/each}
-										</div>
-									{/if}
+								</p>
+								{#if historyItems.length > 0}
+									<div class="mt-3 w-full max-w-sm text-left">
+										<p class="mb-1 text-xs font-medium text-muted-foreground">最近打开</p>
+										{#each historyItems.slice(0, 3) as item}
+											<button
+												type="button"
+												class="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-muted"
+												onclick={() => restoreHistory(item)}
+												title="恢复这条 JSON"
+											>
+												<span class="truncate font-mono">{item.content.slice(0, 48)}</span>
+												<span class="shrink-0 text-muted-foreground">{formatHistoryDate(item.savedAt)}</span>
+											</button>
+										{/each}
+									</div>
+								{/if}
 								{#if parseError.excerpt}
 									<pre
 										class="mt-2 overflow-x-auto rounded bg-muted/60 p-2 font-mono text-xs leading-relaxed">{parseError.excerpt}</pre>
