@@ -60,5 +60,8 @@ COPY --from=site /app/build /srv
 # 非 root 运行（scratch 无 /etc/passwd，用数字 UID/GID；8080 非 root 可绑）
 USER 65532:65532
 ENV SERVER_ROOT=/srv PORT=8080
+# cdn-base admin listener（A5：容器内 0.0.0.0:8081；compose 仅发布宿主 127.0.0.1:8081）
+ENV ADMIN_PORT=8081
 EXPOSE 8080
+EXPOSE 8081
 ENTRYPOINT ["/server"]

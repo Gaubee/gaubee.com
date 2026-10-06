@@ -1,0 +1,61 @@
+# ---------------------------------------------------------------------------
+# gaubee.com cdn-base 配置（cdn-media-bootstrap plan A9 schema 冻结）。
+#
+# 用法：cp config.example.toml config.toml 后按环境修改；compose 将其只读挂载到
+# 容器 /config.toml（不进 scratch 镜像）。文件缺失/字段非法/启动校验不过 →
+# 启动即败，日志给出修复指令。
+#
+# env 覆盖（优先级高于本文件）：
+#   CDN_CONFIG        配置文件绝对路径（默认 ./config.toml，其次 /config.toml）
+#   MEDIA_CACHE_DIR   覆盖 cache.dir
+#   ADMIN_PORT        覆盖 admin.port
+#   CDN_GITHUB_TOKEN  覆盖 github.token（只读公开仓库无需配置）
+#   CDN_ADMIN_TOKEN   覆盖 admin.token
+# ---------------------------------------------------------------------------
+
+version = 1
+
+[manifest]
+# 指针文件（git 指针协议 A2）：raw 主分支 current.json，无 API 限额
+current_url = "https://raw.githubusercontent.com/Gaubee/cdn-media.gaubee.com/main/manifest/current.json"
+# 短 TTL（秒）：TTL 内沿用内存 last-known-good，不发起条件请求
+refresh_interval_secs = 300
+
+[github]
+# 媒体仓库：卷 asset 的 API URL 由 asset id + 本仓库构造（A2：不按 tag+文件名拼）
+repo = "Gaubee/cdn-media.gaubee.com"
+# 可选只读 token；公开仓库留空。禁止把真实 token 写进任何文件（用 env 注入）
+token = ""
+
+[sources]
+# source 白名单（/cdn-media/<source>/ 只接受列内值；Phase 1 仅 GitHub 单源）
+allow = ["x"]
+
+[cache]
+# 缓存目录（A3 bind mount：宿主目录预创建并 chown 65532:65532，见 docker-compose.yml 注释）
+dir = "/media-cache"
+# LRU 水位（字节）：超 high 按 LRU 逐出到 low；启动校验剩余空间 ≥ high×1.2
+high_bytes = 524288000    # 500MB
+low_bytes = 314572800     # 300MB
+# 超过该大小的对象回源透传不落盘（pinned 例外常驻）
+large_object_bytes = 52428800  # 50MB
+
+[pinned]
+# 常驻 key（canonical media key，计入总容量；合计超 high_bytes 启动失败）
+keys = []
+
+[admin]
+enabled = true
+# 容器内监听端口（compose 仅发布宿主 127.0.0.1:8081，外网不可达）
+port = 8081
+# 可选 Bearer token（真实 token 用 env CDN_ADMIN_TOKEN 注入）
+token = ""
+
+[media]
+# 默认 mediaBase（A8：默认同源；本字段为 Phase 2 geo 回退预留）
+base = "/cdn-media"
+
+[geo]
+# Phase 2 预留：地区规则与 KV namespace（Phase 1 不读）
+rules = []
+kv_namespace = ""

@@ -1,8 +1,9 @@
-//! gaubee.com 静态站服务（axum + tower-http，2026-08-15）。
+//! gaubee.com 静态站服务（axum + tower-http，2026-08-15）+ cdn-base
+//!（cdn-media-bootstrap plan Phase 1，2026-10-06）。
 //!
 //! 正交意图：
 //! 1. 原始需求（2026-08-15）：nginx 容器 → Rust 自研静态服务，
-//!    musl 静态二进制 + scratch 镜像（~15MB，nginx:alpine 的三分之一）。
+//!    musl 静态二进制 + scratch 镜像（~15MB 级，nginx:alpine 的三分之一）。
 //!    Pingora 是代理/LB 框架、无静态文件模块，故选 axum + tower-http 标准生态。
 //! 2. 查找语义与退役的 deploy/nginx.conf 逐条对齐（四级 try_files）：
 //!    `$uri` / `$uri/index.html`（ServeDir 内置）→ `$uri.html`（扁平 SSG，fallback 阶段一）
@@ -10,35 +11,99 @@
 //! 3. 缓存矩阵（Router::layer 覆盖所有路由含 fallback）：默认 no-cache
 //!    （协商缓存，发布即时生效）；`/_app/immutable/*`（vite 内容哈希资产）一年 immutable。
 //! 4. MIME 修正：`.md` 显式 text/markdown（raw markdown 端点）。
+//! 5. cdn-base（R3/R4）：`/cdn-media/:source/*` 独立子路由——挂在无中间件的外层
+//!    Router，结构性绕过全局 CompressionLayer 与通用 no-cache 头（A4）；
+//!    admin listener 0.0.0.0:8081（A5，compose 只发布宿主 loopback），8080 上
+//!    admin 路径显式 404；配置缺失/非法或启动强校验不过 → 启动即败（A9）。
 //!
-//! 容器内明文 8080（非 root 可绑），TLS 由服务器外层反代负责。
+//! 容器内明文 8080/8081（非 root 可绑），TLS 由服务器外层反代负责。
 
+mod admin;
+mod cache;
+mod config;
+mod manifest;
+mod media;
+/// USTAR 头解析（A1）：运行时不解卷（对象按 manifest offset 直取 HTTP Range），
+/// 仅测试用本地 staging 卷核对 offset 定位语义
+#[cfg(test)]
+mod ustar;
+
+use std::collections::HashSet;
 use std::convert::Infallible;
 use std::env;
 use std::net::SocketAddr;
 use std::path::{Component, Path, PathBuf};
+use std::sync::Arc;
 
 use axum::http::{header, HeaderValue, Request, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{any, get, post};
 use axum::Router;
 use tower::ServiceExt;
 use tower_http::compression::CompressionLayer;
 use tower_http::services::{ServeDir, ServeFile};
 
 fn main() {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("tokio runtime");
+    runtime.block_on(run());
+}
+
+async fn run() {
+    // 1. 配置加载（A9：文件缺失/字段非法 → 启动即败，日志给修复指令）
+    let cfg = match config::load(&config::ProcessEnv) {
+        Ok(c) => Arc::new(c),
+        Err(e) => {
+            eprintln!("[cdn-base] 配置错误，启动即败：{e}");
+            std::process::exit(1);
+        }
+    };
     let root = PathBuf::from(env::var("SERVER_ROOT").unwrap_or_else(|_| "/srv".into()));
     let port: u16 = env::var("PORT")
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(8080);
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
-    // 主体：append_index=false（关闭目录 307 redirect 与自动 index 查找，
-    // SSG 双格式与 SPA 兜底全部收口到 fallback 三级查找，语义与 nginx try_files 对齐）。
-    // 注意用 .fallback() 而非 .not_found_service()：后者会把响应状态码强制改 404
-    //（body 仍输出，浏览器全挂）。
+    // 2. 缓存恢复 + 磁盘启动强校验（A3：可写探针 / 剩余空间 ≥ high×1.2 / 水位合法）
+    let pinned: HashSet<String> = cfg.pinned.keys.iter().cloned().collect();
+    let cache: Arc<cache::DiskCache> = match startup_cache_validation(&cfg, &pinned) {
+        Ok(c) => Arc::new(c),
+        Err(e) => {
+            eprintln!("[cdn-base] 缓存目录校验失败，启动即败：{e}");
+            std::process::exit(1);
+        }
+    };
+
+    // 3. manifest 首次加载（A2：重试 4 次、退避 3/6/12/24s）。
+    //    失败时：配置了 pinned → 无法核对预算，启动即败；否则降级继续
+    //    （冷启动无 LKG：source 视为不可用 503，服务本体照常起）。
+    let manifest = Arc::new(manifest::ManifestSource::new(cfg.clone()));
+    match manifest.refresh().await {
+        Ok(idx) => {
+            if let Err(e) = check_pinned_budget(&cfg, &idx) {
+                eprintln!("[cdn-base] pinned 预算校验失败，启动即败：{e}");
+                std::process::exit(1);
+            }
+        }
+        Err(e) => {
+            if !pinned.is_empty() {
+                eprintln!(
+                    "[cdn-base] manifest 不可用（{e}）且配置了 pinned，无法核对预算，启动即败。\
+                     修复：恢复 GitHub 可达后重试，或清空 pinned.keys"
+                );
+                std::process::exit(1);
+            }
+            eprintln!("[cdn-base] manifest 首次加载失败（{e}），降级启动：/cdn-media 返回 503");
+        }
+    }
+
+    // 4. 路由结构（A4 middleware 隔离）：
+    //    内层 main_app 逐字节保留原 8080 语义（healthz + 静态 + 压缩 + 缓存矩阵）；
+    //    外层只挂 media 子路由（无任何中间件 → 天然无压缩/无 no-cache）与
+    //    admin 路径的显式 404（公网 8080 扫描 /cdn-media-admin/* 必须 404，A5）。
     let root_for_log = root.display().to_string();
     let serve_dir = ServeDir::new(&root)
         .append_index_html_on_directories(false)
@@ -46,26 +111,174 @@ fn main() {
             fallback(req, root.clone())
         }));
 
-    let app = Router::new()
+    let main_app: Router = Router::new()
         .route("/healthz", get(|| async { "ok" }))
         .fallback_service(serve_dir)
         .layer(middleware::from_fn(cache_and_mime))
         .layer(CompressionLayer::new());
 
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .expect("tokio runtime");
-    runtime.block_on(async move {
-        let listener = tokio::net::TcpListener::bind(addr)
-            .await
-            .unwrap_or_else(|e| panic!("bind {addr} 失败：{e}"));
-        eprintln!(
-            "gaubee-static-server listening on {addr}, root={}",
-            root_for_log
-        );
-        axum::serve(listener, app).await.expect("server error");
+    let media_ctx = Arc::new(media::MediaCtx {
+        cfg: cfg.clone(),
+        manifest: manifest.clone(),
+        cache,
+        http: media::MediaCtx::new_client(),
     });
+
+    let media_router: Router = Router::new()
+        .route("/cdn-media/{source}/{*key}", get(media::serve))
+        .with_state(media_ctx.clone());
+
+    let admin_block: Router = Router::new()
+        .route("/cdn-media-admin", any(admin_not_found))
+        .route("/cdn-media-admin/", any(admin_not_found))
+        .route("/cdn-media-admin/{*rest}", any(admin_not_found));
+
+    let app: Router = Router::new()
+        .merge(media_router)
+        .merge(admin_block)
+        .fallback_service(main_app);
+
+    // admin listener（A5）：8081 独立 Router，无压缩/无缓存矩阵
+    let admin_enabled = cfg.admin.enabled;
+    let admin_port = cfg.admin.port;
+    let admin_app: Router = Router::new()
+        .route("/cdn-media-admin/warm", post(admin::warm))
+        .route("/cdn-media-admin/stats", get(admin::stats))
+        .fallback(admin_not_found)
+        .with_state(media_ctx);
+
+    // 5. 双 listener + 后台指针刷新（短 TTL）
+    let main_addr = SocketAddr::from(([0, 0, 0, 0], port));
+    let admin_addr = SocketAddr::from(([0, 0, 0, 0], admin_port));
+
+    let listener = tokio::net::TcpListener::bind(main_addr)
+        .await
+        .unwrap_or_else(|e| panic!("bind {main_addr} 失败：{e}"));
+    let admin_listener = if admin_enabled {
+        Some(
+            tokio::net::TcpListener::bind(admin_addr)
+                .await
+                .unwrap_or_else(|e| panic!("bind {admin_addr} 失败：{e}")),
+        )
+    } else {
+        None
+    };
+    eprintln!(
+        "gaubee-static-server listening on {main_addr}, root={root_for_log}\
+        {}, cdn-cache={}",
+        if admin_enabled {
+            format!(" + admin on {admin_addr}")
+        } else {
+            String::new()
+        },
+        cfg.cache.dir
+    );
+
+    // 后台刷新：间隔到达时条件拉指针（ETag），成功原子换索引，失败保 LKG
+    let manifest_for_refresh = manifest.clone();
+    let cfg_for_refresh = cfg.clone();
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(manifest_for_refresh.refresh_interval);
+        tick.tick().await; // 首个 tick 立即完成（启动时已刷过）
+        loop {
+            tick.tick().await;
+            match manifest_for_refresh.refresh().await {
+                Ok(idx) => {
+                    // 代际切换后重新核对 pinned 预算（运行期仅告警，不杀服务）
+                    if let Err(e) = check_pinned_budget(&cfg_for_refresh, &idx) {
+                        eprintln!("[cdn-base] pinned 预算告警（gen 切换后）：{e}");
+                    }
+                }
+                Err(e) => {
+                    eprintln!("[cdn-base] manifest 刷新失败（保留 last-known-good）：{e}")
+                }
+            }
+        }
+    });
+
+    let main_handle =
+        tokio::spawn(async move { axum::serve(listener, app).await.expect("server error") });
+    let admin_handle = admin_listener.map(|l| {
+        tokio::spawn(async move { axum::serve(l, admin_app).await.expect("admin server error") })
+    });
+    // 任一 listener 退出（含 panic）即整体退出
+    if let Some(h) = admin_handle {
+        if h.await.is_err() {
+            eprintln!("[cdn-base] admin listener 异常退出");
+            std::process::exit(1);
+        }
+    }
+    if main_handle.await.is_err() {
+        eprintln!("[cdn-base] main listener 异常退出");
+        std::process::exit(1);
+    }
+}
+
+async fn admin_not_found() -> Response {
+    (StatusCode::NOT_FOUND, "not found").into_response()
+}
+
+/// A3 启动强校验：可写探针 → 剩余空间 ≥ high×1.2 → 水位合法 → 恢复 LRU
+fn startup_cache_validation(
+    cfg: &config::Config,
+    pinned: &HashSet<String>,
+) -> Result<cache::DiskCache, String> {
+    let dir = PathBuf::from(&cfg.cache.dir);
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("无法创建缓存目录 {dir:?}：{e}。修复：宿主预创建目录并 chown 65532:65532（A3 bind mount），或修正 cache.dir / env MEDIA_CACHE_DIR"))?;
+    let probe = dir.join(".write-probe");
+    std::fs::write(&probe, b"probe")
+        .map_err(|e| format!("缓存目录 {dir:?} 不可写（UID 65532）：{e}。修复：chown 65532:65532 {dir:?}"))?;
+    std::fs::remove_file(&probe)
+        .map_err(|e| format!("缓存目录 {dir:?} 探针清理失败：{e}"))?;
+
+    let required = cfg.cache.high_bytes.saturating_mul(12) / 10;
+    let free = free_disk_bytes(&dir)?;
+    if free < required {
+        return Err(format!(
+            "剩余空间不足：{dir:?} 可用 {free} 字节 < high×1.2 = {required} 字节。修复：清理磁盘或调低 cache.high_bytes"
+        ));
+    }
+    if cfg.cache.low_bytes >= cfg.cache.high_bytes {
+        return Err(format!(
+            "水位非法：low({}) ≥ high({})。修复：调整 cache.low_bytes / cache.high_bytes",
+            cfg.cache.low_bytes, cfg.cache.high_bytes
+        ));
+    }
+    cache::DiskCache::recover(&dir, cfg.cache.high_bytes, cfg.cache.low_bytes, pinned)
+        .map_err(|e| format!("缓存目录恢复失败 {dir:?}：{e}"))
+}
+
+/// pinned 预算（R3）：key 必须在 manifest 中；合计 ≤ high_bytes，超出启动失败
+fn check_pinned_budget(cfg: &config::Config, idx: &manifest::ManifestIndex) -> Result<(), String> {
+    if cfg.pinned.keys.is_empty() {
+        return Ok(());
+    }
+    let mut total = 0u64;
+    for k in &cfg.pinned.keys {
+        let o = idx.lookup(k).ok_or_else(|| {
+            format!("pinned key {k:?} 不在 manifest 中（修复：更正 key 或重新打包发布）")
+        })?;
+        total += o.size;
+    }
+    if total > cfg.cache.high_bytes {
+        return Err(format!(
+            "pinned 合计 {total} 字节 > high {} 字节（修复：缩减 pinned.keys 或调高 cache.high_bytes）",
+            cfg.cache.high_bytes
+        ));
+    }
+    Ok(())
+}
+
+fn free_disk_bytes(dir: &Path) -> Result<u64, String> {
+    let c = std::ffi::CString::new(dir.to_str().ok_or("缓存路径非 UTF-8")?)
+        .map_err(|e| format!("路径编码失败：{e}"))?;
+    let mut st: libc::statvfs = unsafe { std::mem::zeroed() };
+    let rc = unsafe { libc::statvfs(c.as_ptr(), &mut st) };
+    if rc != 0 {
+        return Err("statvfs 失败（剩余空间不可测）".to_owned());
+    }
+    Ok(st.f_bavail as u64 * st.f_frsize as u64)
 }
 
 /// nginx try_files 的后三级（`$uri` 精确命中由 ServeDir 完成）：

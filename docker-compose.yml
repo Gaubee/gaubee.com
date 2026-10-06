@@ -33,6 +33,24 @@ services:
       # 宿主端口可用 PORT 环境变量覆盖（默认 8080，避免与宿主已有 nginx 冲突）。
       # 容器内固定 8080（Rust scratch 镜像以非 root 运行，80 需特权）
       - "${PORT:-8080}:8080"
+      # cdn-base admin listener（A5）：只发布到宿主 loopback，外网不可达；
+      # 1Panel/宿主脚本经 http://127.0.0.1:8081/cdn-media-admin/* 调用
+      - "127.0.0.1:8081:8081"
+    volumes:
+      # cdn-base 配置（A9）：只读挂载，不进 scratch 镜像；文件缺失/非法启动即败。
+      # 首次部署：cp config.example.toml config.toml 后再 up（本仓库已 gitignore config.toml）
+      - ./config.toml:/config.toml:ro
+      # 媒体缓存（A3 bind mount，强烈建议启用：默认落在容器可写层，重建即丢）：
+      #   1) 宿主预创建目录并交还给容器内 UID 65532（scratch 无 useradd）：
+      #        mkdir -p /opt/gaubee/media-cache && chown 65532:65532 /opt/gaubee/media-cache
+      #   2) 取消下行注释：
+      # - /opt/gaubee/media-cache:/media-cache
+    environment:
+      # 配置文件路径（对应上方只读挂载）
+      CDN_CONFIG: /config.toml
+      # 媒体缓存目录（与上方 cache mount 的容器内路径一致；也可在 config.toml 的
+      # [cache] dir 配置，env 优先）
+      MEDIA_CACHE_DIR: /media-cache
     # 运行时为 Rust scratch 镜像（无 shell/busybox，不支持 exec 型 healthcheck）；
     # 健康检查由外层反代或 1Panel 对 http://宿主:8080/healthz 探测
 

@@ -2,14 +2,26 @@
 name = "gaubee-static-server"
 version = "0.1.0"
 edition = "2021"
-description = "gaubee.com 静态站服务（axum + tower-http，替代 nginx 容器）"
+description = "gaubee.com 静态站服务（axum + tower-http，替代 nginx 容器；Phase 1 内建 cdn-base）"
 
 [dependencies]
 axum = "0.8"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "fs", "io-util", "sync", "time"] }
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["fs", "compression-gzip"] }
 mime_guess = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bytes = "1"
+toml = "0.8"
+sha2 = "0.10"
+# CDN 回源客户端（cdn-media plan A2/R4）：rustls（musl 静态链接，禁 openssl），
+# default-features=false 避免带入 native-tls；stream 用于对象字节流透传
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
+tokio-util = { version = "0.7", features = ["io"] }
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+# 启动校验用 statvfs（A3：剩余空间 ≥ high×1.2）
+libc = "0.2"
 
 # 体积优先（scratch 镜像）：LTO + strip + 单 codegen unit，
 # opt-level=2 在静态文件场景与 3 无感知差异

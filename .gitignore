@@ -41,6 +41,9 @@ tests/jules-scratch/**/screenshots/
 # Rust 构建产物
 static-server/target
 
+# cdn-base 本地配置（A9：config.example.toml 才进仓库；实例可含 token，绝不提交）
+config.toml
+
 # gaubee-skills 私有数据红线（2026-10-05 迁移裁决）：含私有仓信号的数据与凭据绝不进仓库
 skills/gaubee-skills/data/
 skills/gaubee-skills/**/.env
