@@ -7,10 +7,10 @@
 
 |  样本 | 路径                    |                                        打开耗时 |  RSS 增量 |
 | ----: | ----------------------- | ----------------------------------------------: | --------: |
-|  1 MB | `JSON.parse`            |                                         18.2 ms |  19.5 MiB |
-|  1 MB | JS 分块状态机           |                                         83.5 ms |  40.0 MiB |
-| 10 MB | `JSON.parse`            |                                        148.8 ms | 197.0 MiB |
-| 10 MB | JS 分块状态机           |                                        589.0 ms | 145.6 MiB |
+|  1 MB | `JSON.parse`            |                                         17.8 ms |  19.3 MiB |
+|  1 MB | JS 分块状态机           |                                         84.4 ms |  38.1 MiB |
+| 10 MB | `JSON.parse`            |                                        196.3 ms | 197.0 MiB |
+| 10 MB | JS 分块状态机           |                                        552.6 ms | 191.2 MiB |
 |  1 MB | MoonBit native 分块扫描 | 由 `moon bench` 输出 283.0 ms（含基准 harness） |    未采集 |
 
 这组数据不支持“流式解析更快”的结论；它支持流式路径在大输入下控制主线程占用和峰值内存。当前 MoonBit 仅为有限词法扫描器，且 `moon bundle --target wasm --release --strip` 在工具链中因多个 producer panic，未产出可加载浏览器 ABI；native bench 只作为扫描循环基准，不冒充浏览器 WASM 数据。
