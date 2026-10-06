@@ -394,9 +394,9 @@
 	</div>
 
 	<!-- 主区：桌面左右分栏，窄屏上下堆叠 -->
-	<div class="flex min-h-0 flex-1 flex-col lg:flex-row">
+	<div class="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
 		<!-- 输入 pane -->
-		<div class="flex h-44 shrink-0 flex-col border-b lg:h-auto lg:w-1/2 lg:border-b-0 lg:border-r">
+		<div class="flex h-44 min-h-0 shrink-0 flex-col overflow-hidden border-b lg:h-full lg:w-1/2 lg:border-b-0 lg:border-r">
 			<CodeMirror
 				doc={inputText}
 				docId={String(docVersion)}
@@ -409,7 +409,7 @@
 		</div>
 
 		<!-- 结果 pane -->
-		<div class="min-h-0 flex-1 overflow-auto p-3">
+		<div class="flex min-h-0 flex-1 flex-col overflow-auto p-3">
 			{#if !inputText.trim()}
 				<!-- 空态：初级用户的起点 -->
 				<div
@@ -471,7 +471,7 @@
 				</div>
 			{:else if okResult && stats}
 				{#if view === "tree"}
-					<div class="jv-tree">
+					<div class="jv-tree h-full min-h-0 flex-1">
 						{#key parseSeq}
 							{#if useVirtualTree}
 								<JsonVirtualTree
