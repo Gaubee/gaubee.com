@@ -15,6 +15,7 @@ export interface StreamProgress {
 }
 
 export interface StreamRunResult {
+  source: Blob;
   checkpoints: StreamCheckpoint[];
   events: StreamEvent[];
   loadedBytes: number;
@@ -110,7 +111,7 @@ export async function runStreamFile(
       if (options.collectEvents) events.push(...message.events);
       options.onEvents?.(message.events);
       settled = true;
-      resolveRun?.({ checkpoints, events, loadedBytes, totalBytes: file.size });
+      resolveRun?.({ source: file, checkpoints, events, loadedBytes, totalBytes: file.size });
       worker.terminate();
     } else if (message.type === "error") {
       fail(new Error(message.error.message));

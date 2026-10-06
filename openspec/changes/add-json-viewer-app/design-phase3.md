@@ -116,8 +116,9 @@ skip_to(pre: Ctx, target_offset) -> { next: Ctx }       // 快进：不产事件
       Node 共享内存实例化与 `json_stream_step` 四参数实测通过。
 - [x] 3.2 JS 桥 + worker：Transferable 双缓冲管道（File.stream() 分块写入）、
       检查点索引、纯 JS 降级实现（同协议）
-- [ ] 3.3 行模型惰性化（聚合行 + read_rows 增量提取）+ 行缓冲上限
-      （已补可见窗口按需投影与聚合行；当前 `readRows` 仍是已收集事件的分页，尚未按检查点从文件增量提取）
+- [x] 3.3 行模型惰性化（聚合行 + read_rows 增量提取）+ 行缓冲上限
+      （`readRowsIncremental(sourceOffset, max)` 从最近 2MB 检查点恢复并重放源 Blob；
+      `readValueWindow` 按巨值 offset/end 读取受限窗口，保留同步 `readRows` 行分页兼容）
 - [x] 3.4 UI：进度指示、阈值切换、tanstack virtual 接入
       （token 边界 Custom Highlight 尚未接入）
 - [ ] 3.5 性能基准：已跑通 MoonBit/native 与 JS/JSON.parse 基线；完整 10MB/100MB/1GB/3GB

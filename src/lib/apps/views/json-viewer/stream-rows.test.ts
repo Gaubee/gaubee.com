@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { initialStreamCtx, step } from "./stream-protocol";
+import { initialStreamCtx, snapshotCtx, step } from "./stream-protocol";
 import { StreamRowModel } from "./stream-rows";
 
 function eventsOf(source: string) {
@@ -43,5 +43,32 @@ describe("StreamRowModel", () => {
     model.addCheckpoint({ offset: 10, ctx: initialStreamCtx() });
     model.addCheckpoint({ offset: 20, ctx: initialStreamCtx() });
     expect(model.nearestCheckpoint(19)?.offset).toBe(10);
+  });
+
+  it("replays a source window from the nearest checkpoint", async () => {
+    const source = new Blob(["[0,1,2,3,4]"]);
+    const prefix = "[0,1";
+    const prefixResult = step(initialStreamCtx(), prefix);
+    expect(prefixResult.error).toBeUndefined();
+    const model = new StreamRowModel({ source });
+    model.addCheckpoint(snapshotCtx(prefixResult.next));
+
+    const result = await model.readRowsIncremental(prefix.length, 3);
+    expect(result.rows.map((row) => row.preview)).toEqual(["2", "3", "4"]);
+    expect(result.nextOffset).toBeGreaterThan(prefix.length);
+  });
+
+  it("reads giant scalar bytes on demand with a hard window limit", async () => {
+    const source = new Blob([`{"blob":"${"x".repeat(200)}"}`]);
+    const model = new StreamRowModel({ source });
+    const parsed = step(initialStreamCtx(), await source.text());
+    expect(parsed.error).toBeUndefined();
+    model.append(parsed.events);
+    const value = model.readRows(0, 2).rows[1];
+    expect(value).toBeDefined();
+    const window = await model.readValueWindow(value!, 16);
+    expect(window.text.length).toBe(16);
+    expect(window.truncated).toBe(true);
+    expect(window.end - window.offset).toBe(16);
   });
 });

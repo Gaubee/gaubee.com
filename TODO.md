@@ -1328,8 +1328,15 @@ kzf 指令：开发 osapp jsonviewer，ZCode 做基础版，Codex 补充高级�
 
 - [x] 3.1：MoonBit 双 target RFC 8259 增量状态机、事件流、病态输入测试与经典 wasm shared-memory ptr+len ABI 已落地；Node 共享内存加载实测通过。
 - [x] 3.2：Transferable Worker 桥、检查点、JS 状态机和取消/背压校验已落地。
-- [ ] 3.3：聚合行与可见窗口投影已落地；按检查点从源文件增量提取尚未完成。
+- [x] 3.3：行模型保留 50 万行上限；新增按最近检查点二分恢复的 `readRowsIncremental` 源窗口重放，
+      以及巨值字段 `readValueWindow` 受限懒读取；同步 `readRows` 行分页保持兼容。
 - [x] 3.4：TanStack 窗口树、阈值/进度 UI 已落地；token 边界 Custom Highlight 尚未接入。
 - [ ] 3.5：当前只有 1/10MB JS 与 MoonBit/native 基线；10/100/1024/3072MB 双谱形、长任务与内存矩阵待专用性能机。
 - [x] 3.6：COOP/COEP 影响评估完成，首发保持 Transferable，SAB 不随本轮部署。
 - [ ] 3.7：Agent 已完成 production preview 桌面/390px 走查、build 与聚焦单测；Owner 视觉验收与完整 e2e 仍待完成。
+
+### Phase 3 Codex 变更记录（2026-10-06）
+
+- 3.3 做了什么：流式行模型绑定原始 Blob；按源字节 offset 选择最近 Ctx 检查点，分块重放并只保留请求窗口；巨值通过 offset/end 读取不超过 1 MiB 的窗口。
+- 为什么：碎片型输入不再要求主线程一次缓存所有行，巨值字段也不会因为预览以外的读取而整体复制。
+- 初级用户为何无感：现有树组件和同步 `readRows` 接口不变，懒读取仅为大文件窗口和后续值展开提供能力。

@@ -48,6 +48,7 @@ describe("stream client and worker transport", () => {
       onEvents: (batch) => events.push(...batch.map((event) => event.type)),
     });
     expect(result.loadedBytes).toBe(result.totalBytes);
+    expect(result.source.size).toBe(result.totalBytes);
     expect(events).toContain("start");
     expect(events).toContain("scalar");
     expect(worker.terminated).toBe(true);

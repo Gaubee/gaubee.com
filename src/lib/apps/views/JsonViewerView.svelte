@@ -128,11 +128,12 @@
 			streamAbort?.abort();
 			const controller = new AbortController();
 			streamAbort = controller;
-			const model = new StreamRowModel();
+			const source = new Blob([text], { type: "application/json" });
+			const model = new StreamRowModel({ source });
 			streamModel = model;
 			streamProgress = null;
 			streamError = null;
-			void runStreamFile(new Blob([text], { type: "application/json" }), {
+			void runStreamFile(source, {
 				signal: controller.signal,
 				collectEvents: false,
 				onEvents: (events) => {
@@ -222,7 +223,7 @@
 		streamAbort?.abort();
 		const controller = new AbortController();
 		streamAbort = controller;
-		const model = new StreamRowModel();
+		const model = new StreamRowModel({ source: file });
 		streamModel = model;
 		streamProgress = null;
 		streamError = null;

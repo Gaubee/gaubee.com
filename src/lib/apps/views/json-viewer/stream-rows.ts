@@ -5,6 +5,11 @@
  */
 import {
   STREAM_ROW_BUFFER_LIMIT,
+  STREAM_CHUNK_SIZE,
+  initialStreamCtx,
+  resumeCtx,
+  step,
+  finishStream,
   type StreamEvent,
   type StreamCheckpoint,
   type ScalarKind,
@@ -32,9 +37,17 @@ export interface ReadRowsResult {
   truncated: boolean;
 }
 
+export interface ReadValueWindowResult {
+  offset: number;
+  end: number;
+  text: string;
+  truncated: boolean;
+}
+
 export interface StreamRowModelOptions {
   rowLimit?: number;
   aggregateThreshold?: number;
+  source?: Blob;
 }
 
 const DEFAULT_AGGREGATE_THRESHOLD = 2_000;
@@ -47,6 +60,7 @@ export class StreamRowModel {
   readonly #checkpoints: StreamCheckpoint[] = [];
   readonly #rowLimit: number;
   readonly #aggregateThreshold: number;
+  #source: Blob | undefined;
   #stack: number[] = [];
   #nextId = 0;
   #truncated = false;
@@ -54,6 +68,7 @@ export class StreamRowModel {
   constructor(options: StreamRowModelOptions = {}) {
     this.#rowLimit = options.rowLimit ?? STREAM_ROW_BUFFER_LIMIT;
     this.#aggregateThreshold = options.aggregateThreshold ?? DEFAULT_AGGREGATE_THRESHOLD;
+    this.#source = options.source;
   }
 
   get size(): number {
@@ -66,6 +81,10 @@ export class StreamRowModel {
 
   get checkpoints(): readonly StreamCheckpoint[] {
     return this.#checkpoints;
+  }
+
+  attachSource(source: Blob | undefined): void {
+    this.#source = source;
   }
 
   addCheckpoint(checkpoint: StreamCheckpoint): void {
@@ -88,6 +107,91 @@ export class StreamRowModel {
     const count = Math.max(0, Math.min(Math.floor(max), 10_000));
     const rows = this.#rows.slice(start, start + count).map((row) => ({ ...row }));
     return { rows, nextOffset: start + rows.length, truncated: this.#truncated };
+  }
+
+  /**
+   * Replays a source window from the nearest parser checkpoint. `offset` is a
+   * source byte offset, unlike the legacy `readRows` row index. The replay is
+   * deliberately bounded by `max` completed rows and never stores the source
+   * contents in the row model.
+   */
+  async readRowsIncremental(offset: number, max: number): Promise<ReadRowsResult> {
+    const source = this.#source;
+    if (!source) return this.readRows(offset, max);
+    const target = Math.max(0, Math.min(source.size, Math.floor(offset)));
+    const count = Math.max(0, Math.min(Math.floor(max), 10_000));
+    if (count === 0 || target >= source.size) {
+      return { rows: [], nextOffset: target, truncated: false };
+    }
+
+    const checkpoint = this.nearestCheckpoint(target);
+    const start = checkpoint?.offset ?? 0;
+    let ctx = checkpoint ? resumeCtx(checkpoint) : initialStreamCtx();
+    let cursor = start;
+    const decoder = new TextDecoder("utf-8", { fatal: true });
+    const windowModel = new StreamRowModel({
+      rowLimit: count,
+      aggregateThreshold: this.#aggregateThreshold,
+    });
+    let eventsStarted = false;
+
+    while (cursor < source.size && windowModel.size < count) {
+      const end = Math.min(source.size, cursor + STREAM_CHUNK_SIZE);
+      const bytes = new Uint8Array(await source.slice(cursor, end).arrayBuffer());
+      let text: string;
+      try {
+        text = decoder.decode(bytes, { stream: end < source.size });
+      } catch {
+        return { rows: [], nextOffset: cursor, truncated: false };
+      }
+      const result = step(ctx, text);
+      ctx = result.next;
+      const visible = result.events.filter((event) => {
+        if (!eventsStarted) {
+          if (event.end <= target) return false;
+          eventsStarted = true;
+        }
+        return true;
+      });
+      windowModel.append(visible);
+      cursor = end;
+      if (result.error) break;
+    }
+
+    if (cursor >= source.size && !windowModel.truncated) {
+      const tail = decoder.decode();
+      if (tail) {
+        const result = step(ctx, tail);
+        ctx = result.next;
+        windowModel.append(result.events.filter((event) => event.end >= target || eventsStarted));
+      }
+      if (!windowModel.truncated) {
+        const result = finishStream(ctx);
+        windowModel.append(result.events);
+      }
+    }
+    const rows = windowModel.readRows(0, count).rows;
+    const nextOffset = rows.at(-1)?.end ?? target;
+    return { rows, nextOffset, truncated: false };
+  }
+
+  /** Read a bounded source window for an explicitly opened giant scalar. */
+  async readValueWindow(
+    row: Pick<StreamRow, "start" | "end">,
+    maxBytes = 64 * 1024,
+  ): Promise<ReadValueWindowResult> {
+    const source = this.#source;
+    if (!source) return { offset: row.start, end: row.start, text: "", truncated: false };
+    const limit = Math.max(0, Math.min(Math.floor(maxBytes), 1024 * 1024));
+    const end = Math.min(row.end, row.start + limit);
+    const bytes = new Uint8Array(await source.slice(row.start, end).arrayBuffer());
+    let text = "";
+    try {
+      text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    } catch {
+      text = new TextDecoder().decode(bytes);
+    }
+    return { offset: row.start, end, text, truncated: end < row.end };
   }
 
   visibleRows(openIds: ReadonlySet<number>, start = 0, count = 1_000): ReadRowsResult {
