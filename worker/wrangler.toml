@@ -7,6 +7,7 @@ compatibility_flags = ["nodejs_compat"]
 # 环境变量（非敏感，可提交）：
 # - APP_ORIGIN：静态站点的 origin，CORS 与重定向白名单用。部署时设置。
 # - ENVIRONMENT：dev 时允许 localhost CORS；生产设为 "production" 严格白名单。
+# - OWNER_LOGIN：/api/geo/rules 写接口的 owner GitHub login（worker/src/geo.ts 校验用）。
 # 敏感变量（GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET）用 wrangler secret put 设置，不入库。
 [vars]
 # 本地开发：前端经 portless 暴露为 https://gaubee.com.localhost，Worker 经 vite proxy 同源转发。
@@ -16,15 +17,30 @@ compatibility_flags = ["nodejs_compat"]
 APP_ORIGIN = "https://gaubee.com.localhost"
 WORKER_ORIGIN = "https://gaubee.com.localhost"
 ENVIRONMENT = "dev"
+OWNER_LOGIN = "gaubee"
+
+# geo 规则 KV（cdn-media Phase 2，worker/src/geo.ts 读写；本地 dev 用 wrangler 模拟的本地 KV，
+# `wrangler dev` 与 `wrangler kv key put --local` 共享 .wrangler/state 存储，无需真实 id）。
+# ★ 生产部署前必须先 `wrangler kv namespace create GEO_RULES --env production`，
+#   把真实 id 填进下方两处（否则 CI 的 wrangler deploy 会失败）。部署步骤见 deploy/cdn-base-rollout.md。
+[[kv_namespaces]]
+binding = "GEO_RULES"
+id = "PLACEHOLDER_CREATE_BEFORE_DEPLOY"
 
 # 生产环境配置（CI 用 wrangler deploy --env production 触发）：
 # APP_ORIGIN 必须与静态站（GitHub Pages）实际域名一致，用于 CORS 与 OAuth 回调重定向。
 # WORKER_ORIGIN 是生产 Worker 的对外域名（用于构造 OAuth redirect_uri）。
-# 部署前请确认下面三个值与你的实际域名匹配（WORKER_ORIGIN 用你选定的 Worker 域名，含 https 无尾斜杠）。
+# 部署前请确认下面几个值与你的实际域名匹配（WORKER_ORIGIN 用你选定的 Worker 域名，含 https 无尾斜杠）。
 [env.production.vars]
 APP_ORIGIN = "https://gaubee.com"
 WORKER_ORIGIN = "https://auth.gaubee.com"
 ENVIRONMENT = "production"
+OWNER_LOGIN = "gaubee"
+
+# 生产 geo 规则 KV：id 必须替换为 `wrangler kv namespace create GEO_RULES --env production` 的真实 id。
+[[env.production.kv_namespaces]]
+binding = "GEO_RULES"
+id = "PLACEHOLDER_CREATE_BEFORE_DEPLOY"
 
 # ===== 三方一致性检查清单（改动任一处，必须同步其余两处）=====
 # Worker 用 WORKER_ORIGIN 构造 GitHub OAuth 的 redirect_uri，故下面三处的「Worker 域名」必须相同：

@@ -14,6 +14,7 @@
   import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
   import { xvideo } from '$lib/player/x-video'
   import { xhighlight } from '$lib/player/x-highlight'
+  import { mediasrc } from '$lib/player/media-src'
   import { resetScrollFrom } from '$lib/utils/scroll'
   import TocTree from './TocTree.svelte'
   import { Badge } from '$lib/components/ui/badge'
@@ -177,11 +178,13 @@
         </header>
 
         <!-- 正文：bind this 给 TocTree 用作 ScrollSpy 的 container；
-             xvideo/xhighlight 增强（自动播放/单实例/手势、代码高亮）与列表同源 -->
+             xvideo/xhighlight 增强（自动播放/单实例/手势、代码高亮）与列表同源；
+             mediasrc 做媒体引用的地区路由重写（cdn-media Phase 2，geo 失败不重写） -->
         <article
           bind:this={articleContentEl}
           use:xvideo
           use:xhighlight
+          use:mediasrc
           data-syntax-theme="gaubee"
           class="article-content prose dark:prose-invert prose-zinc max-w-none"
         >

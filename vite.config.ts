@@ -7,6 +7,13 @@ import { defineConfig } from "vitest/config";
 
 // 注：isomorphic-git 的 Buffer polyfill 在 +layout.svelte 运行时注入（globalThis.Buffer）。
 
+// 本地 Worker（wrangler dev）地址：/auth、/api 同源转发（dev 与 preview 同一目标）。
+const proxyLocalWorker = {
+  target: "http://localhost:8787",
+  changeOrigin: true, // 必需：portless 反代下避免 508 循环检测
+  secure: false,
+};
+
 export default defineConfig({
   plugins: [
     tailwindcss(),
@@ -31,16 +38,20 @@ export default defineConfig({
     }),
   ],
   // 本地开发：vite 经 portless 暴露为 https://gaubee.com.localhost，
-  // Worker（wrangler dev，localhost:8787）的 /auth/* 经 vite proxy 同源转发。
+  // Worker（wrangler dev，localhost:8787）的 /auth/*、/api/* 经 vite proxy 同源转发。
   // 前端 OAuth 跳转走相对路径 /auth/github，vite proxy 转发到 Worker。
-  // 新架构前端直连 api.github.com（不走 proxy），Worker 仅处理 OAuth + 图片上传。
+  // 新架构前端直连 api.github.com（不走 proxy），Worker 仅处理 OAuth + 图片上传 + /api/geo。
+  // /api/geo：cdn-media 地区路由（Phase 2）——worker 不起时 proxy 502，action 静默不重写（A8）。
   server: {
     proxy: {
-      "/auth": {
-        target: "http://localhost:8787",
-        changeOrigin: true, // 必需：portless 反代下避免 508 循环检测
-        secure: false,
-      },
+      "/auth": proxyLocalWorker,
+      "/api": proxyLocalWorker,
+    },
+  },
+  // vite preview 同拓扑：E2E/本地验收用 build 产物 + wrangler dev 复现生产反代路由。
+  preview: {
+    proxy: {
+      "/api": proxyLocalWorker,
     },
   },
   test: {

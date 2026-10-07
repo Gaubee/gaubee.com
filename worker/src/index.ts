@@ -1,11 +1,12 @@
 /**
- * Gaubee Auth Worker —— GitHub OAuth + 图片上传。
+ * Gaubee Auth Worker —— GitHub OAuth + 图片上传 + geo 地区路由。
  *
  * v2 架构（2026-07-27）：前端直连 api.github.com（token 在前端内存），
  * Worker 不再做 API 代理。职责缩减为：
  * 1. GET /auth/github          —— 重定向到 GitHub authorize URL（带 state 防 CSRF）
  * 2. GET /auth/github/callback —— code 换 token，通过 URL fragment 返回前端
  * 3. POST /upload/image        —— 图片上传（Issues 评论插图，用 token 调 Contents API）
+ * 4. /api/geo、/api/geo/rules  —— cdn-media 地区路由（Phase 2，见 worker/src/geo.ts）
  *
  * 安全要点：
  * - token 通过 URL hash fragment（#auth_token=...）返回前端，不发服务器/日志。
@@ -17,19 +18,10 @@ import { Hono } from "hono";
 import { setCookie, getCookie, deleteCookie } from "hono/cookie";
 import { cors } from "hono/cors";
 
-export interface Env {
-  GITHUB_CLIENT_ID: string;
-  GITHUB_CLIENT_SECRET: string;
-  APP_ORIGIN: string;
-  /**
-   * Worker 自身的对外 origin，用于构造 OAuth redirect_uri。
-   * 反代（portless / Cloudflare）下 c.req.url 的 Host 不可靠，必须显式指定。
-   * 未配置时回退到 c.req.url.origin（仅适合无反代的直连场景）。
-   */
-  WORKER_ORIGIN?: string;
-  /** 部署环境：dev 时允许 localhost CORS，prod 严格白名单。 */
-  ENVIRONMENT?: string;
-}
+import { geoRoutes } from "./geo";
+import type { Env } from "./env";
+
+export type { Env, GeoKV } from "./env";
 
 const GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize";
 const GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token";
@@ -66,6 +58,9 @@ app.use(
 );
 
 app.get("/", (c) => c.json({ name: "gaubee-auth", ok: true }));
+
+// ---- cdn-media 地区路由（Phase 2）：/api/geo 公读 + /api/geo/rules owner 读写 ----
+app.route("/api/geo", geoRoutes);
 
 // ---- 图片上传（GithubApp Issues 评论插图 + GithubEditor 资产上传）----
 // 前端发送 multipart（owner + repo + file，可选 path/branch），Worker 用 token 调

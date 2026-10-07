@@ -38,7 +38,23 @@ jobs:
         # worker 目录无 lock 文件，用 install 而非 ci
         run: npm install
 
+      # 部署门：geo 路由单测（cdn-media Phase 2 起，红则不发布）
+      - name: Run worker tests
+        working-directory: worker
+        run: npm test
+
+      # 守卫：KV id 占位符未替换（cdn-media Phase 2 用户待办）时跳过部署——
+      # 占位符下部署会让 geo 规则存储指向不存在的 namespace。替换真实 id 后此步自动恢复部署。
+      - name: Guard - skip deploy while KV placeholder present
+        working-directory: worker
+        run: |
+          if grep -q "PLACEHOLDER_CREATE_BEFORE_DEPLOY" wrangler.toml; then
+            echo "::warning::wrangler.toml 仍含 GEO_RULES KV 占位符（创建 namespace 后填入真实 id），本次跳过部署"
+            echo "SKIP_DEPLOY=1" >> "$GITHUB_ENV"
+          fi
+
       - name: Deploy to Cloudflare Workers
+        if: env.SKIP_DEPLOY != '1'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

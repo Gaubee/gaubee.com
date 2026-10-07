@@ -8,6 +8,7 @@ import { notificationsApp } from "./builtin/notifications";
 import { searchApp } from "./builtin/search";
 import { settingsApp } from "./builtin/settings";
 import { eventApp } from "./builtin/event";
+import { geoRulesApp } from "./builtin/geo-rules";
 import { skillGraphApp } from "./builtin/skill-graph";
 import { themeApp } from "./builtin/theme";
 import { filesApp } from "./installable/files";
@@ -42,6 +43,7 @@ export function registerAllApps(): void {
   appManager.register(appStoreApp);
   appManager.register(themeApp);
   appManager.register(skillGraphApp);
+  appManager.register(geoRulesApp);
 
   // 可安装应用（默认不安装，用户手动安装）
   appManager.register(githubApp);
@@ -65,6 +67,7 @@ export {
   appStoreApp,
   themeApp,
   skillGraphApp,
+  geoRulesApp,
 };
 export { githubApp, githubEditorApp, terminalApp, filesApp };
 
@@ -81,6 +84,7 @@ export function getAllRegisteredApps(): AppEntry[] {
     appStoreApp,
     themeApp,
     skillGraphApp,
+    geoRulesApp,
     githubApp,
     githubEditorApp,
     terminalApp,
