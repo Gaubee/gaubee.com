@@ -85,7 +85,13 @@ impl DiskCache {
                     last_disk_touch: last,
                 },
             );
-            inner.total += size;
+            // r6 P1-8：恢复期记账 checked——异常目录内容导致溢出时启动即败，绝不回绕
+            inner.total = inner.total.checked_add(*size).ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("缓存恢复总字节溢出（key {key} size {size}）——缓存目录内容异常"),
+                )
+            })?;
             let _ = mtime;
         }
 
@@ -138,7 +144,13 @@ impl DiskCache {
                 Some(path)
             }
             _ => {
-                inner.total -= entry.size;
+                // r6 P1-8：账目收缩用 checked_sub（entry.size 按不变式必计入 total，
+                // None 只可能是外部破坏不变式——归零并告警，绝不回绕放大预算）
+                let size = entry.size;
+                inner.total = inner.total.checked_sub(size).unwrap_or_else(|| {
+                    eprintln!("[cdn-media] 缓存账目下溢（total < entry.size）：账目已归零");
+                    0
+                });
                 inner.entries.remove(key);
                 None
             }
@@ -172,10 +184,12 @@ impl DiskCache {
         if incoming > self.high {
             return None;
         }
+        // r6 P1-8：inflight 记账 checked——溢出（外部极端输入）拒绝入缓存，不回绕
+        let projected_inflight = inner.inflight.checked_add(incoming)?;
         if !self.make_room_locked(&mut inner, incoming, key) {
             return None;
         }
-        inner.inflight += incoming;
+        inner.inflight = projected_inflight;
         Some(Reservation {
             cache: self.clone(),
             key: key.to_owned(),
@@ -190,7 +204,20 @@ impl DiskCache {
     /// 返回 false = 无法腾出足够空间。
     fn make_room_locked(&self, inner: &mut CacheInner, incoming: u64, key: &str) -> bool {
         let mut attempted: HashSet<String> = HashSet::new();
-        while inner.total + inner.inflight + incoming > self.high {
+        loop {
+            // r6 P1-8：投影预算 checked——total/inflight/incoming 任一步溢出 = 账目
+            // 已被极端输入破坏，拒绝新 admission（fail-safe），绝不回绕绕过 high
+            let Some(projected) = inner
+                .total
+                .checked_add(inner.inflight)
+                .and_then(|v| v.checked_add(incoming))
+            else {
+                eprintln!("[cdn-media] admission 投影预算溢出（拒绝入缓存）");
+                return false;
+            };
+            if projected <= self.high {
+                return true;
+            }
             match self.remove_victim_locked(inner, key, &mut attempted) {
                 // 无候选（全 pinned / 全部删除失败）
                 None => return false,
@@ -199,7 +226,6 @@ impl DiskCache {
                 Some(true) => {}
             }
         }
-        true
     }
 
     /// 选最老候选并尝试删除（r5 P1-11 次序硬约束：先删文件、成功才摘账）。
@@ -224,7 +250,8 @@ impl DiskCache {
         match std::fs::remove_file(&path) {
             Ok(()) => {
                 let e = inner.entries.remove(&v).expect("victim entry 在场");
-                inner.total -= e.size;
+                // r6 P1-8：账目收缩不回绕（不变式：e.size 必计入 total，饱和仅防御）
+                inner.total = inner.total.saturating_sub(e.size);
                 Some(true)
             }
             Err(err) => {
@@ -280,6 +307,28 @@ impl DiskCache {
         }
     }
 
+    /// r6 P0-1：流生命周期 flight 锁——返回 **owned**（'static）守卫，供
+    /// stream-through 的响应体状态机持有到 finish/abort/Drop 才释放。
+    /// 普通 GET tee 在函数返回时响应体仍在下载，借用型守卫会随 `serve` 返回提前
+    /// Drop，同 key 并发 miss 就会重复回源——必须用本方法取得可移交的守卫。
+    /// 摘表语义与 [`KeyLockGuard`] 完全一致。
+    pub async fn lock_key_owned(self: &Arc<Self>, key: &str) -> FlightGuard {
+        let handle = self
+            .inflight_locks
+            .lock()
+            .unwrap()
+            .entry(key.to_owned())
+            .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+            .clone();
+        let guard = Some(handle.clone().lock_owned().await);
+        FlightGuard {
+            cache: self.clone(),
+            key: key.to_owned(),
+            handle,
+            guard,
+        }
+    }
+
     // ---- poisoned 标记（r5 P1-12：任何访问顺带 TTL 清扫，防高基数无界） ----
 
     pub fn is_poisoned(&self, key: &str) -> bool {
@@ -306,20 +355,27 @@ impl DiskCache {
             let mut p = self.poisoned.lock().unwrap();
             sweep_poisoned(&mut p);
         }
+        // r6 P1-8：pinned 求和 checked——极端账目下饱和到 u64::MAX（观测面），不 panic
+        let pinned_bytes = inner
+            .entries
+            .values()
+            .filter(|e| e.pinned)
+            .try_fold(0u64, |acc, e| acc.checked_add(e.size))
+            .unwrap_or(u64::MAX);
         CacheStats {
             objects: inner.entries.len(),
             bytes: inner.total,
             high: self.high,
             low: self.low,
             pinned_objects: inner.entries.values().filter(|e| e.pinned).count(),
-            pinned_bytes: inner.entries.values().filter(|e| e.pinned).map(|e| e.size).sum(),
+            pinned_bytes,
             undiscardable: inner.entries.values().filter(|e| e.undiscardable).count(),
             inflight_reserved: inner.inflight,
         }
     }
 
     #[cfg(test)]
-    fn inflight_locks_len(&self) -> usize {
+    pub(crate) fn inflight_locks_len(&self) -> usize {
         self.inflight_locks.lock().unwrap().len()
     }
 
@@ -364,9 +420,19 @@ impl Reservation {
                 last_disk_touch: now,
             },
         ) {
-            inner.total -= old.size;
+            inner.total = inner.total.saturating_sub(old.size);
         }
-        inner.total += size;
+        // r6 P1-8：total checked——溢出饱和到 u64::MAX（此后 admission 一律拒绝，
+        // fail-safe），绝不回绕绕过水位
+        inner.total = match inner.total.checked_add(size) {
+            Some(t) => t,
+            None => {
+                eprintln!(
+                    "[cdn-media] 缓存账目 total 溢出（饱和至 u64::MAX，后续 admission 将拒绝）"
+                );
+                u64::MAX
+            }
+        };
     }
 }
 
@@ -375,6 +441,30 @@ impl Drop for Reservation {
         if !self.done {
             let mut inner = self.cache.inner.lock().unwrap();
             inner.inflight = inner.inflight.saturating_sub(self.bytes);
+        }
+    }
+}
+
+/// r6 P0-1：流生命周期 flight 守卫（owned——'static，可移交流状态机持有）。
+/// Drop 语义与 [`KeyLockGuard`] 一致：先释放锁，再在无其他持有者时摘表。
+/// tee 路径中它随 TeeState 存活到 finish/abort/客户端断连（响应体被 Drop），
+/// 保证同 key 并发 miss 在整个流期间被挡在锁后。
+pub struct FlightGuard {
+    cache: Arc<DiskCache>,
+    key: String,
+    handle: Arc<tokio::sync::Mutex<()>>,
+    guard: Option<tokio::sync::OwnedMutexGuard<()>>,
+}
+
+impl Drop for FlightGuard {
+    fn drop(&mut self) {
+        // 先释放锁（唤醒等待者）
+        drop(self.guard.take());
+        let mut m = self.cache.inflight_locks.lock().unwrap();
+        if Arc::strong_count(&self.handle) == 2
+            && m.get(&self.key).is_some_and(|h| Arc::ptr_eq(h, &self.handle))
+        {
+            m.remove(&self.key);
         }
     }
 }

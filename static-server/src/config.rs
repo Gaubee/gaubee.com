@@ -296,10 +296,13 @@ impl Config {
                 self.cache.dir
             ));
         }
-        if self.cache.max_buffer_bytes == 0 {
-            return Err(
-                "cache.max_buffer_bytes 不能为 0（修复：如 134217728 即 128MB）".to_owned()
-            );
+        // r6 P1-1：严格模式缓冲上限冻结为 1..=134217728（128MiB）——超过上界一律
+        // 启动即败，杜绝部署者把严格模式意外配成无界级别的资源消耗
+        if self.cache.max_buffer_bytes == 0 || self.cache.max_buffer_bytes > 134_217_728 {
+            return Err(format!(
+                "cache.max_buffer_bytes 必须在 1..=134217728（128MiB）内（当前：{}；修复：如 134217728 即 128MB）",
+                self.cache.max_buffer_bytes
+            ));
         }
         for k in &self.pinned.keys {
             if let Err(e) = validate_key(k) {
@@ -459,6 +462,51 @@ mod tests {
             let cfg: Config = toml::from_str(&raw).expect("解析应成功（校验层拒绝）");
             assert!(cfg.validate().is_err(), "{what} 必须被校验拒绝");
         }
+    }
+
+    /// r6 P1-1：strict buffer 上界冻结 128MiB——超上界拒绝、边界值放行
+    #[test]
+    fn max_buffer_bytes_frozen_upper_bound() {
+        // 恰好超 1 字节 → 拒绝
+        let raw = EXAMPLE.replacen(
+            "max_buffer_bytes = 134217728   # 128MB",
+            "max_buffer_bytes = 134217729",
+            1,
+        );
+        let cfg: Config = toml::from_str(&raw).expect("解析应成功（校验层拒绝）");
+        let err = cfg.validate().expect_err("超 128MiB 必须被拒");
+        assert!(err.contains("134217728"), "错误信息必须给出上界：{err}");
+        // 极端值（i64::MAX，TOML 整数上界）→ 校验层拒绝
+        let raw = EXAMPLE.replacen(
+            "max_buffer_bytes = 134217728   # 128MB",
+            "max_buffer_bytes = 9223372036854775807",
+            1,
+        );
+        let cfg: Config = toml::from_str(&raw).unwrap();
+        assert!(cfg.validate().is_err(), "超 128MiB 的极端值必须被拒");
+        // u64::MAX 在 TOML 整数（i64）域外 → 解析层即拒绝（同样启动即败）
+        let raw = EXAMPLE.replacen(
+            "max_buffer_bytes = 134217728   # 128MB",
+            "max_buffer_bytes = 18446744073709551615",
+            1,
+        );
+        assert!(toml::from_str::<Config>(&raw).is_err(), "u64::MAX 必须被解析层拒绝");
+        // 恰好上界 → 放行
+        let raw = EXAMPLE.replacen(
+            "max_buffer_bytes = 134217728   # 128MB",
+            "max_buffer_bytes = 134217728",
+            1,
+        );
+        let cfg: Config = toml::from_str(&raw).unwrap();
+        cfg.validate().expect("恰好 128MiB 必须放行");
+        // 恰好下界 1 → 放行
+        let raw = EXAMPLE.replacen(
+            "max_buffer_bytes = 134217728   # 128MB",
+            "max_buffer_bytes = 1",
+            1,
+        );
+        let cfg: Config = toml::from_str(&raw).unwrap();
+        cfg.validate().expect("1 字节必须放行");
     }
 
     #[test]

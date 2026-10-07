@@ -44,6 +44,9 @@ pub struct MediaCtx {
     pub cache: Arc<DiskCache>,
     /// 对象回源客户端：无总超时（大对象长流），connect 15s + 读空闲 30s
     pub http: reqwest::Client,
+    /// warm 全局并发闸（r6 P1-3）：跨请求共享——所有 admin warm 请求共用同一个
+    /// semaphore，杜绝「每个 warm 请求自建独立 semaphore 绕过全局并发边界」
+    pub warm_gate: Arc<tokio::sync::Semaphore>,
 }
 
 impl MediaCtx {
@@ -204,36 +207,48 @@ pub async fn serve(State(ctx): State<Arc<MediaCtx>>, req: Request<Body>) -> Resp
     }
 
     if cacheable && !strict_unbufferable {
-        // single-flight（r5 P0-4）：并发同 key miss 只有一个回源者，其余等锁后重查缓存；
-        // lock_key 返回持有型守卫（await 后独占持锁，释放即摘表）
-        let _guard = ctx.cache.lock_key(&canonical).await;
+        // single-flight（r5 P0-4 / r6 P0-1）：并发同 key miss 只有一个回源者。
+        // r6 P0-1：必须取 **owned** flight 守卫——stream-through 场景下响应体在
+        // `serve` 返回后仍在下载，借用型守卫会随函数返回提前 Drop，第二个同 key
+        // 请求就会重新拿到锁、再次回源并竞争同一个 final path。owned 守卫在 tee
+        // 路径移交流状态机（finish/abort/响应体 Drop 才释放），其余路径返回前显
+        // 式释放
+        let flight = ctx.cache.lock_key_owned(&canonical).await;
         if let Some(path) = ctx.cache.lookup(&canonical) {
+            drop(flight);
             return serve_local(&path, obj.size, &obj.content_type, &range).await;
         }
         if !ctx.cache.is_poisoned(&canonical) {
             // admission 原子预留（r5 P0-4）：预留失败 = 超水位/腾位失败 → 透传
             if let Some(res) = ctx.cache.admit(&canonical, obj.size) {
                 // 有 Range 或严格模式：整对象取回校验入缓存后本地伺服 200/206/416
+                //（整取在本次 await 内完成，守卫随作用域覆盖全程）
                 if range != RangeSpec::None || strict {
-                    match fetch_object_to_cache(&ctx, &index, &canonical, &obj, pinned, res).await {
+                    let fetched =
+                        fetch_object_to_cache(&ctx, &index, &canonical, &obj, pinned, res).await;
+                    drop(flight);
+                    return match fetched {
                         Ok(path) => {
-                            return serve_local(&path, obj.size, &obj.content_type, &range).await
+                            serve_local(&path, obj.size, &obj.content_type, &range).await
                         }
                         Err(e) => {
                             eprintln!("[cdn-media] 取回失败 {canonical}：{e}");
-                            return err_json(
+                            err_json(
                                 StatusCode::BAD_GATEWAY,
                                 "upstream_error",
                                 Some(&canonical),
-                            );
+                            )
                         }
-                    }
+                    };
                 }
                 // 无 Range 非严格：stream-through tee——响应头 no-store（校验通过前
-                // 不承诺 immutable，r5 P1-7），流毕校验通过才入缓存
-                return stream_through_tee(&ctx, &index, &canonical, &obj, pinned, res).await;
+                // 不承诺 immutable，r5 P1-7），流毕校验通过才入缓存。
+                // r6 P0-1：flight 守卫随 TeeState 持有到流结束
+                return stream_through_tee(&ctx, &index, &canonical, &obj, pinned, res, flight)
+                    .await;
             }
         }
+        drop(flight);
         // 超水位拒绝入缓存 / poisoned → 落入透传
     }
 
@@ -358,7 +373,9 @@ async fn serve_local(path: &std::path::Path, size: u64, ct: &str, range: &RangeS
 /// stream-through（≤阈值 miss、无 Range、非严格模式）：tee 临时文件流式回客户端，
 /// 流毕校验 sha256 → 原子 rename 入缓存；失败标 poisoned、临时文件丢弃。
 /// 响应头 no-store（r5 P1-7）：字节尚未校验，不承诺 immutable——校验通过前客户端
-/// 不得缓存，失败重试即得正确副本
+/// 不得缓存，失败重试即得正确副本。
+/// r6 P0-1：`flight` 守卫由调用方移交本函数，封装进 TeeState——锁活到流
+/// finish/abort/响应体被 Drop 为止，同 key 后续请求在整个流期间拿不到锁
 async fn stream_through_tee(
     ctx: &Arc<MediaCtx>,
     index: &Arc<ManifestIndex>,
@@ -366,8 +383,14 @@ async fn stream_through_tee(
     obj: &MediaObject,
     pinned: bool,
     res: crate::cache::Reservation,
+    flight: crate::cache::FlightGuard,
 ) -> Response {
     let Some(url) = index.object_url(&ctx.cfg.github.repo, obj) else {
+        drop(res);
+        return err_json(StatusCode::BAD_GATEWAY, "volume_unresolved", Some(key));
+    };
+    // r6 P1-5：卷尺寸是 206 Content-Range total 的对账依据（manifest 冻结 wire 字段）
+    let Some(volume_size) = index.volume_size(&obj.volume) else {
         drop(res);
         return err_json(StatusCode::BAD_GATEWAY, "volume_unresolved", Some(key));
     };
@@ -381,18 +404,19 @@ async fn stream_through_tee(
             return err_json(StatusCode::BAD_GATEWAY, "cache_io_error", Some(key));
         }
     };
-    let resp = match object_fetch(&ctx.http, &ctx.cfg.github.token, &url, obj, None).await {
-        Ok(r) => r,
-        Err(e) => {
-            drop(res);
-            let _ = std::fs::remove_file(&tmp);
-            if matches!(e, FetchError::Integrity(_)) {
-                ctx.cache.mark_poisoned(key);
+    let resp =
+        match object_fetch(&ctx.http, &ctx.cfg.github.token, &url, obj, None, volume_size).await {
+            Ok(r) => r,
+            Err(e) => {
+                drop(res);
+                let _ = std::fs::remove_file(&tmp);
+                if matches!(e, FetchError::Integrity(_)) {
+                    ctx.cache.mark_poisoned(key);
+                }
+                eprintln!("[cdn-media] 回源失败 {key}：{e}");
+                return err_json(StatusCode::BAD_GATEWAY, "upstream_error", Some(key));
             }
-            eprintln!("[cdn-media] 回源失败 {key}：{e}");
-            return err_json(StatusCode::BAD_GATEWAY, "upstream_error", Some(key));
-        }
-    };
+        };
 
     let state = TeeState {
         upstream: Box::pin(resp.bytes_stream()),
@@ -409,6 +433,9 @@ async fn stream_through_tee(
         // r5 P0-4：预留随状态机走——finish 转正、abort/Drop 归还
         res: Some(res),
         done: false,
+        // r6 P0-1：owned flight 守卫（声明在 res 之后——Drop 按字段序先归还预留
+        // 再释放锁，等待者看到的一定是收口后的账目）
+        flight,
     };
     let body = Body::from_stream(futures_util::stream::unfold(state, |mut st| async move {
         match st.upstream.next().await {
@@ -474,7 +501,8 @@ async fn stream_through_tee(
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 /// tee 流状态机：Drop 兜底清理临时文件（客户端断连导致流被丢弃时）；
-/// admission 预留随状态机走——finish 转正、abort/Drop 归还（r5 P0-4）
+/// admission 预留随状态机走——finish 转正、abort/Drop 归还（r5 P0-4）；
+/// r6 P0-1：flight 守卫随状态机存活到流结束（Drop 按字段序：先还预留、再放锁）
 struct TeeState {
     upstream: std::pin::Pin<Box<dyn futures_util::Stream<Item = Result<bytes::Bytes, reqwest::Error>> + Send>>,
     file: Option<tokio::fs::File>,
@@ -489,6 +517,10 @@ struct TeeState {
     pinned: bool,
     res: Option<crate::cache::Reservation>,
     done: bool,
+    /// r6 P0-1：owned flight 守卫——只在 Drop 时起作用（活到流结束），
+    /// 终验/记账路径不读它
+    #[allow(dead_code)]
+    flight: crate::cache::FlightGuard,
 }
 
 impl TeeState {
@@ -654,12 +686,22 @@ pub async fn fetch_object_to_cache(
     let url = index
         .object_url(&ctx.cfg.github.repo, obj)
         .ok_or_else(|| format!("卷未解析：{}", obj.volume))?;
+    // r6 P1-4：206 total 对账需要卷尺寸（manifest 冻结字段）
+    let volume_size = index
+        .volume_size(&obj.volume)
+        .ok_or_else(|| format!("卷尺寸未声明：{}", obj.volume))?;
     let tmp = ctx.cache.new_tmp_path(key);
     let fetch = async {
-        let resp =
-            object_fetch(&ctx.http, &ctx.cfg.github.token, &url, obj, None)
-                .await
-                .map_err(|e| e.to_string())?;
+        let resp = object_fetch(
+            &ctx.http,
+            &ctx.cfg.github.token,
+            &url,
+            obj,
+            None,
+            volume_size,
+        )
+        .await
+        .map_err(|e| e.to_string())?;
         let mut file = tokio::fs::File::create(&tmp)
             .await
             .map_err(|e| format!("临时文件创建失败：{e}"))?;
@@ -733,13 +775,16 @@ pub async fn warm_one(
     }
 }
 
-/// r5 P1-8：精确校验上游 206 的 Content-Range 区间与 Content-Length 与请求一致；
-/// 不一致 = Integrity 错误（poisoned + 失败）
+/// r5 P1-8 / r6 P1-4：精确校验上游 206 的 Content-Range 与 Content-Length 与请求一致。
+/// Content-Range 必须完整解析为 `bytes <start>-<end>/<total>`：
+/// start/end 与请求区间逐值相等，total 为合法数值且与卷尺寸（manifest 冻结字段）
+/// 一致——上游谎报总长度（如分卷漂移后的错误定位）必须被识别为 Integrity。
 fn validate_upstream_206(
     resp: reqwest::Response,
     start: u64,
     end: u64,
     expect_len: u64,
+    volume_size: u64,
 ) -> Result<reqwest::Response, FetchError> {
     let integrity = |m: String| FetchError::Integrity(m);
     let cr = resp
@@ -747,11 +792,36 @@ fn validate_upstream_206(
         .get(reqwest::header::CONTENT_RANGE)
         .and_then(|v| v.to_str().ok())
         .ok_or_else(|| integrity("206 响应缺 Content-Range".to_owned()))?;
-    let expect_prefix = format!("bytes {start}-{end}/");
-    if !cr.starts_with(&expect_prefix) {
+    let reject_cr = |got: &str| {
+        integrity(format!(
+            "Content-Range 与请求不一致：got={got:?} want=bytes {start}-{end}/{volume_size}"
+        ))
+    };
+    // 完整语法：bytes <start>-<end>/<total>（`*` 通配/缺 denominator/多余段一律拒绝）
+    let rest = cr.strip_prefix("bytes ").ok_or_else(|| reject_cr(cr))?;
+    let (range_part, total_part) = rest.split_once('/').ok_or_else(|| {
+        integrity(format!("Content-Range 缺 total（denominator）：got={cr:?}"))
+    })?;
+    let total: u64 = total_part.trim().parse().map_err(|_| {
+        integrity(format!(
+            "Content-Range total 非法：got={total_part:?}（want {volume_size}）"
+        ))
+    })?;
+    if total != volume_size {
         return Err(integrity(format!(
-            "Content-Range 与请求不一致：got={cr:?} want={expect_prefix:?}*"
+            "Content-Range total 与卷尺寸不符：got={total} want={volume_size}"
         )));
+    }
+    let (got_start, got_end) = range_part
+        .split_once('-')
+        .ok_or_else(|| reject_cr(cr))?;
+    let got_start: u64 = got_start
+        .trim()
+        .parse()
+        .map_err(|_| reject_cr(cr))?;
+    let got_end: u64 = got_end.trim().parse().map_err(|_| reject_cr(cr))?;
+    if got_start != start || got_end != end {
+        return Err(reject_cr(cr));
     }
     let cl = resp
         .headers()
@@ -768,17 +838,25 @@ fn validate_upstream_206(
 }
 
 /// 对象字节范围回源：总是携带对象坐标 Range（上游若回 200 = 整卷 → 拒绝，防误拉百 MB 卷）。
-/// 206 响应必须通过 Content-Range/Content-Length 精确校验（r5 P1-8）；offset 计算全部
-/// checked_add，畸形 manifest 数据不得回绕成错误区间
+/// 206 响应必须通过 Content-Range/Content-Length 精确校验（r5 P1-8 / r6 P1-4：含
+/// `/total` 与卷尺寸对账）；offset 与区间长度计算全部 checked（r6 P1-8），畸形
+/// manifest 数据不得回绕成错误区间。零字节对象在回源前明确拒绝（r6 P1-8：杜绝
+/// `saturating_sub(1)` 回绕出的错误一字节请求）
 async fn object_fetch(
     http: &reqwest::Client,
     token: &str,
     url: &str,
     obj: &MediaObject,
     sub_range: Option<(u64, u64)>,
+    volume_size: u64,
 ) -> Result<reqwest::Response, FetchError> {
-    let (a, b) = sub_range.unwrap_or((0, obj.size.saturating_sub(1)));
     let integrity = |m: String| FetchError::Integrity(m);
+    if obj.size == 0 {
+        return Err(integrity(
+            "零字节对象拒绝回源（manifest wire 校验应已拦截）".to_owned(),
+        ));
+    }
+    let (a, b) = sub_range.unwrap_or((0, obj.size - 1));
     let start = obj
         .offset
         .checked_add(a)
@@ -787,7 +865,10 @@ async fn object_fetch(
         .offset
         .checked_add(b)
         .ok_or_else(|| integrity(format!("offset 溢出：offset={} + b={b}", obj.offset)))?;
-    let expect_len = b - a + 1;
+    let expect_len = b
+        .checked_sub(a)
+        .and_then(|d| d.checked_add(1))
+        .ok_or_else(|| integrity(format!("请求区间长度溢出：a={a} b={b}")))?;
     let range_value = format!("bytes={start}-{end}");
     let mut last_err = String::new();
     for attempt in 0..=OBJECT_RETRY_DELAYS_SECS.len() {
@@ -807,7 +888,7 @@ async fn object_fetch(
             Ok(resp) => {
                 let status = resp.status();
                 if status == reqwest::StatusCode::PARTIAL_CONTENT {
-                    return validate_upstream_206(resp, start, end, expect_len);
+                    return validate_upstream_206(resp, start, end, expect_len, volume_size);
                 }
                 if status == reqwest::StatusCode::NOT_FOUND || status == reqwest::StatusCode::GONE {
                     return Err(FetchError::Transient(format!(
@@ -840,12 +921,17 @@ async fn pass_through(
     let Some(url) = index.object_url(&ctx.cfg.github.repo, obj) else {
         return err_json(StatusCode::BAD_GATEWAY, "volume_unresolved", Some(key));
     };
+    let Some(volume_size) = index.volume_size(&obj.volume) else {
+        return err_json(StatusCode::BAD_GATEWAY, "volume_unresolved", Some(key));
+    };
     let sub = match range {
         RangeSpec::None => None,
         RangeSpec::Slice(a, b) => Some((*a, *b)),
         RangeSpec::Unsatisfiable => return not_satisfiable(obj.size),
     };
-    let resp = match object_fetch(&ctx.http, &ctx.cfg.github.token, &url, obj, sub).await {
+    let resp = match object_fetch(&ctx.http, &ctx.cfg.github.token, &url, obj, sub, volume_size)
+        .await
+    {
         Ok(r) => r,
         Err(e) => {
             // r5 P1-8：上游 206 与请求不符 = Integrity → poisoned + 透传失败
@@ -1072,6 +1158,7 @@ mod tests {
             manifest,
             cache,
             http: MediaCtx::new_client(),
+            warm_gate: Arc::new(tokio::sync::Semaphore::new(crate::admin::WARM_CONCURRENCY)),
         });
         (ctx, cache_root)
     }
@@ -1080,6 +1167,7 @@ mod tests {
         Arc::new(ManifestIndex::new_for_test(
             1,
             HashMap::from([(VOLUME.to_owned(), 42u64)]),
+            HashMap::from([(VOLUME.to_owned(), 2048u64)]),
             url_base.to_owned(),
         ))
     }
@@ -1119,7 +1207,7 @@ mod tests {
         let (ctx, root) = test_ctx("fetch-ok").await;
         let obj = test_obj(b"abc");
         let url = format!("http://{addr}/repos/test/cdn-media.test/releases/assets/42");
-        let resp = object_fetch(&ctx.http, "", &url, &obj, None)
+        let resp = object_fetch(&ctx.http, "", &url, &obj, None, 2048)
             .await
             .expect("精确匹配的 206 必须通过");
         assert_eq!(resp.status(), reqwest::StatusCode::PARTIAL_CONTENT);
@@ -1145,7 +1233,7 @@ mod tests {
         let (ctx, root) = test_ctx("fetch-wrong-cr").await;
         let obj = test_obj(&body);
         let url = format!("http://{addr}/repos/test/cdn-media.test/releases/assets/42");
-        let err = object_fetch(&ctx.http, "", &url, &obj, None)
+        let err = object_fetch(&ctx.http, "", &url, &obj, None, 2048)
             .await
             .expect_err("Content-Range 不符必须拒绝");
         assert!(matches!(err, FetchError::Integrity(_)), "必须是 Integrity：{err:?}");
@@ -1166,7 +1254,7 @@ mod tests {
         let (ctx, root) = test_ctx("fetch-wrong-cl").await;
         let obj = test_obj(b"abc");
         let url = format!("http://{addr}/repos/test/cdn-media.test/releases/assets/42");
-        let err = object_fetch(&ctx.http, "", &url, &obj, None)
+        let err = object_fetch(&ctx.http, "", &url, &obj, None, 2048)
             .await
             .expect_err("Content-Length 不符必须拒绝");
         assert!(matches!(err, FetchError::Integrity(_)), "{err:?}");
@@ -1187,7 +1275,7 @@ mod tests {
         let (ctx, root) = test_ctx("fetch-no-cr").await;
         let obj = test_obj(b"abc");
         let url = format!("http://{addr}/repos/test/cdn-media.test/releases/assets/42");
-        let err = object_fetch(&ctx.http, "", &url, &obj, None)
+        let err = object_fetch(&ctx.http, "", &url, &obj, None, 2048)
             .await
             .expect_err("缺 Content-Range 必须拒绝");
         assert!(matches!(err, FetchError::Integrity(_)), "{err:?}");
@@ -1206,7 +1294,7 @@ mod tests {
         let mut obj = test_obj(b"abc");
         obj.offset = u64::MAX;
         let url = format!("http://{addr}/repos/test/cdn-media.test/releases/assets/42");
-        let err = object_fetch(&ctx.http, "", &url, &obj, None)
+        let err = object_fetch(&ctx.http, "", &url, &obj, None, 2048)
             .await
             .expect_err("offset 溢出必须拒绝");
         assert!(matches!(err, FetchError::Integrity(_)), "{err:?}");
@@ -1338,7 +1426,7 @@ mod tests {
         let obj = test_obj(&body);
         let key = "x/2020-01/tee.jpg";
         let res = ctx.cache.admit(key, obj.size).expect("admission 应通过");
-        let resp = stream_through_tee(&ctx, &index, key, &obj, false, res).await;
+        let resp = stream_through_tee(&ctx, &index, key, &obj, false, res, ctx.cache.lock_key_owned(key).await).await;
         assert_eq!(resp.headers().get("cache-control").unwrap(), "no-store", "tee 头不得承诺 immutable");
         assert_eq!(resp.headers().get("content-length").unwrap(), &obj.size.to_string());
         let got = axum::body::to_bytes(resp.into_body(), usize::MAX)
@@ -1367,7 +1455,7 @@ mod tests {
         let obj = test_obj(b"expected-torrent-of-other-bytes");
         let key = "x/2020-01/teebad.jpg";
         let res = ctx.cache.admit(key, obj.size).expect("admission 应通过");
-        let resp = stream_through_tee(&ctx, &index, key, &obj, false, res).await;
+        let resp = stream_through_tee(&ctx, &index, key, &obj, false, res, ctx.cache.lock_key_owned(key).await).await;
         assert_eq!(resp.headers().get("cache-control").unwrap(), "no-store");
         let got = axum::body::to_bytes(resp.into_body(), usize::MAX).await.expect("no-store 下坏字节仍如实送达");
         assert_eq!(got.len(), body.len());
@@ -1402,6 +1490,486 @@ mod tests {
         let second = stream.next().await.expect("超长块应以错误终止");
         assert!(second.is_err(), "超长必须终止流");
         assert!(ctx.cache.is_poisoned(key), "超长必须标 poisoned");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    // ---- r6 P1-4：206 Content-Range 完整解析（denominator /total 必须合法且与卷一致） ----
+
+    #[tokio::test]
+    async fn object_fetch_206_wrong_total_rejected() {
+        let body = b"abc".to_vec();
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState::ok_206(
+            "bytes 512-514/4096".to_owned(),
+            body,
+        )));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = test_ctx("fetch-wrong-total").await;
+        let obj = test_obj(b"abc");
+        let url = format!("http://{addr}/repos/test/cdn-media.test/releases/assets/42");
+        let err = object_fetch(&ctx.http, "", &url, &obj, None, 2048)
+            .await
+            .expect_err("total 与卷尺寸不符必须拒绝");
+        assert!(matches!(err, FetchError::Integrity(ref m) if m.contains("total")), "{err:?}");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[tokio::test]
+    async fn object_fetch_206_missing_denominator_rejected() {
+        let body = b"abc".to_vec();
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState::ok_206(
+            "bytes 512-514".to_owned(),
+            body,
+        )));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = test_ctx("fetch-no-total").await;
+        let obj = test_obj(b"abc");
+        let url = format!("http://{addr}/repos/test/cdn-media.test/releases/assets/42");
+        let err = object_fetch(&ctx.http, "", &url, &obj, None, 2048)
+            .await
+            .expect_err("缺 denominator 必须拒绝");
+        assert!(matches!(err, FetchError::Integrity(ref m) if m.contains("total")), "{err:?}");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[tokio::test]
+    async fn object_fetch_206_star_total_rejected() {
+        let body = b"abc".to_vec();
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState::ok_206(
+            "bytes 512-514/*".to_owned(),
+            body,
+        )));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = test_ctx("fetch-star-total").await;
+        let obj = test_obj(b"abc");
+        let url = format!("http://{addr}/repos/test/cdn-media.test/releases/assets/42");
+        let err = object_fetch(&ctx.http, "", &url, &obj, None, 2048)
+            .await
+            .expect_err("通配 total 必须拒绝");
+        assert!(matches!(err, FetchError::Integrity(_)), "{err:?}");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[tokio::test]
+    async fn object_fetch_206_nonnumeric_total_rejected() {
+        let body = b"abc".to_vec();
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState::ok_206(
+            "bytes 512-514/2O48".to_owned(),
+            body,
+        )));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = test_ctx("fetch-bad-total").await;
+        let obj = test_obj(b"abc");
+        let url = format!("http://{addr}/repos/test/cdn-media.test/releases/assets/42");
+        let err = object_fetch(&ctx.http, "", &url, &obj, None, 2048)
+            .await
+            .expect_err("非数值 total 必须拒绝");
+        assert!(matches!(err, FetchError::Integrity(_)), "{err:?}");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    // ---- r6 P1-8：零字节对象拒绝回源（不发请求） ----
+
+    #[tokio::test]
+    async fn object_fetch_zero_byte_object_rejected_without_request() {
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState::ok_206(
+            "bytes 512-512/2048".to_owned(),
+            b"x".to_vec(),
+        )));
+        let addr = spawn_object_mock(st.clone()).await;
+        let (ctx, root) = test_ctx("fetch-zero").await;
+        let mut obj = test_obj(b"abc");
+        obj.size = 0;
+        let url = format!("http://{addr}/repos/test/cdn-media.test/releases/assets/42");
+        let err = object_fetch(&ctx.http, "", &url, &obj, None, 2048)
+            .await
+            .expect_err("零字节对象必须拒绝回源");
+        assert!(matches!(err, FetchError::Integrity(ref m) if m.contains("零字节")), "{err:?}");
+        assert_eq!(st.lock().unwrap().hits(), 0, "零字节不得发出任何上游请求");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    // ---- r6 P0-1 / P1-7：serve 全链路（注入索引 + raw TCP mock 上游） ----
+
+    /// 注入完整索引的测试上下文（handler 全链路：serve() 直调）；
+    /// `large_object` = 透传阈值（压小可强制对象走 pass_through）
+    async fn serve_ctx(
+        name: &str,
+        large_object: u64,
+    ) -> (Arc<MediaCtx>, std::path::PathBuf) {
+        let cache_root =
+            std::env::temp_dir().join(format!("cdn-media-serve-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&cache_root);
+        let cfg = Arc::new(crate::test_support::test_config_with_threshold(
+            "http://127.0.0.1:9/manifest/current.json".to_owned(),
+            cache_root.display().to_string(),
+            large_object,
+        ));
+        let manifest = Arc::new(ManifestSource::new(cfg.clone()));
+        let cache = Arc::new(
+            DiskCache::recover(&cache_root, cfg.cache.high_bytes, cfg.cache.low_bytes, &HashSet::new())
+                .unwrap(),
+        );
+        let ctx = Arc::new(MediaCtx {
+            cfg,
+            manifest,
+            cache,
+            http: MediaCtx::new_client(),
+            warm_gate: Arc::new(tokio::sync::Semaphore::new(crate::admin::WARM_CONCURRENCY)),
+        });
+        (ctx, cache_root)
+    }
+
+    fn get_req(key: &str, range: Option<&str>) -> Request<Body> {
+        let mut b = Request::builder()
+            .method(Method::GET)
+            .uri(format!("/cdn-media/{key}"));
+        if let Some(r) = range {
+            b = b.header(header::RANGE, r);
+        }
+        b.body(Body::empty()).expect("request")
+    }
+
+    fn serve_obj(body: &[u8], key: &str) -> (String, MediaObject) {
+        (
+            key.to_owned(),
+            MediaObject {
+                volume: VOLUME.to_owned(),
+                offset: 512,
+                size: body.len() as u64,
+                sha256: sha256_hex(body),
+                content_type: "image/jpeg".to_owned(),
+            },
+        )
+    }
+
+    /// 把 (key → object) 表注入 ctx 的 manifest 源（跳过 HTTP 拉取）
+    async fn inject_index(ctx: &Arc<MediaCtx>, objects: Vec<(String, MediaObject)>, url_base: String) {
+        let idx = ManifestIndex::new_for_test_full(
+            1,
+            objects.into_iter().collect(),
+            HashMap::from([(VOLUME.to_owned(), 42u64)]),
+            HashMap::from([(VOLUME.to_owned(), 2048u64)]),
+            url_base,
+        );
+        ctx.manifest.set_index_for_test(idx).await;
+    }
+
+    async fn body_bytes(resp: Response) -> Result<bytes::Bytes, axum::Error> {
+        axum::body::to_bytes(resp.into_body(), usize::MAX).await
+    }
+
+    /// r6 P0-1：普通 GET 并发同 key miss——只有一个回源者；全程恰好一次 upstream
+    /// 命中、一次成功 commit；成功后无 reservation/tmp/lock-table 泄漏
+    #[tokio::test]
+    async fn serve_tee_concurrent_miss_single_flight_single_fetch() {
+        let body = b"serve-flight-payload".to_vec();
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState::ok_206(
+            format!("bytes 512-{}/2048", 512 + body.len() - 1),
+            body.clone(),
+        )));
+        let addr = spawn_object_mock(st.clone()).await;
+        let (ctx, root) = serve_ctx("flight-ok", 1_000_000).await;
+        let key = "x/2020-01/flight.jpg";
+        inject_index(&ctx, vec![serve_obj(&body, key)], format!("http://{addr}")).await;
+
+        // 顺序驱动（不能 join 两个 serve——后到者要等先到者 body 消费完才放锁，
+        // join 会形成「等锁 ↔ 等 body」死锁）：先取 A 的响应（持锁 streaming），
+        // 再起 B（应阻塞在锁上），消费 A body 触发 commit + 放锁，B 才完成
+        let ctx_a = ctx.clone();
+        let ta = tokio::spawn(async move { serve(State(ctx_a), get_req(key, None)).await });
+        let ra = ta.await.expect("A task") ;
+        assert_eq!(ra.status(), StatusCode::OK);
+        let ctx_b = ctx.clone();
+        let tb = tokio::spawn(async move { serve(State(ctx_b), get_req(key, None)).await });
+        // B 此刻应阻塞在 flight 锁上：尚未回源
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert_eq!(st.lock().unwrap().hits(), 1, "B 必须仍在等锁（不得提前回源）");
+        // 消费 A body → finish/commit → 守卫随流结束释放
+        let ba = body_bytes(ra).await.expect("A body 完整");
+        let rb = tb.await.expect("B task");
+        assert_eq!(rb.status(), StatusCode::OK);
+        let bb = body_bytes(rb).await.expect("B body 完整");
+        assert!(
+            &ba[..] == body.as_slice() && &bb[..] == body.as_slice(),
+            "两个响应都必须送达完整对象字节"
+        );
+        assert_eq!(st.lock().unwrap().hits(), 1, "并发同 key miss 只允许一次回源");
+        assert!(ctx.cache.lookup(key).is_some(), "校验通过必须入缓存");
+        assert_eq!(ctx.cache.total(), body.len() as u64, "恰好成功 commit 一次");
+        assert_eq!(ctx.cache.stats().inflight_reserved, 0, "无 reservation 泄漏");
+        assert_eq!(ctx.cache.inflight_locks_len(), 0, "锁表必须最终清理");
+        assert_tmp_empty(&root);
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// r6 P0-1：并发失败路径——先到者 tee 流毕 sha 失败标 poisoned；后到者等锁后
+    /// 看到 poisoned 落入透传（第二次回源）；终态无泄漏
+    #[tokio::test]
+    async fn serve_tee_concurrent_failure_no_reservation_or_lock_leak() {
+        let expect = b"expected-concurrent-bytes";
+        let bad = vec![b'X'; expect.len()];
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState::ok_206(
+            format!("bytes 512-{}/2048", 512 + bad.len() - 1),
+            bad.clone(),
+        )));
+        let addr = spawn_object_mock(st.clone()).await;
+        let (ctx, root) = serve_ctx("flight-bad", 1_000_000).await;
+        let key = "x/2020-01/flightbad.jpg";
+        inject_index(&ctx, vec![serve_obj(expect, key)], format!("http://{addr}")).await;
+
+        // 顺序驱动（同上：后到者等锁依赖先到者 body 消费完毕）
+        let ctx_a = ctx.clone();
+        let ta = tokio::spawn(async move { serve(State(ctx_a), get_req(key, None)).await });
+        let ra = ta.await.expect("A task");
+        let ctx_b = ctx.clone();
+        let tb = tokio::spawn(async move { serve(State(ctx_b), get_req(key, None)).await });
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert_eq!(st.lock().unwrap().hits(), 1, "B 必须仍在等锁");
+        // A body 消费完 → 流毕 sha 失败 → poisoned + 放锁；B 等锁后见 poisoned → 透传
+        let ba = body_bytes(ra).await;
+        let rb = tb.await.expect("B task");
+        let bb = body_bytes(rb).await;
+        assert!(
+            matches!(ba.as_ref(), Ok(b) if &b[..] == bad.as_slice())
+                || matches!(bb.as_ref(), Ok(b) if &b[..] == bad.as_slice()),
+            "至少一个响应如实送达完整上游字节（坏字节也要转发给客户端）"
+        );
+        assert_eq!(st.lock().unwrap().hits(), 2, "失败路径：tee 一次 + 透传一次");
+        assert!(ctx.cache.lookup(key).is_none(), "坏数据不得入缓存");
+        assert!(ctx.cache.is_poisoned(key), "必须标 poisoned");
+        assert_eq!(ctx.cache.total(), 0, "不得有任何入账");
+        assert_eq!(ctx.cache.stats().inflight_reserved, 0, "失败/断连后 inflight 必须归零");
+        assert_eq!(ctx.cache.inflight_locks_len(), 0, "锁表必须最终清理");
+        assert_tmp_empty(&root);
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// r6 P0-1：客户端断连（响应体未消费即丢弃）——TeeState Drop 兜底：归还预留、
+    /// 删临时文件、标 poisoned、释放锁
+    #[tokio::test]
+    async fn serve_tee_disconnect_cleans_reservation_tmp_and_lock_table() {
+        let body = b"disconnect-payload-bytes".to_vec();
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState::ok_206(
+            format!("bytes 512-{}/2048", 512 + body.len() - 1),
+            body,
+        )));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = serve_ctx("flight-drop", 1_000_000).await;
+        let key = "x/2020-01/disconnect.jpg";
+        inject_index(&ctx, vec![serve_obj(b"disconnect-payload-bytes", key)], format!("http://{addr}")).await;
+
+        let resp = serve(State(ctx.clone()), get_req(key, None)).await;
+        assert_eq!(resp.headers().get("cache-control").unwrap(), "no-store");
+        // 断连 = 客户端不消费 body 直接丢弃 → 流状态机 Drop 兜底
+        drop(resp);
+        assert_eq!(ctx.cache.stats().inflight_reserved, 0, "断连必须归还预留");
+        assert!(ctx.cache.lookup(key).is_none(), "断连不得入缓存");
+        assert!(ctx.cache.is_poisoned(key), "断连的半截流必须标 poisoned");
+        assert_eq!(ctx.cache.inflight_locks_len(), 0, "断连必须释放锁并摘表");
+        assert_tmp_empty(&root);
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    // ---- r6 P1-7：真实 HTTP framing（声明 CL 与实际 body 不一致）全链路 ----
+
+    /// tee 全链路：上游声明 CL = size+5（与请求区间不符）——头校验层（206 精确
+    /// 校验）即拒绝 → Integrity → 502 + poisoned，坏 framing 不得进入流阶段
+    #[tokio::test]
+    async fn serve_tee_upstream_content_length_lie_returns_502_and_poisons() {
+        let expect = b"framing-overlong-payload";
+        let mut lying = expect.to_vec();
+        lying.extend_from_slice(b"EXTRA");
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState {
+            status: 206,
+            content_range: Some(format!("bytes 512-{}/2048", 512 + lying.len() - 1)),
+            content_length: Some(lying.len().to_string()),
+            body: lying,
+            ..Default::default()
+        }));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = serve_ctx("frame-tee-over", 1_000_000).await;
+        let key = "x/2020-01/framingover.jpg";
+        inject_index(&ctx, vec![serve_obj(expect, key)], format!("http://{addr}")).await;
+
+        let resp = serve(State(ctx.clone()), get_req(key, None)).await;
+        assert_eq!(resp.status(), StatusCode::BAD_GATEWAY, "CL 与请求不符必须 502");
+        assert!(ctx.cache.lookup(key).is_none(), "越界不得入缓存");
+        assert!(ctx.cache.is_poisoned(key), "Integrity 失败必须标 poisoned");
+        assert_eq!(ctx.cache.stats().inflight_reserved, 0, "失败后预留必须归还");
+        assert_tmp_empty(&root);
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// tee 全链路（真实 framing 截断）：上游诚实声明 CL = size 但多发 5 字节——
+    /// hyper 在 framing 层截断到 CL，应用层恰好收到 size 字节且 sha 对账通过 →
+    /// 正常入缓存；多出的尾流绝不进入缓存（r6 P1-7：framing 截断路径可观测）
+    #[tokio::test]
+    async fn serve_tee_framing_truncates_long_body_to_content_length() {
+        let expect = b"framing-truncate-payload";
+        let mut long_body = expect.to_vec();
+        long_body.extend_from_slice(b"JUNK5");
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState {
+            status: 206,
+            content_range: Some(format!("bytes 512-{}/2048", 512 + expect.len() - 1)),
+            content_length: Some(expect.len().to_string()),
+            body: long_body,
+            ..Default::default()
+        }));
+        let addr = spawn_object_mock(st.clone()).await;
+        let (ctx, root) = serve_ctx("frame-tee-trunc", 1_000_000).await;
+        let key = "x/2020-01/framingtrunc.jpg";
+        inject_index(&ctx, vec![serve_obj(expect, key)], format!("http://{addr}")).await;
+
+        let resp = serve(State(ctx.clone()), get_req(key, None)).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let got = body_bytes(resp).await.expect("framing 截断后必须完整送达 CL 字节");
+        assert_eq!(&got[..], &expect[..], "客户端只能收到 CL 声明的字节数");
+        assert!(ctx.cache.lookup(key).is_some(), "sha 对账通过必须入缓存");
+        assert!(!ctx.cache.is_poisoned(key));
+        assert_eq!(st.lock().unwrap().hits(), 1);
+        assert_tmp_empty(&root);
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// tee 全链路：上游声明 CL = size-3 并只发 size-3 字节——framing 层提前 EOF，
+    /// 应用层看到「上游提前断流」→ poisoned；缓存无残留
+    #[tokio::test]
+    async fn serve_tee_framing_short_content_length_poisons() {
+        let expect = b"framing-short-payload-bytes";
+        let truncated = expect[..expect.len() - 3].to_vec();
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState {
+            status: 206,
+            content_range: Some(format!("bytes 512-{}/2048", 512 + truncated.len() - 1)),
+            content_length: Some(truncated.len().to_string()),
+            body: truncated,
+            ..Default::default()
+        }));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = serve_ctx("frame-tee-short", 1_000_000).await;
+        let key = "x/2020-01/framingshort.jpg";
+        inject_index(&ctx, vec![serve_obj(expect, key)], format!("http://{addr}")).await;
+
+        let resp = serve(State(ctx.clone()), get_req(key, None)).await;
+        let got = body_bytes(resp).await;
+        // 客户端被承诺 size 字节但流在 size-3 处终止：必须以错误收尾（绝不静默成功）
+        assert!(
+            got.is_err() || got.as_ref().expect("err 情形之外必有 body").len() != expect.len(),
+            "短长流不得伪装成完整响应"
+        );
+        assert!(ctx.cache.lookup(key).is_none(), "提前断流不得入缓存");
+        assert!(ctx.cache.is_poisoned(key), "提前断流必须标 poisoned");
+        assert_eq!(ctx.cache.stats().inflight_reserved, 0);
+        assert_tmp_empty(&root);
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// pass_through 全链路（小透传阈值）：上游声明 CL = size+4（与请求区间不符）
+    /// → 头校验层拒绝 → Integrity → 502 + poisoned（透传同样不得放过坏 framing）
+    #[tokio::test]
+    async fn serve_pass_through_upstream_content_length_lie_returns_502_and_poisons() {
+        let expect = b"pass-through-overlong";
+        let mut lying = expect.to_vec();
+        lying.extend_from_slice(b"JUNK");
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState {
+            status: 206,
+            content_range: Some(format!("bytes 512-{}/2048", 512 + lying.len() - 1)),
+            content_length: Some(lying.len().to_string()),
+            body: lying,
+            ..Default::default()
+        }));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = serve_ctx("frame-pt-over", 8).await;
+        let key = "x/2020-01/ptover.jpg";
+        inject_index(&ctx, vec![serve_obj(expect, key)], format!("http://{addr}")).await;
+
+        let resp = serve(State(ctx.clone()), get_req(key, None)).await;
+        assert_eq!(resp.status(), StatusCode::BAD_GATEWAY, "CL 与请求不符必须 502");
+        assert!(ctx.cache.lookup(key).is_none());
+        assert!(ctx.cache.is_poisoned(key), "透传 Integrity 失败必须标 poisoned");
+        assert_eq!(ctx.cache.stats().inflight_reserved, 0, "透传不占用预留");
+        assert_tmp_empty(&root);
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// pass_through 全链路（真实 framing 截断）：诚实 CL = size 但多发尾流——
+    /// hyper 截断到 CL，透传恰好送达 size 字节，不缓存（透传本就不落盘）
+    #[tokio::test]
+    async fn serve_pass_through_framing_truncates_long_body_to_content_length() {
+        let expect = b"pass-through-truncate";
+        let mut long_body = expect.to_vec();
+        long_body.extend_from_slice(b"ZZZZZ");
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState {
+            status: 206,
+            content_range: Some(format!("bytes 512-{}/2048", 512 + expect.len() - 1)),
+            content_length: Some(expect.len().to_string()),
+            body: long_body,
+            ..Default::default()
+        }));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = serve_ctx("frame-pt-trunc", 8).await;
+        let key = "x/2020-01/pttrunc.jpg";
+        inject_index(&ctx, vec![serve_obj(expect, key)], format!("http://{addr}")).await;
+
+        let resp = serve(State(ctx.clone()), get_req(key, None)).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let got = body_bytes(resp).await.expect("透传必须送达 CL 字节");
+        assert_eq!(&got[..], &expect[..], "透传只能送达 CL 声明的字节数");
+        assert!(ctx.cache.lookup(key).is_none(), "透传不落盘");
+        assert!(!ctx.cache.is_poisoned(key), "诚实 CL + 前缀一致不得误标 poisoned");
+        assert_tmp_empty(&root);
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// pass_through 全链路：短长 framing → 提前 EOF → poisoned
+    #[tokio::test]
+    async fn serve_pass_through_framing_short_poisons() {
+        let expect = b"pass-through-short-body";
+        let truncated = expect[..expect.len() - 2].to_vec();
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState {
+            status: 206,
+            content_range: Some(format!("bytes 512-{}/2048", 512 + truncated.len() - 1)),
+            content_length: Some(truncated.len().to_string()),
+            body: truncated,
+            ..Default::default()
+        }));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = serve_ctx("frame-pt-short", 8).await;
+        let key = "x/2020-01/ptshort.jpg";
+        inject_index(&ctx, vec![serve_obj(expect, key)], format!("http://{addr}")).await;
+
+        let resp = serve(State(ctx.clone()), get_req(key, None)).await;
+        let got = body_bytes(resp).await;
+        assert!(
+            got.is_err() || got.as_ref().expect("err 情形之外必有 body").len() != expect.len(),
+            "透传短长流不得伪装成完整响应"
+        );
+        assert!(ctx.cache.is_poisoned(key), "透传提前断流必须标 poisoned");
+        assert!(ctx.cache.lookup(key).is_none());
+        assert_tmp_empty(&root);
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// Range miss 全链路：上游 206 的 Content-Length 与请求不符 → Integrity →
+    /// 502 + poisoned（validate_upstream_206 在真实 handler 链路生效）
+    #[tokio::test]
+    async fn serve_range_miss_upstream_lie_returns_502_and_poisons() {
+        let expect = b"range-miss-payload";
+        let wrong = vec![b'Y'; expect.len() - 1];
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState::ok_206(
+            format!("bytes 512-{}/2048", 512 + wrong.len() - 1),
+            wrong,
+        )));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = serve_ctx("range-lie", 1_000_000).await;
+        let key = "x/2020-01/rangelie.jpg";
+        inject_index(&ctx, vec![serve_obj(expect, key)], format!("http://{addr}")).await;
+
+        let resp = serve(State(ctx.clone()), get_req(key, Some("bytes=0-4"))).await;
+        assert_eq!(resp.status(), StatusCode::BAD_GATEWAY, "上游 206 与请求不符必须 502");
+        assert!(ctx.cache.is_poisoned(key), "Integrity 失败必须标 poisoned");
+        assert!(ctx.cache.lookup(key).is_none());
+        assert_eq!(ctx.cache.stats().inflight_reserved, 0);
+        assert_tmp_empty(&root);
         std::fs::remove_dir_all(&root).ok();
     }
 }

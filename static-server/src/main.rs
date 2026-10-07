@@ -55,6 +55,24 @@ fn main() {
     runtime.block_on(run());
 }
 
+/// 主端口解析（r6 P1-2）：PORT=0 与非法值一律拒绝——compose 将宿主端口映射到
+/// 容器固定 8080，绑随机端口会使容器端口不可达（健康检查与站点直接失效）。
+/// 缺失/空白 = 默认 8080
+fn parse_port(raw: Option<String>) -> Result<u16, String> {
+    let Some(v) = raw else { return Ok(8080) };
+    let cleaned = v.trim();
+    if cleaned.is_empty() {
+        return Ok(8080);
+    }
+    let p: u16 = cleaned
+        .parse()
+        .map_err(|_| format!("PORT={v:?} 解析失败。修复：PORT 必须是 1-65535 的整数"))?;
+    if p == 0 {
+        return Err("PORT=0 非法（修复：改为有效监听端口，如 8080）".to_owned());
+    }
+    Ok(p)
+}
+
 async fn run() {
     // 1. 配置加载（A9：文件缺失/字段非法 → 启动即败，日志给修复指令）
     let cfg = match config::load(&config::ProcessEnv) {
@@ -65,22 +83,13 @@ async fn run() {
         }
     };
     let root = PathBuf::from(env::var("SERVER_ROOT").unwrap_or_else(|_| "/srv".into()));
-    // r5 P1-14：env 解析失败一律启动即败，绝不静默回退默认值
-    let port: u16 = match env::var("PORT") {
-        Ok(raw) => {
-            let cleaned = raw.trim();
-            if cleaned.is_empty() {
-                8080
-            } else {
-                cleaned.parse().unwrap_or_else(|_| {
-                    eprintln!(
-                        "[cdn-base] PORT={raw:?} 解析失败，启动即败。修复：PORT 必须是 1-65535 的整数"
-                    );
-                    std::process::exit(1);
-                })
-            }
+    // r5 P1-14 / r6 P1-2：env 解析失败与 PORT=0 一律启动即败，绝不静默回退
+    let port = match parse_port(env::var("PORT").ok()) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("[cdn-base] {e}，启动即败");
+            std::process::exit(1);
         }
-        Err(_) => 8080,
     };
 
     // 2. 缓存恢复 + 磁盘启动强校验（A3：可写探针 / 剩余空间 ≥ high×1.2 / 水位合法）
@@ -138,6 +147,8 @@ async fn run() {
         manifest: manifest.clone(),
         cache,
         http: media::MediaCtx::new_client(),
+        // r6 P1-3：warm 全局并发闸——跨请求共享（构造即定死上限）
+        warm_gate: Arc::new(tokio::sync::Semaphore::new(admin::WARM_CONCURRENCY)),
     });
 
     let media_router: Router = Router::new()
@@ -289,7 +300,10 @@ fn check_pinned_budget(cfg: &config::Config, idx: &manifest::ManifestIndex) -> R
         let o = idx.lookup(k).ok_or_else(|| {
             format!("pinned key {k:?} 不在 manifest 中（修复：更正 key 或重新打包发布）")
         })?;
-        total += o.size;
+        // r6 P1-8：合计 checked——极端 manifest 数据溢出时启动即败，绝不回绕放行
+        total = total.checked_add(o.size).ok_or_else(|| {
+            format!("pinned 合计字节溢出（key {k}，size {}）——manifest 数据异常", o.size)
+        })?;
     }
     if total > cfg.cache.high_bytes {
         return Err(format!(
@@ -389,4 +403,71 @@ async fn cache_and_mime(req: Request<axum::body::Body>, next: Next) -> Response 
         );
     }
     resp
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    // ---- r6 P1-2：主 PORT 解析（0 与非法值一律拒绝） ----
+
+    #[test]
+    fn parse_port_matrix() {
+        assert_eq!(parse_port(None).unwrap(), 8080);
+        assert_eq!(parse_port(Some(String::new())).unwrap(), 8080);
+        assert_eq!(parse_port(Some("  ".to_owned())).unwrap(), 8080);
+        assert_eq!(parse_port(Some("8080".to_owned())).unwrap(), 8080);
+        assert_eq!(parse_port(Some(" 9090 ".to_owned())).unwrap(), 9090);
+        assert_eq!(parse_port(Some("1".to_owned())).unwrap(), 1);
+        assert_eq!(parse_port(Some("65535".to_owned())).unwrap(), 65535);
+        // r6 P1-2 核心：0 拒绝
+        let err = parse_port(Some("0".to_owned())).expect_err("PORT=0 必须拒绝");
+        assert!(err.contains("PORT=0"), "错误信息必须指认字段：{err}");
+        // 非法值拒绝
+        assert!(parse_port(Some("not-a-port".to_owned())).is_err());
+        assert!(parse_port(Some("-1".to_owned())).is_err());
+        assert!(parse_port(Some("65536".to_owned())).is_err());
+        // 空白由 trim 收敛：合法数字带尾随换行照常放行
+        assert_eq!(parse_port(Some("8080\n".to_owned())).unwrap(), 8080);
+    }
+
+    // ---- r6 P1-8：pinned 预算 checked——极端 manifest 数据溢出必须失败 ----
+
+    #[test]
+    fn pinned_budget_overflow_fails() {
+        let mut cfg: config::Config =
+            toml::from_str(include_str!("../config.example.toml")).unwrap();
+        cfg.pinned.keys = vec!["x/1970-01/a.jpg".to_owned(), "x/1970-01/b.jpg".to_owned()];
+        let idx = manifest::ManifestIndex::new_for_test_full(
+            1,
+            HashMap::from([
+                (
+                    "x/1970-01/a.jpg".to_owned(),
+                    manifest::MediaObject {
+                        volume: "v".to_owned(),
+                        offset: 0,
+                        size: u64::MAX,
+                        sha256: "0".repeat(64),
+                        content_type: "image/jpeg".to_owned(),
+                    },
+                ),
+                (
+                    "x/1970-01/b.jpg".to_owned(),
+                    manifest::MediaObject {
+                        volume: "v".to_owned(),
+                        offset: 0,
+                        size: 1,
+                        sha256: "0".repeat(64),
+                        content_type: "image/jpeg".to_owned(),
+                    },
+                ),
+            ]),
+            HashMap::new(),
+            HashMap::new(),
+            String::new(),
+        );
+        let err = check_pinned_budget(&cfg, &idx).expect_err("合计溢出必须失败");
+        assert!(err.contains("溢出"), "{err}");
+    }
 }

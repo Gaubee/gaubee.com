@@ -49,6 +49,17 @@ pub fn test_config_default_cache(current_url: String, cache_dir: String) -> Conf
     test_config(current_url, cache_dir, 1_000_000, 500_000)
 }
 
+/// 测试 Config（自定义透传阈值：压小可强制对象走 pass_through，P1-7 全链路用）
+pub fn test_config_with_threshold(
+    current_url: String,
+    cache_dir: String,
+    large_object_bytes: u64,
+) -> Config {
+    let mut c = test_config_default_cache(current_url, cache_dir);
+    c.cache.large_object_bytes = large_object_bytes;
+    c
+}
+
 // ---- raw 对象 mock：完全可控的 206 响应（可说谎） ----
 
 #[derive(Default)]
@@ -61,6 +72,10 @@ pub struct ObjectMockState {
     pub body: Vec<u8>,
     pub hits: AtomicUsize,
     pub last_range: Mutex<Option<String>>,
+    /// r6 P1-3：当前在途连接数（warm 全局并发测试的观测面）
+    pub inflight: AtomicUsize,
+    /// r6 P1-3：历史最大在途连接数（跨请求共享 semaphore 的上界断言）
+    pub max_inflight: AtomicUsize,
 }
 
 impl ObjectMockState {
@@ -126,7 +141,17 @@ pub async fn spawn_object_mock(state: Arc<Mutex<ObjectMockState>>) -> SocketAddr
                     resp.extend_from_slice(&st.body);
                     resp
                 };
+                // r6 P1-3：在途连接观测——计数持锁瞬间完成（write_all 在锁外，
+                // 连接不会被串行化、max_inflight 观测不失真）
                 let _ = sock.write_all(&resp).await;
+                {
+                    let st = st.lock().unwrap();
+                    let now = st.inflight.fetch_add(1, Ordering::SeqCst) + 1;
+                    st.max_inflight.fetch_max(now, Ordering::SeqCst);
+                }
+                {
+                    st.lock().unwrap().inflight.fetch_sub(1, Ordering::SeqCst);
+                }
                 let _ = sock.shutdown().await;
             });
         }
@@ -235,6 +260,8 @@ pub fn make_fixture(gen: u64, asset_id: u64, url_base: &str) -> Fixture {
   "format_version": 1,
   "gen": {gen},
   "object_count": 1,
+  "total_size": 3,
+  "volume_limit_bytes": 209715200,
   "objects": [
     {{"key": "{key}", "volume": "{volume}", "offset": 512, "size": 3, "sha256": "{sha}", "content_type": "image/jpeg"}}
   ],

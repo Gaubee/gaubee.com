@@ -43,6 +43,8 @@ pub struct ManifestIndex {
     pub objects: HashMap<String, MediaObject>,
     /// 卷名 → release asset id（构造 API URL）
     pub volume_assets: HashMap<String, u64>,
+    /// 卷名 → 卷总字节（r6 P1-4：206 Content-Range total 对账依据；r6 P1-5 wire 冻结字段）
+    pub volume_sizes: HashMap<String, u64>,
     pub loaded_at: SystemTime,
     /// 指针指纹（r5 P0-5）：manifest_sha256 + manifest_path + 各卷 (name, asset_id,
     /// sha256) 的 hash——同 gen 但指纹变化 = 指针内容变化 → 必须重新校验清单
@@ -54,6 +56,11 @@ pub struct ManifestIndex {
 impl ManifestIndex {
     pub fn lookup(&self, key: &str) -> Option<&MediaObject> {
         self.objects.get(key)
+    }
+
+    /// 卷的冻结总字节（r6 P1-4：上游 206 Content-Range 的 /total 必须与之对账）
+    pub fn volume_size(&self, name: &str) -> Option<u64> {
+        self.volume_sizes.get(name).copied()
     }
 
     /// 对象的回源 URL：asset id API URL（A2 契约，见模块头注）
@@ -70,12 +77,34 @@ impl ManifestIndex {
     pub(crate) fn new_for_test(
         gen: u64,
         volume_assets: HashMap<String, u64>,
+        volume_sizes: HashMap<String, u64>,
         url_base: String,
     ) -> Self {
         Self {
             gen,
             objects: HashMap::new(),
             volume_assets,
+            volume_sizes,
+            loaded_at: SystemTime::now(),
+            pointer_fingerprint: "test-fingerprint".to_owned(),
+            url_base,
+        }
+    }
+
+    /// 测试专用构造：完整对象表 + 自定义 url_base（media.rs serve() 全链路测试注入）
+    #[cfg(test)]
+    pub(crate) fn new_for_test_full(
+        gen: u64,
+        objects: HashMap<String, MediaObject>,
+        volume_assets: HashMap<String, u64>,
+        volume_sizes: HashMap<String, u64>,
+        url_base: String,
+    ) -> Self {
+        Self {
+            gen,
+            objects,
+            volume_assets,
+            volume_sizes,
             loaded_at: SystemTime::now(),
             pointer_fingerprint: "test-fingerprint".to_owned(),
             url_base,
@@ -99,7 +128,7 @@ struct CurrentVolumeJson {
     /// 刻意不使用：按 tag+文件名拼的下载 URL 不具备抗误改性（A2）
     #[allow(dead_code)]
     url: String,
-    #[allow(dead_code)]
+    /// r6 P1-5：与 manifest 卷 sha256 逐卷对账（冻结 wire 字段，不再是 dead_code）
     sha256: String,
     name: String,
 }
@@ -108,6 +137,12 @@ struct CurrentVolumeJson {
 struct ManifestJson {
     format_version: u32,
     gen: u64,
+    /// r6 P1-5：wire 冻结字段——必须与 objects 数组长度一致
+    object_count: u64,
+    /// r6 P1-5：wire 冻结字段——必须与对象 size 总和（checked）一致
+    total_size: u64,
+    /// r6 P1-5：wire 冻结字段——冻结卷上限 200MiB，每卷 size 不得越过
+    volume_limit_bytes: u64,
     objects: Vec<ManifestObjectJson>,
     volumes: Vec<ManifestVolumeJson>,
 }
@@ -125,8 +160,12 @@ struct ManifestObjectJson {
 #[derive(Deserialize, Debug)]
 struct ManifestVolumeJson {
     name: String,
-    /// 卷总字节（wire 校验：对象 offset+size 不得越过卷边界）
+    /// 卷总字节（wire 校验：对象 offset+size 不得越过卷边界；≤ 冻结卷上限）
     size: u64,
+    /// r6 P1-5：整卷 sha256——与 current.json 卷 sha256 逐卷对账
+    sha256: String,
+    /// r6 P1-5：release asset 名——冻结为与卷名一致（asset 名 = 文件名）
+    asset_name: String,
 }
 
 pub struct ManifestSource {
@@ -205,6 +244,12 @@ impl ManifestSource {
         self.refresh_locked().await
     }
 
+    /// 测试专用：直接注入内存索引（media.rs serve() 全链路测试，跳过 HTTP 拉取）
+    #[cfg(test)]
+    pub(crate) async fn set_index_for_test(&self, idx: ManifestIndex) {
+        *self.index.write().await = Some(std::sync::Arc::new(idx));
+    }
+
     /// A2 解析算法：条件拉指针 → sha256 校验 → gen 变了才拉清单 → 原子替换。
     /// 返回新索引；任何失败返回 Err 且内存索引保持不动。
     async fn refresh_locked(&self) -> Result<std::sync::Arc<ManifestIndex>, String> {
@@ -247,6 +292,11 @@ impl ManifestSource {
 
         // 指针自身一致性：manifest_sha256 必须是 64 位 hex
         let expect_sha = normalize_sha256(&pointer.manifest_sha256)?;
+
+        // r6 P1-6：manifest_path 冻结为 `manifest/manifest-<gen>.json` 且 gen 与指针
+        // 一致——先严格校验再拼 URL，`../`、绝对路径、错 gen、非 manifest 目录在
+        // 发起任何请求之前即被拒绝（协议边界供应链防护）
+        validate_manifest_path(&pointer.manifest_path, pointer.gen)?;
 
         let manifest_url = manifest_raw_url(&self.cfg.manifest.current_url, &pointer.manifest_path)?;
         let (_, _, manifest_body) = fetch_with_retry(&self.http, &manifest_url, None).await?;
@@ -313,6 +363,9 @@ fn validate_object_key(key: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// 冻结卷上限（r6 P1-5）：打包端 VOL_LIMIT 的 wire 冻结值（200MiB）
+const FROZEN_VOLUME_LIMIT_BYTES: u64 = 200 * 1024 * 1024;
+
 fn build_index(pointer: &CurrentJson, manifest_body: &[u8]) -> Result<ManifestIndex, String> {
     // wire 校验（r5 P1-6）：format_version 冻结为 1
     let manifest: ManifestJson =
@@ -329,9 +382,17 @@ fn build_index(pointer: &CurrentJson, manifest_body: &[u8]) -> Result<ManifestIn
             manifest.gen, pointer.gen
         ));
     }
+    // r6 P1-5：冻结卷上限——上限值本身与每卷 size 双重对账
+    if manifest.volume_limit_bytes != FROZEN_VOLUME_LIMIT_BYTES {
+        return Err(format!(
+            "volume_limit_bytes = {} 与冻结契约 {}（200MiB）不符",
+            manifest.volume_limit_bytes, FROZEN_VOLUME_LIMIT_BYTES
+        ));
+    }
 
     // 指针侧：asset_id > 0、卷名/sha 合法、无重复
     let mut volume_assets = HashMap::with_capacity(pointer.volumes.len());
+    let mut pointer_sha: HashMap<String, String> = HashMap::with_capacity(pointer.volumes.len());
     for v in &pointer.volumes {
         if v.name.is_empty() {
             return Err("current.json 含空卷名".to_owned());
@@ -339,24 +400,45 @@ fn build_index(pointer: &CurrentJson, manifest_body: &[u8]) -> Result<ManifestIn
         if v.asset_id == 0 {
             return Err(format!("current.json 卷 {} 的 asset_id 必须为正整数", v.name));
         }
-        normalize_sha256(&v.sha256).map_err(|e| format!("current.json 卷 {} sha256 非法：{e}", v.name))?;
+        let psha = normalize_sha256(&v.sha256)
+            .map_err(|e| format!("current.json 卷 {} sha256 非法：{e}", v.name))?;
         if volume_assets.insert(v.name.clone(), v.asset_id).is_some() {
             return Err(format!("current.json 卷名重复：{}", v.name));
         }
+        pointer_sha.insert(v.name.clone(), psha);
     }
 
-    // 清单侧卷表：名字唯一 + 与指针卷集合完全一致（双向）
-    let mut volume_sizes: HashMap<&str, u64> = HashMap::with_capacity(manifest.volumes.len());
+    // 清单侧卷表：名字唯一 + 与指针卷集合完全一致（双向）+ 每卷 sha256 与指针一致
+    let mut volume_sizes: HashMap<String, u64> = HashMap::with_capacity(manifest.volumes.len());
+    let mut volume_sha: HashMap<String, String> = HashMap::with_capacity(manifest.volumes.len());
     for v in &manifest.volumes {
         if v.name.is_empty() {
             return Err("清单含空卷名".to_owned());
         }
-        if volume_sizes.insert(v.name.as_str(), v.size).is_some() {
+        if v.size == 0 {
+            return Err(format!("清单卷 {} size 为 0（卷必须非空）", v.name));
+        }
+        if v.size > manifest.volume_limit_bytes {
+            return Err(format!(
+                "清单卷 {} size({}) 越过冻结卷上限({})",
+                v.name, v.size, manifest.volume_limit_bytes
+            ));
+        }
+        if v.asset_name != v.name {
+            return Err(format!(
+                "清单卷 {} 的 asset_name({:?}) 必须与卷名一致（冻结契约：asset 名 = 文件名）",
+                v.name, v.asset_name
+            ));
+        }
+        let msha = normalize_sha256(&v.sha256)
+            .map_err(|e| format!("清单卷 {} sha256 非法：{e}", v.name))?;
+        if volume_sizes.insert(v.name.clone(), v.size).is_some() {
             return Err(format!("清单卷名重复：{}", v.name));
         }
+        volume_sha.insert(v.name.clone(), msha);
     }
     for name in volume_sizes.keys() {
-        if !volume_assets.contains_key(*name) {
+        if !volume_assets.contains_key(name) {
             return Err(format!("清单卷 {name} 在 current.json 无 asset id（清单与指针不同代？）"));
         }
     }
@@ -364,6 +446,41 @@ fn build_index(pointer: &CurrentJson, manifest_body: &[u8]) -> Result<ManifestIn
         if !volume_sizes.contains_key(name.as_str()) {
             return Err(format!("current.json 卷 {name} 不在清单中（清单与指针不同代？）"));
         }
+    }
+    // r6 P1-5：每卷 sha256——current.json 声明与 manifest 冻结字段逐卷一致
+    for (name, psha) in &pointer_sha {
+        match volume_sha.get(name) {
+            Some(msha) if msha == psha => {}
+            Some(msha) => {
+                return Err(format!(
+                    "卷 {name} 的 sha256 在 current.json({psha}) 与 manifest({msha}) 不一致"
+                ));
+            }
+            None => {
+                return Err(format!("卷 {name} 在 manifest 中缺失（卷 sha 对账失败）"));
+            }
+        }
+    }
+
+    // r6 P1-5：wire 冻结总量对账——object_count 与对象 size 总和（checked）
+    if manifest.object_count != manifest.objects.len() as u64 {
+        return Err(format!(
+            "object_count({}) 与 objects 数组长度({}) 不一致",
+            manifest.object_count,
+            manifest.objects.len()
+        ));
+    }
+    let mut total_size = 0u64;
+    for o in &manifest.objects {
+        total_size = total_size.checked_add(o.size).ok_or_else(|| {
+            format!("对象 size 总和溢出（对象 {}，size {}）——畸形清单", o.key, o.size)
+        })?;
+    }
+    if total_size != manifest.total_size {
+        return Err(format!(
+            "total_size({}) 与对象 size 总和({total_size}) 不一致",
+            manifest.total_size
+        ));
     }
 
     let mut objects = HashMap::with_capacity(manifest.objects.len());
@@ -381,6 +498,10 @@ fn build_index(pointer: &CurrentJson, manifest_body: &[u8]) -> Result<ManifestIn
                 "对象 {} offset({}) 未按 512 字节对齐",
                 o.key, o.offset
             ));
+        }
+        // r6 P1-8：零字节对象明确拒绝（杜绝回源路径 saturating_sub(1) 的错误一字节请求）
+        if o.size == 0 {
+            return Err(format!("对象 {} size 为 0（零字节对象拒绝入索引）", o.key));
         }
         // offset+size ≤ 卷 size（checked arithmetic，防回绕越过校验）
         let end = o
@@ -416,10 +537,25 @@ fn build_index(pointer: &CurrentJson, manifest_body: &[u8]) -> Result<ManifestIn
         gen: manifest.gen,
         objects,
         volume_assets,
+        volume_sizes,
         loaded_at: SystemTime::now(),
         pointer_fingerprint: pointer_fingerprint(pointer),
         url_base: "https://api.github.com".to_owned(),
     })
+}
+
+/// r6 P1-6：manifest_path 冻结校验——必须严格等于 `manifest/manifest-<gen>.json`。
+/// 精确等值比对天然拒绝：`../` 穿越、绝对路径、错误 generation、零填充代号
+///（manifest-01.json）、非 manifest 目录、尾随垃圾段与任何注入变形
+fn validate_manifest_path(path: &str, gen: u64) -> Result<(), String> {
+    let expect = format!("manifest/manifest-{gen}.json");
+    if path == expect {
+        Ok(())
+    } else {
+        Err(format!(
+            "manifest_path 必须严格为 {expect:?}（当前 {path:?}）——r6 P1-6 冻结路径契约"
+        ))
+    }
 }
 
 /// current.json 同目录约定（A2：指针与清单都在仓库 manifest/ 目录）：
@@ -560,14 +696,20 @@ mod tests {
 
     #[test]
     fn build_index_rejects_bad_key() {
-        let raw = br#"{"format_version":1,"gen":1,"objects":[{"key":"x/a%b.jpg","volume":"v","offset":0,"size":1,"sha256":"xx","content_type":"image/png"}],"volumes":[{"name":"v","size":1024}]}"#;
+        let raw = br#"{"format_version":1,"gen":1,"object_count":1,"total_size":1,"volume_limit_bytes":209715200,"objects":[{"key":"x/a%b.jpg","volume":"v","offset":0,"size":1,"sha256":"xx","content_type":"image/png"}],"volumes":[{"name":"v","size":1024,"sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","asset_name":"v"}]}"#;
         let pointer = CurrentJson {
             gen: 1,
             manifest_sha256: "00".repeat(32),
             manifest_path: "manifest/manifest-1.json".into(),
-            volumes: vec![],
+            volumes: vec![CurrentVolumeJson {
+                asset_id: 7,
+                url: "u".to_owned(),
+                sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned(),
+                name: "v".to_owned(),
+            }],
         };
-        assert!(build_index(&pointer, raw).is_err());
+        let err = build_index(&pointer, raw).expect_err("非法 key 必须被拒");
+        assert!(err.contains("key"), "拒绝原因必须是 key 校验：{err}");
     }
 
     // ---- r5 P0-5：指针指纹 ----
@@ -609,19 +751,20 @@ mod tests {
         assert_eq!(pointer_fingerprint(&p1), pointer_fingerprint(&p4), "内容相同的指针指纹一致");
         // build_index 产出的索引携带指纹
         let manifest_body = format!(
-            r#"{{"format_version":1,"gen":1,"objects":[],"volumes":[{{"name":"v1","size":1024,"sha256":"{vol_sha}","asset_name":"v1"}}]}}"#
+            r#"{{"format_version":1,"gen":1,"object_count":0,"total_size":0,"volume_limit_bytes":209715200,"objects":[],"volumes":[{{"name":"v1","size":1024,"sha256":"{vol_sha}","asset_name":"v1"}}]}}"#
         );
         let idx = build_index(&p1, manifest_body.as_bytes()).unwrap();
         assert_eq!(idx.pointer_fingerprint, pointer_fingerprint(&p1));
     }
 
-    // ---- r5 P1-6：wire 校验矩阵（畸形 manifest 必须整体拒绝，保 LKG 不产部分索引） ----
+    // ---- r5 P1-6 / r6 P1-5：wire 校验矩阵（畸形 manifest 必须整体拒绝，保 LKG 不产部分索引） ----
 
     const HEX_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const HEX_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const HEX_C: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    const HEX_D: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 
-    const GOOD_MANIFEST: &str = r#"{"format_version":1,"gen":1,"objects":[{"key":"x/1970-01/a.jpg","volume":"v1","offset":512,"size":3,"sha256":"HEX_A","content_type":"image/jpeg"}],"volumes":[{"name":"v1","size":2048,"sha256":"HEX_B","asset_name":"v1"}]}"#;
+    const GOOD_MANIFEST: &str = r#"{"format_version":1,"gen":1,"object_count":1,"total_size":3,"volume_limit_bytes":209715200,"objects":[{"key":"x/1970-01/a.jpg","volume":"v1","offset":512,"size":3,"sha256":"HEX_A","content_type":"image/jpeg"}],"volumes":[{"name":"v1","size":2048,"sha256":"HEX_B","asset_name":"v1"}]}"#;
     const GOOD_POINTER: &str = r#"{"gen":1,"manifest_sha256":"HEX_C","manifest_path":"manifest/manifest-1.json","volumes":[{"asset_id":7,"url":"u","sha256":"HEX_B","name":"v1"}]}"#;
 
     fn wire_case(name: &str, manifest: &str, pointer: &str, expect_err: bool) {
@@ -779,6 +922,193 @@ mod tests {
             &GOOD_POINTER.replace("HEX_C", HEX_C).replace("HEX_B", HEX_B),
             true,
         );
+        // ---- r6 P1-5：wire 冻结总量/卷上限/卷 sha 对账 ----
+        // object_count 与 objects 数组长度不一致
+        wire_case(
+            "object_count 不符",
+            GOOD_MANIFEST
+                .replace(r#""object_count":1"#, r#""object_count":2"#)
+                .replace("HEX_A", HEX_A)
+                .replace("HEX_B", HEX_B)
+                .as_str(),
+            &GOOD_POINTER.replace("HEX_C", HEX_C).replace("HEX_B", HEX_B),
+            true,
+        );
+        // total_size 与对象 size 总和不一致
+        wire_case(
+            "total_size 不符",
+            GOOD_MANIFEST
+                .replace(r#""total_size":3"#, r#""total_size":4"#)
+                .replace("HEX_A", HEX_A)
+                .replace("HEX_B", HEX_B)
+                .as_str(),
+            &GOOD_POINTER.replace("HEX_C", HEX_C).replace("HEX_B", HEX_B),
+            true,
+        );
+        // volume_limit_bytes 非冻结值（200MiB）
+        wire_case(
+            "卷上限非冻结值",
+            GOOD_MANIFEST
+                .replace("209715200", "104857600")
+                .replace("HEX_A", HEX_A)
+                .replace("HEX_B", HEX_B)
+                .as_str(),
+            &GOOD_POINTER.replace("HEX_C", HEX_C).replace("HEX_B", HEX_B),
+            true,
+        );
+        // 卷 size 越过冻结卷上限
+        wire_case(
+            "卷 size 超上限",
+            GOOD_MANIFEST
+                .replace(r#""size":2048"#, r#""size":209715201"#)
+                .replace("HEX_A", HEX_A)
+                .replace("HEX_B", HEX_B)
+                .as_str(),
+            &GOOD_POINTER.replace("HEX_C", HEX_C).replace("HEX_B", HEX_B),
+            true,
+        );
+        // 清单卷 sha256 与 current.json 声明不一致
+        wire_case(
+            "卷 sha 与 current 不一致",
+            GOOD_MANIFEST
+                .replace("HEX_A", HEX_A)
+                .replace("HEX_B", HEX_D)
+                .as_str(),
+            &GOOD_POINTER.replace("HEX_C", HEX_C).replace("HEX_B", HEX_B),
+            true,
+        );
+        // 清单卷 sha256 非 hex
+        wire_case(
+            "清单卷 sha 非 hex",
+            GOOD_MANIFEST
+                .replace("HEX_A", HEX_A)
+                .replace("HEX_B", "zz")
+                .as_str(),
+            &GOOD_POINTER.replace("HEX_C", HEX_C).replace("HEX_B", HEX_B),
+            true,
+        );
+        // asset_name 必须与卷名一致
+        wire_case(
+            "asset_name 不一致",
+            GOOD_MANIFEST
+                .replace(r#""asset_name":"v1""#, r#""asset_name":"other.tar""#)
+                .replace("HEX_A", HEX_A)
+                .replace("HEX_B", HEX_B)
+                .as_str(),
+            &GOOD_POINTER.replace("HEX_C", HEX_C).replace("HEX_B", HEX_B),
+            true,
+        );
+        // 卷 size 为 0
+        wire_case(
+            "卷 size 为 0",
+            GOOD_MANIFEST
+                .replace(r#""size":2048"#, r#""size":0"#)
+                .replace("HEX_A", HEX_A)
+                .replace("HEX_B", HEX_B)
+                .as_str(),
+            &GOOD_POINTER.replace("HEX_C", HEX_C).replace("HEX_B", HEX_B),
+            true,
+        );
+        // 缺 object_count 字段（wire 冻结字段必须存在——serde 解析整体失败）
+        wire_case(
+            "缺 object_count",
+            GOOD_MANIFEST
+                .replace(r#""object_count":1,"#, "")
+                .replace("HEX_A", HEX_A)
+                .replace("HEX_B", HEX_B)
+                .as_str(),
+            &GOOD_POINTER.replace("HEX_C", HEX_C).replace("HEX_B", HEX_B),
+            true,
+        );
+        // r6 P1-8：零字节对象拒绝入索引
+        wire_case(
+            "零字节对象",
+            GOOD_MANIFEST
+                .replace(r#""offset":512,"size":3"#, r#""offset":512,"size":0"#)
+                .replace("HEX_A", HEX_A)
+                .replace("HEX_B", HEX_B)
+                .as_str(),
+            &GOOD_POINTER.replace("HEX_C", HEX_C).replace("HEX_B", HEX_B),
+            true,
+        );
+    }
+
+    // ---- r6 P1-6：manifest_path 冻结路径校验 ----
+
+    #[test]
+    fn manifest_path_must_be_frozen_generation_path() {
+        assert!(validate_manifest_path("manifest/manifest-1.json", 1).is_ok());
+        assert!(validate_manifest_path("manifest/manifest-12.json", 12).is_ok());
+        assert!(validate_manifest_path("manifest/manifest-1.json", 2).is_err(), "gen 必须一致");
+        for bad in [
+            "manifest/manifest-2.json",      // 错 gen
+            "manifest/manifest-01.json",     // 零填充代号
+            "../manifest/manifest-1.json",   // 穿越
+            "manifest/../manifest-1.json",   // 内嵌穿越
+            "/etc/manifest-1.json",          // 绝对路径
+            "manifests/manifest-1.json",     // 非 manifest 目录
+            "other/manifest-1.json",         // 非 manifest 目录
+            "manifest/manifest-1.json.bak",  // 尾随垃圾
+            "manifest/manifest-1.json/..",   // 尾随穿越
+            "Manifest/manifest-1.json",      // 大小写
+            "manifest/manifest-1.json ",     // 尾随空格
+            "",                              // 空串
+        ] {
+            assert!(
+                validate_manifest_path(bad, 1).is_err(),
+                "manifest_path {bad:?} 必须被拒绝"
+            );
+        }
+    }
+
+    /// r6 P1-6：注入式 manifest_path 在 refresh 链路被拒绝（发请求前拦截，LKG 保留）
+    #[tokio::test]
+    async fn refresh_rejects_injected_manifest_path_keeping_lkg() {
+        let fixture = make_fixture(1, 111, "http://mock");
+        let state = Arc::new(ManifestMockState::default());
+        state
+            .bodies
+            .lock()
+            .unwrap()
+            .insert("/manifest/current.json".to_owned(), fixture.pointer_json.clone().into_bytes());
+        state
+            .bodies
+            .lock()
+            .unwrap()
+            .insert(
+                "/manifest/manifest-1.json".to_owned(),
+                fixture.manifest_json.clone().into_bytes(),
+            );
+        let addr = spawn_manifest_mock(state.clone()).await;
+        let cfg = Arc::new(crate::test_support::test_config_default_cache(
+            format!("http://{addr}/manifest/current.json"),
+            std::env::temp_dir()
+                .join(format!("cdn-manifest-path-test-{}", std::process::id()))
+                .display()
+                .to_string(),
+        ));
+        let src = ManifestSource::new(cfg);
+        let good = src.refresh().await.expect("合法指针必须成功");
+        let hits_before = state.manifest_hits.load(std::sync::atomic::Ordering::SeqCst);
+
+        // 恶意指针：manifest_path 注入穿越段（sha 与清单真实一致——只有路径被篡改）
+        let evil = format!(
+            r#"{{"gen":1,"manifest_sha256":"{msha}","manifest_path":"../evil/manifest-1.json","volumes":[{{"asset_id":111,"url":"http://mock/x","sha256":"{vsha}","name":"{vol}"}}]}}"#,
+            msha = sha256_hex(fixture.manifest_json.as_bytes()),
+            vsha = sha256_hex(fixture.volume_name.as_bytes()),
+            vol = fixture.volume_name,
+        );
+        *state.bodies.lock().unwrap().get_mut("/manifest/current.json").unwrap() =
+            evil.into_bytes();
+        let err = src.refresh().await.expect_err("注入路径必须被拒绝");
+        assert!(err.contains("manifest_path"), "拒绝原因应为路径冻结校验：{err}");
+        assert_eq!(
+            state.manifest_hits.load(std::sync::atomic::Ordering::SeqCst),
+            hits_before,
+            "被拒指针不得发起清单拉取"
+        );
+        let lkg = src.get().await.expect("LKG 必须保留");
+        assert_eq!(lkg.pointer_fingerprint, good.pointer_fingerprint);
     }
 
     #[test]
@@ -876,6 +1206,32 @@ mod tests {
             lkg.volume_assets.get(fixture.volume_name),
             Some(&222),
             "LKG 指针不得被畸形清单污染"
+        );
+        assert_eq!(lkg.pointer_fingerprint, idx3.pointer_fingerprint);
+
+        // 5) r6 P1-5 LKG：object_count 与对象数组不符（sha 对得上但 wire 冻结字段矛盾）
+        //    → 整体拒绝，LKG 原样保留
+        let bad_count = fixture.manifest_json.replace("\"object_count\": 1", "\"object_count\": 2");
+        let count_pointer = format!(
+            r#"{{"gen":1,"manifest_sha256":"{msha}","manifest_path":"manifest/manifest-1.json","volumes":[{{"asset_id":444,"url":"http://mock/x","sha256":"{vsha}","name":"{vol}"}}]}}"#,
+            msha = sha256_hex(bad_count.as_bytes()),
+            vsha = sha256_hex(fixture.volume_name.as_bytes()),
+            vol = fixture.volume_name,
+        );
+        {
+            let mut bodies = state.bodies.lock().unwrap();
+            bodies.get_mut("/manifest/current.json").unwrap().clear();
+            bodies.get_mut("/manifest/current.json").unwrap().extend_from_slice(count_pointer.as_bytes());
+            bodies.get_mut("/manifest/manifest-1.json").unwrap().clear();
+            bodies.get_mut("/manifest/manifest-1.json").unwrap().extend_from_slice(bad_count.as_bytes());
+        }
+        let err = src.refresh().await.expect_err("object_count 不符必须整体拒绝");
+        assert!(err.contains("object_count"), "拒绝原因应为 object_count 对账：{err}");
+        let lkg = src.get().await.expect("LKG 必须保留");
+        assert_eq!(
+            lkg.volume_assets.get(fixture.volume_name),
+            Some(&222),
+            "LKG 指针不得被 object_count 矛盾清单污染"
         );
         assert_eq!(lkg.pointer_fingerprint, idx3.pointer_fingerprint);
     }
