@@ -662,31 +662,57 @@ mod tests {
 
     #[test]
     fn build_index_from_real_manifest_fixture() {
-        // 用子仓真实 manifest 产物（gen 1）喂解析器：字段语义 + 一致性 + r5 P1-6
-        // 全量 wire 校验（format_version/offset 对齐/卷边界/卷集合一致/key 路径格式）
+        // 用子仓真实 manifest 产物喂解析器：字段语义 + 一致性 + r5 P1-6 全量 wire
+        // 校验（format_version/offset 对齐/卷边界/卷集合一致/key 路径格式）。
+        // r7 P1-1：要读的清单与全部断言从 current.json 实况派生（gen/对象数/卷表），
+        // 指针换代（如 gen-2：3426 对象/105 卷）后自动跟随，不再硬编码 gen-1。
         let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../cdn-media");
-        let raw = match std::fs::read(fixture.join("manifest/manifest-1.json")) {
-            Ok(r) => r,
+        let pointer: CurrentJson = match serde_json::from_str(
+            &std::fs::read_to_string(fixture.join("manifest/current.json")).unwrap_or_default(),
+        ) {
+            Ok(p) => p,
             Err(_) => {
-                eprintln!("skip：本地无 cdn-media manifest fixture（CI 场景）");
+                eprintln!("skip：本地无 cdn-media current.json fixture（CI 场景）");
                 return;
             }
         };
-        let pointer: CurrentJson = serde_json::from_str(
-            &std::fs::read_to_string(fixture.join("manifest/current.json")).unwrap(),
-        )
-        .unwrap();
+        let raw = match std::fs::read(fixture.join(&pointer.manifest_path)) {
+            Ok(r) => r,
+            Err(_) => {
+                eprintln!("skip：本地无 {} fixture（CI 场景）", pointer.manifest_path);
+                return;
+            }
+        };
         let idx = build_index(&pointer, &raw).expect("真实清单必须可构建索引（r5 P1-6 校验全过）");
-        assert_eq!(idx.gen, 1);
-        assert!(idx.objects.len() >= 3413);
+        // 代际与集合规模以 current 实况为准
+        assert_eq!(idx.gen, pointer.gen, "索引 gen 必须等于 current.json gen");
+        let wire: serde_json::Value = serde_json::from_slice(&raw).unwrap();
+        let wire_objects = wire["objects"].as_array().unwrap().len();
+        assert_eq!(
+            idx.objects.len(),
+            wire_objects,
+            "索引对象数必须与 manifest 实况一致"
+        );
+        assert!(wire_objects >= 3413, "存量对象数只增不减（初代 3413）");
+        assert_eq!(
+            idx.volume_assets.len(),
+            pointer.volumes.len(),
+            "索引卷表必须覆盖 current.json 全部卷"
+        );
+        // 卷表逐卷对账（asset id 来自 current 实况，不硬编码）
+        for cv in &pointer.volumes {
+            assert_eq!(
+                idx.volume_assets.get(&cv.name),
+                Some(&cv.asset_id),
+                "卷 {} 的 asset id 必须与 current.json 一致",
+                cv.name
+            );
+        }
+        // 初代即存在的锚点对象：offset/尺寸/类型字段语义不随换代漂移
         let obj = idx.lookup("x/1970-01/1004445344514572290-poster.jpg").unwrap();
         assert_eq!(obj.offset, 512);
         assert_eq!(obj.size, 33861);
         assert_eq!(obj.content_type, "image/jpeg");
-        assert_eq!(
-            idx.volume_assets.get("vol-1970-01-001.tar"),
-            Some(&615171231)
-        );
         // 对象回源 URL 必须是 asset id API URL（A2）
         assert!(idx
             .object_url("Gaubee/cdn-media.gaubee.com", obj)

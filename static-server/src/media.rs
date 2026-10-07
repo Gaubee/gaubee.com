@@ -419,7 +419,10 @@ async fn stream_through_tee(
         };
 
     let state = TeeState {
-        upstream: Box::pin(resp.bytes_stream()),
+        upstream: Box::pin(
+            resp.bytes_stream()
+                .map(|r| r.map_err(|e| Box::new(e) as BoxError)),
+        ),
         file: Some(file),
         hasher: Sha256::new(),
         written: 0,
@@ -437,54 +440,12 @@ async fn stream_through_tee(
         // 再释放锁，等待者看到的一定是收口后的账目）
         flight,
     };
+    // r7 P1-3：单步推进收敛到 TeeState::next_chunk——入口先判 done，abort/finish
+    // 之后消费者再多 poll 也立即终止（不消费上游、不重复 finish/abort），
+    // 状态机对任意消费者行为闭合
     let body = Body::from_stream(futures_util::stream::unfold(state, |mut st| async move {
-        match st.upstream.next().await {
-            Some(Ok(chunk)) => {
-                st.hasher.update(&chunk);
-                // r5 P1-9：写盘前 checked 投影——超长/溢出立即中止（删 tmp+poisoned），
-                // 绝不把越界字节落到临时文件
-                let projected = match st.written.checked_add(chunk.len() as u64) {
-                    Some(p) if p <= st.size => p,
-                    _ => {
-                        st.abort(
-                            "上游超长",
-                            &format!("written={} chunk={} expect={}", st.written, chunk.len(), st.size),
-                        )
-                        .await;
-                        return Some((Err("upstream over-length".into()), st));
-                    }
-                };
-                if let Some(f) = st.file.as_mut() {
-                    if let Err(e) = f.write_all(&chunk).await {
-                        st.abort("临时文件写入失败", &e.to_string()).await;
-                        return Some((Err(Box::new(e) as BoxError), st));
-                    }
-                }
-                st.written = projected;
-                // 关键：不能等流 EOF（None）才终验——hyper 发满 Content-Length 后
-                // 不再轮询 body，Drop 兜底会把临时文件当失败清理。对象长度在
-                // manifest 里是已知常量，收满即终验+入缓存。
-                if st.written == st.size {
-                    st.finish().await;
-                }
-                Some((Ok(chunk), st))
-            }
-            Some(Err(e)) => {
-                st.abort("回源流中断", &e.to_string()).await;
-                Some((Err(Box::new(e) as BoxError), st))
-            }
-            None => {
-                // 收满路径已在上面终验；这里处理「上游提前断流」（written < size）
-                if !st.done {
-                    st.abort(
-                        "上游提前断流",
-                        &format!("written={}/{}", st.written, st.size),
-                    )
-                    .await;
-                }
-                None
-            }
-        }
+        let item = st.next_chunk().await;
+        item.map(|item| (item, st))
     }));
     // 头部先行：no-store（r5 P1-7，非严格 tee 校验通过前不承诺 immutable）
     let mut resp = Response::new(body);
@@ -504,7 +465,9 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 /// admission 预留随状态机走——finish 转正、abort/Drop 归还（r5 P0-4）；
 /// r6 P0-1：flight 守卫随状态机存活到流结束（Drop 按字段序：先还预留、再放锁）
 struct TeeState {
-    upstream: std::pin::Pin<Box<dyn futures_util::Stream<Item = Result<bytes::Bytes, reqwest::Error>> + Send>>,
+    /// r7 P1-3：错误类型泛化为 BoxError（reqwest 错误在构造处 map），
+    /// 测试可用内存流直喂状态机做闭合性验证
+    upstream: std::pin::Pin<Box<dyn futures_util::Stream<Item = Result<bytes::Bytes, BoxError>> + Send>>,
     file: Option<tokio::fs::File>,
     hasher: Sha256,
     written: u64,
@@ -524,6 +487,65 @@ struct TeeState {
 }
 
 impl TeeState {
+    /// r7 P1-3：单步推进（unfold 消费的唯一入口）。
+    /// done（abort/finish 已收口）时立即返回 None——绝不再消费 upstream、
+    /// 绝不再触发 abort/finish，状态机对「错误后继续 poll」「收满后上游
+    /// 迟迟不 EOF」等任意消费者行为闭合。
+    async fn next_chunk(&mut self) -> Option<Result<bytes::Bytes, BoxError>> {
+        if self.done {
+            return None;
+        }
+        match self.upstream.next().await {
+            Some(Ok(chunk)) => {
+                self.hasher.update(&chunk);
+                // r5 P1-9：写盘前 checked 投影——超长/溢出立即中止（删 tmp+poisoned），
+                // 绝不把越界字节落到临时文件
+                let projected = match self.written.checked_add(chunk.len() as u64) {
+                    Some(p) if p <= self.size => p,
+                    _ => {
+                        self.abort(
+                            "上游超长",
+                            &format!("written={} chunk={} expect={}", self.written, chunk.len(), self.size),
+                        )
+                        .await;
+                        return Some(Err("upstream over-length".into()));
+                    }
+                };
+                if let Some(f) = self.file.as_mut() {
+                    if let Err(e) = f.write_all(&chunk).await {
+                        let msg = e.to_string();
+                        self.abort("临时文件写入失败", &msg).await;
+                        return Some(Err(Box::new(e)));
+                    }
+                }
+                self.written = projected;
+                // 关键：不能等流 EOF（None）才终验——hyper 发满 Content-Length 后
+                // 不再轮询 body，Drop 兜底会把临时文件当失败清理。对象长度在
+                // manifest 里是已知常量，收满即终验+入缓存。
+                if self.written == self.size {
+                    self.finish().await;
+                }
+                Some(Ok(chunk))
+            }
+            Some(Err(e)) => {
+                let msg = e.to_string();
+                self.abort("回源流中断", &msg).await;
+                Some(Err(e))
+            }
+            None => {
+                // 收满路径已在上面终验；这里处理「上游提前断流」（written < size）
+                if !self.done {
+                    self.abort(
+                        "上游提前断流",
+                        &format!("written={}/{}", self.written, self.size),
+                    )
+                    .await;
+                }
+                None
+            }
+        }
+    }
+
     async fn abort(&mut self, why: &str, detail: &str) {
         self.done = true;
         self.file = None;
@@ -1071,6 +1093,21 @@ impl futures_util::Stream for HashedStream {
     }
 }
 
+/// r7 P1-4：Drop 收口——客户端中途断开（响应体未消费完即被丢弃）时，state 尚未
+/// 走完任一终态（收满终验 / 错误 / EOF 对账），视为透传失败标 poisoned：
+/// 半截透传绝不当作成功放行（响应头本就 no-store，重试即得正确副本）。
+/// 终态路径都会 take() 清空 state，Drop 只在「半途丢弃」这一种情况起作用。
+impl Drop for HashedStream {
+    fn drop(&mut self) {
+        if let Some((_, _, key, cache, received, expect_size)) = self.state.take() {
+            eprintln!(
+                "[cdn-media] 透传响应被中途丢弃 {key}：{received}/{expect_size}（标 poisoned）"
+            );
+            cache.mark_poisoned(&key);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1465,6 +1502,154 @@ mod tests {
         std::fs::remove_dir_all(&root).ok();
     }
 
+    /// r7 P1-3：tee 状态机闭合（内存流直喂）——上游 Err（abort 收口）之后消费者
+    /// 再多 poll：立即返回 None，不再消费上游（错误后残留的 Ok 块不得再进入
+    /// hasher/文件）、不再触发 finish/abort；poisoned、tmp 已删、预留与锁随 Drop 全归还
+    #[tokio::test]
+    async fn tee_state_after_error_poll_is_terminal() {
+        let full = b"tee-close-after-error-payload".to_vec();
+        let (ctx, root) = test_ctx("tee-close-err").await;
+        let key = "x/2020-01/teecloseerr.jpg";
+        let res = ctx.cache.admit(key, full.len() as u64).expect("admission 应通过");
+        let tmp = ctx.cache.new_tmp_path(key);
+        let file = tokio::fs::File::create(&tmp).await.expect("tmp file");
+        // 上游剧本：8 字节 → Err（断流）→ 又一段 Ok（异常流在错误后继续出数据）
+        let err_item: BoxError =
+            Box::new(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "mock reset"));
+        let upstream: std::pin::Pin<
+            Box<dyn futures_util::Stream<Item = Result<bytes::Bytes, BoxError>> + Send>,
+        > = Box::pin(futures_util::stream::iter(vec![
+            Ok(bytes::Bytes::from(full[..8].to_vec())),
+            Err(err_item),
+            Ok(bytes::Bytes::from(full[8..].to_vec())),
+        ]));
+        let mut st = TeeState {
+            upstream,
+            file: Some(file),
+            hasher: Sha256::new(),
+            written: 0,
+            cache: ctx.cache.clone(),
+            tmp: tmp.clone(),
+            final_path: ctx.cache.path_for(key),
+            key: key.to_owned(),
+            expect_sha: sha256_hex(&full),
+            size: full.len() as u64,
+            pinned: false,
+            res: Some(res),
+            done: false,
+            flight: ctx.cache.lock_key_owned(key).await,
+        };
+        let first = st
+            .next_chunk()
+            .await
+            .expect("第一块必须送达")
+            .expect("第一块必须为 Ok");
+        assert_eq!(&first[..], &full[..8]);
+        assert!(
+            st.next_chunk().await.expect("Err 帧必须转出").is_err(),
+            "上游 Err 必须以错误帧转出（abort 已触发）"
+        );
+        // 核心断言：done 后再 poll 必须 None——错误后残留的 Ok 块绝不再被消费
+        assert!(st.next_chunk().await.is_none(), "abort 后再 poll 必须立即终止");
+        assert!(st.next_chunk().await.is_none(), "重复 poll 持续幂等终止");
+        assert!(ctx.cache.is_poisoned(key), "断流必须标 poisoned");
+        assert!(ctx.cache.lookup(key).is_none(), "断流不得入缓存");
+        assert!(!tmp.exists(), "abort 必须删除临时文件");
+        assert_tmp_empty(&root);
+        // 状态机存续期间预留仍持有；Drop（body 丢弃）后必须全部归还
+        drop(st);
+        assert_eq!(ctx.cache.stats().inflight_reserved, 0, "预留必须随 Drop 归还");
+        assert_eq!(ctx.cache.total(), 0, "失败路径不得入账");
+        assert_eq!(ctx.cache.inflight_locks_len(), 0, "锁表必须随 Drop 摘除");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// r7 P1-3：收满 size 即 finish（commit+rename），此后上游迟迟不 EOF——
+    /// done 后再 poll 立即 None，绝不再等待/消费上游（有界超时证明不挂起）
+    #[tokio::test]
+    async fn tee_state_full_length_silent_upstream_commits_and_closes() {
+        let full = b"tee-full-length-silent-upstream".to_vec();
+        let (ctx, root) = test_ctx("tee-silent").await;
+        let key = "x/2020-01/teesilent.jpg";
+        let expect_sha = sha256_hex(&full);
+        let size = full.len() as u64;
+        let res = ctx.cache.admit(key, size).expect("admission 应通过");
+        let tmp = ctx.cache.new_tmp_path(key);
+        let file = tokio::fs::File::create(&tmp).await.expect("tmp file");
+        // 上游剧本：一次性发满 size 字节后永远 Pending（不发 EOF）
+        let upstream: std::pin::Pin<
+            Box<dyn futures_util::Stream<Item = Result<bytes::Bytes, BoxError>> + Send>,
+        > = Box::pin(
+            futures_util::stream::once(async move { Ok(bytes::Bytes::from(full)) })
+                .chain(futures_util::stream::pending::<Result<bytes::Bytes, BoxError>>()),
+        );
+        let mut st = TeeState {
+            upstream,
+            file: Some(file),
+            hasher: Sha256::new(),
+            written: 0,
+            cache: ctx.cache.clone(),
+            tmp: tmp.clone(),
+            final_path: ctx.cache.path_for(key),
+            key: key.to_owned(),
+            expect_sha,
+            size,
+            pinned: false,
+            res: Some(res),
+            done: false,
+            flight: ctx.cache.lock_key_owned(key).await,
+        };
+        let chunk = st
+            .next_chunk()
+            .await
+            .expect("收满块必须送达")
+            .expect("收满块必须为 Ok");
+        assert_eq!(chunk.len() as u64, size);
+        // 收满即终验：缓存入账、预留转正、tmp 已 rename
+        assert!(ctx.cache.lookup(key).is_some(), "收满即终验入缓存（不等 EOF）");
+        assert_eq!(ctx.cache.total(), size);
+        assert_eq!(ctx.cache.stats().inflight_reserved, 0, "commit 后 inflight 归零");
+        assert_tmp_empty(&root);
+        // 核心断言：finish 后再 poll 立即 None——上游 Pending 也绝不能挂住状态机
+        let again = tokio::time::timeout(std::time::Duration::from_millis(500), st.next_chunk()).await;
+        assert!(
+            matches!(again, Ok(None)),
+            "finish 后再 poll 必须立即返回 None（不得等待上游 EOF）：{again:?}"
+        );
+        drop(st);
+        assert_eq!(ctx.cache.inflight_locks_len(), 0, "锁表必须随 Drop 摘除");
+        assert_eq!(ctx.cache.total(), size, "commit 入账不受 Drop 影响");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// r7 P1-4：透传流半途被丢弃（客户端断连）→ Drop 收口标 poisoned（内存流直喂）
+    #[tokio::test]
+    async fn hashed_stream_drop_mid_stream_poisons() {
+        let (ctx, root) = test_ctx("hashed-drop").await;
+        let key = "x/2020-01/hasheddrop.jpg";
+        {
+            let mut stream = HashedStream {
+                inner: Box::pin(futures_util::stream::iter(vec![Ok(bytes::Bytes::from(vec![
+                    b'x';
+                    100
+                ]))])),
+                state: Some((
+                    Sha256::new(),
+                    sha256_hex(b"whatever"),
+                    key.to_owned(),
+                    ctx.cache.clone(),
+                    0,
+                    500,
+                )),
+            };
+            use futures_util::StreamExt;
+            assert!(stream.next().await.is_some(), "第一块正常送达");
+            // 半途丢弃：未收满、无错误、无 EOF——Drop 兜底
+        }
+        assert!(ctx.cache.is_poisoned(key), "半途丢弃必须由 Drop 标 poisoned");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
     /// r5 P1-9：透传流 received 超 expect → poisoned + 流终止（内存流直喂）
     #[tokio::test]
     async fn hashed_stream_over_length_poisons() {
@@ -1831,16 +2016,21 @@ mod tests {
         std::fs::remove_dir_all(&root).ok();
     }
 
-    /// tee 全链路：上游声明 CL = size-3 并只发 size-3 字节——framing 层提前 EOF，
-    /// 应用层看到「上游提前断流」→ poisoned；缓存无残留
+    /// tee 全链路（r7 P1-4 真实 framing 短 EOF）：头诚实声明对象完整的
+    /// Content-Range/Content-Length（validate_upstream_206 放行进入流阶段），
+    /// socket 实际少发 3 字节后断开——reqwest body 以错误终止 → abort →
+    /// poisoned；无缓存、无 tmp、预留归还、锁表清理。此前用例把 CL/CR 一并写成
+    /// 截短值，在头校验层即被拦截，从未测到 framing 路径。
     #[tokio::test]
     async fn serve_tee_framing_short_content_length_poisons() {
         let expect = b"framing-short-payload-bytes";
         let truncated = expect[..expect.len() - 3].to_vec();
         let st = Arc::new(std::sync::Mutex::new(ObjectMockState {
             status: 206,
-            content_range: Some(format!("bytes 512-{}/2048", 512 + truncated.len() - 1)),
-            content_length: Some(truncated.len().to_string()),
+            // 头诚实：完整区间 + 完整 CL
+            content_range: Some(format!("bytes 512-{}/2048", 512 + expect.len() - 1)),
+            content_length: Some(expect.len().to_string()),
+            // socket 实际少发 3 字节
             body: truncated,
             ..Default::default()
         }));
@@ -1851,14 +2041,15 @@ mod tests {
 
         let resp = serve(State(ctx.clone()), get_req(key, None)).await;
         let got = body_bytes(resp).await;
-        // 客户端被承诺 size 字节但流在 size-3 处终止：必须以错误收尾（绝不静默成功）
+        // 客户端被承诺 size 字节但流在 size-3 处以错误终止：绝不静默成功
         assert!(
             got.is_err() || got.as_ref().expect("err 情形之外必有 body").len() != expect.len(),
             "短长流不得伪装成完整响应"
         );
         assert!(ctx.cache.lookup(key).is_none(), "提前断流不得入缓存");
         assert!(ctx.cache.is_poisoned(key), "提前断流必须标 poisoned");
-        assert_eq!(ctx.cache.stats().inflight_reserved, 0);
+        assert_eq!(ctx.cache.stats().inflight_reserved, 0, "断流后预留必须归还");
+        assert_eq!(ctx.cache.inflight_locks_len(), 0, "断流后锁表必须清理");
         assert_tmp_empty(&root);
         std::fs::remove_dir_all(&root).ok();
     }
@@ -1920,15 +2111,19 @@ mod tests {
         std::fs::remove_dir_all(&root).ok();
     }
 
-    /// pass_through 全链路：短长 framing → 提前 EOF → poisoned
+    /// pass_through 全链路（r7 P1-4 真实 framing 短 EOF）：头诚实声明完整
+    /// Content-Range/Content-Length，socket 实际少发 2 字节后断开——reqwest body
+    /// 报错 → HashedStream Err 分支收口标 poisoned；缓存无残留
     #[tokio::test]
     async fn serve_pass_through_framing_short_poisons() {
         let expect = b"pass-through-short-body";
         let truncated = expect[..expect.len() - 2].to_vec();
         let st = Arc::new(std::sync::Mutex::new(ObjectMockState {
             status: 206,
-            content_range: Some(format!("bytes 512-{}/2048", 512 + truncated.len() - 1)),
-            content_length: Some(truncated.len().to_string()),
+            // 头诚实：完整区间 + 完整 CL
+            content_range: Some(format!("bytes 512-{}/2048", 512 + expect.len() - 1)),
+            content_length: Some(expect.len().to_string()),
+            // socket 实际少发 2 字节
             body: truncated,
             ..Default::default()
         }));
@@ -1945,6 +2140,38 @@ mod tests {
         );
         assert!(ctx.cache.is_poisoned(key), "透传提前断流必须标 poisoned");
         assert!(ctx.cache.lookup(key).is_none());
+        assert_eq!(ctx.cache.stats().inflight_reserved, 0, "透传不占用预留");
+        assert_tmp_empty(&root);
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// r7 P1-4：pass-through 客户端中途断开（响应体未消费完即被丢弃）——
+    /// HashedStream Drop 收口标 poisoned：半截透传绝不当作成功放行；
+    /// 透传无预留无 tmp，缓存无残留
+    #[tokio::test]
+    async fn serve_pass_through_disconnect_mid_stream_poisons() {
+        let body = b"pass-through-disconnect-payload".to_vec();
+        let st = Arc::new(std::sync::Mutex::new(ObjectMockState::ok_206(
+            format!("bytes 512-{}/2048", 512 + body.len() - 1),
+            body,
+        )));
+        let addr = spawn_object_mock(st).await;
+        let (ctx, root) = serve_ctx("pt-disconnect", 8).await;
+        let key = "x/2020-01/ptdisconnect.jpg";
+        inject_index(
+            &ctx,
+            vec![serve_obj(b"pass-through-disconnect-payload", key)],
+            format!("http://{addr}"),
+        )
+        .await;
+
+        let resp = serve(State(ctx.clone()), get_req(key, None)).await;
+        assert_eq!(resp.headers().get("cache-control").unwrap(), "no-store");
+        // 客户端断连 = 不消费 body 直接丢弃 → HashedStream Drop 收口
+        drop(resp);
+        assert!(ctx.cache.is_poisoned(key), "半截透传必须由 Drop 收口标 poisoned");
+        assert!(ctx.cache.lookup(key).is_none(), "透传不得入缓存");
+        assert_eq!(ctx.cache.stats().inflight_reserved, 0, "透传不占用预留");
         assert_tmp_empty(&root);
         std::fs::remove_dir_all(&root).ok();
     }

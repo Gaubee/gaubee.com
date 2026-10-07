@@ -84,10 +84,16 @@ mod tests {
 
     static MANIFEST: LazyLock<Option<serde_json::Value>> = LazyLock::new(|| {
         let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../cdn-media");
-        serde_json::from_str(
-            &std::fs::read_to_string(base.join("manifest/manifest-1.json")).ok()?,
-        )
-        .ok()
+        // r7 P1-1：清单文件从 current.json 的 manifest_path 派生——指针换代
+        // （gen-1 → gen-2 …）后自动跟随，不再永久硬编码 manifest-1.json
+        let Ok(pointer_raw) = std::fs::read_to_string(base.join("manifest/current.json")) else {
+            return None;
+        };
+        let Ok(pointer) = serde_json::from_str::<serde_json::Value>(&pointer_raw) else {
+            return None;
+        };
+        let rel = pointer["manifest_path"].as_str()?;
+        serde_json::from_str(&std::fs::read_to_string(base.join(rel)).ok()?).ok()
     });
 
     fn staging_volume(name: &str) -> Option<std::path::PathBuf> {
