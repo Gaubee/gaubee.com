@@ -55,21 +55,44 @@ df -h /opt/gaubee/media-cache
 > 所以本节全部步骤都可以在媒体前端无感的前提下灰度推进；只有写入一条非空 mediaBase
 > 规则才会开始改写引用，随时可写回空串全球切回同源。
 
-## 1. Worker 部署（r10 P1-1 起：规则存储为 Durable Object，无部署前资源待办）
+## 1. Worker 部署（规则存储为 Durable Object；生产收据：KV 零状态，无迁移需求，r11 P1-1）
 
-> **历史 KV 待办已由 DO 替代**：原「创建生产 KV + 替换 wrangler.toml 两处
-> PLACEHOLDER_CREATE_BEFORE_DEPLOY 占位符」不再存在——规则文档现由单写入器
-> Durable Object（binding `GEO_RULES_DO` / 类 `GeoRulesDO`）承载，实例经
-> `idFromName("geo-rules")` 派生 id，类由 wrangler.toml 的 `[[migrations]]`（tag v1,
-> new_classes）在首次 `wrangler deploy` 时自动创建，**无任何手动资源步骤**。
-> deploy-worker.yml 的 KV 占位符守卫（skip deploy + regex fixtures）随之删除。
+> **部署收据（2026-10-07 依据 deploy-worker.yml 全部 13 次运行核实）——生产从未存在
+> GEO_RULES KV，无任何规则数据可迁移**：
+> - 成功部署只有 2026-07-24 ～ 2026-08-14 的 7 次（run 30074387592 / 30125697664 /
+>   30160940159 / 30199208445 / 30316282876 / 30522909532 / 31786419710），全部早于
+>   Phase 2（geo 模块 2026-10-07 才随 70640720 入库）。当前生产 worker（gaubee-auth-production）
+>   即 2026-08-14 版本：从未包含任何 geo / KV / DO binding，也从未服务过 /api/geo。
+> - 首个含 GEO_RULES KV binding 的提交 70640720（wrangler.toml id 仍是
+>   PLACEHOLDER_CREATE_BEFORE_DEPLOY 占位符）部署 FAILED（run 37573789659：npm ci 的
+>   Arborist edgesOut bug，未走到 wrangler deploy）；修复尝试 c5c4dd85 也 FAILED
+>   （run 37575131668：worker 测试 TSCONFIG_ERROR）。
+> - 其后三个提交（7647822b / d85cfcb6 / 456d2c75）workflow 虽绿，但 KV 占位符守卫置
+>   SKIP_DEPLOY=1，wrangler deploy 从未执行（run 37575490505 / 37577693434 / 37578421101
+>   日志均含「仍含 GEO_RULES KV 占位符…跳过部署」warning）。
+> - 综上：**生产 KV 零状态（binding 从未部署、namespace 从未创建、零规则写入），
+>   无迁移需求**——不存在「已有规则被 DO 空状态静默顶掉」的发布回退面。
+>
+> **防御性说明**：若未来在任何环境发现 KV 规则存量（例如某台开发机曾用
+> `wrangler kv key put --local` 写入过——那只存在于该机 .wrangler/state，不可能出现在生产），
+> 迁移路径是经 owner PUT 逐条写入 DO（首写接受任意正整数版本，其后必须 current+1，
+> 见第 3 节版本纪律）；不存在也不计划提供自动 KV→DO 迁移工具。
+>
+> **DO 部署形态**：规则文档由单写入器 Durable Object（binding `GEO_RULES_DO` /
+> 类 `GeoRulesDO`）承载，实例经 `idFromName("geo-rules")` 派生 id，类由 wrangler.toml
+> `[[migrations]]`（tag v1，`new_sqlite_classes`）在首次 `wrangler deploy` 时自动创建，
+> **无任何手动资源步骤**。free plan 只接受 `new_sqlite_classes`：首个含 DO 的提交
+> f03a4507 用 `new_classes` 部署即被 Cloudflare API 拒绝（run 37581484857，错误码 10097
+> 「free plan 下必须用 new_sqlite_classes 迁移创建 namespace」），wrangler.toml 已改为
+> `new_sqlite_classes`（v1 此前从未成功发布到任何环境，改动不违「账本只增不改」）。
+> deploy-worker.yml 的 KV 占位符守卫（skip deploy + regex fixtures）已随 KV binding 一并删除。
 > 迁移账本只增不改：后续新增 DO 类必须追加新 tag（v2...），不可重放 v1。
 
 ```sh
 cd worker
 # 1) （可选）本地先演练：npx wrangler dev 后 curl localhost:8787/api/geo
 # 2) 部署（CI deploy-worker.yml 也会在 push worker/** 时自动做；手动等价命令：）
-npx wrangler deploy --env production   # 首次部署自动应用 migrations（new_classes: GeoRulesDO）
+npx wrangler deploy --env production   # 首次部署自动应用 migrations（new_sqlite_classes: GeoRulesDO）
 ```
 
 - `OWNER_LOGIN` 已在 wrangler.toml（= gaubee，非敏感 var）；secrets 不变。
@@ -130,13 +153,12 @@ curl -s -X PUT https://gaubee.com/api/geo/rules \
 ## 4. 本地私有化验收（同一程序、仅参数不同）
 
 ```sh
+export GH_TOKEN="$(gh auth token)"   # 自定义 base 场景经 owner PUT 种规则（真实 Bearer→GitHub /user→owner 鉴权链路）
 pnpm build && (pnpm exec vite preview --host 127.0.0.1 &)
-cd worker && npx wrangler dev   # 另开终端
 PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 pnpm exec playwright test tests/media-geo.e2e.ts
-# 三用例：worker 不可达（关掉 wrangler dev 单跑该文件）、默认规则、自定义 base 重写
+# 三场景：worker 不可达（先在 wrangler dev 未启动时跑一轮，再补下面两场景）、默认规则、自定义 base 重写。
+# wrangler dev 由测试按需拉起（--persist-to 一次性临时目录，DO 空状态，默认规则场景依赖它），
+# 结束后测试自动回收进程并清理目录；也可手动 `cd worker && npx wrangler dev` 预先启动复用
+#（此时默认规则场景要求该实例的 DO 处于空状态，否则该场景会报出明确指引并失败）。
 ```
-
-> ⚠ r10 P1-1 存留待办：`tests/media-geo.e2e.ts` 的种规则方式仍是 KV 时代的
-> `wrangler kv key put --binding GEO_RULES --local`，KV binding 删除后会失败——
-> 该文件在 worker/ 目录之外，需单独迁移（如改为经本地 `PUT /api/geo/rules` 种规则）。
 

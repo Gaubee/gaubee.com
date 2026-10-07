@@ -19,7 +19,8 @@ R2/ESA 后续作为可插拔性能件接入。**Phase 0-3 完成后，不配置 
   （manifest generation 协议）+ failover/熔断 + loopback admin 端口的预热接口 + 持久缓存卷。
 - **Phase 2 引用与路由**：渲染 action 重写 src/poster/source[src]/href 四类属性 →
   geo 指定的外部 mediaBase（默认同源不重写）；worker `/api/geo`（Bearer GitHub owner 鉴权 +
-  KV）+ 后台配置页；本地/生产同 schema 配置文件。
+  规则存单写入器 Durable Object `GEO_RULES_DO`/`GeoRulesDO`，r10 起，部署收据确认生产
+  KV 零状态无迁移）+ 后台配置页；本地/生产同 schema 配置文件。
 - **Phase 3 管道切换与摘除**：生成器前缀 `/x-media/` → `/cdn-media/x/` + 全量重渲染；
   迁移矩阵全量脚本（fetch/backfill/posters/audit/audit-fix/media-meta）切 staging+manifest；
   主仓库 `git rm -r --cached static/x-media` + ignore/dockerignore；

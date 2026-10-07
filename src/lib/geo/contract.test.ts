@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 
 import {
 	DEFAULT_GEO_RULES,
-	GEO_RULES_KV_KEY,
 	isValidMediaBase,
 	isValidRuleVersion,
 	joinMediaBase,
@@ -144,9 +143,9 @@ describe("joinMediaBase", () => {
 		);
 	});
 
-	it("KV 存储常量与默认规则版本", () => {
-		expect(GEO_RULES_KV_KEY).toBe("geo_rules_v1");
+	it("内置默认规则版本（v0 = 未写规则的全球同源代次）", () => {
 		expect(DEFAULT_GEO_RULES.version).toBe(0);
+		expect(DEFAULT_GEO_RULES.rules).toEqual([{ match: { default: true }, mediaBase: "" }]);
 	});
 });
 

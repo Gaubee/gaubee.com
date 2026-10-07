@@ -28,11 +28,12 @@ bindings = [
   { name = "GEO_RULES_DO", class_name = "GeoRulesDO" },
 ]
 
-# Durable Object 迁移账本：new_classes 只增不改（已发布的 tag 不可重放或改名）；
-# 顶层 migrations 对所有 env（含 production）生效。
+# Durable Object 迁移账本：new_sqlite_classes 只增不改（已发布的 tag 不可重放或改名）；
+# 必须用 sqlite 变体——free plan 拒绝 new_classes（API 10097，CI run 37581484857 实证，
+# 收据见 deploy/cdn-base-rollout.md 第 1 节）；顶层 migrations 对所有 env（含 production）生效。
 [[migrations]]
 tag = "v1"
-new_classes = ["GeoRulesDO"]
+new_sqlite_classes = ["GeoRulesDO"]
 
 # 生产环境配置（CI 用 wrangler deploy --env production 触发）：
 # APP_ORIGIN 必须与静态站（GitHub Pages）实际域名一致，用于 CORS 与 OAuth 回调重定向。

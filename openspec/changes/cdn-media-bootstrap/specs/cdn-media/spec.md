@@ -72,12 +72,15 @@ last-known-good。
 ### Requirement: 地区路由配置
 
 `/api/geo`（CF Workers + Hono）必须（SHALL）按 IP→地区→mediaBase 规则返回基础域；写接口以
-Bearer GitHub token 验证 /user 与 owner 匹配；规则存 KV。
+Bearer GitHub token 验证 /user 与 owner 匹配；规则存单写入器 Durable Object（binding
+`GEO_RULES_DO`、类 `GeoRulesDO`、实例 `idFromName("geo-rules")`、wrangler.toml migrations
+tag v1 用 `new_sqlite_classes`）；DO binding 缺失/不可达/无状态/损坏时回退内置默认规则
+（A8 同源，读路径不 500）。
 
 #### Scenario: owner 更新规则
 
 - WHEN 持有效 GitHub token 且 login 与 owner 匹配的请求写规则
-- THEN KV 更新生效且留下审计记录
+- THEN DO 更新生效（版本单调：首写任意正整数，其后必须 current+1，冲突 409 带 currentVersion）且留下审计记录
 
 #### Scenario: 非 owner 写入
 

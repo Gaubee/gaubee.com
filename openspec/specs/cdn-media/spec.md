@@ -87,8 +87,15 @@
   灰度/降级（某源降权、全球切回自托管）= 改规则，不碰 DNS。
 - **鉴权模型（r1 复核裁决）**：GET /api/geo 公读；写接口独立鉴权——`Authorization: Bearer
   <GitHub token>` → 调 GitHub /user → login 与配置 owner 匹配（前端 OAuth cookie 无 worker
-  session，不复用）；严格 CORS、限流、审计；KV binding 进 wrangler.toml（dev/prod），
-  规则 schema + 默认回退；Worker 单测 + 部署后真实请求验收。
+  session，不复用）；严格 CORS、限流、审计；Worker 单测 + 部署后真实请求验收。
+- **规则存储（r10 复核裁决：单写入器 Durable Object，替代 KV——KV 无 compare-and-swap，
+  并发 owner 写会双双读到同代后写覆盖）**：binding `GEO_RULES_DO` / 类 `GeoRulesDO` /
+  实例 `idFromName("geo-rules")`，binding 进 wrangler.toml（dev/prod，per-env 重申），
+  `[[migrations]]` tag v1 用 `new_sqlite_classes`（free plan 拒绝 `new_classes`，API 10097
+  实证，部署收据见 deploy/cdn-base-rollout.md）；版本单调判定收敛进 DO 串行执行
+  （首写任意正整数，其后必须 current+1，重复/回退/跳跃 409 带 currentVersion）；
+  DO 故障回退语义：binding 缺失/不可达/无状态/损坏 → 内置默认规则（A8 同源，读路径
+  绝不 500），写路径 DO 失败 502、校验拒绝 400 原样透传。
 - 渲染 action 从 geo 结果取 base；本地私有化 `mediaBase` 指向 localhost 同拓扑。
 - **引用覆盖**：action 必须重写 src / poster / source[src] / href 全部属性
   （r1 实测 /x-media/ 引用 4510 处），幂等 + MutationObserver + geo 失败回退默认 base。

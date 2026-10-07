@@ -16,10 +16,10 @@ Bun/TS 归属 **cdn-media 子仓 `tools/`**（主仓编排，子仓提交同步 
 | A3 | ★缓存卷落地机制（v4 修正） | 采用 **bind mount**（现状澄清：镜像仅 Dockerfile `USER 65532:65532`，compose 无 user/env_file）。部署文档（写入 1Panel 步骤）：宿主目录绝对路径（如 `/opt/gaubee/media-cache`）预创建 + `chown 65532:65532`；compose 挂载为容器内 `MEDIA_CACHE_DIR=/media-cache`；启动校验：可写探针文件、剩余空间 ≥ high×1.2、水位合法，任何失败**启动即败**（日志给修复指令）；磁盘满行为：拒绝入缓存仅透传（服务不中断）；升级迁移：目录 self-describing（key 即路径） |
 | A4 | 媒体 HTTP 语义 | ★**middleware 拆分**：/cdn-media/* 子路由**绕过全局 CompressionLayer**（现 main.rs:49 全局启用）+ **不继承**通用 no-cache 头（现 main.rs:129），独立写入 `Cache-Control: public, max-age=31536000, immutable`、Accept-Ranges、Content-Range、Content-Length、Content-Type；验收：curl -I 含 Accept-Encoding 实测无压缩 + 200/206/416 全矩阵 |
 | A5 | ★admin 隔离（v4 修正拓扑） | 容器内监听 **0.0.0.0:8081**（第二 listener），compose **只发布到宿主 loopback**：`127.0.0.1:8081:8081`——外网不可达，1Panel/宿主脚本经宿主 loopback 调用（scratch 无 shell，不能 docker exec）；公网 8080 扫描 `/cdn-media-admin/*` 必须 404（验收项）；反代拒绝转发 8081；源 URL 白名单 + 预热限 key/并发/速率/总量 |
-| A6 | worker 鉴权 | GET /api/geo 公读；写接口 Bearer GH token → /user → owner 匹配；KV binding（dev/prod）+ 严格 CORS + 限流 + 审计 + 规则 schema + 默认回退 |
+| A6 | worker 鉴权 | GET /api/geo 公读；写接口 Bearer GH token → /user → owner 匹配；规则存单写入器 Durable Object：binding `GEO_RULES_DO`（类 `GeoRulesDO`，实例 `idFromName("geo-rules")`，migrations tag v1 用 `new_sqlite_classes`，free plan 拒绝 `new_classes`）进 wrangler.toml（dev/prod）+ 严格 CORS + 限流 + 审计 + 规则 schema + DO 故障回退默认规则（A8） |
 | A7 | 域名拓扑 | cdn-media.gaubee.com → 反代 Host 路由 → static-server `/cdn-media/*`；DNS/TLS/健康检查/默认 mediaBase；外网全链路验收 |
 | A8 | ★默认 base=同源（定死） | SSG 首屏 HTML 即带 `/cdn-media/...` 相对路径，**static-server 本身就内建 cdn-base**，同源路径原生可用（hydration 前 0 404）。`use:media-src` 仅在 geo 规则返回外部 base（如 ESA 域）时才重写；geo 失败/无规则 = 不重写。兼容重定向 `/x-media/*` → 302 |
-| A9 | ★配置 schema（冻结产物） | `static-server/config.example.toml`（版本化 + 启动强校验）：manifest endpoint/generation、GitHub repo、source allowlist+优先级、cache dir/high/low/threshold、pinned keys、admin listener/token、默认 mediaBase、geo 规则与 KV namespace。本地与生产同 schema 实例化，env 覆盖规则写明。★**配置不进 scratch 镜像**：compose 只读 bind mount 挂载 config.toml；文件缺失/字段非法启动即败 |
+| A9 | ★配置 schema（冻结产物） | `static-server/config.example.toml`（版本化 + 启动强校验）：manifest endpoint/generation、GitHub repo、source allowlist+优先级、cache dir/high/low/threshold、pinned keys、admin listener/token、默认 mediaBase、geo 预留段（`rules`/`kv_namespace` 仅解析不读的冻结 schema 字段；规则权威存储在 worker 侧 `GEO_RULES_DO` 单写入器，不经 static-server 配置）。本地与生产同 schema 实例化，env 覆盖规则写明。★**配置不进 scratch 镜像**：compose 只读 bind mount 挂载 config.toml；文件缺失/字段非法启动即败 |
 
 ## Phase 0 打包引导（含恢复演练）
 
@@ -39,4 +39,4 @@ Bun/TS 归属 **cdn-media 子仓 `tools/`**（主仓编排，子仓提交同步 
 
 ## 翻车点自查清单
 
-poster/href 漏改；Content-Range 错；压缩层残留；容器缓存不可写；manifest current 窗口 404；摘目录后生成器丢尺寸；/api/geo 生产无 KV；admin 端口暴露公网；透传损坏数据入缓存。
+poster/href 漏改；Content-Range 错；压缩层残留；容器缓存不可写；manifest current 窗口 404；摘目录后生成器丢尺寸；/api/geo 生产 DO 无规则（回退默认同源，A8——部署收据确认生产 KV 本就零状态）；admin 端口暴露公网；透传损坏数据入缓存。

@@ -3,7 +3,8 @@
  *
  * 正交意图：
  * - [2026-10-07] cdn-media-bootstrap Phase 2（openspec R5）：`/api/geo` 返回 mediaBase
- *   规则的 schema、校验与解析算法。规则存 worker KV，GET /api/geo 公读，写接口 owner 限定。
+ *   规则的 schema、校验与解析算法。规则存 worker 的 GeoRulesDO（单写入器 Durable Object，
+ *   r10 P1-1 起替代 KV），GET /api/geo 公读，写接口 owner 限定。
  * - A8 语义：默认 mediaBase = 空串 = 同源（不重写）；geo 失败/无规则 = 不重写。
  * - 不可拆分原因：契约必须被 worker（Cloudflare Workers）与浏览器同时 import，
  *   本文件保持零运行时依赖、零平台 API（无 DOM/Node/CF 类型），物理上是同一份协议。
@@ -26,7 +27,7 @@ export interface GeoRule {
 	mediaBase: string;
 }
 
-/** KV 中存储的规则文档（key 见 GEO_RULES_KV_KEY）。 */
+/** 规则文档（GeoRulesDO 单文档存储，worker 读写与前端缓存失效广播共用此形状）。 */
 export interface GeoRules {
 	/** 规则版本号（写接口递增，前端 sessionStorage 缓存 key 携带它）。 */
 	version: number;
@@ -39,10 +40,7 @@ export interface GeoResponse {
 	ruleVersion: number;
 }
 
-/** worker KV 中规则文档的存储 key。 */
-export const GEO_RULES_KV_KEY = "geo_rules_v1";
-
-/** KV 无值/解析失败/校验失败时的内置规则（A8：全球同源，不重写）。 */
+/** DO 无状态/解析失败/校验失败时的内置规则（A8：全球同源，不重写）。 */
 export const DEFAULT_GEO_RULES: GeoRules = {
 	version: 0,
 	rules: [{ match: { default: true }, mediaBase: "" }],
@@ -52,7 +50,7 @@ const CONTINENTS = new Set(["AF", "AN", "AS", "EU", "NA", "OC", "SA"]);
 /** http(s) origin：scheme://host[:port]，禁止路径/查询/哈希/空白。 */
 const ORIGIN_RE = /^https?:\/\/[a-z0-9.-]+(?::\d{1,5})?$/i;
 const COUNTRY_RE = /^[A-Z]{2}$/;
-/** 规则条数上限（防手滑写爆 KV/边缓存）。 */
+/** 规则条数上限（防手滑写爆 DO 文档/边缓存）。 */
 const MAX_RULES = 64;
 
 export type GeoRulesParseResult =
