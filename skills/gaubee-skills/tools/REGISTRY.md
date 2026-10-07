@@ -11,3 +11,5 @@
 | 2026-10-04 | star-at      | tools/2026-10-04-star-at/      | 收藏序号查询：order 字段第一个消费者（正查 #N / 反查仓库名）                                | proposed |          |
 | 2026-10-05 | x-media-audit | tools/2026-10-05-x-media-audit/ | X 媒体库对账：引用完整性（断链/孤儿）+ 本地化缺口 + 体积与 100MB push 风险榜（首跑：0 断链 0 孤儿、图片侧缺口 14、≥90MB 警戒 2） | proposed |          |
 | 2026-10-05 | x-search     | tools/2026-10-05-x-search/     | X 动态 3025 条速查：多关键词 AND + kind/作者/媒体/时间过滤 + --json 管道（--nolocal 与对账缺口口径互证） | proposed |          |
+| 2026-10-07 | manifest-lint | tools/2026-10-07-manifest-lint/ | cdn-media 清单体检：指针 sha256/offset 对齐/key 格式/卷集合一致 + 可选远端抽检（首跑 3413 对象 104 卷全过） | proposed |          |
+| 2026-10-07 | event-frontmatter-lint | tools/2026-10-07-event-frontmatter-lint/ | 站点 events frontmatter 体检：报告类 title R2 规范/date/tags/媒体断链（首跑 1325 event、4510 引用 0 断链） | proposed |          |
