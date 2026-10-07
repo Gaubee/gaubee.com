@@ -59,12 +59,22 @@ async function main(): Promise<void> {
 
   // (a) 指针 → 清单 sha256
   const curPath = path.join(MANIFEST_DIR, "current.json");
-  const manPath = path.join(MANIFEST_DIR, "manifest-1.json");
-  if (!existsSync(curPath) || !existsSync(manPath)) {
-    console.error("manifest/current.json 或 manifest-1.json 不存在");
+  if (!existsSync(curPath)) {
+    console.error("manifest/current.json 不存在");
     process.exit(1);
   }
   const cur = JSON.parse(readFileSync(curPath, "utf8")) as CurrentFile;
+  // 跟随指针的 manifest_path（校验冻结格式，防误读旧代清单——2026-10-07 gen-2 换代实测抓出硬编码 bug）
+  const expectPath = `manifest/manifest-${cur.gen}.json`;
+  if (cur.manifest_path !== expectPath) {
+    console.error(`manifest_path 非冻结格式: ${cur.manifest_path}（期望 ${expectPath}）`);
+    process.exit(1);
+  }
+  const manPath = path.join(MANIFEST_DIR, path.basename(cur.manifest_path));
+  if (!existsSync(manPath)) {
+    console.error(`指针指向的清单不存在: ${cur.manifest_path}`);
+    process.exit(1);
+  }
   const manBytes = readFileSync(manPath);
   const manSha = createHash("sha256").update(manBytes).digest("hex");
   if (manSha !== cur.manifest_sha256) bad(`(a) current.manifest_sha256 与实际清单不符: current=${cur.manifest_sha256} actual=${manSha}`);

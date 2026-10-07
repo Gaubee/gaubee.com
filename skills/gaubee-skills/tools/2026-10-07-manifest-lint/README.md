@@ -21,11 +21,11 @@ bun skills/gaubee-skills/tools/2026-10-07-manifest-lint/manifest-lint.ts [--asse
 ## 真实示例输出（2026-10-07，3413 对象 / 104 卷）
 
 ```
-(a) 指针 sha256 一致: gen=1, manifest=c891afdb83c67d22…
-(b) offset 对齐违规 0，越界 0（对象 3413）
+(a) 指针 sha256 一致: gen=2, manifest=c14c3ff7bf9a879f…
+(b) offset 对齐违规 0，越界 0（对象 3426）
 (c) key 格式违规 0
-(a2) 指针/清单卷集合一致: 104 卷
+(a2) 指针/清单卷集合一致: 105 卷
 
 [OK] 全部校验通过
 ```
-退出码 0。
+退出码 0。linter 跟随指针 `manifest_path` 解析清单（首版硬编码 manifest-1.json，gen-2 换代实测抓出后已修复——linter 自身也被换代号回归验证）。
