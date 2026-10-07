@@ -3,8 +3,13 @@
  * 该测试必须使用 client project；server project 无法运行 ResizeObserver。
  */
 import { mount, tick, unmount } from "svelte";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  clearHistory,
+  readHistory,
+} from "./json-viewer/history";
+import { createIdbHistoryStorage } from "./json-viewer/history-idb";
 import JsonStreamTree from "./json-viewer/JsonStreamTree.svelte";
 import JsonVirtualTree from "./json-viewer/JsonVirtualTree.svelte";
 import { initialStreamCtx, step } from "./json-viewer/stream-protocol";
@@ -14,6 +19,9 @@ import JsonViewerView from "./JsonViewerView.svelte";
 function nextFrame(): Promise<void> {
   return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
+
+// 防泄漏：任一测试中途失败时，fake timers 不得泄漏到后续测试（真实 setTimeout 永不触发）
+afterEach(() => vi.useRealTimers());
 
 describe("JsonVirtualTree 组件", () => {
   it("超过 5000 节点时只挂载远少于总行数的可见行", async () => {
@@ -111,47 +119,50 @@ describe("JsonViewerView 历史落盘", () => {
     target.remove();
   });
 
-  it("解析成功后等待防抖才写入 localStorage", async () => {
-    vi.useFakeTimers();
-    localStorage.clear();
+  it("解析成功后等待防抖才写入 IndexedDB", async () => {
+    // 真实时间等待（fake timers 会挂死 IDB 任务队列并污染后续测试）
+    await clearHistory(createIdbHistoryStorage());
     const target = document.createElement("div");
     target.style.height = "700px";
     document.body.append(target);
     const component = mount(JsonViewerView, { target });
+    await tick();
     await tick();
     target.querySelector<HTMLButtonElement>('button[title^="填充一份"]')?.click();
-    await tick();
-    await vi.advanceTimersByTimeAsync(300);
-    expect(localStorage.getItem("gaubee:json-viewer:history")).toBeNull();
-    await vi.advanceTimersByTimeAsync(2000);
-    expect(localStorage.getItem("gaubee:json-viewer:history")).toContain("features");
+    // 解析防抖（250ms）已过、历史落盘去抖（2s）未到：IndexedDB 应仍为空
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(await readHistory(createIdbHistoryStorage())).toHaveLength(0);
+    // 历史落盘去抖已过：IndexedDB 出现示例内容
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    const items = await readHistory(createIdbHistoryStorage());
+    expect(items.length).toBeGreaterThan(0);
+    expect(items[0].content).toContain("features");
     await unmount(component);
     target.remove();
-    localStorage.clear();
-    vi.useRealTimers();
-  });
+    await clearHistory(createIdbHistoryStorage());
+  }, 10000);
 
   it("历史 Dialog 提供点击恢复和删除入口", async () => {
-    localStorage.setItem(
-      "gaubee:json-viewer:history",
-      JSON.stringify([{ id: "1", content: '{"ok":true}', savedAt: 1, bytes: 11 }]),
-    );
+    const idb = createIdbHistoryStorage();
+    await idb.put({ id: "1", content: '{"ok":true}', savedAt: 1, bytes: 11 });
     const target = document.createElement("div");
     target.style.height = "700px";
     document.body.append(target);
     const component = mount(JsonViewerView, { target });
     await tick();
-    target.querySelector<HTMLButtonElement>('button[title="查看最近打开的 10 条 JSON"]')?.click();
     await tick();
-    expect(document.querySelector('button[title="点击恢复"]')).not.toBeNull();
+    target.querySelector<HTMLButtonElement>('button[title="查看最近打开的 10 条 JSON"]')?.click();
+    await vi.waitFor(async () => {
+      expect(document.querySelector('button[title="点击恢复"]')).not.toBeNull();
+    });
     const remove = document.querySelector<HTMLButtonElement>('button[title="删除这条历史"]');
     expect(remove).not.toBeNull();
     remove?.click();
-    await tick();
-    expect(JSON.parse(localStorage.getItem("gaubee:json-viewer:history") ?? "[]")).toEqual([]);
+    await vi.waitFor(async () => {
+      expect(await readHistory(idb)).toHaveLength(0);
+    });
     await unmount(component);
     target.remove();
-    localStorage.clear();
   });
 
   it("diff Dialog 使用结构化解析错误和修复建议", async () => {
