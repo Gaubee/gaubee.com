@@ -3,13 +3,11 @@
  *
  * - GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET：wrangler secret put，不入库。
  * - OWNER_LOGIN：geo 规则写接口的 owner GitHub login（wrangler.toml [vars]，非敏感）。
- * - GEO_RULES：规则 KV binding（worker/src/geo.ts 读写；类型取最小结构面，测试用内存实现即可满足）。
+ * - GEO_RULES_DO：geo 规则单写入器 Durable Object binding（worker/src/geo-rules-do.ts）。
+ *   r10 P1-1 起替代原 GEO_RULES KV——KV 无 compare-and-swap，并发 owner 写可双双 200
+ *   后写覆盖；版本单调判定现收敛进 DO 串行执行。类型取全局 DurableObjectNamespace，
+ *   测试用内存 stub（idFromName/get/fetch 结构面）即可满足。
  */
-/** geo 规则存储的最小 KV 结构面（真实 KVNamespace 结构兼容）。 */
-export interface GeoKV {
-	get(key: string): Promise<string | null>;
-	put(key: string, value: string): Promise<void>;
-}
 
 export interface Env {
 	GITHUB_CLIENT_ID: string;
@@ -25,6 +23,6 @@ export interface Env {
 	ENVIRONMENT?: string;
 	/** geo 规则写接口的 owner GitHub login（大小写不敏感比较；未配置 = 拒绝一切写入）。 */
 	OWNER_LOGIN?: string;
-	/** geo 规则 KV binding（wrangler.toml kv_namespaces；缺失时 /api/geo 走内置默认规则）。 */
-	GEO_RULES?: GeoKV;
+	/** geo 规则单写入器 DO binding（wrangler.toml durable_objects；缺失时 /api/geo 走内置默认规则）。 */
+	GEO_RULES_DO?: DurableObjectNamespace;
 }

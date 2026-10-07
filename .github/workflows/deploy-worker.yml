@@ -46,27 +46,11 @@ jobs:
         working-directory: worker
         run: npm test
 
-      # 守卫自检（r10 要求的 fixture 收据）：注释/行尾注释里的占位符字面量不得命中，活动 id 行必须命中
-      - name: Verify guard regex fixtures
-        working-directory: worker
-        run: |
-          grep -Eq '^[[:space:]]*id[[:space:]]*=[[:space:]]*"PLACEHOLDER_CREATE_BEFORE_DEPLOY"[[:space:]]*$' wrangler.toml || { echo "expected active placeholder id lines"; exit 1; }
-          printf '# id = "PLACEHOLDER_CREATE_BEFORE_DEPLOY"\nother: x # id = "PLACEHOLDER_CREATE_BEFORE_DEPLOY"\n' | grep -Eqv '^[[:space:]]*id[[:space:]]*=[[:space:]]*"PLACEHOLDER_CREATE_BEFORE_DEPLOY"[[:space:]]*$' || { echo "comment forms must not match"; exit 1; }
-
-      # 守卫：KV id 占位符未替换（cdn-media Phase 2 用户待办）时跳过部署——
-      # 占位符下部署会让 geo 规则存储指向不存在的 namespace。替换真实 id 后此步自动恢复部署。
-      # 只匹配活动的 id = 行（r9 P1-1）：整行锚定 ^…$，注释里出现占位符字面量不再误触发跳过。
-      # 正则整体单引号包裹：$ 锚点不被 shell / GITHUB_ENV 展开。
-      - name: Guard - skip deploy while KV placeholder present
-        working-directory: worker
-        run: |
-          if grep -Eq '^[[:space:]]*id[[:space:]]*=[[:space:]]*"PLACEHOLDER_CREATE_BEFORE_DEPLOY"[[:space:]]*$' wrangler.toml; then
-            echo "::warning::wrangler.toml 仍含 GEO_RULES KV 占位符（创建 namespace 后填入真实 id），本次跳过部署"
-            echo "SKIP_DEPLOY=1" >> "$GITHUB_ENV"
-          fi
+      # 历史 KV 占位符守卫（skip deploy + regex fixtures 两步）已随 GEO_RULES KV binding 一并删除
+      # （r10 P1-1：规则存储迁到 Durable Object，无占位符 id，类由 wrangler.toml 的 migrations
+      # 在首次 deploy 时自动创建；标注见 deploy/cdn-base-rollout.md 的 Phase 2 节）。
 
       - name: Deploy to Cloudflare Workers
-        if: env.SKIP_DEPLOY != '1'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

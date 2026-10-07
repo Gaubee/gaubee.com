@@ -6,7 +6,8 @@
  * 1. GET /auth/github          —— 重定向到 GitHub authorize URL（带 state 防 CSRF）
  * 2. GET /auth/github/callback —— code 换 token，通过 URL fragment 返回前端
  * 3. POST /upload/image        —— 图片上传（Issues 评论插图，用 token 调 Contents API）
- * 4. /api/geo、/api/geo/rules  —— cdn-media 地区路由（Phase 2，见 worker/src/geo.ts）
+ * 4. /api/geo、/api/geo/rules  —— cdn-media 地区路由（Phase 2，见 worker/src/geo.ts；
+ *    规则存储为单写入器 Durable Object GeoRulesDO，见 worker/src/geo-rules-do.ts，r10 P1-1）
  *
  * 安全要点：
  * - token 通过 URL hash fragment（#auth_token=...）返回前端，不发服务器/日志。
@@ -21,7 +22,10 @@ import { cors } from "hono/cors";
 import { geoRoutes } from "./geo";
 import type { Env } from "./env";
 
-export type { Env, GeoKV } from "./env";
+export type { Env } from "./env";
+// Durable Object 类必须从入口模块导出，wrangler 才能发现它（配合 wrangler.toml 的
+// durable_objects binding 与 migrations new_classes；r10 P1-1 起承载 geo 规则单写入器）。
+export { GeoRulesDO } from "./geo-rules-do";
 
 const GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize";
 const GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token";

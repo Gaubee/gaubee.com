@@ -55,19 +55,24 @@ df -h /opt/gaubee/media-cache
 > 所以本节全部步骤都可以在媒体前端无感的前提下灰度推进；只有写入一条非空 mediaBase
 > 规则才会开始改写引用，随时可写回空串全球切回同源。
 
-## 1. Worker 部署（KV 先于 deploy，顺序不可换）
+## 1. Worker 部署（r10 P1-1 起：规则存储为 Durable Object，无部署前资源待办）
+
+> **历史 KV 待办已由 DO 替代**：原「创建生产 KV + 替换 wrangler.toml 两处
+> PLACEHOLDER_CREATE_BEFORE_DEPLOY 占位符」不再存在——规则文档现由单写入器
+> Durable Object（binding `GEO_RULES_DO` / 类 `GeoRulesDO`）承载，实例经
+> `idFromName("geo-rules")` 派生 id，类由 wrangler.toml 的 `[[migrations]]`（tag v1,
+> new_classes）在首次 `wrangler deploy` 时自动创建，**无任何手动资源步骤**。
+> deploy-worker.yml 的 KV 占位符守卫（skip deploy + regex fixtures）随之删除。
+> 迁移账本只增不改：后续新增 DO 类必须追加新 tag（v2...），不可重放 v1。
 
 ```sh
 cd worker
-# 1) 创建生产 KV，把输出的 id 填进 wrangler.toml 两处 PLACEHOLDER_CREATE_BEFORE_DEPLOY
-npx wrangler kv namespace create GEO_RULES --env production
-# 2) （可选）本地先演练：npx wrangler dev 后 curl localhost:8787/api/geo
-# 3) 部署（CI deploy-worker.yml 也会在 push worker/** 时自动做；手动等价命令：）
-npx wrangler deploy --env production
+# 1) （可选）本地先演练：npx wrangler dev 后 curl localhost:8787/api/geo
+# 2) 部署（CI deploy-worker.yml 也会在 push worker/** 时自动做；手动等价命令：）
+npx wrangler deploy --env production   # 首次部署自动应用 migrations（new_classes: GeoRulesDO）
 ```
 
 - `OWNER_LOGIN` 已在 wrangler.toml（= gaubee，非敏感 var）；secrets 不变。
-- ★ wrangler.toml 的 KV id 占位符没换成真实 id 之前，**不要合入 main**（CI 会 deploy 失败）。
 
 ## 2. DNS / 反代
 
@@ -88,13 +93,14 @@ npx wrangler deploy --env production
 
 ## 3. 验收 curl 清单（部署后逐条实跑）
 
-> 版本纪律（r9 P1-2）：规则版本由服务端守护单调——KV 已有规则时 `version` 必须严格等于
+> 版本纪律（r9 P1-2）：规则版本由服务端守护单调——服务端已有规则时 `version` 必须严格等于
 > 当前版本 +1，重复/回退/跳跃一律 409（响应带 `currentVersion`）；首次写入接受任意正整数
-> （0 与内置默认规则撞代次，拒收）。下面的 curl 示例版本号按首写 1 → 回滚 2 递增；
+> （0 与内置默认规则撞代次，拒收）。r10 P1-1 起该判定在单写入器 Durable Object 内串行执行，
+> 并发保存不会分叉代次。下面的 curl 示例版本号按首写 1 → 回滚 2 递增；
 > 实际操作时先用 `GET /api/geo/rules` 看当前版本再决定下一个版本号。
 
 ```sh
-# 1) 默认回退（未写 KV）：期望 {"mediaBase":"","ruleVersion":0}
+# 1) 默认回退（未写规则）：期望 {"mediaBase":"","ruleVersion":0}
 curl -s https://gaubee.com/api/geo
 
 # 2) 非匿名读原始规则：期望 401（无 token）/ 403（非 owner）
@@ -129,4 +135,8 @@ cd worker && npx wrangler dev   # 另开终端
 PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 pnpm exec playwright test tests/media-geo.e2e.ts
 # 三用例：worker 不可达（关掉 wrangler dev 单跑该文件）、默认规则、自定义 base 重写
 ```
+
+> ⚠ r10 P1-1 存留待办：`tests/media-geo.e2e.ts` 的种规则方式仍是 KV 时代的
+> `wrangler kv key put --binding GEO_RULES --local`，KV binding 删除后会失败——
+> 该文件在 worker/ 目录之外，需单独迁移（如改为经本地 `PUT /api/geo/rules` 种规则）。
 

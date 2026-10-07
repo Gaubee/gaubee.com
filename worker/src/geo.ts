@@ -2,23 +2,26 @@
  * geo 地区路由（cdn-media-bootstrap Phase 2，openspec R5 / 契约 A6）。
  *
  * 正交意图：
- * - [2026-10-07] GET /api/geo：公读。地区来源 request.cf（CF 免费自带），规则读 KV，
- *   KV 缺失/损坏 → 内置默认规则（mediaBase="" 同源，A8）。响应 { mediaBase, ruleVersion }。
+ * - [2026-10-07] GET /api/geo：公读。地区来源 request.cf（CF 免费自带），规则读
+ *   GeoRulesDO（单实例 Durable Object，裁决：直接经 DO 读），DO 缺失/不可达/无状态/损坏
+ *   → 内置默认规则（mediaBase="" 同源，A8）。响应 { mediaBase, ruleVersion }。
  * - GET /api/geo/rules：owner 读原始规则文档（后台配置页回显用）。
  * - PUT /api/geo/rules：owner 写。Bearer GitHub token → /user → login 与 OWNER_LOGIN 匹配；
- *   规则 schema 校验（src/lib/geo/contract.ts 三方共用）；内存桶限流 + 结构化审计日志。
+ *   schema 校验（src/lib/geo/contract.ts 三方共用）后转发 GeoRulesDO；内存桶限流 + 结构化审计。
+ * - [2026-10-07 r10 P1-1] 规则存储从 KV 迁到 Durable Object 单写入器（worker/src/geo-rules-do.ts）：
+ *   KV 无 compare-and-swap，「读→比较→写」在并发 owner PUT 下可双双 200 后写覆盖。
+ *   版本单调判定整体下沉进 DO，本文件不再做任何版本比较，只透传 200/409/400；
+ *   KV 读写路径与 GEO_RULES KV binding 一并删除。
  * - 妥协声明：限流桶在内存（isolate 重启即清零），是「简单限流」契约的有意取舍；
- *   精确全局限流需 Durable Object，当前规模不值得。
+ *   精确全局限流需要独立的限流 DO，当前规模不值得。
  * - [2026-10-07 r9 复评] GET /api/geo 响应 private, no-store（地区结果禁入任何共享缓存：
  *   CF 默认 cache key 不含 country，共享缓存会让先到地区决定全网 mediaBase）；
- *   PUT 版本服务端单调（KV 已有规则 → 严格 +1，重复/回退/跳跃 409；首次写正整数）；
  *   写审计行带 cfCountry。
  */
 import { Hono, type Context } from "hono";
 
 import {
 	DEFAULT_GEO_RULES,
-	GEO_RULES_KV_KEY,
 	resolveGeoBase,
 	validateGeoRules,
 	type GeoRules,
@@ -31,6 +34,10 @@ const RATE_WRITE = 20;
 const RATE_WINDOW_MS = 60_000;
 /** GitHub /user 校验超时。 */
 const GITHUB_TIMEOUT_MS = 5000;
+
+/** GeoRulesDO 单实例的固定名与 RPC 地址（idFromName 全网同一实例）。 */
+const DO_NAME = "geo-rules";
+const DO_STATE_URL = "https://geo-rules.do/state";
 
 type GeoContext = Context<{ Bindings: Env }>;
 
@@ -63,20 +70,32 @@ function cfGeo(c: GeoContext): { country?: string; continent?: string } {
 	return { country, continent };
 }
 
-/** 读规则文档：KV 无值/解析失败/校验失败 → 内置默认（A8 fail-safe，绝不 500）。 */
-async function loadGeoRules(kv: Env["GEO_RULES"]): Promise<{ rules: GeoRules; fromDefault: boolean }> {
-	if (!kv) return { rules: DEFAULT_GEO_RULES, fromDefault: true };
+/** GeoRulesDO 单实例 stub（binding 缺失 → null，由调用方走 fail-safe 路径）。 */
+function geoRulesStub(env: Env): DurableObjectStub | null {
+	const ns = env.GEO_RULES_DO;
+	if (!ns) return null;
+	return ns.get(ns.idFromName(DO_NAME));
+}
+
+/** 读规则文档 + fromDefault 标记：DO 缺失/不可达/无状态/损坏 → 内置默认（A8 fail-safe，绝不 500）。 */
+async function loadGeoRulesWithOrigin(env: Env): Promise<{ rules: GeoRules; fromDefault: boolean }> {
+	const stub = geoRulesStub(env);
+	if (!stub) return { rules: DEFAULT_GEO_RULES, fromDefault: true };
 	try {
-		const raw = await kv.get(GEO_RULES_KV_KEY);
-		if (!raw) return { rules: DEFAULT_GEO_RULES, fromDefault: true };
-		const parsed = validateGeoRules(JSON.parse(raw));
+		const res = await stub.fetch(DO_STATE_URL);
+		if (res.status === 404) return { rules: DEFAULT_GEO_RULES, fromDefault: true };
+		if (!res.ok) {
+			audit("geo_rules.do_error", { action: "read", status: res.status });
+			return { rules: DEFAULT_GEO_RULES, fromDefault: true };
+		}
+		const parsed = validateGeoRules(await res.json());
 		if (!parsed.ok) {
-			audit("geo_rules.kv_corrupt", { error: parsed.error });
+			audit("geo_rules.do_corrupt", { error: parsed.error });
 			return { rules: DEFAULT_GEO_RULES, fromDefault: true };
 		}
 		return { rules: parsed.value, fromDefault: false };
 	} catch (e) {
-		audit("geo_rules.kv_error", { error: e instanceof Error ? e.message : String(e) });
+		audit("geo_rules.do_error", { action: "read", error: e instanceof Error ? e.message : String(e) });
 		return { rules: DEFAULT_GEO_RULES, fromDefault: true };
 	}
 }
@@ -144,19 +163,20 @@ export const geoRoutes = new Hono<{ Bindings: Env }>();
  * cache key 不含 country——任何共享缓存（CF 边缘/反代）都会让先到地区决定同一 URL 的
  * mediaBase，串给所有地区。时效由前端 sessionStorage TTL + 保存时的 BroadcastChannel
  * 失效广播承担；未来若要恢复共享缓存，必须把规范化 country 纳入 cache key 并做跨地区验收。
+ * 规则来源（r10 P1-1）：直接经 GeoRulesDO 读（单实例内存态，写后立即可见）。
  */
 geoRoutes.get("/", async (c) => {
 	const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
 	if (!rateAllow(`get:${ip}`, RATE_GET)) {
 		return c.json({ error: "rate limited" }, 429);
 	}
-	const { rules } = await loadGeoRules(c.env.GEO_RULES);
+	const { rules } = await loadGeoRulesWithOrigin(c.env);
 	const { country, continent } = cfGeo(c);
 	const result = resolveGeoBase(rules, country, continent);
 	return c.json(result, 200, { "Cache-Control": "private, no-store" });
 });
 
-/** GET /api/geo/rules —— owner 读原始规则（含 KV 未配置/为空时的默认规则回显）。 */
+/** GET /api/geo/rules —— owner 读原始规则（含 DO 无状态/缺失时的默认规则回显）。 */
 geoRoutes.get("/rules", async (c) => {
 	const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
 	if (!rateAllow(`get_rules:${ip}`, RATE_WRITE)) {
@@ -165,11 +185,11 @@ geoRoutes.get("/rules", async (c) => {
 	const auth = await requireOwner(c, "read");
 	if (!auth.ok) return auth.response;
 
-	const { rules, fromDefault } = await loadGeoRules(c.env.GEO_RULES);
+	const { rules, fromDefault } = await loadGeoRulesWithOrigin(c.env);
 	return c.json({ rules, fromDefault });
 });
 
-/** PUT /api/geo/rules —— owner 写（schema 校验 + 版本服务端单调 + KV 落库 + 审计）。 */
+/** PUT /api/geo/rules —— owner 写（schema 校验后转发 GeoRulesDO；版本单调由 DO 串行守护）。 */
 geoRoutes.put("/rules", async (c) => {
 	const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
 	if (!rateAllow(`put_rules:${ip}`, RATE_WRITE)) {
@@ -188,44 +208,53 @@ geoRoutes.put("/rules", async (c) => {
 	if (!parsed.ok) {
 		return c.json({ error: `invalid: ${parsed.error}` }, 400);
 	}
-	if (!c.env.GEO_RULES) {
-		audit("geo_rules.write_failed", { login: auth.login, reason: "kv_binding_missing" });
-		return c.json({ error: "GEO_RULES kv binding missing (check wrangler.toml)" }, 500);
+	const stub = geoRulesStub(c.env);
+	if (!stub) {
+		audit("geo_rules.write_failed", { login: auth.login, reason: "do_binding_missing" });
+		return c.json({ error: "GEO_RULES_DO binding missing (check wrangler.toml)" }, 500);
 	}
-	// 版本服务端单调（r9 P1-2）：version 是前端缓存 key 的发布代次，必须由服务端守护——
-	// KV 已有有效规则 → 要求 incoming.version === current.version + 1（重复/回退/跳跃一律 409，
-	// 响应带当前 version 供后台页提示）；首次写入（KV 无值/损坏回退默认）→ 接受任意正整数，
-	// 但拒收 0（与内置默认规则 version 0 撞代次，会让已缓存 v0 的 tab 分不清默认与自定义规则）。
-	const current = await loadGeoRules(c.env.GEO_RULES);
-	if (!current.fromDefault) {
-		const expected = current.rules.version + 1;
-		if (parsed.value.version !== expected) {
-			audit("geo_rules.write_rejected", {
-				ip,
-				login: auth.login,
-				reason: "version_not_monotonic",
-				cfCountry: cfGeo(c).country,
-				currentVersion: current.rules.version,
-				incomingVersion: parsed.value.version,
-			});
-			return c.json(
-				{
-					error: `version conflict: current ${current.rules.version}, expected ${expected}`,
-					currentVersion: current.rules.version,
-				},
-				409,
-			);
-		}
-	} else if (parsed.value.version < 1) {
-		return c.json({ error: "invalid: first write requires a positive integer version" }, 400);
+	// 版本服务端单调（r9 P1-2）现由 GeoRulesDO 串行守护（r10 P1-1）：version 是前端缓存 key
+	// 的发布代次；DO 内「判定 → 内存落定」同步段 + input gate 保证并发 v+1 恰一胜一。
+	// 本处只转发，200/409/400 原样透传；409 带 currentVersion 供后台页提示。
+	let res: Response;
+	try {
+		res = await stub.fetch(DO_STATE_URL, {
+			method: "PUT",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify(parsed.value),
+		});
+	} catch (e) {
+		audit("geo_rules.write_failed", {
+			login: auth.login,
+			reason: "do_unreachable",
+			error: e instanceof Error ? e.message : String(e),
+		});
+		return c.json({ error: "geo rules storage unavailable" }, 502);
 	}
-	await c.env.GEO_RULES.put(GEO_RULES_KV_KEY, JSON.stringify(parsed.value));
+	if (res.status === 409) {
+		const conflict = (await res.json()) as { error: string; currentVersion: number };
+		audit("geo_rules.write_rejected", {
+			ip,
+			login: auth.login,
+			reason: "version_not_monotonic",
+			cfCountry: cfGeo(c).country,
+			currentVersion: conflict.currentVersion,
+			incomingVersion: parsed.value.version,
+		});
+		return c.json(conflict, 409);
+	}
+	if (res.status !== 200) {
+		// 防御纵深 400（DO 二次校验拒绝）或存储层故障：状态与错误体原样透传。
+		const text = await res.text();
+		return new Response(text, { status: res.status, headers: { "content-type": "application/json" } });
+	}
+	const ok = (await res.json()) as { ok: true; ruleVersion: number };
 	audit("geo_rules.write", {
 		ip,
 		login: auth.login,
-		ruleVersion: parsed.value.version,
+		ruleVersion: ok.ruleVersion,
 		ruleCount: parsed.value.rules.length,
 		cfCountry: cfGeo(c).country,
 	});
-	return c.json({ ok: true, ruleVersion: parsed.value.version });
+	return c.json(ok, 200);
 });

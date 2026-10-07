@@ -19,13 +19,20 @@ WORKER_ORIGIN = "https://gaubee.com.localhost"
 ENVIRONMENT = "dev"
 OWNER_LOGIN = "gaubee"
 
-# geo 规则 KV（cdn-media Phase 2，worker/src/geo.ts 读写；本地 dev 用 wrangler 模拟的本地 KV，
-# `wrangler dev` 与 `wrangler kv key put --local` 共享 .wrangler/state 存储，无需真实 id）。
-# ★ 生产部署前必须先 `wrangler kv namespace create GEO_RULES --env production`，
-#   把真实 id 填进下方两处（否则 CI 的 wrangler deploy 会失败）。部署步骤见 deploy/cdn-base-rollout.md。
-[[kv_namespaces]]
-binding = "GEO_RULES"
-id = "PLACEHOLDER_CREATE_BEFORE_DEPLOY"
+# geo 规则单写入器 Durable Object（cdn-media Phase 2，r10 P1-1）：版本单调判定收敛进 DO
+# 串行执行，替代原 GEO_RULES KV——KV 无 compare-and-swap，并发 owner 写可双双 200 后写覆盖。
+# DO 无占位符 id（worker/src/geo.ts 以 idFromName("geo-rules") 寻址，workerd 按 name 派生 id），
+# 类由下方 migrations 在首次部署时自动创建，无任何部署前手动资源步骤。
+[durable_objects]
+bindings = [
+  { name = "GEO_RULES_DO", class_name = "GeoRulesDO" },
+]
+
+# Durable Object 迁移账本：new_classes 只增不改（已发布的 tag 不可重放或改名）；
+# 顶层 migrations 对所有 env（含 production）生效。
+[[migrations]]
+tag = "v1"
+new_classes = ["GeoRulesDO"]
 
 # 生产环境配置（CI 用 wrangler deploy --env production 触发）：
 # APP_ORIGIN 必须与静态站（GitHub Pages）实际域名一致，用于 CORS 与 OAuth 回调重定向。
@@ -37,10 +44,11 @@ WORKER_ORIGIN = "https://auth.gaubee.com"
 ENVIRONMENT = "production"
 OWNER_LOGIN = "gaubee"
 
-# 生产 geo 规则 KV：id 必须替换为 `wrangler kv namespace create GEO_RULES --env production` 的真实 id。
-[[env.production.kv_namespaces]]
-binding = "GEO_RULES"
-id = "PLACEHOLDER_CREATE_BEFORE_DEPLOY"
+# 生产 geo 规则 DO：durable_objects 不随顶层配置继承（与原 kv_namespaces 同规则），per-env 必须重申。
+[env.production.durable_objects]
+bindings = [
+  { name = "GEO_RULES_DO", class_name = "GeoRulesDO" },
+]
 
 # ===== 三方一致性检查清单（改动任一处，必须同步其余两处）=====
 # Worker 用 WORKER_ORIGIN 构造 GitHub OAuth 的 redirect_uri，故下面三处的「Worker 域名」必须相同：
