@@ -39,7 +39,11 @@ R2/ESA 后续作为可插拔性能件接入。**Phase 0-3 完成后，不配置 
 
 ## 验收门
 
-- [ ] Phase 0：manifest 与卷可从空环境完整恢复全量媒体（拉清单→拉卷→对账 sha256）。
-- [ ] Phase 1：cdn-base 单元测试（水位/LRU/Range/failover）+ 本地端到端（serve→miss→hit→逐出）。
-- [ ] Phase 2：浏览器实机走查 base 重写与 geo 路由；本地私有化模式跑通。
-- [ ] Phase 3：线上无 R2/ESA 形态全站可用；镜像体积回落数十 MB 量级；CI 绿。
+- [x] Phase 0：manifest 与卷可从空环境完整恢复全量媒体（拉清单→拉卷→对账 sha256）。
+  收据：316e40f 系工具落地（--initial/--publish/--verify/--drill），空环境恢复演练 3413/3413 全量 sha256 一致。
+- [x] Phase 1：cdn-base 单元测试（水位/LRU/Range/failover）+ 本地端到端（serve→miss→hit→逐出）。
+  收据：cargo 测试 75/75；gen-2 发布（105 卷/3426 对象）经 cdn-base GitHub 源适配器端到端。
+- [x] Phase 2：浏览器实机走查 base 重写与 geo 路由；本地私有化模式跑通。
+  收据：worker 测试 33/33；r12 复核 8.3 GO；DO 以 new_sqlite_classes 迁移部署（free plan 实证收据）。
+- [x] Phase 3：线上无 R2/ESA 形态全站可用；镜像体积回落数十 MB 量级；CI 绿。
+  收据：877ad11a（1299 归档全量重渲染，shadow 对账 1006/1006 仅前缀差；frontmatter-lint 4524/0；docker 上下文 3.3GB→57MB）；CI Docker 绿；r13 复核 8.3。

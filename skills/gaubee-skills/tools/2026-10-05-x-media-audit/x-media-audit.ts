@@ -15,8 +15,11 @@
  *   7 天保留期）/ 孤儿（不在 manifest 且无任何条目引用 → 硬门禁）
  * - 3. 本地化覆盖：按图片/视频侧统计「有远程 URL 无本地引用」条目
  * - 4. 门禁语义：断链/孤儿任一硬问题退出码 1，否则 0（可挂日常维护流程）
+ * - 5. [2026-10-07 r13 P1-2] `--require-packed` 硬门旗标：开启时「待打包 awaitingPack」
+ *   也视为失败退出非零——供日报生成等下游流程作前置 gate（引用已 stage 但未入卷
+ *   就是会 404 的断链，诊断模式不受影响：默认行为不变，仍退出 0）
  *
- * 运行：bun tools/2026-10-05-x-media-audit/x-media-audit.ts [--top N]
+ * 运行：bun tools/2026-10-05-x-media-audit/x-media-audit.ts [--top N] [--require-packed]
  * 前置：x.json 已由 x-archive-import / x-likes-fetch 建立；manifest 在
  * GAUBEE_SITE（缺省仓库根）/cdn-media/manifest；staging 在 cdn-media/staging/x
  */
@@ -80,6 +83,9 @@ async function main() {
 	let top = 10;
 	const topIdx = args.indexOf("--top");
 	if (topIdx >= 0) top = Number.parseInt(args[topIdx + 1] ?? "", 10) || 10;
+	// r13 P1-2：--require-packed 硬门——awaitingPack > 0 也退出非零（日报生成等
+	// 下游流程的前置 gate）；默认（诊断模式）不受影响，待打包仍只提示。
+	const requirePacked = args.includes("--require-packed");
 
 	const store: XStore = JSON.parse(
 		await Bun.file(path.join(sourceDir("x-likes"), "x.json")).text(),
@@ -214,8 +220,19 @@ async function main() {
 	}
 
 	console.log(lines.join("\n"));
-	// 门禁：硬问题（断链/孤儿）才失败；待打包/待清理/缺口只提示
-	if (broken.length || orphan.length) process.exit(1);
+	// 门禁：硬问题（断链/孤儿）才失败；待打包/待清理/缺口只提示。
+	// r13 P1-2：--require-packed 开启时，待打包引用（已 stage 未入卷 = 对外 404）
+	// 升级为硬失败——日报生成前的硬 gate，堵住「staging 引用未入 manifest 仍放行」。
+	const hardFail = broken.length > 0 || orphan.length > 0 || (requirePacked && awaitingPack.length > 0);
+	if (hardFail) {
+		if (requirePacked && awaitingPack.length > 0) {
+			console.error(
+				`[require-packed] 待打包引用 ${awaitingPack.length} 个未入卷（对站点即 404）——` +
+					`先跑 media-pack --patch + --publish 入卷再生成日报`,
+			);
+		}
+		process.exit(1);
+	}
 }
 
 await main();

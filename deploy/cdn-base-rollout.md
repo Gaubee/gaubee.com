@@ -57,7 +57,7 @@ df -h /opt/gaubee/media-cache
 
 ## 1. Worker 部署（规则存储为 Durable Object；生产收据：KV 零状态，无迁移需求，r11 P1-1）
 
-### 1.0 Preflight：旧 KV binding/namespace 对账护栏（首次 DO 部署前执行；r12 P1-2 收口）
+### 1.0 Preflight：旧 KV binding/namespace 对账护栏（首次 DO 部署前执行；r13 P1-1 收口）
 
 > **当前生产收据（已闭合）**：2026-10-07 依据 deploy-worker.yml 全部 13 次运行核实，
 > **生产从未存在 GEO_RULES KV**（binding 从未部署、namespace 从未创建、零规则写入），
@@ -65,55 +65,46 @@ df -h /opt/gaubee/media-cache
 > 任何环境首次部署 DO 前（或怀疑误绑定了旧 KV 时）必须实跑，不得凭记忆跳过。
 
 ```sh
-#!/usr/bin/env bash
-# geo KV→DO 对账 preflight：发现旧 KV 规则存量即阻断部署，给出迁移路径。
-# 前置：CF_ACCOUNT_ID（Cloudflare 账户 ID）、GH_TOKEN（owner GitHub token）已就绪。
-set -euo pipefail
-
-CF_ACCOUNT_ID="${CF_ACCOUNT_ID:?export CF_ACCOUNT_ID=<cloudflare 账户 id>}"
-GH_TOKEN="${GH_TOKEN:?export GH_TOKEN=\"\$(gh auth token)\"}"
-SITE="${SITE:-https://gaubee.com}"
-
-# 1) 列账户全部 KV namespace，过滤 geo/规则相关（title 命名含 GEO / geo / rules 的都算嫌疑）
-echo "== 1) 扫描 KV namespaces =="
-SUSPECTS=$(gh api "/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces" --paginate \
-  --jq '.[] | select(.title | test("GEO|geo|rules"; "i")) | "\(.id) \(.title)"' || true)
-if [ -z "${SUSPECTS}" ]; then
-  echo "PASS：账户下不存在 geo/rules 相关 KV namespace（与生产收据一致，无需迁移）"
-else
-  echo "发现疑似旧 KV namespace："
-  echo "${SUSPECTS}"
-  echo ""
-  echo "== 2) 逐 namespace 读取存量规则，与 DO 当前规则对账 =="
-  DO_RULES=$(curl -sf "${SITE}/api/geo/rules" -H "Authorization: Bearer ${GH_TOKEN}" \
-    || echo '{"fromDefault":true}')
-  echo "DO 当前规则：${DO_RULES}"
-  while read -r NS_ID NS_TITLE; do
-    [ -z "${NS_ID}" ] && continue
-    echo "--- namespace ${NS_TITLE} (${NS_ID}) 的 keys ---"
-    for KEY in $(npx -y wrangler kv key list --namespace-id "${NS_ID}" \
-        | jq -r '.[].name'); do
-      echo "key: ${KEY}"
-      npx -y wrangler kv key get --namespace-id "${NS_ID}" "${KEY}" || true
-    done
-  done <<< "${SUSPECTS}"
-  echo ""
-  echo "FAIL：发现旧 KV 规则存量——首次 DO 部署阻断。"
-  echo "迁移路径（人工执行，工具不自动迁移）：把上面每个 key 的 rules 经 owner PUT 逐条写入 DO"
-  echo "（首写接受任意正整数版本，其后必须 current+1，见第 3 节版本纪律；"
-  echo " 若 DO 已有规则且 KV 内容与之不一致，先人工裁决哪份权威，再决定是否 PUT）。"
-  exit 1
-fi
-
-# 2) DO 侧现状确认：必须可达且报告版本（首次部署应为 fromDefault / v0）
-echo "== 3) DO 现状 =="
-curl -sf "${SITE}/api/geo" && echo ""
-echo "PASS：preflight 通过，可继续第 1.1 步 wrangler deploy"
+# r13 P1-1：preflight 收口为仓库脚本 deploy/preflight-kv-do.sh——
+# 走 Cloudflare API v4（GET /accounts/{id}/storage/kv/namespaces，Bearer CF_API_TOKEN，
+# 按 result_info.cursor 分页；对 geo/rules 嫌疑 namespace 再查 keys 找 geo_rules_v1）。
+# 旧内联版的 gh api（只会打 GitHub API，永远打不到 Cloudflare）与尾部 || true
+# （把 404/认证失败吞成空 SUSPECTS 假 PASS）已废除；新脚本 fail-closed：
+# 任何 API/认证/网络/解析失败退出非零，绝不静默放行。
+export CF_ACCOUNT_ID="<cloudflare 账户 id>"
+export CF_API_TOKEN="<cloudflare api token，需 Workers KV Storage:Read>"   # 不要写进任何文件
+bash deploy/preflight-kv-do.sh    # PASS（exit 0）才允许继续第 1.1 步 wrangler deploy
 ```
 
-> 判定语义：①无嫌疑 namespace → PASS（当前生产即此形态，收据闭合）；
-> ②有嫌疑且有 keys → FAIL 阻断，按输出的人工迁移路径处置后重跑；
-> ③有嫌疑但 keys 为空（空 namespace）→ 视同 PASS，但建议顺手解绑/删除防误读。
+> 判定语义（脚本冻结）：①无嫌疑 namespace → PASS（当前生产即此形态，收据闭合）；
+> ②嫌疑 namespace 存在 `geo_rules_v1` key → 阻断（exit 1），按输出的人工迁移路径
+> 处置后重跑；③有嫌疑但无 `geo_rules_v1` key（空/无关 namespace）→ PASS，建议顺手
+> 解绑/删除防误读；④任何 API/认证/网络/解析失败 → 阻断（exit 1，fail-closed）。
+
+#### 三路径自测（本地夹具，2026-10-07 实测）
+
+用仓库内 mock（`deploy/preflight-kv-do.mock.mjs`，单文件 node HTTP server，假 id/假
+namespace，无任何真实凭据）充当 CF API，经 `CF_API_BASE` 注入指向本地端口，六组夹具
+全数符合预期（runner 一次性脚本，跑完即 kill mock，实测无残留进程）：
+
+| 夹具 | mock 形态 | 期望 | 实测 |
+|------|-----------|------|------|
+| `empty` | namespaces 为空数组 | PASS exit 0 | exit 0，输出「账户下不存在 geo/rules 相关 KV namespace」 |
+| `haskey` | 嫌疑 namespace `geo-rules-old-env` 含 key `geo_rules_v1` | 阻断 exit 1 | exit 1，输出 keys 清单 + 迁移路径 |
+| `nokey` | 嫌疑 namespace 存在但 keys 为空 | PASS exit 0 | exit 0，输出「均无 geo_rules_v1 规则数据…建议解绑/删除」 |
+| `paged` | namespaces 两页（`result_info.cursor` 续页，嫌疑在第 2 页） | PASS exit 0 | exit 0，cursor 续页逻辑正确消费第 2 页 |
+| `err` | 全端点 HTTP 500 | 阻断 exit 1 | exit 1（fail-closed；开发中曾抓出「管道吞退出码致 500 仍 PASS」缺陷并已修复） |
+| 无 `CF_API_TOKEN` | 不起 mock | 阻断 exit 1 | exit 1 |
+
+复跑方式（每条单独起 mock、跑完即回收）：
+
+```sh
+node deploy/preflight-kv-do.mock.mjs empty &   # 其余模式：haskey / nokey / paged / err
+# 等它打印 MOCK_PORT <port> 后：
+CF_API_BASE="http://127.0.0.1:<port>" CF_ACCOUNT_ID=fake CF_API_TOKEN=fake \
+  bash deploy/preflight-kv-do.sh; echo "exit=$?"
+kill %1   # 回收 mock（脚本自身也响应 SIGTERM/SIGINT 自清理）
+```
 
 > **部署收据（2026-10-07 依据 deploy-worker.yml 全部 13 次运行核实）——生产从未存在
 > GEO_RULES KV，无任何规则数据可迁移**：
@@ -219,5 +210,43 @@ PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 pnpm exec playwright test tests/media-
 # 禁止复用外部 8787 实例——端口被占即 fail 并提示清理；测试前后断言外部 8787 状态不变）。
 # preview 须以 GAUBEE_WORKER_PORT=8799 启动（vite proxy 目标随它切换），否则自定义 base
 # 场景会给出可操作的失败信息而不是写进外部实例。结束后测试自动回收进程并清理目录。
+```
+
+---
+
+# staging 清理协议（r13 P1-3 收口，2026-10-07）
+
+> plan 3.3 / SKILL 媒体管道裁决冻结的「发布校验通过后 7 天清理 staging」由
+> `cdn-media/tools/staging-clean.ts` 执行（此前无执行者——r13 P1-3 收口）。
+> 工具与真实仓库的交接只经 `cdn-media/manifest` 与 `cdn-media/staging/x`，不触网络。
+
+## 工具语义
+
+- 默认 **dry-run**：只打印将删清单（key/字节/mtime），不动任何文件。
+- `--execute` 才真删；删除四条件**全部满足**才进清单：
+  1. 文件在当前 manifest 对象集内（复用 media-pack `loadCurrentState` 三态校验）；
+  2. 对象所在卷已发布——current.json 指针 `asset_id ≥1` 且 `url` 非空（发布收据）；
+  3. 文件 mtime 距今超过 7 天；
+  4. 文件位于 `staging/x/` 下（卷 tar 与 `.verify-restore` 不在范围）。
+- fail-closed：current.json 缺失/损坏/sha 不符、目录读取失败——一律退出非零、
+  一个文件都不删；`--execute` 中途删除失败同样立即中止。
+- 删除后打印收据：删除数 / 释放字节 / 剩余 staging 字节。
+
+## 执行节奏
+
+```sh
+cd <站点仓库根>   # gaubee.com 主仓
+# 1) 先 dry-run，人工核对将删清单（输出留档）
+bun cdn-media/tools/staging-clean.ts
+# 2) 确认无误后再执行（人工确认；cron 周任务可代跑，但周任务必须先跑
+#    x-media-audit --require-packed 确认零待打包，再跑本工具）
+bun cdn-media/tools/staging-clean.ts --execute
+```
+
+夹具回归（假 staging 目录 + 假 manifest，六例：dry-run 不删 / execute 真删出收据 /
+未发布不删 / current 缺失 fail-closed / current 损坏 fail-closed / 未知参数拒绝）：
+
+```sh
+cd cdn-media && bun test tools/staging-clean.test.ts   # 2026-10-07 实测 6/6 绿
 ```
 
