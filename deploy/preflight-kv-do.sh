@@ -7,13 +7,20 @@
 #   旧内联版误用 gh api 访问 Cloudflare（gh 只打 GitHub API），且尾部 || true 把
 #   404/认证失败吞成「无嫌疑」假 PASS——本版改为 CF API v4 直连，任何 API/认证/
 #   网络/解析失败一律退出非零（fail-closed），绝不静默放行。
+# - [2026-10-07 r14 收口] cf_get 在 success==true 之上追加结构校验（result 数组/
+#   result_info 对象/cursor 字符串或 null）；分页 cursor 经 jq @uri 编码后再拼 query。
+#   动机：r14 夹具实证两种畸形 200 响应（缺 result / 缺 result_info）会绕过原校验
+#   产出空集假 PASS；不透明 cursor 中的保留字符裸拼 query 会被改写。
 #
 # 判定语义（冻结）：
 #   PASS（exit 0）  ① 账户下无 geo/rules 嫌疑 namespace；
 #                   ② 有嫌疑 namespace 但其 keys 里没有 geo_rules_v1（无规则数据可迁，
 #                     建议顺手解绑/删除防误读，不阻断）。
 #   阻断（exit 1）  ③ 嫌疑 namespace 存在 geo_rules_v1 key——必须先迁移再部署 DO。
-#   阻断（exit 1）  ④ 任何 API/认证/网络/响应解析失败（fail-closed，含 env 缺失）。
+#   阻断（exit 1）  ④ 任何 API/认证/网络/响应解析失败（fail-closed，含 env 缺失；
+#                     r14 收口：HTTP 200 但 success=true 而 result/result_info 缺失、
+#                     类型不对或 cursor 非字符串/null，同样按解析失败阻断——结构畸形
+#                     的 200 响应若放行，会让分页/投影产出空集假 PASS）。
 #
 # 环境变量：
 #   CF_ACCOUNT_ID  必填，Cloudflare 账户 ID
@@ -47,10 +54,10 @@ command -v jq >/dev/null 2>&1 || fail "依赖缺失: jq 不在 PATH（fail-close
 [ -n "${CF_API_TOKEN}" ] || fail "CF_API_TOKEN 未设置（export CF_API_TOKEN=<cloudflare api token>）"
 
 # 单次 CF v4 GET：成功时写全局 CF_BODY 并 return 0；网络错误/HTTP 非 2xx/
-# success!=true/非 JSON 一律打印 FAIL 并 return 1（由调用方 fail 兜底退出）。
+# success!=true/非 JSON/成功响应结构畸形 一律打印 FAIL 并 return 1（由调用方 fail 兜底退出）。
 cf_get() {
   CF_BODY=""
-  local path="$1" tmp code body curl_status
+  local path="$1" tmp code body curl_status struct_msg struct_status
   tmp="$(mktemp)" || { printf 'FAIL: mktemp 失败（fail-closed）\n' >&2; return 1; }
   code="$(curl -sS --connect-timeout 15 --max-time 60 \
     -H "Authorization: Bearer ${CF_API_TOKEN}" \
@@ -75,18 +82,36 @@ cf_get() {
     printf 'FAIL: GET %s 响应 success!=true 或非 JSON（fail-closed）：%.200s\n' "${path}" "${body}" >&2
     return 1
   fi
+  # 结构校验（r14 收口）：列表端点契约 result=数组、result_info=对象、cursor=字符串或
+  # null（末页）。任一不满足按解析失败阻断——这类 200 若放行，分页/投影会静默产空集。
+  struct_msg="$(printf '%s' "${body}" | jq -r '
+    if (.result | type) != "array" then "result 缺失或非数组"
+    elif (.result_info | type) != "object" then "result_info 缺失或非对象"
+    elif ((.result_info.cursor | type) != "string" and (.result_info.cursor | type) != "null") then "cursor 类型非法（须字符串或 null）"
+    else empty end' 2>/dev/null)"
+  struct_status=$?
+  if [ "${struct_status}" -ne 0 ]; then
+    printf 'FAIL: GET %s 响应结构校验执行失败（jq 非零，fail-closed）：%.200s\n' "${path}" "${body}" >&2
+    return 1
+  fi
+  if [ -n "${struct_msg}" ]; then
+    printf 'FAIL: GET %s 响应结构畸形（success=true 但 %s，fail-closed）：%.200s\n' "${path}" "${struct_msg}" "${body}" >&2
+    return 1
+  fi
   CF_BODY="${body}"
   return 0
 }
 
-# 分页拉取 CF v4 列表端点：按 result_info.cursor 续页，全部 .result 逐项一行 JSON
-# 写入全局 CF_LINES；任一页失败 return 1（调用方显式 || fail）。
+# 分页拉取 CF v4 列表端点：按 result_info.cursor 续页（jq @uri 编码后再拼 query，
+# r14 收口：cursor 是不透明字符串，裸拼会被 +/& 等保留字符改写），全部 .result 逐项
+# 一行 JSON 写入全局 CF_LINES；任一页失败 return 1（调用方显式 || fail）。
 cf_get_all_pages() {
   CF_LINES=""
-  local base_path="$1" cursor="" page
+  local base_path="$1" cursor="" cursor_enc page
   while :; do
     if [ -n "${cursor}" ]; then
-      cf_get "${base_path}?per_page=100&cursor=${cursor}" || return 1
+      cursor_enc="$(jq -rn --arg c "${cursor}" '$c | @uri')" || return 1
+      cf_get "${base_path}?per_page=100&cursor=${cursor_enc}" || return 1
     else
       cf_get "${base_path}?per_page=100" || return 1
     fi

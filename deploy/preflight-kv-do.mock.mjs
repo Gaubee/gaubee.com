@@ -1,11 +1,14 @@
-// preflight-kv-do.mock.mjs — CF API v4 本地 mock（preflight-kv-do.sh 三路径自测夹具）
+// preflight-kv-do.mock.mjs — CF API v4 本地 mock（preflight-kv-do.sh 自测夹具）
 //
 // 用法：node deploy/preflight-kv-do.mock.mjs <mode>
-//   empty  账户无任何 KV namespace                          → 脚本应 PASS（exit 0）
-//   haskey 嫌疑 namespace 含 geo_rules_v1 key               → 脚本应阻断（exit 1）
-//   nokey  嫌疑 namespace 存在但 keys 为空                  → 脚本应 PASS（exit 0）
-//   paged  namespaces 两页分页（cursor 续页，第 2 页才有嫌疑）→ 脚本应 PASS（exit 0）
-//   err    全端点 500                                       → 脚本应阻断（exit 非 0，fail-closed）
+//   empty           账户无任何 KV namespace                          → 脚本应 PASS（exit 0）
+//   haskey          嫌疑 namespace 含 geo_rules_v1 key               → 脚本应阻断（exit 1）
+//   nokey           嫌疑 namespace 存在但 keys 为空                  → 脚本应 PASS（exit 0）
+//   paged           namespaces 两页分页（cursor 续页，第 2 页才有嫌疑）→ 脚本应 PASS（exit 0）
+//   err             全端点 500                                       → 脚本应阻断（exit 非 0，fail-closed）
+//   no-result       200 success=true 但缺 result 键（r14）           → 脚本应阻断（exit 1，且无 PASS 输出）
+//   no-result-info  200 success=true 但缺 result_info 键（r14）      → 脚本应阻断（exit 1，且无 PASS 输出）
+//   bad-cursor      200 但 result_info.cursor=123 非字符串（r14）    → 脚本应阻断（exit 1，且无 PASS 输出）
 // 启动后 stdout 打印 "MOCK_PORT <port>"，SIGTERM/SIGINT 退出。
 // 全部 id/title 均为假值，无真实凭据参与。
 
@@ -29,6 +32,17 @@ const server = http.createServer((req, res) => {
 
   if (mode === "err") {
     return send(500, { success: false, errors: [{ code: 10000, message: "mock internal error" }] });
+  }
+
+  // r14 畸形成功响应夹具：结构校验前脚本必须不放行（空集假 PASS 防线）
+  if (mode === "no-result") {
+    return send(200, { success: true, errors: [], messages: [], result_info: { page: 1, per_page: 100, count: 0, total_count: 0, cursor: "" } });
+  }
+  if (mode === "no-result-info") {
+    return send(200, { success: true, errors: [], messages: [], result: [] });
+  }
+  if (mode === "bad-cursor") {
+    return send(200, { success: true, errors: [], messages: [], result: [], result_info: { page: 1, per_page: 100, count: 0, total_count: 0, cursor: 123 } });
   }
 
   if (url.pathname.endsWith("/storage/kv/namespaces")) {

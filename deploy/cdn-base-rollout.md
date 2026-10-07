@@ -81,11 +81,12 @@ bash deploy/preflight-kv-do.sh    # PASS（exit 0）才允许继续第 1.1 步 w
 > 处置后重跑；③有嫌疑但无 `geo_rules_v1` key（空/无关 namespace）→ PASS，建议顺手
 > 解绑/删除防误读；④任何 API/认证/网络/解析失败 → 阻断（exit 1，fail-closed）。
 
-#### 三路径自测（本地夹具，2026-10-07 实测）
+#### 九路径自测（本地夹具，2026-10-07 r14 实测）
 
 用仓库内 mock（`deploy/preflight-kv-do.mock.mjs`，单文件 node HTTP server，假 id/假
-namespace，无任何真实凭据）充当 CF API，经 `CF_API_BASE` 注入指向本地端口，六组夹具
-全数符合预期（runner 一次性脚本，跑完即 kill mock，实测无残留进程）：
+namespace，无任何真实凭据）充当 CF API，经 `CF_API_BASE` 注入指向本地端口。一键复跑：
+`bash deploy/preflight-kv-do.selftest.sh`（每条单独起 mock、跑完即 kill+wait 回收、
+末尾 pgrep 兜底复查无残留；断言退出码 + PASS 判定行纪律）。10/10 全绿：
 
 | 夹具 | mock 形态 | 期望 | 实测 |
 |------|-----------|------|------|
@@ -94,17 +95,15 @@ namespace，无任何真实凭据）充当 CF API，经 `CF_API_BASE` 注入指�
 | `nokey` | 嫌疑 namespace 存在但 keys 为空 | PASS exit 0 | exit 0，输出「均无 geo_rules_v1 规则数据…建议解绑/删除」 |
 | `paged` | namespaces 两页（`result_info.cursor` 续页，嫌疑在第 2 页） | PASS exit 0 | exit 0，cursor 续页逻辑正确消费第 2 页 |
 | `err` | 全端点 HTTP 500 | 阻断 exit 1 | exit 1（fail-closed；开发中曾抓出「管道吞退出码致 500 仍 PASS」缺陷并已修复） |
+| `no-result` | 200 `success=true` 但缺 `result` 键（r14） | 阻断 exit 1 | exit 1，无 PASS 判定行（r14 收口：结构校验拦截空集假 PASS） |
+| `no-result-info` | 200 `success=true` 但缺 `result_info` 键（r14） | 阻断 exit 1 | exit 1，无 PASS 判定行 |
+| `bad-cursor` | 200 但 `result_info.cursor=123` 非字符串（r14） | 阻断 exit 1 | exit 1，无 PASS 判定行（分页 cursor 同时经 jq `@uri` 编码后拼 query） |
 | 无 `CF_API_TOKEN` | 不起 mock | 阻断 exit 1 | exit 1 |
 
-复跑方式（每条单独起 mock、跑完即回收）：
-
-```sh
-node deploy/preflight-kv-do.mock.mjs empty &   # 其余模式：haskey / nokey / paged / err
-# 等它打印 MOCK_PORT <port> 后：
-CF_API_BASE="http://127.0.0.1:<port>" CF_ACCOUNT_ID=fake CF_API_TOKEN=fake \
-  bash deploy/preflight-kv-do.sh; echo "exit=$?"
-kill %1   # 回收 mock（脚本自身也响应 SIGTERM/SIGINT 自清理）
-```
+历史注：r13 首版夹具六路径（empty/haskey/nokey/paged/err/无 token）全绿后，r14 复检
+仍抓出「`cf_get` 只验 `success==true` 不验成功响应结构」的缺口——三种畸形 200 响应
+会绕过校验产出空集假 PASS，另指出分页 cursor 裸拼 query 会被保留字符改写。两类问题
+均已修复并锁进上表 `no-result`/`no-result-info`/`bad-cursor` 三条新夹具。
 
 > **部署收据（2026-10-07 依据 deploy-worker.yml 全部 13 次运行核实）——生产从未存在
 > GEO_RULES KV，无任何规则数据可迁移**：
