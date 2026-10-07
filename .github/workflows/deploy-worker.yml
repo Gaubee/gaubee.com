@@ -35,8 +35,8 @@ jobs:
 
       - name: Install Worker dependencies
         working-directory: worker
-        # worker 目录无 lock 文件，用 install 而非 ci
-        run: npm install
+        # npm ci（lockfile 入库）：npm10 的 Arborist 在裸 install 上有 edgesOut null bug（2026-10-07 CI 实证）
+        run: npm ci
 
       # 部署门：geo 路由单测（cdn-media Phase 2 起，红则不发布）
       - name: Run worker tests
