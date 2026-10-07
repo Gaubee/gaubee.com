@@ -1,4 +1,6 @@
+import HistorySettingsSection from "$lib/apps/views/HistorySettingsSection.svelte";
 import { leafRoute } from "$lib/router";
+import DatabaseIcon from "@lucide/svelte/icons/database";
 /**
  * JSON 查看器应用（默认安装，可卸载）。
  *
@@ -27,10 +29,21 @@ export const jsonViewerApp: AppEntry = {
     ],
     vfsOwnership: [],
     cliCommands: jsonCommands,
+    // 设置面板：历史记录的 IndexedDB 预算自定义（单条上限 / LRU 总预算）
+    settingsSections: [
+      {
+        id: "json-viewer:history",
+        title: "JSON 历史记录",
+        description: "历史记录的存储预算（IndexedDB）",
+        icon: DatabaseIcon,
+        order: 20,
+        render: HistorySettingsSection,
+      },
+    ],
     description: "粘贴即看的 JSON 树视图与校验工具",
     longDescription:
-      "把任意 JSON 粘贴进来，立刻得到可折叠浏览的树视图：类型着色、实时校验（错误精确到行列）、格式化/压缩/复制、大小与深度统计。支持直接拖入 .json 文件。",
-    version: "1.0.0",
+      "把任意 JSON 粘贴进来，立刻得到可折叠浏览的树视图：类型着色、实时校验（错误精确到行列）、格式化/压缩/复制、大小与深度统计。支持直接拖入 .json 文件；超大文件走分块流式解析。",
+    version: "1.1.0",
     author: "Gaubee",
   },
 };

@@ -41,10 +41,11 @@
 	import { diffJson, type JsonDiffEntry } from "./json-viewer/diff";
 	import {
 		createHistoryScheduler,
-		readHistory,
+		migrateLegacyHistory,
 		removeHistory,
 		type JsonHistoryItem,
 	} from "./json-viewer/history";
+	import { createIdbHistoryStorage } from "./json-viewer/history-idb";
 	import { formatJsonPath, queryJson, type QueryMatch, type QueryOutcome } from "./json-viewer/query";
 	import { inferJsonSchema, inferTypeScript, jsonToYaml, yamlToJson } from "./json-viewer/transform";
 	import { isJsonViewerActive, shortcutAction } from "./json-viewer/shortcuts";
@@ -93,9 +94,14 @@
 	const appContext = useApp();
 
 	onMount(() => {
-		if (typeof localStorage === "undefined") return;
-		historyItems = readHistory(localStorage);
-		historyScheduler = createHistoryScheduler(localStorage, {
+		// 历史数据在 IndexedDB（不占 localStorage）；首次访问迁移旧版 localStorage 记录
+		const idb = createIdbHistoryStorage();
+		if (typeof localStorage !== "undefined") {
+			void migrateLegacyHistory(localStorage, idb).then((items) => {
+				if (historyItems.length === 0) historyItems = items;
+			});
+		}
+		historyScheduler = createHistoryScheduler(idb, {
 			onRecorded: (items) => (historyItems = items),
 		});
 		const flushHistory = () => historyScheduler?.flush();
@@ -107,7 +113,7 @@
 		return () => {
 			window.removeEventListener("blur", flushHistory);
 			document.removeEventListener("visibilitychange", onVisibilityChange);
-			flushHistory();
+			void flushHistory();
 		};
 	});
 
@@ -350,8 +356,7 @@
 		await copyText(entry.pathText);
 	}
 	function openHistory(): void {
-		historyScheduler?.flush();
-		if (typeof localStorage !== "undefined") historyItems = readHistory(localStorage);
+		void historyScheduler?.flush().then((items) => (historyItems = items));
 		historyOpen = true;
 	}
 	function restoreHistory(item: JsonHistoryItem): void {
@@ -359,8 +364,9 @@
 		historyOpen = false;
 	}
 	function deleteHistory(item: JsonHistoryItem): void {
-		if (typeof localStorage === "undefined") return;
-		historyItems = removeHistory(localStorage, item.id);
+		void removeHistory(createIdbHistoryStorage(), item.id).then(
+			(items) => (historyItems = items),
+		);
 	}
 	function formatHistoryDate(timestamp: number): string {
 		return new Date(timestamp).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
