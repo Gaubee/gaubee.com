@@ -27,6 +27,9 @@ interface Tweet {
   created_at: string;
   kind: "posted" | "reposted" | "liked" | "bookmarked";
   author?: string;
+  // Phase 3（cdn-media-bootstrap，2026-10-07）语义冻结：值为 canonical media key
+  // `cdn-media/x/<月>/<文件>`（原 `x-media/<月>/<文件>`），正文引用一律拼
+  // `/${p}` = `/cdn-media/x/...`（R1 路径契约：永不绑定存储域名）。
   mediaLocal?: string[];
   videoLocal?: string[];
   posterLocal?: string;
@@ -236,7 +239,8 @@ async function main() {
   const translations: Record<string, string> = existsSync(translationsFile)
     ? JSON.parse(await Bun.file(translationsFile).text())
     : {};
-  // 媒体元数据（media-meta.ts 产物）：宽高挂进 HTML，布局稳定不跳动（kzf 裁决 16）
+  // 媒体元数据（media-meta.ts 产物：manifest w/h/ms + staging 兜底，键 = canonical
+  // media key）：宽高挂进 HTML，布局稳定不跳动（kzf 裁决 16）
   const mediaMetaFile = path.join(SRC, "media-meta.json");
   const mediaMeta: Record<string, { w: number; h: number; ms?: number }> = existsSync(mediaMetaFile)
     ? JSON.parse(await Bun.file(mediaMetaFile).text())

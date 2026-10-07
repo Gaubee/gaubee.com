@@ -2,54 +2,52 @@
 
 ## 是什么
 
-一条命令核对 X (Twitter) 档案的本地媒体库（`static/x-media/`，按月分目录）：`x.json` 声明的本地副本（`mediaLocal`/`videoLocal`）与磁盘文件双向对账（断链引用 + 孤儿文件）、本地化覆盖缺口、体积构成与 git push 风险榜。零网络、跑完即退。
+一条命令核对 X (Twitter) 档案的媒体一致性（cdn-media Phase 3 语义，2026-10-07 重写）：
+`x.json` 声明的本地引用（`mediaLocal`/`videoLocal`/`posterLocal`，canonical media key
+`cdn-media/x/<月>/<文件>`）与 **manifest 对象集（已发布权威）∪ staging 磁盘（本地增量）**
+对账：断链引用、staging 待打包/待清理/孤儿三态、本地化覆盖缺口、体积构成。零网络、跑完即退。
 
 ## 解决什么
 
-- 媒体由 `x-media-backfill` 回灌，带 4.5GB 体积护栏与「GitHub 单文件 100MB 拒收」红线——回灌/导入跑完后媒体库是否一致，此前只能靠肉眼。本工具把一致性变成可验证的。
-- 缺口会静默累积：backfill 对含视频条目只本地化视频（策略性跳过图片）、护栏触发留下未下载条目、条目清理可能留下孤儿文件——首跑实查：图片侧缺口 14 条，断链/孤儿 0。
-- push 前先看风险榜：≥90MB 警戒、≥100MB 必拒收。首跑实测已有 2 个视频在警戒区（94.2 / 93.1 MB）。
-- 门禁语义：断链/孤儿/超限任一硬问题退出码 1，可挂进日常维护流程；警戒与缺口只提示不失败。
+- 权威存放 = GitHub Releases 卷（`cdn-media/manifest/manifest-<gen>.json` 对象集），
+  本地不再有整库副本——引用是否都能在权威源兑现，此前只能靠肉眼。本工具把一致性变成可验证的。
+- staging 会静默累积：抓取管道落盘后等 `media-pack --patch` 打卷，发布校验通过后按 7 天
+  保留期清理。本工具区分「待打包」（引用已声明、卷未收录）与「待清理」（已入卷，可清理）。
+- 断链 = 引用既不在 manifest、staging 也无副本（读者会 404）；孤儿 = staging 有文件但
+  无引用无 manifest（下载后库存写入中断的残留）。
+- 门禁语义：断链/孤儿任一硬问题退出码 1，可挂进日常维护流程；待打包/待清理/缺口只提示。
+- 旧「git push 100MB 拒收线」门禁已随「媒体不进 git」（R6）一并废除——单文件体积上限
+  由 media-pack 的单卷 200MiB 装箱硬限把守。
 
 ## 怎么跑
 
 ```sh
 bun tools/2026-10-05-x-media-audit/x-media-audit.ts          # 在 skills/gaubee-skills/ 下执行，默认 Top10
-bun tools/2026-10-05-x-media-audit/x-media-audit.ts --top 5  # 自定义大文件榜单条数
+bun tools/2026-10-05-x-media-audit/x-media-audit.ts --top 5  # 自定义榜单条数
 ```
 
-数据根与站点根遵循既有约定：`GAUBEE_SKILLS_DATA`（缺省 `~/.gaubee-skills`）、`GAUBEE_SITE`（缺省为仓库根，媒体库在 `<GAUBEE_SITE>/static/x-media/`）。
+数据根与站点根遵循既有约定：`GAUBEE_SKILLS_DATA`（缺省 `~/.gaubee-skills`）、
+`GAUBEE_SITE`（缺省为仓库根；manifest 在 `<GAUBEE_SITE>/cdn-media/manifest/`，
+staging 在 `<GAUBEE_SITE>/cdn-media/staging/x/`）。
 
-## 示例输出（真实运行，2026-10-05）
+## 示例输出（真实运行，2026-10-07 Phase 3 迁移日）
 
 ```sh
 $ bun tools/2026-10-05-x-media-audit/x-media-audit.ts --top 5
-# X 媒体库对账
-库存 3025 条动态（liked 2178 · posted 832 · bookmarked 15）· 待回灌 0 条
-本地引用：图片条目 1125 · 视频条目 1138 ｜ 远程未本地化：图片 14 · 视频 0
-本地库：2263 文件 · 3.14 GB（2017-12 → 2026-10，92 个月）
+# X 媒体库对账（manifest + staging，Phase 3 语义）
+库存 3042 条动态（liked 2195 · posted 832 · bookmarked 15）· 待回灌 17 条
+本地引用：图片条目 2284 · 视频条目 1142 ｜ 远程未本地化：图片 0 · 视频 0
+manifest gen 2：3426 对象 · 3.22 GB（视频 1142）
+staging：0 文件（待打包 0 · 0 B；待清理 0 · 0 B，发布校验通过后 7 天）
 
-引用完整性：断链 0 ✓ ｜ 孤儿文件 0 ✓
-本地化覆盖：缺口 14 条（图片侧 14 · 视频侧 0；backfill 不会自动补齐：视频条目只本地化视频）
-
-## git push 风险（GitHub 单文件 100MB 拒收线）
-⚠ 警戒（≥90MB）2 个：
-- x-media/2026-10/2066467110960959833-video.mp4 — 94.2 MB
-- x-media/2026-10/2076916584938189192-video.mp4 — 93.1 MB
-
-## 体积构成
-视频 2.99 GB（1138 个）· 图片等 156.4 MB（1125 个）
-按月 Top5：2026-10 2.26 GB · 2026-07 156.4 MB · 2026-08 146.7 MB · 2026-09 119.5 MB · 2026-05 77.6 MB
-大文件 Top5：
-- x-media/2026-10/2066467110960959833-video.mp4 — 94.2 MB
-- x-media/2026-10/2076916584938189192-video.mp4 — 93.1 MB
-- x-media/2026-10/2100950673135444366-video.mp4 — 76.3 MB
-- x-media/2026-05/2056306341451366789-video.mp4 — 71.5 MB
-- x-media/2026-07/2075830073991823579-video.mp4 — 68.6 MB
+引用完整性：断链 0 ✓（缺失且 staging 无副本）｜ 待打包引用 0
+staging 一致性：孤儿 0 ✓
+本地化覆盖：全量已本地化 ✓
 ```
 
-（退出码 0：无硬问题。沙盒自测过断链/孤儿场景，报告会列出明细且退出码为 1。）
+（退出码 0。隔离沙盒里实测过三态：staging 有副本未入卷 → 「待打包 N」；声明但从未下载 →
+「断链」且退出码 1；孤儿文件 → 「孤儿」且退出码 1。）
 
 ## 状态
 
-proposed（2026-10-05，等 kzf 裁决）
+proposed（2026-10-05，等 kzf 裁决；2026-10-07 随 cdn-media Phase 3 重写对账语义）

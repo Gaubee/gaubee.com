@@ -34,8 +34,11 @@ interface Tweet {
   media?: string[]; // 图片 URL（pbs.twimg.com，已归一 name=large）
   video?: string[]; // 视频 mp4 直链（时间线 DOM 能拿到的，如 gif；blob 播放器拿不到）
   hasVideo?: boolean; // 有视频播放器（blob 源）——直链拿不到时交 yt-dlp 解析下载
-  mediaLocal?: string[]; // 已下载的站内相对路径（x-media/YYYY-MM/…，2026-10-05 kzf：动态 event 媒体本地化）
-  videoLocal?: string[]; // yt-dlp 下载的视频（x-media/YYYY-MM/<id>-video.mp4）
+  // Phase 3（cdn-media-bootstrap，2026-10-07）语义冻结：canonical media key
+  // `cdn-media/x/<月>/<文件>`（原 `x-media/...`），不再兼任 staging 路径——
+  // 磁盘落点 = cdn-media/staging/x/<月>/<文件>（canonical key 布局，media-pack 输入约定）
+  mediaLocal?: string[];
+  videoLocal?: string[];
 }
 
 interface StreamCursor {
@@ -244,6 +247,10 @@ async function main() {
   store.updated_at = new Date().toISOString();
 
   // ---- 媒体本地化（2026-10-05 kzf：动态 event 媒体进自己域名，墙内可读）----
+  // Phase 3（cdn-media-bootstrap）：下载落点 = cdn-media/staging/x/<月>/<文件>
+  // （canonical key 布局，media-pack --source 输入约定）；x.json 记 canonical
+  // media key `cdn-media/x/<月>/<文件>`。媒体不再进主仓 git，经 media-pack
+  // --patch 打卷上 GitHub Releases 后由 cdn-base 分发。
   // 新条目自动下载；--media-backfill N 给最近 N 条缺本地的补（体积抽样/回填用）
   // 视频：DOM 直链（gif）直接下；blob 播放器走 yt-dlp 兜底（--video-backfill N 补库存）
   let backfill = 0;
@@ -253,7 +260,8 @@ async function main() {
     else if (argv[i] === "--video-backfill") videoBackfill = Number.parseInt(argv[++i] ?? "0", 10) || 0;
   }
   const SITE = process.env.GAUBEE_SITE ?? path.resolve(import.meta.dir, "..", "..", "..");
-  const mediaRoot = path.join(SITE, "static", "x-media");
+  const STAGING = path.join(SITE, "cdn-media", "staging", "x");
+  const mediaRoot = STAGING;
   const wantMedia: Tweet[] = fresh.filter(
     (t) => (t.media?.length ?? 0) + (t.video?.length ?? 0) > 0 || t.hasVideo,
   );
@@ -286,8 +294,10 @@ async function main() {
       const url = urls[i]!;
       const extMatch = url.match(/format=(\w+)/) ?? url.match(/\.(jpg|jpeg|png|webp|mp4)(?:\?|$)/);
       const ext = extMatch ? extMatch[1]!.toLowerCase() : url.includes("video.twimg.com") ? "mp4" : "jpg";
-      const rel = path.join("x-media", month, `${t.id}-${i + 1}.${ext}`);
-      const abs = path.join(SITE, "static", rel);
+      // canonical media key（x.json 值）与 staging 落点分离：key 冻结为 cdn-media/x/...，
+      // 磁盘文件在 staging/x/...（media-pack 打卷输入）
+      const rel = path.join("cdn-media", "x", month, `${t.id}-${i + 1}.${ext}`);
+      const abs = path.join(STAGING, month, `${t.id}-${i + 1}.${ext}`);
       if (!existsSync(abs)) {
         try {
           const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 gaubee-skills" } });
@@ -317,16 +327,17 @@ async function main() {
     const directVideo = (t.mediaLocal ?? []).some((p) => p.endsWith(".mp4"));
     if ((t.hasVideo || (t.video?.length ?? 0) > 0) && !t.videoLocal && !directVideo) {
       const statusUrl = `https://x.com/${t.author || store.user.username}/status/${t.id}`;
-      const absNoExt = path.join(SITE, "static", "x-media", month, `${t.id}-video`);
+      const absNoExt = path.join(STAGING, month, `${t.id}-video`);
       try {
         mkdirSync(path.dirname(absNoExt), { recursive: true });
         execFileSync(
           "yt-dlp",
           [
-            // 体积阶梯：≤98MB 里取最高 720p；超限降 480p；再不行取任意——单文件硬上限
-            // 100MB（GitHub push 拒收大文件，2026-10-05 实证 265MB 长视频）
+            // 体积阶梯：≤190MB 里取最高 720p；超限降 480p；再不行取任意——单文件
+            // 硬上限 190MB（media-pack 单卷 200MiB 上限要留 tar 头/对齐余量；
+            // Phase 3 起媒体不进 git，原 100MB push 红线作废）
             "-f",
-            "bv*[height<=720][size<98M]+ba/b[height<=720][size<98M]/bv*[height<=480]+ba/b[height<=480]/b",
+            "bv*[height<=720][size<190M]+ba/b[height<=720][size<190M]/bv*[height<=480]+ba/b[height<=480]/b",
             "--no-playlist",
             "--merge-output-format",
             "mp4",
@@ -339,7 +350,7 @@ async function main() {
         for (const ext of ["mp4", "mkv", "webm"]) {
           const absVideo = `${absNoExt}.${ext}`;
           if (existsSync(absVideo)) {
-            t.videoLocal = [`x-media/${month}/${t.id}-video.${ext}`];
+            t.videoLocal = [`cdn-media/x/${month}/${t.id}-video.${ext}`];
             mediaBytes += statSync(absVideo).size;
             mediaFiles++;
             break;
@@ -352,7 +363,7 @@ async function main() {
       }
     }
   }
-  if (mediaFiles) console.error(`media: ${mediaFiles} 个文件 ${(mediaBytes / 1024 / 1024).toFixed(2)} MB → ${mediaRoot}`);
+  if (mediaFiles) console.error(`media: ${mediaFiles} 个文件 ${(mediaBytes / 1024 / 1024).toFixed(2)} MB → ${mediaRoot}（staging，待 media-pack 打卷）`);
 
   mkdirSync(SRC, { recursive: true });
   writeFileAtomic(storeFile, JSON.stringify(store, null, 1));

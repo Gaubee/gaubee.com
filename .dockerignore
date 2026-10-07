@@ -22,3 +22,7 @@ worker
 
 # cdn-media 子仓：manifest 与打包工具，非站点构建输入
 cdn-media
+
+# cdn-media Phase 3（2026-10-07）：媒体经 cdn-base 从 GitHub Releases 分发（R1/R6），
+# 不再打进站点镜像/构建上下文（体积红线：镜像 ≤100MB）
+static/x-media

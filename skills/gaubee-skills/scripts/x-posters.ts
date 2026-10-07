@@ -6,7 +6,8 @@
  * - [2026-10-05] kzf 裁决：时间线/归档展示需要视频封面（卡片秒开，不加载视频元数据）；
  *   同时修复 14 条「视频+图片混合推文」的图片侧缺口（backfill 下载分支互斥导致封面被跳过）。
  * - 1. 有 videoLocal 无 posterLocal → 拉 syndication 取 poster（mediaDetails 的 video 条目图），落
- *      x-media/YYYY-MM/<id>-poster.jpg，记 posterLocal
+ *      staging/x/YYYY-MM/<id>-poster.jpg，记 posterLocal（canonical media key cdn-media/x/…，
+ *      Phase 3 起媒体不进 git，落点 = media-pack --source 的 staging 输入）
  * - 2. 有 media 无 mediaLocal → 直接下载图片（<id>-<n>.<ext>），记 mediaLocal（幂等补缺口）
  * - 3. 幂等可续跑：每 50 条落盘；网络失败不标记下次重试；429 退避
  *
@@ -120,8 +121,8 @@ async function main() {
       }
       if (posterUrl) {
         try {
-          const rel = `x-media/${month}/${t.id}-poster.jpg`;
-          const abs = path.join(SITE, "static", rel);
+          const rel = `cdn-media/x/${month}/${t.id}-poster.jpg`;
+          const abs = path.join(SITE, "cdn-media", "staging", "x", month, `${t.id}-poster.jpg`);
           if (!existsSync(abs)) {
             bytes += await download(posterUrl, abs);
             files++;
@@ -142,8 +143,8 @@ async function main() {
         let url = t.media![i]!;
         if (url.includes("/media/") && !url.includes("name=")) url += "?name=large";
         const ext = url.match(/\.(\w{3,4})(?:\?|$)/)?.[1]?.toLowerCase() ?? "jpg";
-        const rel = `x-media/${month}/${t.id}-${i + 1}.${ext}`;
-        const abs = path.join(SITE, "static", rel);
+        const rel = `cdn-media/x/${month}/${t.id}-${i + 1}.${ext}`;
+        const abs = path.join(SITE, "cdn-media", "staging", "x", month, `${t.id}-${i + 1}.${ext}`);
         try {
           if (!existsSync(abs)) {
             bytes += await download(url, abs);

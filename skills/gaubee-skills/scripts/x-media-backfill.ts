@@ -6,9 +6,12 @@
  * - [2026-10-05] kzf：动态 event 要图文视频齐全、墙内可读；时间线抽取只能覆盖近期窗口，
  *   历史条目靠 syndication tweet-result 逐条补：正文全文 + 图片 + mp4 变体直链（免 yt-dlp）。
  * - 1. 遍历库存中无 synChecked 标记的条目，拉 syndication 富化（text/media/video/author/时间）
- * - 2. 媒体落 SITE/static/x-media/YYYY-MM/（图片 name=large；视频挑 ≤720p mp4 变体）
+ * - 2. 媒体落 cdn-media/staging/x/YYYY-MM/（canonical key 布局，media-pack --source 输入；
+ *   Phase 3 起不进主仓 git，打卷上 GitHub Releases 后由 cdn-base 分发）；x.json 记
+ *   canonical media key `cdn-media/x/YYYY-MM/...`（不再兼任 staging 路径）
  * - 3. 幂等可续跑：每 50 条落盘一次（writeFileAtomic 镜像进 vault）；已处理条目标记 synChecked
- * - 4. 体积护栏：累计媒体体积超 --max-gb（默认 4.5）即停下载、只留元数据，报告提示外置存储
+ * - 4. 本地磁盘护栏：staging 累计下载超 --max-gb（默认 4.5）即停下载、只留元数据
+ *   （R6 红线检查本体已移到 cron 的缓存水位/远端用量，这里只护本地盘）
  *
  * 运行：bun scripts/x-media-backfill.ts [--limit N] [--no-download] [--max-gb 4.5]
  * 前置：~/.gaubee-skills/data/sources/x-likes/x.json 已由 x-archive-import / x-likes-fetch 建立
@@ -53,8 +56,9 @@ interface SynMedia {
   };
 }
 
-/** 挑 mp4 变体：≤720p 里优先高码率，但预估体积（bitrate×duration）超 98MB 的降档
- *  ——GitHub push 拒收 >100MB 单文件（2026-10-05 实证 265MB 长视频） */
+/** 挑 mp4 变体：≤720p 里优先高码率，但预估体积（bitrate×duration）超 190MB 的降档
+ *  ——单文件须能装进 media-pack 单卷（200MiB 上限留 tar 头/对齐余量；
+ *  Phase 3 起媒体不进 git，原 100MB push 红线作废） */
 function pickMp4(videoInfo: SynMedia["video_info"]): string | null {
   const mp4 = (videoInfo?.variants ?? []).filter((v) => v.content_type === "video/mp4");
   if (!mp4.length) return null;
@@ -66,7 +70,7 @@ function pickMp4(videoInfo: SynMedia["video_info"]): string | null {
   }));
   const estBytes = (v: { bitrate: number }) => (v.bitrate / 8) * durS;
   const fit = withMeta.filter(
-    (v) => v.h > 0 && v.h <= 720 && (estBytes(v) === 0 || estBytes(v) < 98 * 1024 ** 2),
+    (v) => v.h > 0 && v.h <= 720 && (estBytes(v) === 0 || estBytes(v) < 190 * 1024 ** 2),
   );
   const pool = fit.length ? fit : withMeta.slice().sort((a, b) => estBytes(a) - estBytes(b));
   return pool.sort((a, b) => (b.h - a.h) || (b.bitrate - a.bitrate))[0]!.url;
@@ -209,13 +213,14 @@ async function main() {
     if (photos.length || videos.length) stats.mediaTweets++;
     if (videos.length) stats.videoTweets++;
 
-    // 媒体下载（图片 name=large；视频挑好的 ≤720p 变体；防护栏）
+    // 媒体下载（图片 name=large；视频挑好的 ≤720p 变体；防护栏）。
+    // Phase 3：落点 staging/x/<月>/，x.json 记 canonical media key cdn-media/x/<月>/…
     const month = (t.created_at || localDate()).slice(0, 7);
     if (!noDownload && !guardTripped && (t.media?.length || t.video?.length)) {
       try {
         if (t.video?.length && !t.videoLocal) {
-          const rel = `x-media/${month}/${t.id}-video.mp4`;
-          const abs = path.join(SITE, "static", rel);
+          const rel = `cdn-media/x/${month}/${t.id}-video.mp4`;
+          const abs = path.join(SITE, "cdn-media", "staging", "x", month, `${t.id}-video.mp4`);
           if (existsSync(abs)) {
             t.videoLocal = [rel];
           } else {
@@ -231,8 +236,8 @@ async function main() {
             let url = t.media[i]!;
             if (url.includes("/media/") && !url.includes("name=")) url += "?name=large";
             const ext = url.match(/\.(\w{3,4})(?:\?|$)/)?.[1]?.toLowerCase() ?? "jpg";
-            const rel = `x-media/${month}/${t.id}-${i + 1}.${ext}`;
-            const abs = path.join(SITE, "static", rel);
+            const rel = `cdn-media/x/${month}/${t.id}-${i + 1}.${ext}`;
+            const abs = path.join(SITE, "cdn-media", "staging", "x", month, `${t.id}-${i + 1}.${ext}`);
             if (!existsSync(abs)) {
               const size = await download(url, abs);
               bytes += size;

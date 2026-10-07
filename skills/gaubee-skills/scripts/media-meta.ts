@@ -1,10 +1,16 @@
 #!/usr/bin/env bun
 /**
- * media-meta.ts — 探测 x-media 媒体尺寸/时长，写 media-meta.json 供生成器布局用。
+ * media-meta.ts — 媒体尺寸/时长元数据，写 media-meta.json 供生成器布局用。
  *
  * [2026-10-05] kzf 裁决 16：视频/图片把宽高（视频含时长）挂进 HTML，列表布局稳定不跳动。
- * 视频：ffprobe（软依赖）；图片：bun 内解析 JPEG/PNG/WebP 头（零依赖、免 spawn）。
- * 产物：~/.gaubee-skills/data/sources/x-likes/media-meta.json（rel → { w, h, ms? }）
+ * [2026-10-07 cdn-media Phase 3（plan 3.3）] 输入源切换：
+ * - 权威来源 = cdn-media/manifest/manifest-<gen>.json（A1 打包时 ffprobe 已内嵌
+ *   width/height/duration_ms，本地不再需要视频文件即可产出全量元数据）；
+ * - 增量来源 = cdn-media/staging/x/<月>/<文件>（已下载未打包的新文件，ffprobe/图片头
+ *   解析兜底；下次 media-pack 打包后自动进 manifest，本脚本重跑即收敛）。
+ * 产出格式不变：~/.gaubee-skills/data/sources/x-likes/media-meta.json，键从旧
+ * `x-media/<月>/<文件>` 冻结为 canonical media key `cdn-media/x/<月>/<文件>`（与
+ * x.json mediaLocal/videoLocal/posterLocal 同键空间，Phase 3 前缀迁移一次性完成）。
  *
  * 运行：bun scripts/media-meta.ts
  */
@@ -14,8 +20,32 @@ import path from "node:path";
 import { sourceDir, writeFileAtomic } from "./lib.ts";
 
 const SITE = process.env.GAUBEE_SITE ?? path.resolve(import.meta.dir, "..", "..", "..");
-const MEDIA_ROOT = path.join(SITE, "static", "x-media");
+const MEDIA_REPO = path.join(SITE, "cdn-media");
+const MANIFEST_DIR = path.join(MEDIA_REPO, "manifest");
+const STAGING_X = path.join(MEDIA_REPO, "staging", "x");
 const OUT = path.join(sourceDir("x-likes"), "media-meta.json");
+
+/** manifest 权威源：current.json → manifest-<gen>.json（本地仓库副本，零网络）。
+ *  返回 canonical 元数据键（cdn-media/x/<月>/<文件>）→ { w, h, ms? }。 */
+async function metaFromManifest(): Promise<Record<string, { w: number; h: number; ms?: number }>> {
+  const currentFile = path.join(MANIFEST_DIR, "current.json");
+  if (!existsSync(currentFile)) return {};
+  const current = JSON.parse(await Bun.file(currentFile).text());
+  const gen = current.gen;
+  if (typeof gen !== "number") throw new Error("current.json 缺 gen 字段（损坏？）");
+  const manifestFile = path.join(MANIFEST_DIR, `manifest-${gen}.json`);
+  if (!existsSync(manifestFile)) throw new Error(`manifest-${gen}.json 不存在（指针与清单失配）`);
+  const manifest = JSON.parse(await Bun.file(manifestFile).text());
+  const out: Record<string, { w: number; h: number; ms?: number }> = {};
+  for (const o of manifest.objects ?? []) {
+    if (typeof o.key !== "string" || typeof o.width !== "number" || typeof o.height !== "number")
+      continue; // 无尺寸的对象（打包时不可得）按缺省处理，生成器回退无尺寸输出
+    const entry: { w: number; h: number; ms?: number } = { w: o.width, h: o.height };
+    if (typeof o.duration_ms === "number") entry.ms = o.duration_ms;
+    out[`cdn-media/${o.key}`] = entry;
+  }
+  return out;
+}
 
 function pngSize(buf: Uint8Array): { w: number; h: number } | null {
   if (buf.length < 24) return null;
@@ -109,10 +139,12 @@ async function videoMeta(file: string): Promise<{ w: number; h: number; ms: numb
 }
 
 async function main() {
-  const meta: Record<string, { w: number; h: number; ms?: number }> = existsSync(OUT)
-    ? JSON.parse(await Bun.file(OUT).text())
-    : {};
+  // 1) 权威源：manifest 内嵌元数据（3426 对象全带 w/h，Phase 3 起不再依赖本地视频文件）
+  const meta = await metaFromManifest();
+  const fromManifest = Object.keys(meta).length;
+  console.error(`manifest 权威元数据 ${fromManifest} 条`);
 
+  // 2) 增量源：staging 新文件（canonical key 布局 staging/x/<月>/<文件>），探测兜底
   const files: string[] = [];
   const walk = (dir: string) => {
     for (const name of readdirSync(dir)) {
@@ -124,32 +156,31 @@ async function main() {
       files.push(full);
     }
   };
-  if (existsSync(MEDIA_ROOT)) walk(MEDIA_ROOT);
-  console.error(`待探测 ${files.length} 个文件（缓存 ${Object.keys(meta).length}）`);
+  if (existsSync(STAGING_X)) walk(STAGING_X);
 
-  let done = 0;
+  let probed = 0;
   let videos = 0;
   for (const full of files) {
-    const rel = path.relative(path.join(SITE, "static"), full);
-    if (meta[rel]?.w) continue; // 已缓存
+    const rel = path.relative(STAGING_X, full); // <月>/<文件>（扫描根 = staging/x）
+    const key = `cdn-media/x/${rel}`; // canonical media key = cdn-media/x/<月>/<文件>
+    if (meta[key]?.w) continue; // manifest 已收录（待 7 天保留期清理的 staging 残留）
     if (full.endsWith(".mp4")) {
       const m = await videoMeta(full);
       if (m) {
-        meta[rel] = m;
+        meta[key] = m;
         videos++;
       }
     } else {
       const size = imageSize(full);
-      if (size) meta[rel] = size;
+      if (size) meta[key] = size;
     }
-    done++;
-    if (done % 300 === 0) {
-      writeFileAtomic(OUT, JSON.stringify(meta, null, 1));
-      console.error(`进度 ${done}/${files.length}（视频 ${videos}）`);
-    }
+    probed++;
   }
+
   writeFileAtomic(OUT, JSON.stringify(meta, null, 1));
-  console.error(`完成：${Object.keys(meta).length} 条元数据（视频 ${videos}）`);
+  console.error(
+    `完成：${Object.keys(meta).length} 条元数据（manifest ${fromManifest} + staging 新探测 ${probed}，其中视频 ${videos}）`,
+  );
 }
 
 main().catch((err) => {

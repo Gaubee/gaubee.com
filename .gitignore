@@ -47,3 +47,8 @@ config.toml
 # gaubee-skills 私有数据红线（2026-10-05 迁移裁决）：含私有仓信号的数据与凭据绝不进仓库
 skills/gaubee-skills/data/
 skills/gaubee-skills/**/.env
+
+# cdn-media Phase 3（2026-10-07）：媒体不再进主仓 git——权威存放 = GitHub Releases 卷
+# （cdn-media/manifest 指针），抓取落点 = cdn-media/staging（不进 git）。
+# 本条配合主线程 `git rm -r --cached static/x-media` 一次性摘除存量（历史重写为可选后续）。
+static/x-media/

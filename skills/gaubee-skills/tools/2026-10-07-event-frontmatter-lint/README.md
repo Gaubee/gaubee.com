@@ -14,7 +14,7 @@ kzf 2026-10-06 裁决了 title 规范（全角冒号：`GitHub 日报：2026-10-
 bun skills/gaubee-skills/tools/2026-10-07-event-frontmatter-lint/event-frontmatter-lint.ts
 ```
 
-- 校验项：(a) github-daily-/x-daily-/weekly-/monthly-/yearly- 文件 title 匹配对应 R2 正则；(b) date 可解析且不晚于今天；(c) 报告类 tags 必含 event（**x-archive 归档豁免**——它有自有 x-archive 标签体系，spec 只冻结报告类 title）；(d) 正文 `/x-media/` 引用逐一验存在。
+- 校验项：(a) github-daily-/x-daily-/weekly-/monthly-/yearly- 文件 title 匹配对应 R2 正则；(b) date 可解析且不晚于今天；(c) 报告类 tags 必含 event（**x-archive 归档豁免**——它有自有 x-archive 标签体系，spec 只冻结报告类 title）；(d) 正文 `/cdn-media/<source>/<key>` 引用逐一能在 cdn-media manifest（current.json → manifest-<gen>.json）对象集中找到（2026-10-07 Phase 3 起媒体不在 static/ 磁盘——R1 路径契约，原 static/ 存在性校验随摘除退役）。
 - 退出码：0 全过 / 1 有违规。
 
 ## 真实示例输出（2026-10-07，1325 event）

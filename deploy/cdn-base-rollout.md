@@ -57,6 +57,64 @@ df -h /opt/gaubee/media-cache
 
 ## 1. Worker 部署（规则存储为 Durable Object；生产收据：KV 零状态，无迁移需求，r11 P1-1）
 
+### 1.0 Preflight：旧 KV binding/namespace 对账护栏（首次 DO 部署前执行；r12 P1-2 收口）
+
+> **当前生产收据（已闭合）**：2026-10-07 依据 deploy-worker.yml 全部 13 次运行核实，
+> **生产从未存在 GEO_RULES KV**（binding 从未部署、namespace 从未创建、零规则写入），
+> 无迁移需求——收据明细见下方引用块。本 preflight 是给 **future 环境**的护栏：
+> 任何环境首次部署 DO 前（或怀疑误绑定了旧 KV 时）必须实跑，不得凭记忆跳过。
+
+```sh
+#!/usr/bin/env bash
+# geo KV→DO 对账 preflight：发现旧 KV 规则存量即阻断部署，给出迁移路径。
+# 前置：CF_ACCOUNT_ID（Cloudflare 账户 ID）、GH_TOKEN（owner GitHub token）已就绪。
+set -euo pipefail
+
+CF_ACCOUNT_ID="${CF_ACCOUNT_ID:?export CF_ACCOUNT_ID=<cloudflare 账户 id>}"
+GH_TOKEN="${GH_TOKEN:?export GH_TOKEN=\"\$(gh auth token)\"}"
+SITE="${SITE:-https://gaubee.com}"
+
+# 1) 列账户全部 KV namespace，过滤 geo/规则相关（title 命名含 GEO / geo / rules 的都算嫌疑）
+echo "== 1) 扫描 KV namespaces =="
+SUSPECTS=$(gh api "/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces" --paginate \
+  --jq '.[] | select(.title | test("GEO|geo|rules"; "i")) | "\(.id) \(.title)"' || true)
+if [ -z "${SUSPECTS}" ]; then
+  echo "PASS：账户下不存在 geo/rules 相关 KV namespace（与生产收据一致，无需迁移）"
+else
+  echo "发现疑似旧 KV namespace："
+  echo "${SUSPECTS}"
+  echo ""
+  echo "== 2) 逐 namespace 读取存量规则，与 DO 当前规则对账 =="
+  DO_RULES=$(curl -sf "${SITE}/api/geo/rules" -H "Authorization: Bearer ${GH_TOKEN}" \
+    || echo '{"fromDefault":true}')
+  echo "DO 当前规则：${DO_RULES}"
+  while read -r NS_ID NS_TITLE; do
+    [ -z "${NS_ID}" ] && continue
+    echo "--- namespace ${NS_TITLE} (${NS_ID}) 的 keys ---"
+    for KEY in $(npx -y wrangler kv key list --namespace-id "${NS_ID}" \
+        | jq -r '.[].name'); do
+      echo "key: ${KEY}"
+      npx -y wrangler kv key get --namespace-id "${NS_ID}" "${KEY}" || true
+    done
+  done <<< "${SUSPECTS}"
+  echo ""
+  echo "FAIL：发现旧 KV 规则存量——首次 DO 部署阻断。"
+  echo "迁移路径（人工执行，工具不自动迁移）：把上面每个 key 的 rules 经 owner PUT 逐条写入 DO"
+  echo "（首写接受任意正整数版本，其后必须 current+1，见第 3 节版本纪律；"
+  echo " 若 DO 已有规则且 KV 内容与之不一致，先人工裁决哪份权威，再决定是否 PUT）。"
+  exit 1
+fi
+
+# 2) DO 侧现状确认：必须可达且报告版本（首次部署应为 fromDefault / v0）
+echo "== 3) DO 现状 =="
+curl -sf "${SITE}/api/geo" && echo ""
+echo "PASS：preflight 通过，可继续第 1.1 步 wrangler deploy"
+```
+
+> 判定语义：①无嫌疑 namespace → PASS（当前生产即此形态，收据闭合）；
+> ②有嫌疑且有 keys → FAIL 阻断，按输出的人工迁移路径处置后重跑；
+> ③有嫌疑但 keys 为空（空 namespace）→ 视同 PASS，但建议顺手解绑/删除防误读。
+
 > **部署收据（2026-10-07 依据 deploy-worker.yml 全部 13 次运行核实）——生产从未存在
 > GEO_RULES KV，无任何规则数据可迁移**：
 > - 成功部署只有 2026-07-24 ～ 2026-08-14 的 7 次（run 30074387592 / 30125697664 /
@@ -154,11 +212,12 @@ curl -s -X PUT https://gaubee.com/api/geo/rules \
 
 ```sh
 export GH_TOKEN="$(gh auth token)"   # 自定义 base 场景经 owner PUT 种规则（真实 Bearer→GitHub /user→owner 鉴权链路）
-pnpm build && (pnpm exec vite preview --host 127.0.0.1 &)
+pnpm build && (GAUBEE_WORKER_PORT=8799 pnpm exec vite preview --host 127.0.0.1 &)
 PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 pnpm exec playwright test tests/media-geo.e2e.ts
-# 三场景：worker 不可达（先在 wrangler dev 未启动时跑一轮，再补下面两场景）、默认规则、自定义 base 重写。
-# wrangler dev 由测试按需拉起（--persist-to 一次性临时目录，DO 空状态，默认规则场景依赖它），
-# 结束后测试自动回收进程并清理目录；也可手动 `cd worker && npx wrangler dev` 预先启动复用
-#（此时默认规则场景要求该实例的 DO 处于空状态，否则该场景会报出明确指引并失败）。
+# 三场景：worker 不可达（先在测试专用 worker 未启动时跑一轮，再补下面两场景）、默认规则、自定义 base 重写。
+# wrangler dev 由测试拉起在测试专用端口 8799 + 一次性 --persist-to 临时目录（r12 P1-1：
+# 禁止复用外部 8787 实例——端口被占即 fail 并提示清理；测试前后断言外部 8787 状态不变）。
+# preview 须以 GAUBEE_WORKER_PORT=8799 启动（vite proxy 目标随它切换），否则自定义 base
+# 场景会给出可操作的失败信息而不是写进外部实例。结束后测试自动回收进程并清理目录。
 ```
 

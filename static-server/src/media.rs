@@ -133,6 +133,29 @@ pub fn parse_media_path(path: &str) -> Result<(String, String), &'static str> {
     Ok((source.to_owned(), key.to_owned()))
 }
 
+// ---- Phase 3 兼容路由（A8/R1：存量 /x-media/* 一次性平移到 /cdn-media/x/*） ----
+
+/// `GET /x-media/<key>` → 302 `/cdn-media/x/<key>`，保留 query。
+///
+/// 临时重定向语义（302，非 301）：301 会被浏览器与中间代理永久缓存，而本路由计划
+/// **在一个版本周期后移除**——旧链接应交由外链/搜索引擎自然衰减，不能被客户端钉死。
+/// 路径安全与 [`parse_media_path`] 同口径：raw 路径含 `%` 一律拒（消除百分号编码
+/// 二义性）；key 走 `validate_key`（拒绝 `..`/反斜杠/空段/白名单外字符），不合法
+/// 一律 404，绝不把穿越段重定向进 /cdn-media 空间。
+pub async fn x_media_compat(uri: axum::http::Uri) -> Response {
+    let Some(rest) = uri.path().strip_prefix("/x-media/") else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    if rest.is_empty() || rest.contains('%') || crate::config::validate_key(rest).is_err() {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let target = match uri.query() {
+        Some(q) => format!("/cdn-media/x/{rest}?{q}"),
+        None => format!("/cdn-media/x/{rest}"),
+    };
+    (StatusCode::FOUND, [(header::LOCATION, target)]).into_response()
+}
+
 // ---- handler ----
 
 pub async fn serve(State(ctx): State<Arc<MediaCtx>>, req: Request<Body>) -> Response {
@@ -1121,6 +1144,56 @@ mod tests {
     };
 
     // ---- 纯函数矩阵 ----
+
+    // ---- Phase 3 兼容路由（A8/R1）：/x-media/* → 302 /cdn-media/x/* ----
+
+    async fn compat_get(path: &str) -> Response {
+        use tower::ServiceExt;
+        let app = axum::Router::new().route(
+            "/x-media/{*rest}",
+            axum::routing::get(super::x_media_compat),
+        );
+        app.oneshot(Request::builder().uri(path).body(Body::empty()).unwrap())
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn x_media_compat_redirects_with_query() {
+        let resp = compat_get("/x-media/2026-07/foo.jpg?w=120").await;
+        assert_eq!(resp.status(), StatusCode::FOUND, "必须 302（临时重定向语义）");
+        assert_eq!(
+            resp.headers().get(header::LOCATION).unwrap(),
+            "/cdn-media/x/2026-07/foo.jpg?w=120",
+            "Location 必须指向 /cdn-media/x/ 并保留 query"
+        );
+    }
+
+    #[tokio::test]
+    async fn x_media_compat_redirects_without_query() {
+        let resp = compat_get("/x-media/2026-10/123-video.mp4").await;
+        assert_eq!(resp.status(), StatusCode::FOUND);
+        assert_eq!(
+            resp.headers().get(header::LOCATION).unwrap(),
+            "/cdn-media/x/2026-10/123-video.mp4"
+        );
+    }
+
+    #[tokio::test]
+    async fn x_media_compat_rejects_traversal_and_garbage() {
+        // `..` 穿越段：绝不重定向进 /cdn-media 空间
+        let resp = compat_get("/x-media/../secret.jpg").await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND, "穿越段必须 404");
+        // 反斜杠
+        let resp = compat_get("/x-media/2026-07/a%5Cb.jpg").await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND, "raw 路径含 % 一律 404（与 serve 同口径）");
+        // 白名单外字符（URI 合法但不在 key 白名单：~ 只允许 A-Za-z0-9._-）
+        let resp = compat_get("/x-media/2026-07/a~b.jpg").await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND, "白名单外字符必须 404");
+        // 空 rest
+        let resp = compat_get("/x-media/").await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
 
     #[test]
     fn range_matrix() {

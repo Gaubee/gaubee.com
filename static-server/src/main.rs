@@ -155,6 +155,10 @@ async fn run() {
         .route("/cdn-media/{source}/{*key}", get(media::serve))
         .with_state(media_ctx.clone());
 
+    // Phase 3 兼容路由（A8/R1）：存量 /x-media/* 引用 302 到 /cdn-media/x/*。
+    // 挂在无中间件的外层 Router（重定向无需压缩/缓存矩阵）；临时语义——一个版本周期后移除。
+    let compat_router: Router = Router::new().route("/x-media/{*rest}", get(media::x_media_compat));
+
     let admin_block: Router = Router::new()
         .route("/cdn-media-admin", any(admin_not_found))
         .route("/cdn-media-admin/", any(admin_not_found))
@@ -162,6 +166,7 @@ async fn run() {
 
     let app: Router = Router::new()
         .merge(media_router)
+        .merge(compat_router)
         .merge(admin_block)
         .fallback_service(main_app);
 

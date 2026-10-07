@@ -8,8 +8,11 @@ import { defineConfig } from "vitest/config";
 // 注：isomorphic-git 的 Buffer polyfill 在 +layout.svelte 运行时注入（globalThis.Buffer）。
 
 // 本地 Worker（wrangler dev）地址：/auth、/api 同源转发（dev 与 preview 同一目标）。
+// GAUBEE_WORKER_PORT 可覆盖（默认 8787）：media-geo E2E 用测试专用端口 8799 起隔离
+// 实例（r12 P1-1），对应 preview 须以 GAUBEE_WORKER_PORT=8799 启动，否则代理仍指 8787。
+const workerPort = process.env.GAUBEE_WORKER_PORT ?? "8787";
 const proxyLocalWorker = {
-  target: "http://localhost:8787",
+  target: `http://localhost:${workerPort}`,
   changeOrigin: true, // 必需：portless 反代下避免 508 循环检测
   secure: false,
 };

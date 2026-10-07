@@ -9,7 +9,9 @@
  *       匹配对应 R2 正则（全角冒号）
  *   (b) date 可解析且不晚于今天
  *   (c) 报告类文件 tags 必含 event（归档豁免）
- *   (d) 抽验正文 /x-media/ 引用在 static/ 下真实存在（防断链）
+ *   (d) 正文 /cdn-media/<source>/<key> 引用能在 cdn-media manifest（current.json 指向的
+ *       manifest-<gen>.json）中找到对象（防断链；cdn-media-bootstrap Phase 3 起媒体
+ *       不在 static/ 磁盘上——R1 路径契约，分发走 cdn-base + Releases 卷）
  *
  * 怎么跑：
  *   bun skills/gaubee-skills/tools/2026-10-07-event-frontmatter-lint/event-frontmatter-lint.ts
@@ -20,7 +22,7 @@ import path from "node:path";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../../../..");
 const EVENTS_DIR = path.join(REPO_ROOT, "src", "content", "events");
-const STATIC_ROOT = path.join(REPO_ROOT, "static");
+const MANIFEST_DIR = path.join(REPO_ROOT, "cdn-media", "manifest");
 
 const TITLE_RULES: [RegExp, string][] = [
   [/^github-daily-(\d{4}-\d{2}-\d{2})\.md$/, /^GitHub 日报：\d{4}-\d{2}-\d{2}$/],
@@ -56,6 +58,31 @@ function main(): void {
   const today = new Date().toISOString().slice(0, 10);
   let mediaRefs = 0, mediaMissing = 0;
 
+  // (d) 的权威数据源：current.json → manifest-<gen>.json 的对象 key 集合
+  //（canonical key = "<source>/<key>"，如 x/2026-08/<id>-1.jpg）
+  const manifestKeys = new Set<string>();
+  const currentFile = path.join(MANIFEST_DIR, "current.json");
+  if (existsSync(currentFile)) {
+    try {
+      const current = JSON.parse(readFileSync(currentFile, "utf8")) as { gen?: number };
+      const manifestFile = path.join(MANIFEST_DIR, `manifest-${current.gen}.json`);
+      const manifest = JSON.parse(readFileSync(manifestFile, "utf8")) as {
+        objects?: { key?: string }[];
+      };
+      for (const o of manifest.objects ?? []) if (typeof o.key === "string") manifestKeys.add(o.key);
+    } catch (e) {
+      problems.push({
+        file: "cdn-media/manifest/current.json",
+        problem: `manifest 不可读（${e instanceof Error ? e.message : e}）——(d) 媒体断链校验失效`,
+      });
+    }
+  } else {
+    problems.push({
+      file: "cdn-media/manifest/current.json",
+      problem: "manifest 指针不存在——(d) 媒体断链校验无权威数据源",
+    });
+  }
+
   for (const f of files) {
     const full = path.join(EVENTS_DIR, f);
     const text = readFileSync(full, "utf8");
@@ -90,12 +117,14 @@ function main(): void {
       problems.push({ file: f, problem: `报告类 tags 缺 event（现: ${JSON.stringify(tags)}）` });
     }
 
-    // (d) 正文 /x-media/ 引用抽验
-    for (const m of text.matchAll(/\/x-media\/([A-Za-z0-9._/-]+\.(?:jpg|jpeg|png|webp|gif|mp4))/g)) {
+    // (d) 正文 /cdn-media/<source>/<key> 引用对账 manifest（Phase 3 新语义）
+    for (const m of text.matchAll(
+      /\/cdn-media\/([a-z0-9_-]+)\/([A-Za-z0-9._/-]+\.(?:jpg|jpeg|png|webp|gif|mp4))/g,
+    )) {
       mediaRefs++;
-      if (!existsSync(path.join(STATIC_ROOT, "x-media", m[1]))) {
+      if (!manifestKeys.has(`${m[1]}/${m[2]}`)) {
         mediaMissing++;
-        if (mediaMissing <= 5) problems.push({ file: f, problem: `媒体断链: /x-media/${m[1]}` });
+        if (mediaMissing <= 5) problems.push({ file: f, problem: `媒体断链: /cdn-media/${m[1]}/${m[2]}（不在 manifest 对象集）` });
       }
     }
   }

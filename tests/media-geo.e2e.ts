@@ -3,6 +3,7 @@ import { mkdtemp, open, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import net from "node:net";
 import { expect, test, type Page } from "@playwright/test";
 
 /**
@@ -14,24 +15,34 @@ import { expect, test, type Page } from "@playwright/test";
  *
  * 运行拓扑（复现生产反代路由，全部真实组件）：
  *   - `vite preview`（build 产物，/api 经 vite.config preview.proxy 转发）
- *   - `wrangler dev`（worker 目录，localhost:8787，真实 workerd + GeoRulesDO）
- *   - PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 pnpm exec playwright test tests/media-geo.e2e.ts
+ *   - `wrangler dev`（worker 目录，本文件拉起在测试专用端口 8799，真实 workerd + GeoRulesDO）
+ *   - GAUBEE_WORKER_PORT=8799 pnpm exec vite preview --host 127.0.0.1 &
+ *     PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 pnpm exec playwright test tests/media-geo.e2e.ts
  *
  * 规则写入（r11 P1-2，KV 退役后）：经本地 worker 的 owner PUT（PUT /api/geo/rules）
  * 写入 GeoRulesDO——Bearer GitHub token 走真实鉴权链路（worker 调 GitHub /user 比对
  * OWNER_LOGIN）。token 用环境变量注入：export GH_TOKEN="$(gh auth token)"（owner 本人），
  * 或任意 GITHUB_TOKEN / GH_TOKEN（其 login 须为 owner）。
  *
- * DO 状态管理：wrangler dev 由本文件按需拉起（8787 已有存活实例则复用），persist 目录用
- * 一次性 mkdtemp（独立于默认 .wrangler/state）——默认规则场景依赖空 DO 状态
- * （DO 404 → worker 回退内置默认规则 v0），一次性目录保证零历史污染；结束后自动
- * 回收进程组并删除目录（进程零遗留）。
+ * 实例隔离（r12 P1-1 收口）：本文件**禁止复用外部 wrangler dev**——固定用测试专用端口
+ * 8799 + 一次性 mkdtemp persist 目录。启动前探测 8799：被占即 fail 并给出清理指引
+ * （绝不静默复用一个状态不可知的实例）；同时对常规开发端口 8787 做「前后状态不变」
+ * 断言——测试开始前快照其 /api/geo 状态（通常不可达），结束后复核一致，证明本次
+ * 测试零外部污染。preview 的 /api 代理目标由 GAUBEE_WORKER_PORT 决定（见 vite.config.ts），
+ * 未按上述命令启动 preview 时会在自定义 base 场景给出可操作的失败信息。
  */
 
 const WORKER_DIR = fileURLToPath(new URL("../worker", import.meta.url));
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:4173";
 /** 种规则用的 owner token（r11 P1-2：真实 owner PUT 链路，环境变量注入）。 */
 const OWNER_TOKEN = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN ?? "";
+
+/** 测试专用 worker 端口（绝不复用外部 8787 开发实例——r12 P1-1）。 */
+const WORKER_PORT = 8799;
+const WORKER_DIRECT = `http://127.0.0.1:${WORKER_PORT}`;
+/** 常规开发实例端口：仅用于「前后状态不变」的外部污染断言，绝不写入。 */
+const EXTERNAL_PORT = 8787;
+const EXTERNAL_DIRECT = `http://127.0.0.1:${EXTERNAL_PORT}`;
 
 const CUSTOM_BASE = "https://cdn-local.test";
 const CUSTOM_RULES = [
@@ -43,14 +54,16 @@ const CUSTOM_RULES = [
 let workerProc: ChildProcess | null = null;
 let workerStateDir: string | null = null;
 let workerLogPath: string | null = null;
+/** 测试开始前的外部 8787 状态快照（afterAll 复核零污染）。 */
+let externalBefore: { mediaBase: string; ruleVersion: number } | "unreachable" | null = null;
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((r) => setTimeout(r, ms));
 }
 
-async function fetchGeo(): Promise<{ mediaBase: string; ruleVersion: number } | null> {
+async function probeWorker(url: string): Promise<{ mediaBase: string; ruleVersion: number } | null> {
 	try {
-		const res = await fetch(`${BASE_URL}/api/geo`);
+		const res = await fetch(`${url}/api/geo`);
 		if (!res.ok) return null;
 		return (await res.json()) as { mediaBase: string; ruleVersion: number };
 	} catch {
@@ -58,9 +71,74 @@ async function fetchGeo(): Promise<{ mediaBase: string; ruleVersion: number } | 
 	}
 }
 
-/** 确保 8787 有存活的 wrangler dev：外部已启动则复用；否则拉起一次性实例（空 DO 状态）。 */
+/** 经 preview 代理（BASE_URL）读 geo——与浏览器同通道。 */
+async function fetchGeo(): Promise<{ mediaBase: string; ruleVersion: number } | null> {
+	return probeWorker(BASE_URL);
+}
+
+/** 端口被占即 fail（带清理指引），绝不静默复用外部实例。 */
+function assertPortFree(port: number): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const sock = net.connect({ host: "127.0.0.1", port, timeout: 2_000 });
+		sock.on("connect", () => {
+			sock.destroy();
+			reject(
+				new Error(
+					`端口 ${port} 已被占用——本测试禁止复用已存在的 worker 实例（状态不可知会污染断言）。` +
+						`清理：lsof -ti :${port} 确认占用者后 kill，再重跑。`,
+				),
+			);
+		});
+		sock.on("timeout", () => {
+			sock.destroy();
+			resolve();
+		});
+		sock.on("error", () => resolve());
+	});
+}
+
+/** 启动前探测常规开发端口 8787 并快照（外部状态不变断言的基线）。 */
+async function snapshotExternal(): Promise<void> {
+	const geo = await probeWorker(EXTERNAL_DIRECT);
+	externalBefore = geo ? { ...geo } : "unreachable";
+}
+
+/** afterAll 复核：外部 8787 的 /api/geo 状态与测试开始前一致（零污染证据）。 */
+async function assertExternalUnchanged(): Promise<void> {
+	if (externalBefore === null) return; // 快照未做过（异常路径），无事可断言
+	const after = await probeWorker(EXTERNAL_DIRECT);
+	if (externalBefore === "unreachable") {
+		// 测试前不可达：测试后若可达，只可能是旁人并行起了开发实例（本文件从不写 8787），不归我们断言
+		return;
+	}
+	if (after === null) {
+		throw new Error(
+			`外部 worker（:${EXTERNAL_PORT}）测试前存在（${JSON.stringify(externalBefore)}）但测试后不可达——` +
+				"请排查是否有其它进程回收了它（本文件只操作测试专用端口，理论上不可能）。",
+		);
+	}
+	expect(after).toEqual(externalBefore);
+}
+
+/** 确保 8799 有本文件拉起的一次性 wrangler dev（空 DO 状态）；外部实例一律不复用。 */
 async function ensureWorker(): Promise<void> {
-	if (await fetchGeo()) return;
+	if (workerProc) return; // 本文件已拉起（同文件多用例共享同一空状态实例）
+	await assertPortFree(WORKER_PORT);
+	await snapshotExternal();
+
+	// 拓扑护栏（r12 P1-1 核心场景）：本实例尚未启动，经 preview 代理读 /api/geo 必须不可达。
+	// 若此刻已有 geo 响应，说明代理指向了别的存活 worker（如缺省 8787 开发实例）——
+	// 后续 owner PUT 会写进那个外部实例（真实污染），必须在此 fail 并给出可操作指引。
+	const pre = await fetchGeo();
+	if (pre) {
+		throw new Error(
+			`${BASE_URL}/api/geo 在测试专用 worker（:${WORKER_PORT}）未启动时就有响应（${JSON.stringify(pre)}）` +
+				"——preview 的 /api 代理正指向一个外部 worker 实例，继续跑会把测试写入它。" +
+				"重启 preview 使代理指向测试专用端口：\n" +
+				`  GAUBEE_WORKER_PORT=${WORKER_PORT} pnpm exec vite preview --host 127.0.0.1\n` +
+				"（vite.config.ts 以 GAUBEE_WORKER_PORT 决定代理目标，缺省 8787）",
+		);
+	}
 
 	workerStateDir = await mkdtemp(path.join(tmpdir(), "gaubee-geo-e2e-"));
 	workerLogPath = path.join(workerStateDir, "wrangler-dev.log");
@@ -69,18 +147,31 @@ async function ensureWorker(): Promise<void> {
 		// detached：独立进程组，teardown 用 kill(-pid) 把 wrangler 与其 workerd 孙进程一并收割
 		workerProc = spawn(
 			"npx",
-			["wrangler", "dev", "--port", "8787", "--persist-to", workerStateDir],
+			["wrangler", "dev", "--port", String(WORKER_PORT), "--persist-to", workerStateDir],
 			{ cwd: WORKER_DIR, stdio: ["ignore", log.fd, log.fd], detached: true },
 		);
 	} finally {
 		await log.close();
 	}
 
+	// 就绪判定分两级：直连 8799 可用（实例本身就绪）+ 经 BASE_URL 代理可达（preview 拓扑正确）。
 	const deadline = Date.now() + 90_000;
 	for (;;) {
-		if (await fetchGeo()) return;
 		if (workerProc.exitCode !== null) {
 			throw new Error(`wrangler dev 提前退出（code ${workerProc.exitCode}），日志尾部：\n${await logTail()}`);
+		}
+		const direct = await probeWorker(WORKER_DIRECT);
+		if (direct) {
+			const proxied = await fetchGeo();
+			if (proxied) return;
+			if (Date.now() > deadline) {
+				throw new Error(
+					`wrangler dev（:${WORKER_PORT}）已就绪，但 ${BASE_URL}/api/geo 不可达——` +
+						"preview 的 /api 代理没有指向测试专用端口。重启 preview：\n" +
+						`  GAUBEE_WORKER_PORT=${WORKER_PORT} pnpm exec vite preview --host 127.0.0.1\n` +
+						"（vite.config.ts 以 GAUBEE_WORKER_PORT 决定代理目标，缺省 8787）",
+				);
+			}
 		}
 		if (Date.now() > deadline) {
 			throw new Error(`wrangler dev 90s 未就绪，日志尾部：\n${await logTail()}`);
@@ -99,7 +190,7 @@ async function logTail(): Promise<string> {
 	}
 }
 
-/** 回收本文件拉起的 wrangler dev（进程组 SIGTERM → SIGKILL 兜底）+ 清理一次性状态目录。 */
+/** 回收本文件拉起的 wrangler dev（进程组 SIGTERM → SIGKILL 兜底）+ 清理一次性状态目录 + 外部零污染复核。 */
 async function stopWorker(): Promise<void> {
 	const proc = workerProc;
 	workerProc = null;
@@ -123,6 +214,7 @@ async function stopWorker(): Promise<void> {
 		await rm(workerStateDir, { recursive: true, force: true }).catch(() => {});
 		workerStateDir = null;
 	}
+	await assertExternalUnchanged();
 }
 
 /**
@@ -197,12 +289,13 @@ function attrOf(page: Page, selector: string, attribute: string): ReturnType<Pag
 }
 
 test.describe("use:mediasrc 地区路由（真实 00478 页面）", () => {
-	// 本文件拉起的 wrangler dev（一次性状态目录）由 teardown 统一收割（进程零遗留）
+	// 本文件拉起的 wrangler dev（一次性状态目录）由 teardown 统一收割（进程零遗留），
+	// 并复核外部 8787 前后状态不变（r12 P1-1 零污染断言）
 	test.afterAll(stopWorker);
 
 	test("worker 不可达：geo 失败静默，引用保持相对路径（A8 失败回退）", async ({ page }) => {
 		const geo = await fetchGeo();
-		test.skip(geo !== null, "本用例验证 /api/geo 缺失场景，请在 wrangler dev 未启动时运行");
+		test.skip(geo !== null, "本用例验证 /api/geo 缺失场景，请在测试专用 worker 未启动时先跑本用例");
 
 		await open00478(page);
 		await injectFixture(page);
@@ -219,13 +312,12 @@ test.describe("use:mediasrc 地区路由（真实 00478 页面）", () => {
 	test("默认规则（base 空串）：引用保持 /cdn-media/ 相对路径（A8 默认同源）", async ({ page }) => {
 		await ensureWorker();
 
-		// 空 DO 状态护栏：一次性 persist 目录保证 DO 从零开始（404 → 内置默认 v0）。
-		// 外部复用的实例若已有规则，直接给出可操作的失败信息，而不是静默误判。
+		// 空 DO 状态护栏：一次性 persist 目录 + 测试专用端口保证 DO 从零开始（404 → 内置默认 v0）。
 		const current = await fetchGeo();
 		if (current && (current.mediaBase !== "" || current.ruleVersion !== 0)) {
 			throw new Error(
 				`默认规则场景要求空 DO 状态，实际 ${JSON.stringify(current)}。` +
-					"复用的 wrangler dev 已有规则数据：请关掉它重跑（本文件会自动拉起一次性空状态实例）。",
+					`测试专用实例（:${WORKER_PORT}）的持久目录是一次性的，出现非空状态说明目录被复用——请重跑。`,
 			);
 		}
 		await waitForGeo({ mediaBase: "", ruleVersion: 0 });
@@ -240,9 +332,9 @@ test.describe("use:mediasrc 地区路由（真实 00478 页面）", () => {
 		await expect(attrOf(page, "#fx-source", "src")).resolves.toBe("/cdn-media/x/2026-07/s.mp4");
 		await expect(attrOf(page, "#fx-link", "href")).resolves.toBe("/cdn-media/misc/fixture.bin");
 
-		// 真实内容护栏：00478 的存量 /x-media/ 引用（Phase 3 才迁移前缀）不得被触碰
+		// 真实内容护栏：00478 的正文引用已是 /cdn-media/ 前缀（Phase 3 迁移后），不得被 geo 改写
 		const realPoster = await page.getAttribute(".x-arch-video", "poster");
-		expect(realPoster ?? "").toMatch(/^\/x-media\//);
+		expect(realPoster ?? "").toMatch(/^\/cdn-media\/x\//);
 	});
 
 	test("自定义 base：四类引用全部重写为 mediaBase + path", async ({ page }) => {
@@ -268,8 +360,11 @@ test.describe("use:mediasrc 地区路由（真实 00478 页面）", () => {
 		const imgSrc = await page.getAttribute("#fx-img", "src");
 		expect(imgSrc).toBe(`${CUSTOM_BASE}/cdn-media/site/fixture.png`);
 
-		// 真实内容护栏：/x-media/ 引用不被误伤
+		// 真实内容护栏：00478 正文已整体迁移到 /cdn-media/x/ 前缀（Phase 3），自定义 base
+		// 规则生效时随四类引用一并被改写（A8 语义：外部 base 重写全部 /cdn-media/ 引用）
 		const realPoster = await page.getAttribute(".x-arch-video", "poster");
-		expect(realPoster ?? "").toMatch(/^\/x-media\//);
+		expect(realPoster ?? "").toMatch(
+			new RegExp(`^${CUSTOM_BASE.replace(/\./g, "\\.")}/cdn-media/x/`),
+		);
 	});
 });
