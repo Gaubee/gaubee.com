@@ -9,6 +9,10 @@
  *   规则 schema 校验（src/lib/geo/contract.ts 三方共用）；内存桶限流 + 结构化审计日志。
  * - 妥协声明：限流桶在内存（isolate 重启即清零），是「简单限流」契约的有意取舍；
  *   精确全局限流需 Durable Object，当前规模不值得。
+ * - [2026-10-07 r9 复评] GET /api/geo 响应 private, no-store（地区结果禁入任何共享缓存：
+ *   CF 默认 cache key 不含 country，共享缓存会让先到地区决定全网 mediaBase）；
+ *   PUT 版本服务端单调（KV 已有规则 → 严格 +1，重复/回退/跳跃 409；首次写正整数）；
+ *   写审计行带 cfCountry。
  */
 import { Hono, type Context } from "hono";
 
@@ -134,7 +138,13 @@ async function requireOwner(c: GeoContext, action: "read" | "write"): Promise<Ow
 
 export const geoRoutes = new Hono<{ Bindings: Env }>();
 
-/** GET /api/geo —— 公读，按访客地区解析 mediaBase（短 CDN 缓存，改规则最多 60s 全网生效）。 */
+/**
+ * GET /api/geo —— 公读，按访客地区解析 mediaBase。
+ * 响应头 private, no-store（r9 P1-1）：结果按 request.cf.country/continent 变化，而 CF 默认
+ * cache key 不含 country——任何共享缓存（CF 边缘/反代）都会让先到地区决定同一 URL 的
+ * mediaBase，串给所有地区。时效由前端 sessionStorage TTL + 保存时的 BroadcastChannel
+ * 失效广播承担；未来若要恢复共享缓存，必须把规范化 country 纳入 cache key 并做跨地区验收。
+ */
 geoRoutes.get("/", async (c) => {
 	const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
 	if (!rateAllow(`get:${ip}`, RATE_GET)) {
@@ -143,7 +153,7 @@ geoRoutes.get("/", async (c) => {
 	const { rules } = await loadGeoRules(c.env.GEO_RULES);
 	const { country, continent } = cfGeo(c);
 	const result = resolveGeoBase(rules, country, continent);
-	return c.json(result, 200, { "Cache-Control": "public, max-age=60" });
+	return c.json(result, 200, { "Cache-Control": "private, no-store" });
 });
 
 /** GET /api/geo/rules —— owner 读原始规则（含 KV 未配置/为空时的默认规则回显）。 */
@@ -159,7 +169,7 @@ geoRoutes.get("/rules", async (c) => {
 	return c.json({ rules, fromDefault });
 });
 
-/** PUT /api/geo/rules —— owner 写（schema 校验 + KV 落库 + 审计）。 */
+/** PUT /api/geo/rules —— owner 写（schema 校验 + 版本服务端单调 + KV 落库 + 审计）。 */
 geoRoutes.put("/rules", async (c) => {
 	const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
 	if (!rateAllow(`put_rules:${ip}`, RATE_WRITE)) {
@@ -182,12 +192,40 @@ geoRoutes.put("/rules", async (c) => {
 		audit("geo_rules.write_failed", { login: auth.login, reason: "kv_binding_missing" });
 		return c.json({ error: "GEO_RULES kv binding missing (check wrangler.toml)" }, 500);
 	}
+	// 版本服务端单调（r9 P1-2）：version 是前端缓存 key 的发布代次，必须由服务端守护——
+	// KV 已有有效规则 → 要求 incoming.version === current.version + 1（重复/回退/跳跃一律 409，
+	// 响应带当前 version 供后台页提示）；首次写入（KV 无值/损坏回退默认）→ 接受任意正整数，
+	// 但拒收 0（与内置默认规则 version 0 撞代次，会让已缓存 v0 的 tab 分不清默认与自定义规则）。
+	const current = await loadGeoRules(c.env.GEO_RULES);
+	if (!current.fromDefault) {
+		const expected = current.rules.version + 1;
+		if (parsed.value.version !== expected) {
+			audit("geo_rules.write_rejected", {
+				ip,
+				login: auth.login,
+				reason: "version_not_monotonic",
+				cfCountry: cfGeo(c).country,
+				currentVersion: current.rules.version,
+				incomingVersion: parsed.value.version,
+			});
+			return c.json(
+				{
+					error: `version conflict: current ${current.rules.version}, expected ${expected}`,
+					currentVersion: current.rules.version,
+				},
+				409,
+			);
+		}
+	} else if (parsed.value.version < 1) {
+		return c.json({ error: "invalid: first write requires a positive integer version" }, 400);
+	}
 	await c.env.GEO_RULES.put(GEO_RULES_KV_KEY, JSON.stringify(parsed.value));
 	audit("geo_rules.write", {
 		ip,
 		login: auth.login,
 		ruleVersion: parsed.value.version,
 		ruleCount: parsed.value.rules.length,
+		cfCountry: cfGeo(c).country,
 	});
 	return c.json({ ok: true, ruleVersion: parsed.value.version });
 });

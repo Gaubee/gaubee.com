@@ -60,6 +60,19 @@ export type GeoRulesParseResult =
 	| { ok: false; error: string };
 
 /**
+ * mediaBase 约束（r9 P1-4：规则校验与 /api/geo 响应防御校验共用同一判定）：
+ * 空串（同源）或 http(s) origin（无路径/查询/空白）。
+ */
+export function isValidMediaBase(v: unknown): v is string {
+	return typeof v === "string" && (v === "" || ORIGIN_RE.test(v));
+}
+
+/** ruleVersion 约束：非负整数（前端缓存 key 片段 + 失效广播载荷，必须可作 key）。 */
+export function isValidRuleVersion(v: unknown): v is number {
+	return typeof v === "number" && Number.isInteger(v) && v >= 0;
+}
+
+/**
  * 校验规则文档（手写校验：worker 与浏览器共用，避免为 ~40 行契约引入 zod 到 worker bundle）。
  * 严格模式：未知字段一律拒绝（typos 静默 no-op 比报错更危险）。
  */
@@ -72,7 +85,7 @@ export function validateGeoRules(input: unknown): GeoRulesParseResult {
 	if (unknownTop.length > 0) {
 		return { ok: false, error: `未知字段：${unknownTop.join(", ")}（仅允许 version/rules）` };
 	}
-	if (typeof doc.version !== "number" || !Number.isInteger(doc.version) || doc.version < 0) {
+	if (!isValidRuleVersion(doc.version)) {
 		return { ok: false, error: "version 必须是非负整数" };
 	}
 	if (!Array.isArray(doc.rules)) {
@@ -96,7 +109,7 @@ function validateRule(input: unknown): string | null {
 	const unknownKeys = Object.keys(rule).filter((k) => k !== "match" && k !== "mediaBase");
 	if (unknownKeys.length > 0) return `未知字段：${unknownKeys.join(", ")}（仅允许 match/mediaBase）`;
 	if (typeof rule.mediaBase !== "string") return "mediaBase 必须是字符串";
-	if (rule.mediaBase !== "" && !ORIGIN_RE.test(rule.mediaBase)) {
+	if (!isValidMediaBase(rule.mediaBase)) {
 		return 'mediaBase 必须是空串（同源）或 http(s) origin（如 "https://cdn.example.com"，不带路径）';
 	}
 	const match = rule.match;

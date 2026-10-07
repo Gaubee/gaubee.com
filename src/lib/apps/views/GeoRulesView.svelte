@@ -11,6 +11,8 @@
   import { authStore } from '$lib/auth/session.svelte'
   // 契约与校验：worker 共用同一份 src/lib/geo/contract.ts
   import { DEFAULT_GEO_RULES, validateGeoRules, type GeoResponse, type GeoRules } from '$lib/geo/contract'
+  // 保存成功后广播 geo 失效：本 tab 立即清缓存重拉，其它 tab 经 BroadcastChannel 同样处理（r9 P1-2）
+  import { broadcastGeoInvalidation } from '$lib/player/media-src'
   import { OWNER } from '$lib/github/client'
   import { Button } from '$lib/components/ui/button'
   import { Textarea } from '$lib/components/ui/textarea'
@@ -80,9 +82,13 @@
         body: rulesText,
       })
       if (resp.ok) {
+        // 广播失效（携带新规则版本号）：本 tab 与其它 tab 的 mediasrc 立即清缓存重拉，
+        // 不再等前端 sessionStorage TTL（/api/geo 已是 no-store，无共享缓存窗口）
+        const data = (await resp.json().catch(() => ({}))) as { ruleVersion?: unknown }
+        if (typeof data.ruleVersion === 'number') broadcastGeoInvalidation(data.ruleVersion)
         // 先重载（会清旧 message）再写成功反馈，避免被 load 抹掉
         await load()
-        message = { kind: 'ok', text: '已保存（KV 落库；公读缓存 60s + 前端缓存 10min 内全网生效）' }
+        message = { kind: 'ok', text: '已保存（KV 落库；已广播本页与其它标签页的媒体引用立即重拉）' }
       } else {
         const data = (await resp.json().catch(() => ({}))) as { error?: string }
         message = { kind: 'error', text: `保存失败（${resp.status}）：${data.error ?? resp.statusText}` }
@@ -166,7 +172,7 @@
     <details class="text-muted-foreground mt-6 text-xs">
       <summary class="cursor-pointer">规则 schema 说明</summary>
       <pre class="mt-2 overflow-auto rounded border p-3 font-mono">{`{
-  version: number          // 递增，前端缓存 key 携带
+  version: number          // 服务端单调：必须为当前版本 +1（重复/回退 409），前端缓存 key 携带
   rules: [{                // 声明顺序即优先级
     match: {
       countries?: ["CN"]   // ISO 3166-1 alpha-2，大写

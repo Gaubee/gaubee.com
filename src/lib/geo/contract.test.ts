@@ -7,6 +7,8 @@ import { describe, expect, it } from "vitest";
 import {
 	DEFAULT_GEO_RULES,
 	GEO_RULES_KV_KEY,
+	isValidMediaBase,
+	isValidRuleVersion,
 	joinMediaBase,
 	resolveGeoBase,
 	validateGeoRules,
@@ -145,5 +147,28 @@ describe("joinMediaBase", () => {
 	it("KV 存储常量与默认规则版本", () => {
 		expect(GEO_RULES_KV_KEY).toBe("geo_rules_v1");
 		expect(DEFAULT_GEO_RULES.version).toBe(0);
+	});
+});
+
+describe("isValidMediaBase / isValidRuleVersion（r9 P1-4：/api/geo 响应防御校验共用）", () => {
+	it("mediaBase：空串与 http(s) origin 通过；带路径/裸 host/非字符串拒绝", () => {
+		expect(isValidMediaBase("")).toBe(true);
+		expect(isValidMediaBase("https://cdn.example.com")).toBe(true);
+		expect(isValidMediaBase("http://localhost:8080")).toBe(true);
+		expect(isValidMediaBase("https://cdn.example.com/path")).toBe(false);
+		expect(isValidMediaBase("https://cdn.example.com?q=1")).toBe(false);
+		expect(isValidMediaBase("cdn.example.com")).toBe(false);
+		expect(isValidMediaBase("ftp://cdn.example.com")).toBe(false);
+		expect(isValidMediaBase(1)).toBe(false);
+		expect(isValidMediaBase(null)).toBe(false);
+	});
+
+	it("ruleVersion：非负整数通过；负数/小数/字符串/NaN 拒绝", () => {
+		expect(isValidRuleVersion(0)).toBe(true);
+		expect(isValidRuleVersion(7)).toBe(true);
+		expect(isValidRuleVersion(-1)).toBe(false);
+		expect(isValidRuleVersion(1.5)).toBe(false);
+		expect(isValidRuleVersion("1")).toBe(false);
+		expect(isValidRuleVersion(Number.NaN)).toBe(false);
 	});
 });

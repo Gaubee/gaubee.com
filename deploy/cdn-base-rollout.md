@@ -88,6 +88,11 @@ npx wrangler deploy --env production
 
 ## 3. 验收 curl 清单（部署后逐条实跑）
 
+> 版本纪律（r9 P1-2）：规则版本由服务端守护单调——KV 已有规则时 `version` 必须严格等于
+> 当前版本 +1，重复/回退/跳跃一律 409（响应带 `currentVersion`）；首次写入接受任意正整数
+> （0 与内置默认规则撞代次，拒收）。下面的 curl 示例版本号按首写 1 → 回滚 2 递增；
+> 实际操作时先用 `GET /api/geo/rules` 看当前版本再决定下一个版本号。
+
 ```sh
 # 1) 默认回退（未写 KV）：期望 {"mediaBase":"","ruleVersion":0}
 curl -s https://gaubee.com/api/geo
@@ -101,7 +106,9 @@ curl -s -X PUT https://gaubee.com/api/geo/rules \
   -d '{"version":1,"rules":[{"match":{"default":true},"mediaBase":"https://cdn-media.gaubee.com"}]}'
 # 期望 {"ok":true,"ruleVersion":1}；wrangler tail 里可见 {"audit":"geo_rules.write",...}
 
-# 4) 60s 内公读反映新规则（CF 边缘 + 前端 sessionStorage 各有短缓存）：
+# 4) 公读立即反映新规则（/api/geo 为 Cache-Control: private, no-store，不进 CF 边缘/反代等
+#    任何共享缓存——地区结果按 cf.country 变化而默认 cache key 不含 country，r9 P1-1；
+#    前端 sessionStorage 10min TTL 由保存时的 BroadcastChannel 失效广播兜底，其它 tab 立即重拉）：
 curl -s https://gaubee.com/api/geo   # 期望 {"mediaBase":"https://cdn-media.gaubee.com","ruleVersion":1}
 
 # 5) 真实浏览器：打开任一事件详情页（如 /article/events/00478.x-archive-2026-07-25），
