@@ -125,16 +125,19 @@ ghcr.io 为备用通道（国内直连极慢，仅境外/加速器失效时用�
 优先云厂商专属加速器（阿里云 ACR 控制台专属地址 / 腾讯云内网 `mirror.ccs.tencentyun.com`），
 公共兜底 `https://docker.m.daocloud.io` 或南大 `https://docker.nju.edu.cn`。
 
-### 服务器自动拉取（1Panel，2026-08-14）
+### 服务器自动拉取（2026-10-09 简化定稿：watchtower 现役，webhook 废弃）
 
-服务器用 1Panel 管理，两种自动更新方式（compose 注释同源）：
+gaubee-cloud（1Panel 应用 `gaubeeos`）现役机制 = **compose 内置 watchtower 轮询**：
+每 5 分钟检查镜像 latest 变化，只更新带 `watchtower.enable=true` label 的 web 容器，
+已实跑验证一轮真实更新（2026-10-09，扫描→停旧→起新→清旧镜像全自动）。零 GitHub
+secret、零入站端口、零面板暴露；CI 推完 ghcr 后至多 5 分钟自动上线。
 
-- **Webhook 即时（主）**：1Panel「计划任务」建 Shell 脚本任务（pull 重试 + up -d + prune），
-  开 Webhook 触发，URL 配 GitHub secret `PANEL_WEBHOOK_URL`；CI 推完镜像自动 curl 通知。
-  前提：1Panel 面板端口可被 GitHub Actions 出网访问。
-- **Watchtower 轮询（备）**：compose 内置 `profiles: [auto-update]` 的 watchtower 服务
-  （默认不启动，`docker compose --profile auto-update up -d` 启用），每 5 分钟检查
-  latest 变化，只更新带 `watchtower.enable=true` label 的 web 容器，出站拉取无入站端口要求。
+- 历史 webhook 方案（1Panel 计划任务 + secret `PANEL_WEBHOOK_URL` / watchtower HTTP
+  API + `WATCHTOWER_WEBHOOK_URL`）已废弃不再使用；CI 的 notify 步骤在两个 secret 均未
+  配置时自动跳过，无需改动。
+- 仓库模板 `docker-compose.yml` 的 watchtower 在 `profiles: [auto-update]` 下默认不启动
+  （自管服务器模板语义不变）；gaubee-cloud 的 1Panel compose 为无 profile 常驻版，见
+  `deploy/cdn-base-rollout.md` §2.1 现役拓扑收据。
 
 ### 文件结构
 

@@ -162,6 +162,36 @@ npx wrangler deploy --env production   # 首次部署自动应用 migrations（n
 - 未来接入加速域（ESA 等）：新域同样 CNAME/Host 路由到 8080，规则里 `mediaBase` 填该域——
   灰度/回滚都改规则，不碰 DNS。
 
+### 2.1 存量国内服务器现役拓扑（gaubee-cloud，2026-10-09 实配收据）
+
+事实前提：该服务器（Aliyun 北京）**到 `raw.githubusercontent.com` 无可靠通路**
+（v4 间歇性 RST/超时，无全局 IPv6，clash 节点当时不可用），而 `api.github.com`、
+`github.com`（含 git over 443）、`objects.githubusercontent.com` 均直连可用。
+cdn-base 的 manifest 指针链只依赖 raw 一处，故在服务器本地建指针镜像：
+
+- `/srv/cdn-media-pointer`：媒体仓 git clone（浅依赖小，github.com git 通道直连可用）；
+  systemd timer `cdn-media-pointer.timer` 每 5 分钟 `git pull --ff-only`。
+- `cdn-media-pointer.service`：`python3 -m http.server 17081 --bind 127.0.0.1`
+  伺服该目录（纯本机回环，不对外）。
+- openresty vhost（`gaubee.com.conf`）加 `location ^~ /cdn-media-pointer/ → 
+  proxy_pass http://127.0.0.1:17081/`——走站点现成真证书，容器内可直达。
+- 容器 config.toml：`current_url = "https://gaubee.com/cdn-media-pointer/manifest/current.json"`
+  （`manifest_raw_url` 按 current_url 目录推导 manifest 地址，同布局即兼容；校验器仅
+  loopback 放行 http，https+真证书天然合规）；compose 侧 `extra_hosts: gaubee.com:172.18.0.1`
+  让容器直连宿主 openresty，不出公网。
+
+其余要点（1Panel 应用 `gaubeeos` 的 compose）：
+
+- `./config.toml:/config.toml:ro` + `/opt/gaubee/media-cache:/media-cache`（chown 65532:65532）
+  ——**新镜像缺 config 启动即败**（A9 fail-fast，2026-10-09 曾因此重启循环 2865 次）。
+- admin 端口只发布 `127.0.0.1:8081`；站点经 openresty 17080 → 容器 8080。
+- 自动更新 = compose 内置 watchtower（`--interval 300 --cleanup --label-enable`，只更
+  带 `watchtower.enable=true` label 的 web 容器），盯 ghcr（CI 必推通道）。**已验证一轮
+  真实更新**（2026-10-09 16:28 自行扫描→停旧→起新→清旧镜像，零人工）。webhook/
+  `PANEL_WEBHOOK_URL` secret 方案废弃——不再需要 1Panel 计划任务与任何 GitHub secret。
+- 指针滞后上界 = git pull 周期（5min）+ manifest `refresh_interval_secs`（300s）；手动
+  立即生效：`sudo git -C /srv/cdn-media-pointer pull --ff-only`（容器下一刷新周期自动跟上）。
+
 ## 3. 验收 curl 清单（部署后逐条实跑）
 
 > 版本纪律（r9 P1-2）：规则版本由服务端守护单调——服务端已有规则时 `version` 必须严格等于
