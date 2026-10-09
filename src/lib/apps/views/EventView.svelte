@@ -276,7 +276,9 @@
       </aside>
 
       <!-- 段 2：条目列表（桌面中段 / 移动端默认视图；详情推入时不卸载，滚动位置保留） -->
-      <section class="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="事件列表">
+      <!-- 段 2 events-title：当月事件标题列表（kzf 2026-10-10：本质是 ToC，定窄不占宽；
+           桌面固定 w-80，移动端保持全宽作默认视图） -->
+      <section class="flex min-h-0 min-w-0 flex-1 flex-col lg:w-80 lg:flex-none" aria-label="事件列表">
         <!-- 移动端月份 chips（横向滚动，激活项居中） -->
         <div class="shrink-0 border-b border-border lg:hidden">
           <div bind:this={chipsEl} class="event-chips flex gap-1.5 overflow-x-auto px-3 py-2" role="group" aria-label="月份切换">
