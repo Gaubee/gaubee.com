@@ -29,7 +29,11 @@
     return text.slice(0, 40) || '(无内容)'
   }
   function open(p: ContentEntry) {
-    navController.navigateMain(`/article/events/${p.id.stem}`)
+    // 三段工作区深链（2026-10-09）：?month= &item= 让列表同步定位并内嵌打开详情；
+    // 旧 /article/events/<stem> 路由保留（深链/搜索引用兼容），widget 直达工作区。
+    const month = `${p.date.getFullYear()}-${String(p.date.getMonth() + 1).padStart(2, '0')}`
+    const params = new URLSearchParams({ month, item: p.id.stem })
+    navController.navigateMain(`/app/event?${params.toString()}`)
   }
 </script>
 

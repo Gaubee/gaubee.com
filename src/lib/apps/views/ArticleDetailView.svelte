@@ -3,45 +3,22 @@
 	1. 原始需求（2026-07-21）：长文需要桌面和移动 TOC。
 	2. 原始需求（2026-07-22）：桌面 TOC 位于右侧；拉伸的侧栏承载吸顶，内部目录独立滚动，避免与应用导航叠加在左侧。
 	3. 从内容管道（contentQuery）阅读文章，并保持前后文章导航。
+
+	2026-10-09：头部+正文抽取为 ArticleDetailContent 共享（事件工作区第三段内嵌复用）；
+	本组件保留「场景层」：返回按钮 / TOC / 上一篇下一篇 / 滚动重置。
+	事件条目的返回按钮带月份回落（/app/event?month=…），与三段工作区状态对齐。
 -->
 <script lang="ts">
   import { contentQuery } from '$lib/content-pipeline/query.svelte'
   import type { ContentEntry } from '$lib/content-pipeline/types'
   import { navController } from '$lib/nav/nav-controller-instance'
   import { useParams } from '$lib/router'
-  import { OWNER } from '$lib/github/client'
-  import { authStore } from '$lib/auth/session.svelte'
-  import MarkdownViewer from '$lib/markdown/MarkdownViewer.svelte'
-  import { xvideo } from '$lib/player/x-video'
-  import { xhighlight } from '$lib/player/x-highlight'
-  import { mediasrc } from '$lib/player/media-src'
   import { resetScrollFrom } from '$lib/utils/scroll'
   import TocTree from './TocTree.svelte'
-  import { Badge } from '$lib/components/ui/badge'
-  import { Button } from '$lib/components/ui/button'
-  import AIBadge from '$lib/components/ui/ai-badge/AIBadge.svelte'
+  import ArticleDetailContent from './ArticleDetailContent.svelte'
   import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left'
   import ChevronRightIcon from '@lucide/svelte/icons/chevron-right'
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left'
-  import CalendarIcon from '@lucide/svelte/icons/calendar'
-  import ClockIcon from '@lucide/svelte/icons/clock'
-  import TagIcon from '@lucide/svelte/icons/tag'
-  import SquarePenIcon from '@lucide/svelte/icons/square-pen'
-
-  // 事件内容自持样式（x-arch-* 卡片/视频 HUD/译文切换），谁渲染谁导入（样式自治裁决）
-  import '$lib/styles/x-archive.css'
-
-  /** 当前登录用户是否为仓库本人（显示编辑入口）。 */
-  const isOwner = $derived(
-    !!authStore.state.user && authStore.state.user.login.toLowerCase() === OWNER.toLowerCase(),
-  )
-
-  /** 跳 GithubEditorApp 编辑当前文章。 */
-  function handleEdit(): void {
-    if (!target) return
-    const path = `src/content/${target.collection}/${target.stem}.md`
-    navController.navigateMain(`/app/github-editor/repo/gaubee/gaubee.com?file=${encodeURIComponent(path)}`)
-  }
 
   interface Props {}
 
@@ -89,21 +66,20 @@
       : null
   )
 
-  function formatDate(d: Date): string {
-    return d.toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })
-  }
-
   function gotoPost(p: ContentEntry) {
     navController.navigateMain(`/article/${p.collection}/${p.id.stem}`)
   }
 
+  /** 月份键（YYYY-MM，与事件工作区 ?month= 同口径）。 */
+  function monthKeyOf(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  }
+
   function backToList() {
     if (target?.collection === 'events') {
-      navController.navigateMain('/app/event')
+      // 事件回落到三段工作区并定位到条目所在月份（2026-10-09 三段布局裁决 1）
+      const month = post ? monthKeyOf(post.date) : ''
+      navController.navigateMain(month ? `/app/event?month=${month}` : '/app/event')
     } else {
       navController.navigateMain('/app/articles')
     }
@@ -132,64 +108,10 @@
     </button>
 
     <div class="xl:grid xl:grid-cols-[minmax(0,72ch)_14rem] xl:justify-center xl:gap-x-10">
-      <!-- 主内容区：控制行宽，避免宽屏阅读时单行过长。 -->
+      <!-- 主内容区：控制行宽，避免宽屏阅读时单行过长。头部+正文为共享组件
+           ArticleDetailContent（事件工作区第三段同源渲染）。 -->
       <div class="min-w-0">
-        <!-- 文章头部 -->
-        <header class="mb-8">
-          <div class="mb-4 flex items-start gap-3">
-            <h1 class="min-w-0 flex-1 text-balance text-3xl font-bold leading-tight sm:text-4xl">
-              {post.title}
-            </h1>
-            {#if isOwner}
-              <Button size="sm" variant="outline" class="shrink-0" onclick={handleEdit}>
-                <SquarePenIcon class="size-4" />
-                <span class="hidden sm:inline">编辑</span>
-              </Button>
-            {/if}
-          </div>
-
-          <div class="text-muted-foreground flex flex-wrap items-center gap-4 text-sm">
-            <div class="flex items-center gap-1.5">
-              <CalendarIcon class="size-4" />
-              <time>{formatDate(post.date)}</time>
-            </div>
-
-            {#if post.updated && post.updated.getTime() !== post.date.getTime()}
-              <div class="flex items-center gap-1.5">
-                <ClockIcon class="size-4" />
-                <span>更新于 {formatDate(post.updated)}</span>
-              </div>
-            {/if}
-          </div>
-
-          {#if post.tags.length > 0}
-            <div class="mt-4 flex flex-wrap items-center gap-2">
-              <TagIcon class="text-muted-foreground size-4" />
-              {#each post.tags as tag}
-                <Badge variant="secondary" class="text-xs">{tag}</Badge>
-              {/each}
-            </div>
-          {/if}
-          {#if post.metadata.ai && post.metadata.ai.length > 0}
-            <div class="mt-3 flex flex-wrap items-center gap-2">
-              <AIBadge ai={post.metadata.ai} />
-            </div>
-          {/if}
-        </header>
-
-        <!-- 正文：bind this 给 TocTree 用作 ScrollSpy 的 container；
-             xvideo/xhighlight 增强（自动播放/单实例/手势、代码高亮）与列表同源；
-             mediasrc 做媒体引用的地区路由重写（cdn-media Phase 2，geo 失败不重写） -->
-        <article
-          bind:this={articleContentEl}
-          use:xvideo
-          use:xhighlight
-          use:mediasrc
-          data-syntax-theme="gaubee"
-          class="article-content prose dark:prose-invert prose-zinc max-w-none"
-        >
-          <MarkdownViewer markdown={post.body} />
-        </article>
+        <ArticleDetailContent {post} bind:contentEl={articleContentEl} />
 
         <!-- 上一篇/下一篇 -->
         <nav class="mt-12 flex gap-4 border-t pt-6" aria-label="文章导航">
@@ -239,10 +161,3 @@
     </div>
   {/if}
 </div>
-
-<style>
-  .article-content :global(h2[id]),
-  .article-content :global(h3[id]) {
-    scroll-margin-top: 5rem;
-  }
-</style>

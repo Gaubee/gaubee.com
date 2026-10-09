@@ -217,8 +217,11 @@ function enhanceTouch(video: HTMLVideoElement): () => void {
     wrap.removeEventListener("pointermove", onMove);
     wrap.removeEventListener("pointerup", onUp);
     wrap.removeEventListener("pointercancel", onUp);
-    video.parentNode?.insertBefore(video, wrap);
-    wrap.remove();
+    // 还原用 replaceWith：video.parentNode === wrap（视频在 wrap 内），旧写法
+    // video.parentNode.insertBefore(video, wrap) = wrap.insertBefore(video, wrap)，
+    // 参照节点是自身必然抛 NotFoundError——SPA 内分支卸载（事件工作区内嵌详情收起）
+    // 时该异常会中断 Svelte effect 刷新，冻结同组件后续模板更新（2026-10-09 实证）。
+    wrap.replaceWith(video);
   };
 }
 

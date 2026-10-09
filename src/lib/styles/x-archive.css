@@ -73,8 +73,21 @@
   font-size: 12px;
   color: var(--muted-foreground);
   text-decoration: none;
+  /* 头部行紧张（[译][原]徽章占位）时链接被 flex 压到文本宽，svg 会在文↔图标边界
+     掉行贴右缘——禁收缩保持整体一行（vision 验收 blocker，2026-10-09） */
+  flex: none;
+  white-space: nowrap;
 }
 .x-arch-link:hover { color: var(--primary); }
+.x-arch-link .x-arch-ext {
+  /* Tailwind preflight 把 svg 设为 display:block——块级会让图标在锚点内独占一行
+     （vision 验收 blocker 实证 svgTop=21），inline-block 才参与行内布局 */
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-inline-start: 2px;
+  vertical-align: -1.5px;
+}
 
 .x-arch-text {
   font-size: 15px;

@@ -16,7 +16,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import * as path from "node:path";
 
-import { itemCard, type Tweet } from "./lib/x-arch-render.ts";
+import { inlineText, itemCard, type Tweet } from "./lib/x-arch-render.ts";
 import {
   classifyTextCorrection,
   sameAuthorStatusLinks,
@@ -319,6 +319,31 @@ describe("classifyTextCorrection（全库纠正判定纯函数）", () => {
     // translations 优先级不变：命中时覆盖 xTrans
     const html2 = itemCard(t, { me: { name: "Me" } }, { X1: "人工译文" }, {});
     expect(html2).toContain('x-arch-trans">人工译文');
+  });
+});
+
+// ---------- 渲染对齐（2026-10-09 事件应用四项之 3/4 + prerender linkify 防线） ----------
+
+describe("inlineText linkify 防线与 itemCard data-* 注入", () => {
+  test("linkify：合法 URL 包链接；省略号截断 / new URL 不过 → 纯文本", () => {
+    expect(inlineText("see https://example.com/a?b=1 end")).toContain('<a href="https://example.com/a?b=1"');
+    // X 展示层截断（实证 00490 dash.yl0.me…，U+2026 非法 URL 字符，prerender 会炸）
+    expect(inlineText("web https://dash.yl0.me… here")).not.toContain("<a ");
+    expect(inlineText("web https://dash.yl0.me... here")).not.toContain("<a ");
+    // new URL 兜底：控制字符非法
+    expect(inlineText("bad https://exa\u0007mple.com/x")).not.toContain("<a ");
+  });
+
+  test("itemCard：作者 data-name/data-avatar 注入（hover 卡数据）；缺信息零属性；↗ 换标准图标", () => {
+    const t: Tweet = { id: "X2", text: "hi", created_at: "2026-10-08T10:20:00.000Z", kind: "liked", author: "me" };
+    const full = itemCard(t, { me: { name: 'Kai "K" <Z>', avatar: "https://pbs.twimg.com/a_bigger.jpg" } }, {}, {});
+    expect(full).toContain('data-name="Kai &quot;K&quot; &lt;Z&gt;"');
+    expect(full).toContain('data-avatar="https://pbs.twimg.com/a_bigger.jpg"');
+    expect(full).toContain('class="x-arch-ext"');
+    expect(full).not.toContain("↗");
+    const bare = itemCard(t, {}, {}, {});
+    expect(bare).not.toContain("data-name=");
+    expect(bare).not.toContain("data-avatar=");
   });
 });
 

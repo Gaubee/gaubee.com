@@ -12,6 +12,9 @@
  *   x-arch-thread-sep 分隔；原推文链接仍指互动条目自身；译文对拼接全文生效）。
  * - [2026-10-09] 全库纠正：译文取值 translations[id] ?? t.xTrans——xTrans（--all 纠正
  *   收割的 X 译文，存 x.json 条目，不进 translations 文件）存在即同样出 译/原 toggle。
+ * - [2026-10-09] 事件应用对齐：原推文外链 ↗ 换 lucide arrow-up-right 标准图标（裁决 3）；
+ *   作者锚点注入 data-name/data-avatar 供 hover 用户卡 action 消费（裁决 4）；
+ *   inlineText linkify 加 new URL 防线（截断/非法 URL 降级纯文本，护 prerender 构建）。
  *
  * 契约引用：
  * - canonical media key `cdn-media/x/<月>/<文件>`（cdn-media-bootstrap Phase 3 语义冻结），
@@ -138,10 +141,18 @@ export function richText(raw: string): string {
 
 export function inlineText(s: string): string {
   const escaped = escapeHtml(s).replace(/\n/g, "<br />");
-  return escaped.replace(
-    /(https?:\/\/[^\s<]+)/g,
-    '<a href="$1" target="_blank" rel="noopener">$1</a>',
-  );
+  return escaped.replace(/(https?:\/\/[^\s<]+)/g, (m) => {
+    // X 展示层截断 URL（… 结尾）与 new URL 校验不过的一律降级纯文本：这类 href 会让
+    // SvelteKit prerender 的链接爬取 new URL(href) 抛 Invalid URL 直接炸构建
+    // （实证 00490 `https://dash.yl0.me…`，2026-10-09）
+    if (m.endsWith("…") || m.endsWith("...")) return m;
+    try {
+      new URL(m);
+    } catch {
+      return m;
+    }
+    return `<a href="${m}" target="_blank" rel="noopener">${m}</a>`;
+  });
 }
 
 export function itemCard(
@@ -177,12 +188,20 @@ export function itemCard(
       `<label for="xl-${t.id}-zh" class="x-arch-lang-opt x-arch-lang-zh">译</label>` +
       `<label for="xl-${t.id}-orig" class="x-arch-lang-opt x-arch-lang-orig">原</label></span>`
     : "";
+  // hover 用户卡（kzf 2026-10-09 裁决 4）：作者数据经 data-* 注入渲染产物，消费端
+  // authorHoverCard action（author-hover-card.ts）读取；两者皆缺时消费端优雅降级不浮卡
+  const info = authors[author];
+  const authorData =
+    (info?.name ? ` data-name="${escapeHtml(info.name)}"` : "") +
+    (info?.avatar ? ` data-avatar="${escapeHtml(info.avatar)}"` : "");
   parts.push(
     `    ${langInputs}<div class="x-arch-head">${avatarImg}${kindIcon}` +
-      `<a class="x-arch-author" href="https://x.com/${author}" target="_blank" rel="nofollow noopener">@${escapeHtml(author)}</a>` +
+      `<a class="x-arch-author" href="https://x.com/${author}" target="_blank" rel="nofollow noopener"${authorData}>@${escapeHtml(author)}</a>` +
       `<span class="x-arch-time">${time}</span>` +
       langSwitch +
-      `<a class="x-arch-link" href="${statusUrl}" target="_blank" rel="noopener">原推文 ↗</a></div>`,
+      `<a class="x-arch-link" href="${statusUrl}" target="_blank" rel="noopener">原推文` +
+      // 外链标准图标（kzf 裁决 3）：lucide arrow-up-right，替代文字箭头 ↗，与 KIND_META 同族内联 SVG
+      `<svg class="x-arch-ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10" /><path d="M7 17 17 7" /></svg></a></div>`,
   );
   // 线程链（捕捉 v2）：按段渲染，段间插分隔（⤵ + 细线缩进，样式见 x-archive.css）；
   // 原推文链接始终指向互动条目自身（statusUrl 用 t.id，不随线程根变）

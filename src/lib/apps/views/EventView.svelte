@@ -1,33 +1,47 @@
 <!--
-	EventView：gaubeeOS「事件」应用列表（2026-10-05 kzf 裁决：说说改名事件，shout → event）。
+	EventView：gaubeeOS「事件」应用工作区（2026-10-09 三段布局改造，kzf 裁决 1+2 与移动端）。
 
 	正交意图：
 	1. 原始需求（2026-07-21）：列表正确渲染 Markdown（时间线式阅读）。
 	2. 从内容管道（contentQuery）按时间倒序读取 events。
-	3. [2026-10-05] 按月分页 + 时间轴导航（年 + 月，仅有数据的月份显示）：
-	   桌面端左侧粘性导航栏，移动端底部浮动按钮 + 抽屉。
-	4. [2026-10-05] 列表客观渲染 markdown（与详情同源），高度设上限，
-	   超出则引导到详情页查看全文（EventBody 的限高逻辑）。
-	5. [2026-10-05] 不渲染头像与名字（Owner 单人站点，冗余）。
+	3. URL 承载状态（裁决 1）：?month=YYYY-MM（必显式，缺失/非法时规范化为最新月并 REPLACE
+	   回写）+ ?item=<stem>（可选，选中条目）。刷新/分享/前进后退完整还原；选 search 而非
+	   路径段是因 ActivityRouter 按 route id 保活组件，同 route 仅 search 变化时中段列表
+	   DOM 与滚动位置不销毁。旧 /article/events/<stem> 深链不受影响（独立路由继续渲染）。
+	4. 三段布局（裁决 2，桌面 >=1024px）：左「月份」（年分层时间轴）+ 中「条目」（当月列表，
+	   选中高亮）+ 右「详情」（ArticleDetailContent 内嵌渲染，与旧路由同源）。三段各自
+	   独立滚动（段级 overflow-auto，滚动重置走真实滚动祖先）。
+	5. 移动端（<1024px）单段钻取：月份折叠为顶部横向 chips，点条目推入全屏详情（带返回），
+	   列表不卸载（后退滚动位置保留）。
+	6. [2026-10-05] 列表客观渲染 markdown（与详情同源）。
+	7. [2026-10-05] 不渲染头像与名字（Owner 单人站点，冗余）。
 -->
 <script lang="ts">
   import { contentQuery } from '$lib/content-pipeline/query.svelte'
   import type { ContentEntry } from '$lib/content-pipeline/types'
   import { navController } from '$lib/nav/nav-controller-instance'
+  import { useRoute, useSearch } from '$lib/router'
   import { OWNER } from '$lib/github/client'
   import { authStore } from '$lib/auth/session.svelte'
   import NewContentDialog from './NewContentDialog.svelte'
   import EventBody from './EventBody.svelte'
+  import ArticleDetailContent from './ArticleDetailContent.svelte'
+  import { authorHoverCard } from './author-hover-card'
   import { resetScrollFrom } from '$lib/utils/scroll'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { Button } from '$lib/components/ui/button'
   import MessageSquareIcon from '@lucide/svelte/icons/message-square'
   import CalendarIcon from '@lucide/svelte/icons/calendar'
   import ArrowUpRightIcon from '@lucide/svelte/icons/arrow-up-right'
+  import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left'
   import PlusIcon from '@lucide/svelte/icons/plus'
-  import TimelineIcon from '@lucide/svelte/icons/history'
 
   import '$lib/styles/x-archive.css'
+
+  /** search schema 与 builtin/event.ts 的 leafRoute 声明同形（?month=&item=）。 */
+  type EventSearch = { month?: string; item?: string }
+  const getSearch = useSearch<EventSearch>()
+  const getRoute = useRoute()
 
   const isOwner = $derived(
     !!authStore.state.user && authStore.state.user.login.toLowerCase() === OWNER.toLowerCase(),
@@ -75,32 +89,117 @@
     return [...map.entries()]
   })
 
-  let selectedMonth = $state('')
-  const currentMonth = $derived(selectedMonth || months[0]?.[0] || '')
+  /** 当前 activity 的绝对基路径（/app/event；旧别名场景为 /app/shout），URL 拼接用。 */
+  const basePath = $derived(getRoute?.()?.absolutePattern || '/app/event')
+
+  /** URL 状态（zod 已 parse；缺省为空串）。 */
+  const urlMonth = $derived(getSearch?.()?.month ?? '')
+  const urlItem = $derived(getSearch?.()?.item ?? '')
+
+  /** 生效月份：URL 合法月份优先，否则回落最新月份（URL 由规范化 effect 回写）。 */
+  const currentMonth = $derived.by(() => {
+    if (urlMonth && months.some(([k]) => k === urlMonth)) return urlMonth
+    return months[0]?.[0] ?? ''
+  })
   const visible = $derived(events.filter((e) => monthKeyOf(e.date) === currentMonth))
-  let sheetOpen = $state(false)
 
-  /** 列表容器（滚动重置的遍历起点；真实滚动容器是 AreaOutlet 层，非 window）。 */
-  let listEl = $state<HTMLElement | undefined>()
-
-  function pickMonth(key: string): void {
-    selectedMonth = key
-    sheetOpen = false
-  }
-
-  // 切月重置滚动量（kzf 裁决 17 / 2026-10-06 走查）：$effect 在 DOM 更新后执行
-  $effect(() => {
-    void currentMonth
-    resetScrollFrom(listEl)
+  /** 选中条目（全局按 stem 反查，容错月参错位——同步 effect 会把月参修正为条目所在月）。 */
+  const detailPost = $derived.by<ContentEntry | null>(() => {
+    void contentQuery.version
+    if (!urlItem) return null
+    return contentQuery.findPost('events', urlItem)
   })
 
-  function hrefFor(entry: ContentEntry): string {
-    return `/article/${entry.collection}/${entry.id.stem}`
+  type UrlState = { month?: string; item?: string }
+
+  /** 工作区导航（统一走当前 activity 基路径 + search，编码由 URLSearchParams 承担）。 */
+  function go(state: UrlState, action: 'PUSH' | 'REPLACE' = 'PUSH'): void {
+    const params = new URLSearchParams()
+    if (state.month) params.set('month', state.month)
+    if (state.item) params.set('item', state.item)
+    const qs = params.toString()
+    navController.navigateMain(`${basePath}${qs ? `?${qs}` : ''}`, action)
   }
 
-  function openEvent(event: MouseEvent, entry: ContentEntry): void {
+  // 规范化 1（月份必显式）：URL 无月份或非法月份 → REPLACE 为最新月份（保留 item 让同步修正）
+  $effect(() => {
+    if (!contentQuery.initialized || months.length === 0) return
+    if (urlMonth && months.some(([k]) => k === urlMonth)) return
+    go({ month: months[0][0], item: urlItem || undefined }, 'REPLACE')
+  })
+
+  // 规范化 2（条目定位）：深链 item 与月参错位时，以条目所在月份修正（列表同步定位）
+  $effect(() => {
+    if (!contentQuery.initialized || !urlItem || !detailPost) return
+    const m = monthKeyOf(detailPost.date)
+    if (m !== currentMonth) go({ month: m, item: detailPost.id.stem }, 'REPLACE')
+  })
+
+  /** 列表滚动容器（滚动重置的遍历起点；真实滚动容器是段级 overflow-auto）。 */
+  let listPaneEl = $state<HTMLElement | undefined>()
+  /** 详情正文容器（ArticleDetailContent bind，滚动重置起点）。 */
+  let detailContentEl = $state<HTMLElement | undefined>()
+  /** 移动端月份 chips 行（激活 chip 自动滚入视野）。 */
+  let chipsEl = $state<HTMLElement | undefined>()
+  /** 桌面月份时间轴（深链还原时激活月滚入视野，2026-10-09 vision 验收补）。 */
+  let railEl = $state<HTMLElement | undefined>()
+
+  /** 切月重置列表滚动（$effect 在 DOM 更新后执行）。 */
+  $effect(() => {
+    void currentMonth
+    resetScrollFrom(listPaneEl)
+  })
+
+  /** 换条目重置详情滚动（中段列表滚动不受影响——后退时列表位置保留）。 */
+  $effect(() => {
+    void urlItem
+    resetScrollFrom(detailContentEl)
+  })
+
+  // 激活月份滚入视野（移动 chips 横向居中；桌面时间轴纵向定位——深链直达时
+  // 目标月在 115 个月的深处，仅高亮不可见）
+  $effect(() => {
+    void currentMonth
+    chipsEl?.querySelector('[data-active="true"]')?.scrollIntoView({ block: 'nearest', inline: 'center' })
+    railEl?.querySelector('[data-active="true"]')?.scrollIntoView({ block: 'nearest' })
+  })
+
+  function pickMonth(key: string): void {
+    go({ month: key })
+  }
+
+  function workspaceHref(entry: ContentEntry): string {
+    const params = new URLSearchParams({ month: monthKeyOf(entry.date), item: entry.id.stem })
+    return `${basePath}?${params.toString()}`
+  }
+
+  /** 条目卡片整卡点击（事件委托）：内部 a/button/label/媒体控件自行处理。 */
+  function openItem(event: MouseEvent, entry: ContentEntry): void {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    const t = event.target as HTMLElement | null
+    if (t?.closest('a, button, input, label, video, audio')) return
+    go({ month: monthKeyOf(entry.date), item: entry.id.stem })
+  }
+
+  /** 卡片内标题/日期锚：拦截默认整页跳转走 SPA（修饰键放行新标签 fallback）。 */
+  function openItemFromLink(event: MouseEvent, entry: ContentEntry): void {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     event.preventDefault()
-    navController.navigateMain(hrefFor(entry))
+    go({ month: monthKeyOf(entry.date), item: entry.id.stem })
+  }
+
+  /** 键盘可达：标题锚天然支持 Enter；卡片 Enter/Space 亦推详情。 */
+  function openItemByKey(event: KeyboardEvent, entry: ContentEntry): void {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    const t = event.target as HTMLElement | null
+    if (t?.closest('a, button')) return
+    event.preventDefault()
+    go({ month: monthKeyOf(entry.date), item: entry.id.stem })
+  }
+
+  /** 移动端详情返回列表（留在当月，条目出栈）。 */
+  function backToList(): void {
+    go({ month: currentMonth || undefined })
   }
 
   function titleFor(entry: ContentEntry): string {
@@ -112,14 +211,15 @@
   }
 </script>
 
-<div class="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-  <header class="mb-6 flex items-center gap-3">
-    <div class="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+<div class="flex h-full min-h-0 flex-col">
+  <!-- 顶栏：标题 + 计数 + 新建（三段共用，始终可见） -->
+  <header class="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3 sm:px-6">
+    <div class="flex size-9 items-center justify-center rounded-lg bg-primary/10">
       <MessageSquareIcon class="text-primary size-5" />
     </div>
     <div class="min-w-0">
-      <h1 class="text-2xl font-bold">事件</h1>
-      <p class="text-muted-foreground truncate text-sm">
+      <h1 class="text-lg font-bold leading-tight">事件</h1>
+      <p class="text-muted-foreground truncate text-xs">
         共 {events.length} 条事件{months.length ? ` · ${monthLabel(currentMonth)} ${visible.length} 条` : ''}
       </p>
     </div>
@@ -131,146 +231,161 @@
     {/if}
   </header>
 
-  {#if loading}
-    <div class="divide-y divide-border">
-      {#each Array(5) as _, index (index)}
-        <div class="flex gap-3 py-5" aria-label="正在加载事件">
-          <div class="flex-1 space-y-2">
-            <Skeleton class="h-4 w-1/4" />
-            <Skeleton class="h-4 w-full" />
-            <Skeleton class="h-4 w-3/4" />
+  <!-- 三段容器：relative 承载移动端详情全屏推入（absolute inset-0） -->
+  <div class="relative flex min-h-0 flex-1">
+    {#if loading}
+      <div class="min-w-0 flex-1 divide-y divide-border px-4 py-2 sm:px-6">
+        {#each Array(5) as _, index (index)}
+          <div class="flex gap-3 py-5" aria-label="正在加载事件">
+            <div class="flex-1 space-y-2">
+              <Skeleton class="h-4 w-1/4" />
+              <Skeleton class="h-4 w-full" />
+              <Skeleton class="h-4 w-3/4" />
+            </div>
           </div>
-        </div>
-      {/each}
-    </div>
-  {:else if events.length === 0}
-    <div class="flex flex-col items-center py-20 text-center">
-      <div class="mb-4 flex size-16 items-center justify-center rounded-full bg-muted">
-        <MessageSquareIcon class="text-muted-foreground size-8" />
+        {/each}
       </div>
-      <h2 class="mb-1 text-lg font-medium">暂无事件</h2>
-      <p class="text-muted-foreground text-sm">还没有发布任何事件</p>
-    </div>
-  {:else}
-    <div class="lg:flex lg:gap-8">
-      <!-- 桌面：时间轴导航栏 -->
-      <aside class="hidden w-44 shrink-0 lg:block" aria-label="时间轴导航">
-        <nav class="sticky top-4 max-h-[72vh] overflow-y-auto pr-1">
-          {#each years as [year, list] (year)}
-            <div class="text-muted-foreground mt-3 mb-1 text-xs font-semibold first:mt-0">{year}</div>
-            {#each list as m (m.key)}
-              <button
-                type="button"
-                class="event-nav-item mb-0.5 flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-sm transition-colors {m.key === currentMonth
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
-                onclick={() => pickMonth(m.key)}
-              >
-                <span>{monthLabel(m.key).slice(5)}</span>
-                <span class="text-xs tabular-nums {m.key === currentMonth ? 'opacity-100' : 'opacity-70'}">{m.count}</span>
-              </button>
-            {/each}
+    {:else if events.length === 0}
+      <div class="flex min-w-0 flex-1 flex-col items-center justify-center py-20 text-center">
+        <div class="mb-4 flex size-16 items-center justify-center rounded-full bg-muted">
+          <MessageSquareIcon class="text-muted-foreground size-8" />
+        </div>
+        <h2 class="mb-1 text-lg font-medium">暂无事件</h2>
+        <p class="text-muted-foreground text-sm">还没有发布任何事件</p>
+      </div>
+    {:else}
+      <!-- 段 1：月份时间轴（桌面，年分层，仅有数据月份） -->
+      <aside bind:this={railEl} class="hidden w-44 shrink-0 overflow-y-auto border-r border-border p-3 lg:block" aria-label="时间轴导航">
+        {#each years as [year, list] (year)}
+          <div class="text-muted-foreground mt-3 mb-1 text-xs font-semibold first:mt-0">{year}</div>
+          {#each list as m (m.key)}
+            <button
+              type="button"
+              data-active={m.key === currentMonth}
+              class="event-nav-item mb-0.5 flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-sm transition-colors {m.key === currentMonth
+                ? 'bg-primary/10 text-primary font-medium'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+              onclick={() => pickMonth(m.key)}
+            >
+              <span>{monthLabel(m.key).slice(5)}</span>
+              <span class="text-xs tabular-nums {m.key === currentMonth ? 'opacity-100' : 'opacity-70'}">{m.count}</span>
+            </button>
           {/each}
-        </nav>
+        {/each}
       </aside>
 
-      <!-- 当前月份的事件（移动端预留浮动按钮空间） -->
-      <div bind:this={listEl} class="min-w-0 flex-1 pb-28 lg:pb-0">
-        {#each visible as entry (entry.path)}
-          <article class="border-border border-b py-5">
-            <div class="event-item-head text-sm sticky top-0 z-10 -mx-1 mb-2 flex min-w-0 items-center gap-2 bg-background px-1 py-1.5">
-              <a
-                class="text-muted-foreground inline-flex shrink-0 items-center gap-1 hover:underline"
-                href={hrefFor(entry)}
-                aria-label={`${titleFor(entry)}，发布于 ${formatDate(entry.date)}`}
-                onclick={(event) => openEvent(event, entry)}
-              >
-                <CalendarIcon class="size-3" />
-                <time>{formatDate(entry.date)}</time>
-              </a>
-              <span class="text-muted-foreground truncate text-xs">{titleFor(entry)}</span>
-              <a
-                class="text-muted-foreground ml-auto inline-flex shrink-0 items-center gap-1 hover:text-foreground"
-                href={hrefFor(entry)}
-                onclick={(event) => openEvent(event, entry)}
-              >
-                详情
-                <ArrowUpRightIcon class="size-3.5" />
-              </a>
-            </div>
-            <EventBody body={entry.body} />
-          </article>
-        {/each}
-      </div>
-    </div>
-  {/if}
-</div>
-
-<!-- 移动：浮动导航按钮 + 底部抽屉 -->
-{#if months.length > 1}
-  <button
-    type="button"
-    class="bg-primary text-primary-foreground fixed right-5 bottom-24 z-40 inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium shadow-lg lg:hidden"
-    onclick={() => (sheetOpen = true)}
-  >
-    <TimelineIcon class="size-4" />
-    {monthLabel(currentMonth)}
-  </button>
-
-  {#if sheetOpen}
-    <div class="fixed inset-0 z-50 lg:hidden" role="dialog" aria-label="时间轴导航">
-      <button
-        type="button"
-        class="absolute inset-0 bg-black/50"
-        aria-label="关闭时间轴导航"
-        onclick={() => (sheetOpen = false)}
-      ></button>
-      <div class="event-sheet bg-background absolute inset-x-0 bottom-0 max-h-[70vh] overflow-y-auto rounded-t-2xl border-t border-border p-4 pb-8">
-        <div class="mx-auto mb-2 h-1 w-10 rounded-full bg-muted-foreground/40" aria-hidden="true"></div>
-        {#each years as [year, list] (year)}
-          <div class="text-muted-foreground mt-3 mb-1 text-xs font-semibold first:mt-0">{year}年</div>
-          <div class="grid grid-cols-2 gap-1.5">
-            {#each list as m (m.key)}
+      <!-- 段 2：条目列表（桌面中段 / 移动端默认视图；详情推入时不卸载，滚动位置保留） -->
+      <section class="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="事件列表">
+        <!-- 移动端月份 chips（横向滚动，激活项居中） -->
+        <div class="shrink-0 border-b border-border lg:hidden">
+          <div bind:this={chipsEl} class="event-chips flex gap-1.5 overflow-x-auto px-3 py-2" role="group" aria-label="月份切换">
+            {#each months as m (m[0])}
               <button
                 type="button"
-                class="flex items-center justify-between rounded-md border px-3 py-2 text-sm {m.key === currentMonth
+                data-active={m[0] === currentMonth}
+                class="shrink-0 rounded-full border px-3 py-1 text-xs transition-colors {m[0] === currentMonth
                   ? 'border-primary/40 bg-primary/10 text-primary font-medium'
                   : 'border-border text-muted-foreground'}"
-                onclick={() => pickMonth(m.key)}
+                onclick={() => pickMonth(m[0])}
               >
-                <span>{monthLabel(m.key)}</span>
-                <span class="text-xs tabular-nums opacity-70">{m.count}</span>
+                {monthLabel(m[0])}
+                <span class="tabular-nums opacity-70">{m[1]}</span>
               </button>
             {/each}
           </div>
-        {/each}
-      </div>
-    </div>
-  {/if}
-{/if}
+        </div>
+
+        <!-- 列表项预览里也有 .x-arch-author（2-11 个/卡）：同挂浮卡代理，滚动容器语义
+             由 action 内建（absolute 锚定 + scrollTop 修正 + 滚动即收卡） -->
+        <div bind:this={listPaneEl} use:authorHoverCard class="min-h-0 flex-1 overflow-y-auto">
+          <div class="mx-auto max-w-3xl">
+            {#if visible.length === 0}
+              <div class="text-muted-foreground px-4 py-16 text-center text-sm">
+                {currentMonth ? `${monthLabel(currentMonth)} 暂无事件` : '暂无事件'}
+              </div>
+            {/if}
+            {#each visible as entry (entry.path)}
+              <!-- svelte-ignore a11y_no_noninteractive_element_interactions a11y_click_events_have_key_events -->
+              <!-- 整卡点击是.pointer 便利路径；键盘路径由卡内标题/日期锚（真 <a>）承担 -->
+              <article
+                class="border-border cursor-pointer border-b px-4 py-5 transition-colors sm:px-6 {urlItem === entry.id.stem
+                  ? 'bg-primary/5'
+                  : 'hover:bg-muted/40'}"
+                onclick={(e) => openItem(e, entry)}
+                onkeydown={(e) => openItemByKey(e, entry)}
+              >
+                <div class="event-item-head text-sm sticky top-0 z-10 -mx-1 mb-2 flex min-w-0 items-center gap-2 bg-background px-1 py-1.5">
+                  <a
+                    class="text-muted-foreground inline-flex shrink-0 items-center gap-1 hover:underline"
+                    href={workspaceHref(entry)}
+                    aria-label={`${titleFor(entry)}，发布于 ${formatDate(entry.date)}`}
+                    onclick={(e) => openItemFromLink(e, entry)}
+                  >
+                    <CalendarIcon class="size-3" />
+                    <time>{formatDate(entry.date)}</time>
+                  </a>
+                  <a
+                    class="text-muted-foreground truncate text-xs hover:text-foreground hover:underline"
+                    href={workspaceHref(entry)}
+                    onclick={(e) => openItemFromLink(e, entry)}
+                  >
+                    {titleFor(entry)}
+                  </a>
+                  <a
+                    class="text-muted-foreground ml-auto inline-flex shrink-0 items-center gap-1 hover:text-foreground"
+                    href={workspaceHref(entry)}
+                    aria-label={`查看 ${titleFor(entry)} 详情`}
+                    onclick={(e) => openItemFromLink(e, entry)}
+                  >
+                    详情
+                    <ArrowUpRightIcon class="size-3.5" />
+                  </a>
+                </div>
+                <EventBody body={entry.body} />
+              </article>
+            {/each}
+          </div>
+        </div>
+      </section>
+
+      <!-- 段 3：详情（桌面常驻第三段；移动端推入全屏——选中时 absolute 覆盖，lg 恢复 static） -->
+      <section
+        class="min-h-0 min-w-0 flex-1 overflow-y-auto border-border {urlItem
+          ? 'absolute inset-0 z-20 flex bg-background'
+          : 'hidden'} lg:static lg:block lg:border-l"
+        aria-label="事件详情"
+      >
+        {#if detailPost}
+          <div class="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
+            <!-- 移动端返回列表（桌面由列表点击切换，无需返回钮） -->
+            <button
+              class="text-muted-foreground hover:text-foreground mb-6 flex items-center gap-1.5 text-sm transition-colors lg:hidden"
+              onclick={backToList}
+            >
+              <ArrowLeftIcon class="size-4" />
+              <span>返回{monthLabel(currentMonth)}列表</span>
+            </button>
+            <ArticleDetailContent post={detailPost} bind:contentEl={detailContentEl} />
+          </div>
+        {:else if urlItem}
+          <div class="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+            <p class="text-muted-foreground text-sm">未找到该事件（可能已被删除）</p>
+            <Button size="sm" variant="outline" onclick={backToList}>返回列表</Button>
+          </div>
+        {:else}
+          <!-- 桌面空态：未选中条目 -->
+          <div class="flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
+            <div class="flex size-14 items-center justify-center rounded-full bg-muted">
+              <MessageSquareIcon class="text-muted-foreground/60 size-7" />
+            </div>
+            <p class="text-muted-foreground text-sm">从中间选择一条事件查看详情</p>
+          </div>
+        {/if}
+      </section>
+    {/if}
+  </div>
+</div>
 
 {#if isOwner}
   <NewContentDialog collection="events" bind:open={newDialogOpen} oncreated={handleCreated} />
 {/if}
-
-<style>
-  /* 移动抽屉入场动画（尊重系统减动效） */
-  .event-sheet {
-    animation: event-sheet-in 0.2s ease-out;
-  }
-  @keyframes event-sheet-in {
-    from {
-      transform: translateY(24px);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .event-sheet {
-      animation: none;
-    }
-  }
-</style>
