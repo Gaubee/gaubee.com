@@ -8,10 +8,12 @@
 	   回写）+ ?item=<stem>（可选，选中条目）。刷新/分享/前进后退完整还原；选 search 而非
 	   路径段是因 ActivityRouter 按 route id 保活组件，同 route 仅 search 变化时中段列表
 	   DOM 与滚动位置不销毁。旧 /article/events/<stem> 深链不受影响（独立路由继续渲染）。
-	4. 三段布局（裁决 2，桌面 >=1024px）：左「月份」（年分层时间轴）+ 中「条目」（当月列表，
-	   选中高亮）+ 右「详情」（ArticleDetailContent 内嵌渲染，与旧路由同源）。三段各自
+	4. 三段布局（裁决 2，2026-10-10 kzf 纠偏定稿，桌面 >=1024px）：左「月份」（年分层时间轴）
+	   + 中「events-title」（当月事件标题列表，选中高亮）+ 右「events-list」（选中事件的
+	   EventBody 内容列表，作者浮卡挂正文容器）。eventDetail（/article/events/<stem>）仍是
+	   独立页面，不内嵌工作区——入口在段 3 头部「详情页 ↗」与段 2 行内「详情 ↗」。三段各自
 	   独立滚动（段级 overflow-auto，滚动重置走真实滚动祖先）。
-	5. 移动端（<1024px）单段钻取：月份折叠为顶部横向 chips，点条目推入全屏详情（带返回），
+	5. 移动端（<1024px）单段钻取：月份折叠为顶部横向 chips，点标题推入全屏内容列表（带返回），
 	   列表不卸载（后退滚动位置保留）。
 	6. [2026-10-05] 列表客观渲染 markdown（与详情同源）。
 	7. [2026-10-05] 不渲染头像与名字（Owner 单人站点，冗余）。
@@ -25,7 +27,6 @@
   import { authStore } from '$lib/auth/session.svelte'
   import NewContentDialog from './NewContentDialog.svelte'
   import EventBody from './EventBody.svelte'
-  import ArticleDetailContent from './ArticleDetailContent.svelte'
   import { authorHoverCard } from './author-hover-card'
   import { resetScrollFrom } from '$lib/utils/scroll'
   import { Skeleton } from '$lib/components/ui/skeleton'
@@ -295,9 +296,8 @@
           </div>
         </div>
 
-        <!-- 列表项预览里也有 .x-arch-author（2-11 个/卡）：同挂浮卡代理，滚动容器语义
-             由 action 内建（absolute 锚定 + scrollTop 修正 + 滚动即收卡） -->
-        <div bind:this={listPaneEl} use:authorHoverCard class="min-h-0 flex-1 overflow-y-auto">
+        <!-- 段 2 events-title：当月事件标题列表（纯标题+日期；正文在段 3 events-list） -->
+        <div bind:this={listPaneEl} class="min-h-0 flex-1 overflow-y-auto">
           <div class="mx-auto max-w-3xl">
             {#if visible.length === 0}
               <div class="text-muted-foreground px-4 py-16 text-center text-sm">
@@ -306,15 +306,16 @@
             {/if}
             {#each visible as entry (entry.path)}
               <!-- svelte-ignore a11y_no_noninteractive_element_interactions a11y_click_events_have_key_events -->
-              <!-- 整卡点击是.pointer 便利路径；键盘路径由卡内标题/日期锚（真 <a>）承担 -->
+              <!-- 整行点击选中（段 3 出内容列表）；键盘路径由行内标题/日期锚（真 <a>）承担；
+                   「详情 ↗」锚不通 SPA，直达独立详情页 /article/events/<stem> -->
               <article
-                class="border-border cursor-pointer border-b px-4 py-5 transition-colors sm:px-6 {urlItem === entry.id.stem
+                class="border-border cursor-pointer border-b px-4 py-3.5 transition-colors sm:px-6 {urlItem === entry.id.stem
                   ? 'bg-primary/5'
                   : 'hover:bg-muted/40'}"
                 onclick={(e) => openItem(e, entry)}
                 onkeydown={(e) => openItemByKey(e, entry)}
               >
-                <div class="event-item-head text-sm sticky top-0 z-10 -mx-1 mb-2 flex min-w-0 items-center gap-2 bg-background px-1 py-1.5">
+                <div class="event-item-head flex min-w-0 items-center gap-2 text-sm">
                   <a
                     class="text-muted-foreground inline-flex shrink-0 items-center gap-1 hover:underline"
                     href={workspaceHref(entry)}
@@ -325,7 +326,7 @@
                     <time>{formatDate(entry.date)}</time>
                   </a>
                   <a
-                    class="text-muted-foreground truncate text-xs hover:text-foreground hover:underline"
+                    class="truncate hover:text-foreground hover:underline"
                     href={workspaceHref(entry)}
                     onclick={(e) => openItemFromLink(e, entry)}
                   >
@@ -333,27 +334,27 @@
                   </a>
                   <a
                     class="text-muted-foreground ml-auto inline-flex shrink-0 items-center gap-1 hover:text-foreground"
-                    href={workspaceHref(entry)}
-                    aria-label={`查看 ${titleFor(entry)} 详情`}
-                    onclick={(e) => openItemFromLink(e, entry)}
+                    href="/article/events/{entry.id.stem}"
+                    aria-label={`打开 ${titleFor(entry)} 独立详情页`}
                   >
                     详情
                     <ArrowUpRightIcon class="size-3.5" />
                   </a>
                 </div>
-                <EventBody body={entry.body} />
               </article>
             {/each}
           </div>
         </div>
       </section>
 
-      <!-- 段 3：详情（桌面常驻第三段；移动端推入全屏——选中时 absolute 覆盖，lg 恢复 static） -->
+      <!-- 段 3 events-list：选中事件的内容列表（EventBody 全文渲染；kzf 2026-10-10 纠偏：
+           eventDetail 不内嵌工作区，独立页面经「详情页 ↗」直达。移动端推入全屏——选中时
+           absolute 覆盖，lg 恢复 static） -->
       <section
         class="min-h-0 min-w-0 flex-1 overflow-y-auto border-border {urlItem
           ? 'absolute inset-0 z-20 flex bg-background'
           : 'hidden'} lg:static lg:block lg:border-l"
-        aria-label="事件详情"
+        aria-label="事件内容"
       >
         {#if detailPost}
           <div class="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
@@ -365,7 +366,25 @@
               <ArrowLeftIcon class="size-4" />
               <span>返回{monthLabel(currentMonth)}列表</span>
             </button>
-            <ArticleDetailContent post={detailPost} bind:contentEl={detailContentEl} />
+            <header class="mb-4 flex min-w-0 items-center gap-3">
+              <div class="min-w-0 flex-1">
+                <h2 class="truncate text-base font-bold">{titleFor(detailPost)}</h2>
+                <p class="text-muted-foreground mt-0.5 text-xs">{formatDate(detailPost.date)}</p>
+              </div>
+              <a
+                class="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1 text-xs hover:underline"
+                href="/article/events/{detailPost.id.stem}"
+                aria-label={`打开 ${titleFor(detailPost)} 独立详情页`}
+              >
+                详情页
+                <ArrowUpRightIcon class="size-3.5" />
+              </a>
+            </header>
+            <!-- 浮卡挂正文容器：events-list 里的 @作者名 hover 出卡；xvideo/xhighlight/
+                 mediasrc 由 EventBody 自带 -->
+            <div bind:this={detailContentEl} use:authorHoverCard>
+              <EventBody body={detailPost.body} />
+            </div>
           </div>
         {:else if urlItem}
           <div class="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
@@ -378,7 +397,7 @@
             <div class="flex size-14 items-center justify-center rounded-full bg-muted">
               <MessageSquareIcon class="text-muted-foreground/60 size-7" />
             </div>
-            <p class="text-muted-foreground text-sm">从中间选择一条事件查看详情</p>
+            <p class="text-muted-foreground text-sm">从中间选择一条事件查看内容</p>
           </div>
         {/if}
       </section>

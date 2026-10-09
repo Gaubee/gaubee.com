@@ -29,13 +29,15 @@ interface AuthorCardInfo {
 
 const HIDE_DELAY_MS = 150;
 
-/** 从 x.com/twitter.com 链接反推 handle（既有标记，无需渲染器改动）。 */
-function handleFromHref(href: string): string {
+/** 从 x.com/twitter.com 链接反推 handle（既有标记，无需渲染器改动）。
+ *  [2026-10-10] 修复：pathname 以 / 开头，split("/")[0] 恒为空串导致恒回退显示名
+ *  （实证 @divyanshub024 出「@Divyanshu Bhargava」）——过滤空段取首段。导出供单测。 */
+export function handleFromHref(href: string): string {
   try {
-    const url = new URL(href, window.location.href);
+    const url = new URL(href);
     const host = url.hostname.replace(/^www\./, "");
     if (host !== "x.com" && host !== "twitter.com") return "";
-    const seg = decodeURIComponent(url.pathname.split("/")[0] ?? "");
+    const seg = decodeURIComponent(url.pathname.split("/").filter(Boolean)[0] ?? "");
     return /^[\w.]{1,20}$/.test(seg) ? seg : "";
   } catch {
     return "";
