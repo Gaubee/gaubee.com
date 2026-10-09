@@ -195,9 +195,14 @@ cdn-base 的 manifest 指针链只依赖 raw 一处，故在服务器本地建�
   → watchtower 日志（5min 周期，推送落在扫描间隙属正常）→ `docker kill --signal=SIGUSR1
   gaubee-watchtower` 可立即触发扫描，无需等周期。②回源 403 Forbidden = GitHub 未认证
   API 配额耗尽——服务器共享出口 IP 上限 60/h（`api.github.com/rate_limit` 可查 remaining
-  与 reset），耗尽时缓存未命中的对象 502、已缓存对象不受影响、到 reset 点自愈；根治 =
-  给容器注入只读 token（compose env `CDN_GITHUB_TOKEN`，公开仓只读权限即可，提升至
-  5000/h），token 一律由 Owner 提供与注入，不进任何文件。
+  与 reset），耗尽时缓存未命中的对象 502、已缓存对象不受影响、到 reset 点自愈。
+  **已根治（2026-10-10）**：容器注入只读 token（1Panel compose `environment:
+  CDN_GITHUB_TOKEN`，Owner 提供的 fine-grained 无权限 token，5000/h 按账号计），本地
+  `.env` 同存一份供本地调试；token 值不进任何 git 仓库文件。实证：冷对象回源 206
+  （token 生效前同路径 403→502）。③大对象跨境回源超 60s 会撞 openresty 默认代理超时
+  （504）——已在 gaubee.com.conf 加专属 `location ^~ /cdn-media/`（read/send 600s +
+  `proxy_buffering off` 保持流式），备份 `.bak-20261010`；批量预热走
+  `POST 127.0.0.1:8081/cdn-media-admin/warm`（localhost 无代理超时，23/23 成功实测）。
 
 ## 3. 验收 curl 清单（部署后逐条实跑）
 
