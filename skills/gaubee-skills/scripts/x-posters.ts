@@ -10,13 +10,16 @@
  *      Phase 3 起媒体不进 git，落点 = media-pack --source 的 staging 输入）
  * - 2. 有 media 无 mediaLocal → 直接下载图片（<id>-<n>.<ext>），记 mediaLocal（幂等补缺口）
  * - 3. 幂等可续跑：每 50 条落盘；网络失败不标记下次重试；429 退避
+ * - 4. [2026-10-09 time=0 修复] 月份兜底从 "1970-01" 改为运行日本地日（与
+ *      x-media-backfill 同约定），不再制造 1970-01 错月对象；存量迁移见
+ *      tools/2026-10-09-x-time0-migration/
  *
  * 运行：bun scripts/x-posters.ts [--limit N]
  */
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { sourceDir, writeFileAtomic } from "./lib.ts";
+import { localDate, sourceDir, writeFileAtomic } from "./lib.ts";
 
 const SRC = sourceDir("x-likes");
 const TOKEN = "gaubee-skills-x1";
@@ -105,7 +108,11 @@ async function main() {
   for (const t of todo) {
     if (done >= limit) break;
     done++;
-    const month = (t.created_at || "1970-01").slice(0, 7);
+    // 月份兜底：created_at 缺失时用运行日本地日（与 x-media-backfill.ts 同约定）。
+    // [2026-10-09 time=0 修复] 原兜底 "1970-01" 曾把 847 个对象（838 poster + 9 图）
+    // 打进 x/1970-01/ 错月；该月永远是错的（created_at 事后由归档/syndication 富化补全，
+    // 而落盘键不会回改），改运行日只作为「暂存桶」语义，不再制造 1970-01。
+    const month = t.created_at ? t.created_at.slice(0, 7) : localDate();
 
     // 1) 封面：syndication 的 video 条目 media_url_https 即海报
     if (t.videoLocal && !t.posterLocal) {

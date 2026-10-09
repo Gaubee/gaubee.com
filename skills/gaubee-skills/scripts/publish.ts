@@ -92,16 +92,24 @@ async function main() {
 
   const serial = nextSerial();
   const fileName = `${serial}.${args.slug}.md`;
-  const body = readFileSync(reportPath, "utf8");
-  const front = [
-    "---",
-    `title: ${args.title}`,
-    `date: "${new Date().toISOString()}"`,
-    "tags:",
-    ...args.tags.map((t) => `  - ${t}`),
-    "---",
-    "",
-  ].join("\n");
+  const raw = readFileSync(reportPath, "utf8");
+  // frontmatter 直通（2026-10-09 X 日报卡片化）：生成器产物自带 frontmatter
+  //（title/date/tags 已是权威值），直通不再包第二层——旧手写报告无 frontmatter 时
+  // 仍按 --title/--tags 包一层（历史行为不变）。
+  const fmRe = /^---\r?\n[\s\S]*?\r?\n---\r?\n/;
+  const hasFrontmatter = fmRe.test(raw);
+  const body = hasFrontmatter ? raw.replace(fmRe, "") : raw;
+  const front = hasFrontmatter
+    ? ""
+    : [
+        "---",
+        `title: ${args.title}`,
+        `date: "${new Date().toISOString()}"`,
+        "tags:",
+        ...args.tags.map((t) => `  - ${t}`),
+        "---",
+        "",
+      ].join("\n");
   const content = `${front}${body}\n`;
 
   if (args.dry) {
