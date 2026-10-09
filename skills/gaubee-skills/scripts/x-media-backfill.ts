@@ -13,8 +13,18 @@
  * - 4. 本地磁盘护栏：staging 累计下载超 --max-gb（默认 4.5）即停下载、只留元数据
  *   （R6 红线检查本体已移到 cron 的缓存水位/远端用量，这里只护本地盘）
  *
- * 运行：bun scripts/x-media-backfill.ts [--limit N] [--no-download] [--max-gb 4.5]
+ * 运行：bun scripts/x-media-backfill.ts [--limit N] [--no-download] [--max-gb 4.5] [--ids id1,id2]
  * 前置：~/.gaubee-skills/data/sources/x-likes/x.json 已由 x-archive-import / x-likes-fetch 建立
+ *
+ * 捕捉 v2（kzf 2026-10-09 裁决：头像覆盖 + 线程链 + 原文强制）：
+ * - 原文保证：条目带 xTranslated: true（捕捉层点到 X 译文）→ 即使已 synChecked 也重拉
+ *   syndication 用原文覆盖 text；富化后清 xTranslated、保留 xTrans（X 译文收割复用）
+ * - 头像 upsert：每次 fetchSyn 成功把 user.screen_name 新增/更新进 authors.json
+ *   （_bigger 档，读改写原子落盘；已存在以新值更新，缺失即补）
+ * - 线程链：富化时扫 entities 展开链接，命中同作者 status 链接即沿链收集（向上/向下都走，
+ *   方向按 created_at 判，root=最早；上限 20 层、防环、失败即止拿多少拼多少），产出
+ *   entry.thread = [{id, text, created_at?}]（最早→本条，含自身；段文本剔除链内互链）
+ * - --ids a,b,c：强制重富化指定条目（忽略 synChecked），供已富化条目补线程/头像
  */
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -38,6 +48,26 @@ interface Tweet {
   mediaLocal?: string[];
   videoLocal?: string[];
   synChecked?: boolean; // syndication 回灌已处理（无论成败，防重跑）
+  // 捕捉 v2（kzf 2026-10-09）：翻译态标记 + X 译文收割 + 线程链
+  xTranslated?: boolean; // 捕捉时 X 自动翻译态：text 待 syndication 原文覆盖，富化后清除
+  xTrans?: string; // X 自动译文收割（原文覆盖后保留，供译文复用）
+  thread?: ThreadPart[]; // 同作者线程链（最早部分→本条，含自身；>1 段才写）
+}
+
+/** 线程链的一段（渲染器按 parts 顺序拼接，段间插 x-arch-thread-sep） */
+export interface ThreadPart {
+  id: string;
+  text: string;
+  created_at?: string;
+}
+
+/** syndication 拉取器（注入用）：null=永久不可见，undefined=网络性失败 */
+export type SynFetcher = (id: string) => Promise<any | null | undefined>;
+
+/** 头像条目（authors.json 值） */
+export interface AuthorRec {
+  name?: string;
+  avatar?: string;
 }
 
 interface XStore {
@@ -124,6 +154,129 @@ function cleanText(text: string, entities: any): string {
   return decodeEntities(out.trim());
 }
 
+// ---------- 线程走链（捕捉 v2，2026-10-09；纯函数，fetcher 注入供测试） ----------
+
+const STATUS_RE = (screenName: string) =>
+  new RegExp(`^https://(?:x|twitter)\\.com/${screenName}/status/(\\d+)`);
+// screen_name 字符集为 [A-Za-z0-9_]，不含正则元字符，无需转义
+
+/** 从 syndication entities 提取同作者 status 链接（展开 URL 命中即算，
+ *  含 entities.urls 与 entities.media；去重保序）。 */
+export function sameAuthorStatusLinks(
+  syn: any,
+  screenName: string,
+): { id: string; expanded: string; tco: string }[] {
+  const out: { id: string; expanded: string; tco: string }[] = [];
+  if (!screenName) return out;
+  const seen = new Set<string>();
+  const re = STATUS_RE(screenName);
+  const push = (expanded: unknown, tco: unknown) => {
+    if (typeof expanded !== "string") return;
+    const m = expanded.match(re);
+    if (!m) return;
+    const id = m[1]!;
+    if (seen.has(id)) return;
+    seen.add(id);
+    out.push({ id, expanded, tco: typeof tco === "string" ? tco : "" });
+  };
+  for (const u of syn?.entities?.urls ?? []) push(u.expanded_url, u.url);
+  for (const u of syn?.entities?.media ?? []) push(u.expanded_url, u.url);
+  return out;
+}
+
+/** 段正文：cleanText 后剔除指向链内其它部分的链接（t.co 已被 cleanText 换成展开 URL，
+ *  按 status id 删；指向自身的保留——媒体占位已在 cleanText 删过）。 */
+export function threadPartText(syn: any, chainIds: Set<string>, selfId: string): string {
+  let out = cleanText(String(syn?.text ?? ""), syn?.entities);
+  for (const id of chainIds) {
+    if (id === selfId) continue;
+    out = out.replaceAll(
+      new RegExp(`https://(?:x|twitter)\\.com/[^\\s/]+/status/${id}(?:/photo/\\d+|/video/\\d+)?`, "g"),
+      "",
+    );
+  }
+  return out.trim();
+}
+
+/** 线程走链：从 start 的 payload 出发，沿同作者 status 链接向上（更早）与向下（更晚）
+ *  递归收集，方向按 created_at 判断（root=最早）。上限 maxParts 段（含起点自身）；
+ *  visited 防环；单步拉取失败（null/undefined）该方向即止——拿多少拼多少，如实记录。
+ *  产出：从最早部分到最晚（含起点），段文本已剔除链内互链。起点信息不全返回空数组。 */
+export async function walkThread(
+  start: any,
+  fetcher: SynFetcher,
+  maxParts = 20,
+): Promise<ThreadPart[]> {
+  const selfId = String(start?.id_str ?? "");
+  const screenName = String(start?.user?.screen_name ?? "");
+  if (!selfId || !screenName) return [];
+  const visited = new Set<string>([selfId]);
+  const up: any[] = []; // 越走越早：[较近, ..., 较远]
+  const down: any[] = []; // 越走越晚：[较近, ..., 较远]
+  // 方向试探失败的目标不记 visited（另一方向要复用），用 cache 保证同一 id 只拉一次
+  const cache = new Map<string, any>();
+  const fetchOnce: SynFetcher = async (id) => {
+    if (cache.has(id)) return cache.get(id);
+    const p = await fetcher(id);
+    if (p?.id_str) cache.set(id, p);
+    return p;
+  };
+
+  const walkDir = async (from: any, goingUp: boolean) => {
+    let current = from;
+    let currentDate = Date.parse(String(current?.created_at ?? "")) || 0;
+    while (up.length + down.length < maxParts - 1) {
+      const links = sameAuthorStatusLinks(current, screenName).filter((l) => !visited.has(l.id));
+      if (!links.length) break;
+      const target = links[0]!;
+      const payload = await fetchOnce(target.id);
+      if (!payload?.id_str) break; // 删除/网络失败：该方向即止（不计 visited，另一方向可再试）
+      const d = Date.parse(String(payload.created_at ?? "")) || 0;
+      if (goingUp ? d >= currentDate : d <= currentDate) break; // 方向不符（root=最早）
+      visited.add(target.id);
+      (goingUp ? up : down).push(payload);
+      current = payload;
+      currentDate = d;
+    }
+  };
+  await walkDir(start, true);
+  await walkDir(start, false);
+
+  if (up.length + down.length === 0) return [];
+  const syns = [...up.slice().reverse(), start, ...down];
+  const chainIds = new Set(syns.map((s) => String(s.id_str)));
+  return syns.map((s) => ({
+    id: String(s.id_str),
+    text: threadPartText(s, chainIds, String(s.id_str)),
+    created_at: s.created_at ? String(s.created_at) : undefined,
+  }));
+}
+
+// ---------- 头像 upsert（捕捉 v2；authors.json 读改写原子落盘） ----------
+
+/** 新增/更新一个作者：头像 URL 归一 _bigger 档；已存在的以新值更新（新值为空不覆盖旧值），
+ *  缺失即补。返回是否有变化。 */
+export function upsertAuthor(
+  authors: Record<string, AuthorRec>,
+  user: any,
+): boolean {
+  const handle = String(user?.screen_name ?? "");
+  if (!handle) return false;
+  const raw = String(user?.profile_image_url_https ?? "");
+  const avatar = raw ? raw.replace(/_normal(\.\w+)$/, "_bigger$1") : "";
+  const name = typeof user?.name === "string" ? user.name : "";
+  const prev = authors[handle];
+  const next: AuthorRec = { name: name || prev?.name, avatar: avatar || prev?.avatar };
+  if (prev?.name === next.name && prev?.avatar === next.avatar) return false;
+  authors[handle] = next;
+  return true;
+}
+
+/** authors.json 原子落盘（writeFileAtomic：.tmp 写入后 rename，无撕裂无残留） */
+export function saveAuthors(authorsFile: string, authors: Record<string, AuthorRec>): void {
+  writeFileAtomic(authorsFile, JSON.stringify(authors, null, 1));
+}
+
 async function download(url: string, abs: string): Promise<number> {
   const res = await fetch(url, { headers: { "User-Agent": UA } });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -139,10 +292,16 @@ async function main() {
   let limit = Infinity;
   let noDownload = false;
   let maxGb = 4.5;
+  const forceIds = new Set<string>();
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--limit") limit = Number.parseInt(argv[++i] ?? "0", 10) || Infinity;
     else if (argv[i] === "--no-download") noDownload = true;
     else if (argv[i] === "--max-gb") maxGb = Number.parseFloat(argv[++i] ?? "4.5") || 4.5;
+    else if (argv[i] === "--ids")
+      for (const s of (argv[++i] ?? "").split(",")) {
+        const id = s.trim();
+        if (id) forceIds.add(id);
+      }
   }
 
   const SITE = process.env.GAUBEE_SITE ?? path.resolve(import.meta.dir, "..", "..", "..");
@@ -152,18 +311,53 @@ async function main() {
     process.exit(2);
   }
   const store: XStore = JSON.parse(await Bun.file(storeFile).text());
-  const todo = Object.values(store.items).filter((t) => !t.synChecked);
-  console.error(`待回灌 ${todo.length} 条（库存 ${Object.keys(store.items).length}）`);
+  // 待回灌：无 synChecked 的新条目 + 翻译态条目（原文保证，无视 synChecked）+ --ids 强制清单
+  const todo = forceIds.size
+    ? ([...forceIds].map((id) => store.items[id]).filter((t) => Boolean(t)) as Tweet[])
+    : Object.values(store.items).filter((t) => !t.synChecked || t.xTranslated);
+  console.error(
+    `待回灌 ${todo.length} 条（库存 ${Object.keys(store.items).length}${forceIds.size ? `，--ids 强制 ${forceIds.size}` : ""}）`,
+  );
+
+  // 头像 upsert（捕捉 v2）：随每次 fetchSyn 成功新增/更新，与库存同节奏落盘
+  const authorsFile = path.join(SRC, "authors.json");
+  const authors: Record<string, AuthorRec> = existsSync(authorsFile)
+    ? JSON.parse(await Bun.file(authorsFile).text())
+    : {};
+  let authorsDirty = false;
 
   const maxBytes = maxGb * 1024 ** 3;
   let bytes = 0;
   let dlFiles = 0;
   let guardTripped = false;
-  const stats = { ok: 0, unavailable: 0, netFail: 0, text: 0, mediaTweets: 0, videoTweets: 0 };
+  const stats = {
+    ok: 0,
+    unavailable: 0,
+    netFail: 0,
+    text: 0,
+    mediaTweets: 0,
+    videoTweets: 0,
+    translated: 0,
+    avatars: 0,
+    threads: 0,
+    synCalls: 0,
+  };
+
+  // 线程走链的 fetcher：与主循环同一礼貌限速（每跳后 280ms），计数 syndication 调用
+  const threadFetcher: SynFetcher = async (id) => {
+    stats.synCalls++;
+    const r = await fetchSyn(id);
+    await Bun.sleep(280);
+    return r;
+  };
 
   const save = () => {
     store.updated_at = new Date().toISOString();
     writeFileAtomic(storeFile, JSON.stringify(store, null, 1));
+    if (authorsDirty) {
+      saveAuthors(authorsFile, authors);
+      authorsDirty = false;
+    }
   };
 
   const shutdown = () => {
@@ -179,6 +373,7 @@ async function main() {
     if (processed >= limit) break;
     processed++;
 
+    stats.synCalls++;
     const syn = await fetchSyn(t.id);
     if (syn === undefined) {
       stats.netFail++;
@@ -186,17 +381,38 @@ async function main() {
     }
     if (syn === null) {
       t.synChecked = true;
+      // 翻译态条目已删除/不可见：原文无处可取，清标记防每轮重拉（X 译文留在 xTrans）
+      delete t.xTranslated;
       stats.unavailable++;
       continue;
     }
 
-    // 正文富化：占位/空直接替换；已有则取更长版本（syndication 全文 vs DOM 截断）
+    // 头像 upsert（捕捉 v2）：每次 syndication 成功即新增/更新作者
+    if (upsertAuthor(authors, syn.user)) {
+      authorsDirty = true;
+      stats.avatars++;
+    }
+
+    // 正文富化。捕捉 v2 原文保证：翻译态条目无条件用 syndication 原文覆盖
+    //（X 译文留在 xTrans，富化后清 xTranslated）；其余按占位/更长才覆盖的旧规则
     const text = cleanText(String(syn.text ?? ""), syn.entities);
-    if (text && (t.text === "(archive)" || t.text === "" || text.length > t.text.length)) {
+    if (t.xTranslated) {
+      stats.translated++;
+      if (text && text !== t.text) stats.text++;
+      if (text) t.text = text;
+      delete t.xTranslated;
+    } else if (text && (t.text === "(archive)" || t.text === "" || text.length > t.text.length)) {
       if (text !== t.text) stats.text++;
       t.text = text;
     }
     if (!t.author && syn.user?.screen_name) t.author = syn.user.screen_name;
+
+    // 线程链（捕捉 v2）：沿同作者 status 链接向上/向下收集，>1 段才写 entry.thread
+    const thread = await walkThread(syn, threadFetcher);
+    if (thread.length > 1) {
+      t.thread = thread;
+      stats.threads++;
+    }
 
     // 媒体元数据（URL 会被签名过期影响，回灌时以 syndication 新鲜值为准）
     const details: SynMedia[] = syn.mediaDetails ?? [];
@@ -272,11 +488,15 @@ async function main() {
   console.error(
     `完成：ok=${stats.ok} 不可用=${stats.unavailable} 网络失败=${stats.netFail}（下次重试）\n` +
       `富化：正文 ${stats.text} 条、媒体推文 ${stats.mediaTweets}、含视频 ${stats.videoTweets}\n` +
+      `捕捉 v2：翻译态原文覆盖 ${stats.translated}、头像新增/更新 ${stats.avatars}、线程链 ${stats.threads} 条（syndication 共 ${stats.synCalls} 次调用）\n` +
       `下载：${dlFiles} 文件 ${(bytes / 1024 / 1024).toFixed(1)} MB${guardTripped ? `（护栏 ${maxGb}GB 触发，历史剩余未下载）` : ""}`,
   );
 }
 
-main().catch((err) => {
-  console.error(err instanceof Error ? err.message : err);
-  process.exit(1);
-});
+// import.meta.main 守卫：测试可 import 纯函数（walkThread/upsertAuthor 等）而不触发 CLI
+if (import.meta.main) {
+  main().catch((err) => {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  });
+}

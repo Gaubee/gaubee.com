@@ -39,6 +39,11 @@ interface Tweet {
   // 磁盘落点 = cdn-media/staging/x/<月>/<文件>（canonical key 布局，media-pack 输入约定）
   mediaLocal?: string[];
   videoLocal?: string[];
+  // 捕捉 v2（kzf 2026-10-09 裁决③）：翻译态标记 + X 自动译文收割。
+  // xTranslated=true 时 text 可能是 X 译文（点击展开原文失败）或已点开的原文——
+  // 由 x-media-backfill.ts 重拉 syndication 保证原文，富化后清 xTranslated、保留 xTrans。
+  xTranslated?: boolean;
+  xTrans?: string;
 }
 
 interface StreamCursor {
@@ -164,6 +169,9 @@ function pullBrowser(username: string): Record<Stream, Tweet[]> {
       media: t.media ?? [],
       video: t.video ?? [],
       hasVideo: t.hasVideo ?? false,
+      // 捕捉 v2：翻译态与 X 译文收割透传（undefined 不落库）
+      xTranslated: t.xTranslated === true ? true : undefined,
+      xTrans: typeof t.xTrans === "string" ? t.xTrans : undefined,
     }));
   }
   if (errors.some((e) => e.includes("not-logged-in"))) {
@@ -223,7 +231,15 @@ async function main() {
     if (!prev) {
       store.items[t.id] = t;
     } else if (prev.text === "" || prev.text === "(archive)") {
-      store.items[t.id] = { ...t, mediaLocal: prev.mediaLocal, videoLocal: prev.videoLocal };
+      // 捕捉 v2：新抓取没带翻译态时保留旧条目的标记/译文（点击失败的条目 text 为空，
+      // 走的就是本分支——xTranslated 必须存活，否则富化层不会补原文）
+      store.items[t.id] = {
+        ...t,
+        xTranslated: t.xTranslated ?? prev.xTranslated,
+        xTrans: t.xTrans ?? prev.xTrans,
+        mediaLocal: prev.mediaLocal,
+        videoLocal: prev.videoLocal,
+      };
     } else if (
       (!prev.author && (t.author || t.media?.length || t.hasVideo)) ||
       (t.hasVideo && !prev.hasVideo) ||
@@ -241,6 +257,9 @@ async function main() {
         video: t.video?.length ? t.video : prev.video,
         mediaLocal: prev.mediaLocal,
         videoLocal: prev.videoLocal,
+        // 捕捉 v2：翻译态/译文两边取有值的一边（新收割优先）
+        xTranslated: t.xTranslated ?? prev.xTranslated,
+        xTrans: t.xTrans ?? prev.xTrans,
       };
     }
   }

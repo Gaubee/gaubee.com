@@ -8,6 +8,8 @@
  * - 抽取范围 = x-archive-events.ts 原函数逐字搬移（escapeHtml/localDateOf/hhmm/
  *   TAG_RULES/classifyTags/KIND_META/richText/inlineText/itemCard），新增
  *   renderDayBody(items, opts) 产 x-arch-meta 统计行 + x-arch-day 包裹块。
+ * - [2026-10-09] 捕捉 v2：itemCard 支持 entry.thread（同作者线程链按段渲染，段间
+ *   x-arch-thread-sep 分隔；原推文链接仍指互动条目自身；译文对拼接全文生效）。
  *
  * 契约引用：
  * - canonical media key `cdn-media/x/<月>/<文件>`（cdn-media-bootstrap Phase 3 语义冻结），
@@ -27,6 +29,9 @@ export interface Tweet {
   mediaLocal?: string[];
   videoLocal?: string[];
   posterLocal?: string;
+  // 捕捉 v2（kzf 2026-10-09）：同作者线程链（最早部分→本条，含自身；x-media-backfill
+  // 走链产出，>1 段才写）。存在时正文按段渲染，段间插 x-arch-thread-sep 分隔。
+  thread?: { id: string; text: string; created_at?: string }[];
 }
 
 export interface AuthorInfo {
@@ -173,9 +178,17 @@ export function itemCard(
       langSwitch +
       `<a class="x-arch-link" href="${statusUrl}" target="_blank" rel="noopener">原推文 ↗</a></div>`,
   );
-  const origHtml = richText((t.text ?? "").trim());
+  // 线程链（捕捉 v2）：按段渲染，段间插分隔（⤵ + 细线缩进，样式见 x-archive.css）；
+  // 原推文链接始终指向互动条目自身（statusUrl 用 t.id，不随线程根变）
+  const threadParts = (t.thread ?? []).filter((p) => (p.text ?? "").trim());
+  const threadSep = `<div class="x-arch-thread-sep" aria-label="接上文">⤵</div>`;
+  const origHtml =
+    threadParts.length > 1
+      ? threadParts.map((p) => richText(p.text.trim())).join(`\n    ${threadSep}\n    `)
+      : richText((t.text ?? "").trim());
   if (origHtml && translation) {
     parts.push(`    <div class="x-arch-text x-arch-orig">${origHtml}</div>`);
+    // 译文对拼接全文生效（translations[id] 是整条推文的译文，toggle 逻辑不变）
     parts.push(`    <div class="x-arch-text x-arch-trans">${richText(translation)}</div>`);
   } else if (origHtml) {
     parts.push(`    <div class="x-arch-text">${origHtml}</div>`);

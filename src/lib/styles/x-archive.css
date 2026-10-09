@@ -82,6 +82,19 @@
   overflow-wrap: anywhere;
 }
 
+/* ---------------------------------------------------------------------------
+ * 线程链分隔（捕捉 v2，2026-10-09：entry.thread 多段正文之间的接续标记）。
+ * 最小样式：细分割线 + 缩进层级感；后续视觉调在这里改。
+ * ------------------------------------------------------------------------- */
+.x-arch-thread-sep {
+  margin: 6px 0 6px 12px;
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1;
+}
+
 .x-arch-media {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
