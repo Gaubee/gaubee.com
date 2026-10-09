@@ -191,6 +191,13 @@ cdn-base 的 manifest 指针链只依赖 raw 一处，故在服务器本地建�
   `PANEL_WEBHOOK_URL` secret 方案废弃——不再需要 1Panel 计划任务与任何 GitHub secret。
 - 指针滞后上界 = git pull 周期（5min）+ manifest `refresh_interval_secs`（300s）；手动
   立即生效：`sudo git -C /srv/cdn-media-pointer pull --ff-only`（容器下一刷新周期自动跟上）。
+- **运维补充（2026-10-10 实证）**：①push 后站点未更新的第一排查顺序 = CI run（`gh run list`）
+  → watchtower 日志（5min 周期，推送落在扫描间隙属正常）→ `docker kill --signal=SIGUSR1
+  gaubee-watchtower` 可立即触发扫描，无需等周期。②回源 403 Forbidden = GitHub 未认证
+  API 配额耗尽——服务器共享出口 IP 上限 60/h（`api.github.com/rate_limit` 可查 remaining
+  与 reset），耗尽时缓存未命中的对象 502、已缓存对象不受影响、到 reset 点自愈；根治 =
+  给容器注入只读 token（compose env `CDN_GITHUB_TOKEN`，公开仓只读权限即可，提升至
+  5000/h），token 一律由 Owner 提供与注入，不进任何文件。
 
 ## 3. 验收 curl 清单（部署后逐条实跑）
 
