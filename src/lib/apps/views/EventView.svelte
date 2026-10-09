@@ -8,13 +8,13 @@
 	   回写）+ ?item=<stem>（可选，选中条目）。刷新/分享/前进后退完整还原；选 search 而非
 	   路径段是因 ActivityRouter 按 route id 保活组件，同 route 仅 search 变化时中段列表
 	   DOM 与滚动位置不销毁。旧 /article/events/<stem> 深链不受影响（独立路由继续渲染）。
-	4. 三段布局（裁决 2，2026-10-10 kzf 纠偏定稿，桌面 >=1024px）：左「月份」（年分层时间轴）
-	   + 中「events-title」（当月事件标题列表，选中高亮）+ 右「events-list」（选中事件的
-	   EventBody 内容列表，作者浮卡挂正文容器）。eventDetail（/article/events/<stem>）仍是
-	   独立页面，不内嵌工作区——入口在段 3 头部「详情页 ↗」与段 2 行内「详情 ↗」。三段各自
-	   独立滚动（段级 overflow-auto，滚动重置走真实滚动祖先）。
-	5. 移动端（<1024px）单段钻取：月份折叠为顶部横向 chips，点标题推入全屏内容列表（带返回），
-	   列表不卸载（后退滚动位置保留）。
+	4. 三段布局（kzf 2026-10-10 定稿，桌面 >=1024px）：左「月份」（年分层时间轴）+ 中
+	   「events-title」= 纯 ToC（当月标题紧凑行，固定 w-80，点标题=滚动定位）+ 右
+	   「events-list」= 当月全部事件的连续阅读流（每段 EventBody 全文 + sticky 段头）。
+	   ?item= 是阅读流的定位锚而非"选中渲染"；eventDetail（/article/events/<stem>）仍是
+	   独立页面，入口在各段头与 ToC 行内「详情 ↗」。三段各自独立滚动。
+	5. 移动端（<1024px）单段钻取：月份折叠为顶部横向 chips，点 ToC 行推入全屏阅读流并
+	   定位到该事件（带常驻返回钮），列表不卸载（后退滚动位置保留）。
 	6. [2026-10-05] 列表客观渲染 markdown（与详情同源）。
 	7. [2026-10-05] 不渲染头像与名字（Owner 单人站点，冗余）。
 -->
@@ -138,23 +138,26 @@
 
   /** 列表滚动容器（滚动重置的遍历起点；真实滚动容器是段级 overflow-auto）。 */
   let listPaneEl = $state<HTMLElement | undefined>()
-  /** 详情正文容器（ArticleDetailContent bind，滚动重置起点）。 */
-  let detailContentEl = $state<HTMLElement | undefined>()
+  /** 段 3 阅读流滚动容器（events-list：当月全部事件连续渲染）。 */
+  let pane3El = $state<HTMLElement | undefined>()
   /** 移动端月份 chips 行（激活 chip 自动滚入视野）。 */
   let chipsEl = $state<HTMLElement | undefined>()
   /** 桌面月份时间轴（深链还原时激活月滚入视野，2026-10-09 vision 验收补）。 */
   let railEl = $state<HTMLElement | undefined>()
 
-  /** 切月重置列表滚动（$effect 在 DOM 更新后执行）。 */
+  /** 切月重置 ToC 与阅读流滚动（$effect 在 DOM 更新后执行）。 */
   $effect(() => {
     void currentMonth
     resetScrollFrom(listPaneEl)
+    resetScrollFrom(pane3El)
   })
 
-  /** 换条目重置详情滚动（中段列表滚动不受影响——后退时列表位置保留）。 */
+  /** ToC 锚点语义（kzf 2026-10-10）：?item= 是阅读流内的定位锚——点标题滚动到该事件
+   *  所在段，而非"选中谁只渲染谁"。换月时上面的重置先生效，这里再定位。 */
   $effect(() => {
     void urlItem
-    resetScrollFrom(detailContentEl)
+    if (!urlItem || !detailPost) return
+    pane3El?.querySelector(`[data-stem="${urlItem}"]`)?.scrollIntoView({ block: 'start' })
   })
 
   // 激活月份滚入视野（移动 chips 横向居中；桌面时间轴纵向定位——深链直达时
@@ -349,57 +352,54 @@
         </div>
       </section>
 
-      <!-- 段 3 events-list：选中事件的内容列表（EventBody 全文渲染；kzf 2026-10-10 纠偏：
-           eventDetail 不内嵌工作区，独立页面经「详情页 ↗」直达。移动端推入全屏——选中时
-           absolute 覆盖，lg 恢复 static） -->
+      <!-- 段 3 events-list：当月全部事件的连续阅读流（kzf 2026-10-10 二次纠偏：不是"选中
+           谁渲染谁"的单条详情——ToC 点标题=滚动定位到对应段；每段 sticky 头=标题+日期+
+           独立详情页入口。移动端点 ToC 推入全屏并定位，返回钮常驻不随流滚动） -->
       <section
-        class="min-h-0 min-w-0 flex-1 overflow-y-auto border-border {urlItem
-          ? 'absolute inset-0 z-20 flex bg-background'
-          : 'hidden'} lg:static lg:block lg:border-l"
+        class="min-h-0 min-w-0 flex-1 border-border {urlItem
+          ? 'absolute inset-0 z-20 flex flex-col bg-background'
+          : 'hidden'} lg:static lg:flex lg:border-l"
         aria-label="事件内容"
       >
-        {#if detailPost}
-          <div class="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
-            <!-- 移动端返回列表（桌面由列表点击切换，无需返回钮） -->
-            <button
-              class="text-muted-foreground hover:text-foreground mb-6 flex items-center gap-1.5 text-sm transition-colors lg:hidden"
-              onclick={backToList}
-            >
-              <ArrowLeftIcon class="size-4" />
-              <span>返回{monthLabel(currentMonth)}列表</span>
-            </button>
-            <header class="mb-4 flex min-w-0 items-center gap-3">
-              <div class="min-w-0 flex-1">
-                <h2 class="truncate text-base font-bold">{titleFor(detailPost)}</h2>
-                <p class="text-muted-foreground mt-0.5 text-xs">{formatDate(detailPost.date)}</p>
-              </div>
-              <a
-                class="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1 text-xs hover:underline"
-                href="/article/events/{detailPost.id.stem}"
-                aria-label={`打开 ${titleFor(detailPost)} 独立详情页`}
-              >
-                详情页
-                <ArrowUpRightIcon class="size-3.5" />
-              </a>
-            </header>
-            <!-- 浮卡挂正文容器：events-list 里的 @作者名 hover 出卡；xvideo/xhighlight/
-                 mediasrc 由 EventBody 自带 -->
-            <div bind:this={detailContentEl} use:authorHoverCard>
-              <EventBody body={detailPost.body} />
-            </div>
-          </div>
-        {:else if urlItem}
-          <div class="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-            <p class="text-muted-foreground text-sm">未找到该事件（可能已被删除）</p>
-            <Button size="sm" variant="outline" onclick={backToList}>返回列表</Button>
+        <!-- 移动端返回 ToC（桌面 ToC 常驻，无需返回钮；置于滚动区外不随流滚走） -->
+        <button
+          class="text-muted-foreground hover:text-foreground mx-auto w-full max-w-3xl shrink-0 px-4 pt-4 text-left text-sm transition-colors sm:px-6 lg:hidden"
+          onclick={backToList}
+        >
+          <span class="inline-flex items-center gap-1.5">
+            <ArrowLeftIcon class="size-4" />
+            <span>返回{monthLabel(currentMonth)}列表</span>
+          </span>
+        </button>
+        {#if visible.length === 0}
+          <div class="text-muted-foreground flex flex-1 items-center justify-center p-8 text-sm">
+            {currentMonth ? `${monthLabel(currentMonth)} 暂无事件` : '暂无事件'}
           </div>
         {:else}
-          <!-- 桌面空态：未选中条目 -->
-          <div class="flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
-            <div class="flex size-14 items-center justify-center rounded-full bg-muted">
-              <MessageSquareIcon class="text-muted-foreground/60 size-7" />
+          <div bind:this={pane3El} class="min-h-0 w-full flex-1 overflow-y-auto">
+            <div class="mx-auto w-full max-w-3xl px-4 py-4 sm:px-6">
+              {#each visible as entry (entry.path)}
+                <section data-stem={entry.id.stem} class="mb-10">
+                  <header class="event-item-head sticky top-0 z-10 -mx-1 mb-3 flex min-w-0 items-center gap-2 bg-background px-1 py-2">
+                    <h2 class="min-w-0 truncate text-sm font-semibold">{titleFor(entry)}</h2>
+                    <span class="text-muted-foreground shrink-0 text-xs">{formatDate(entry.date)}</span>
+                    <a
+                      class="text-muted-foreground ml-auto inline-flex shrink-0 items-center gap-1 text-xs hover:text-foreground"
+                      href="/article/events/{entry.id.stem}"
+                      aria-label={`打开 ${titleFor(entry)} 独立详情页`}
+                    >
+                      详情页
+                      <ArrowUpRightIcon class="size-3.5" />
+                    </a>
+                  </header>
+                  <!-- 浮卡逐段挂正文容器：阅读流里的 @作者名 hover 出卡；xvideo/xhighlight/
+                       mediasrc 由 EventBody 自带 -->
+                  <div use:authorHoverCard>
+                    <EventBody body={entry.body} />
+                  </div>
+                </section>
+              {/each}
             </div>
-            <p class="text-muted-foreground text-sm">从中间选择一条事件查看内容</p>
           </div>
         {/if}
       </section>
