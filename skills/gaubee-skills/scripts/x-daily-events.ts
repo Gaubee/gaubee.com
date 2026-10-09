@@ -18,7 +18,7 @@
  *
  * 运行：bun scripts/x-daily-events.ts [--date YYYY-MM-DD] [--run-date YYYY-MM-DD] [--force] [--dry]
  */
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { localDate, sourceDir } from "./lib.ts";
@@ -158,10 +158,18 @@ async function main() {
   }
 
   const body = renderDayBody(entries, { authors, translations, mediaMeta });
+  // date 是发布事实，不随重渲染漂移（kzf 2026-10-10：--force 重写保留既有时间戳；
+  // 实证 01811/01814/01816 曾被重渲染改到当天，页面发布时间全错）
+  let dateIso = new Date().toISOString();
+  const existingEvent = eventFileFor(date);
+  if (existingEvent) {
+    const m = readFileSync(existingEvent.abs, "utf8").match(/^date: "([^"]+)"/m);
+    if (m?.[1]) dateIso = m[1];
+  }
   const content = [
     "---",
     `title: "X 日报：${date}"`,
-    `date: "${new Date().toISOString()}"`,
+    `date: "${dateIso}"`,
     "tags:",
     "  - event",
     "  - signals",
