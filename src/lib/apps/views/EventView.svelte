@@ -145,18 +145,38 @@
   /** 桌面月份时间轴（深链还原时激活月滚入视野，2026-10-09 vision 验收补）。 */
   let railEl = $state<HTMLElement | undefined>()
 
-  /** 切月重置 ToC 与阅读流滚动（$effect 在 DOM 更新后执行）。 */
+  /** 切月重置 ToC 与阅读流滚动（$effect 在 DOM 更新后执行）；高亮回落当月第一段。 */
   $effect(() => {
     void currentMonth
     resetScrollFrom(listPaneEl)
     resetScrollFrom(pane3El)
+    activeStem = visible[0]?.id.stem ?? ''
   })
+
+  /** ScrollSpy（kzf 2026-10-10：ToC 双向——点标题滚动定位之外，滚动也要高亮当前段）。 */
+  let activeStem = $state('')
+  let spyRaf = 0
+  function onFlowScroll(): void {
+    if (spyRaf) return
+    spyRaf = requestAnimationFrame(() => {
+      spyRaf = 0
+      if (!pane3El) return
+      const pr = pane3El.getBoundingClientRect()
+      let cur = visible[0]?.id.stem ?? ''
+      for (const el of pane3El.querySelectorAll<HTMLElement>('[data-stem]')) {
+        if (el.getBoundingClientRect().top - pr.top <= 96) cur = el.dataset.stem ?? cur
+        else break
+      }
+      activeStem = cur
+    })
+  }
 
   /** ToC 锚点语义（kzf 2026-10-10）：?item= 是阅读流内的定位锚——点标题滚动到该事件
    *  所在段，而非"选中谁只渲染谁"。换月时上面的重置先生效，这里再定位。 */
   $effect(() => {
     void urlItem
     if (!urlItem || !detailPost) return
+    activeStem = urlItem
     pane3El?.querySelector(`[data-stem="${urlItem}"]`)?.scrollIntoView({ block: 'start' })
   })
 
@@ -314,7 +334,7 @@
               <!-- 整行点击选中（段 3 出内容列表）；键盘路径由行内标题/日期锚（真 <a>）承担；
                    「详情 ↗」锚不通 SPA，直达独立详情页 /article/events/<stem> -->
               <article
-                class="border-border cursor-pointer border-b px-4 py-3.5 transition-colors sm:px-6 {urlItem === entry.id.stem
+                class="border-border cursor-pointer border-b px-4 py-3.5 transition-colors sm:px-6 {activeStem === entry.id.stem
                   ? 'bg-primary/5'
                   : 'hover:bg-muted/40'}"
                 onclick={(e) => openItem(e, entry)}
@@ -328,7 +348,8 @@
                     onclick={(e) => openItemFromLink(e, entry)}
                   >
                     <CalendarIcon class="size-3" />
-                    <time>{formatDate(entry.date)}</time>
+                    <!-- 月份已由段 1 时间轴表达，ToC 行内只显示「日」避免冗余（kzf 2026-10-10） -->
+                    <time>{entry.date.getDate()}日</time>
                   </a>
                   <a
                     class="truncate hover:text-foreground hover:underline"
@@ -376,7 +397,7 @@
             {currentMonth ? `${monthLabel(currentMonth)} 暂无事件` : '暂无事件'}
           </div>
         {:else}
-          <div bind:this={pane3El} class="min-h-0 w-full flex-1 overflow-y-auto">
+          <div bind:this={pane3El} onscroll={onFlowScroll} class="min-h-0 w-full flex-1 overflow-y-auto">
             <div class="mx-auto w-full max-w-3xl px-4 py-4 sm:px-6">
               {#each visible as entry (entry.path)}
                 <section data-stem={entry.id.stem} class="mb-10">
