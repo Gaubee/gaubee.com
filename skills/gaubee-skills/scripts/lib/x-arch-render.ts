@@ -10,6 +10,8 @@
  *   renderDayBody(items, opts) 产 x-arch-meta 统计行 + x-arch-day 包裹块。
  * - [2026-10-09] 捕捉 v2：itemCard 支持 entry.thread（同作者线程链按段渲染，段间
  *   x-arch-thread-sep 分隔；原推文链接仍指互动条目自身；译文对拼接全文生效）。
+ * - [2026-10-09] 全库纠正：译文取值 translations[id] ?? t.xTrans——xTrans（--all 纠正
+ *   收割的 X 译文，存 x.json 条目，不进 translations 文件）存在即同样出 译/原 toggle。
  *
  * 契约引用：
  * - canonical media key `cdn-media/x/<月>/<文件>`（cdn-media-bootstrap Phase 3 语义冻结），
@@ -32,6 +34,9 @@ export interface Tweet {
   // 捕捉 v2（kzf 2026-10-09）：同作者线程链（最早部分→本条，含自身；x-media-backfill
   // 走链产出，>1 段才写）。存在时正文按段渲染，段间插 x-arch-thread-sep 分隔。
   thread?: { id: string; text: string; created_at?: string }[];
+  // 全库纠正（2026-10-09）：x-media-backfill --all 收割的 X 译文（存量被污染条目的
+  // 原中文）。存在且 translations 无该 id 时作为译文出 译/原 toggle。
+  xTrans?: string;
 }
 
 export interface AuthorInfo {
@@ -159,7 +164,8 @@ export function itemCard(
     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">` +
     meta.paths.map((d) => `<path d="${d}" />`).join("") +
     `</svg></span>`;
-  const translation = translations[t.id];
+  // 译文：translations 文件优先，回退条目自带 xTrans（全库纠正收割，2026-10-09）
+  const translation = translations[t.id] ?? t.xTrans;
   // 译文切换（kzf 裁决 15 + 2026-10-06 走查）：双段 toggle 组（译|原），双 radio 零 JS，
   // 默认选中「译」；name 按推文 id 隔离，避免跨条目互斥
   const langInputs = translation

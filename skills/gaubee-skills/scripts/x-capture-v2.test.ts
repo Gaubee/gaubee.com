@@ -18,6 +18,7 @@ import * as path from "node:path";
 
 import { itemCard, type Tweet } from "./lib/x-arch-render.ts";
 import {
+  classifyTextCorrection,
   sameAuthorStatusLinks,
   saveAuthors,
   threadPartText,
@@ -268,6 +269,56 @@ describe("itemCard thread 渲染（捕捉 v2）", () => {
     const single = itemCard({ ...base, thread: [{ id: "E", text: "其他文本" }] }, authors, {}, {});
     expect(single).not.toContain("x-arch-thread-sep");
     expect(single).toContain("part-E 原文"); // 回退 t.text，不采用单段 thread
+  });
+});
+
+// ---------- 原文纠正判定（--all 全库纠正） ----------
+
+describe("classifyTextCorrection（全库纠正判定纯函数）", () => {
+  const EN = "Introducing EmbeddingGemma! Our lightweight model maps text into a single space.";
+  const ZH = "推出 EmbeddingGemma！我们的轻量模型把文本映射进单一空间。";
+
+  test("翻译污染：存量 CJK 主导 + 原文非 CJK → pollution，xTrans 收割存量", () => {
+    const cls = classifyTextCorrection(ZH, EN);
+    expect(cls.action).toBe("pollution");
+    expect(cls.xTrans).toBe(ZH);
+  });
+
+  test("中文作者中文原文：两侧都 CJK 主导且非前缀关系 → none（text 不动）", () => {
+    // 真实场景：syndication 原文与存量同文（仅 t.co 展开处不同，非前缀关系）
+    expect(classifyTextCorrection(ZH, `${ZH.slice(0, 5)}https://example.com/x${ZH.slice(5)}`).action).toBe("none");
+  });
+
+  test("前缀截断：存量更短且 orig 以存量开头 → truncated", () => {
+    expect(classifyTextCorrection(EN.slice(0, 40), EN).action).toBe("truncated");
+  });
+
+  test("存量含 t.co（与展开后的 orig 前缀失配）→ none，交给 t.co 展开路径", () => {
+    expect(classifyTextCorrection("check this https://t.co/xyz and more", "check this https://example.com/full").action).toBe("none");
+  });
+
+  test("orig 为空或与存量一致 → none", () => {
+    expect(classifyTextCorrection(EN, "").action).toBe("none");
+    expect(classifyTextCorrection(EN, EN).action).toBe("none");
+  });
+
+  test("短文本 >6 个中文字符即算 CJK 占比高（与占比 30% 双口径）", () => {
+    // 7 个中文字符：不过 30% 占比（若正文够长）但过 >6 计数口径
+    expect(classifyTextCorrection("a fine tweet 设计好看内容佳品质优", EN).action).toBe("pollution");
+    expect(classifyTextCorrection("Introducing EmbeddingGemma", EN).action).toBe("truncated");
+    // 仅 4 个中文字符：两个口径都不过 → 非 CJK 占比高
+    expect(classifyTextCorrection(" entirely english with 设计内容", "different english original text here").action).toBe("none");
+  });
+
+  test("itemCard：translations 缺失时回退 t.xTrans 出 toggle（全库纠正渲染）", () => {
+    const t: Tweet = { ...{ id: "X1", text: EN, created_at: "2026-10-08T10:20:00.000Z", kind: "liked" as const, author: "me" }, xTrans: ZH };
+    const html = itemCard(t, { me: { name: "Me" } }, {}, {});
+    expect(html).toContain('class="x-arch-lang-input x-arch-lang-input-zh" checked');
+    expect(html).toContain(`x-arch-trans">${ZH}`);
+    expect(html).toContain(`x-arch-orig">${EN}`);
+    // translations 优先级不变：命中时覆盖 xTrans
+    const html2 = itemCard(t, { me: { name: "Me" } }, { X1: "人工译文" }, {});
+    expect(html2).toContain('x-arch-trans">人工译文');
   });
 });
 

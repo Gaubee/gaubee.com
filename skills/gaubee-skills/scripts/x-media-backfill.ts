@@ -13,7 +13,10 @@
  * - 4. 本地磁盘护栏：staging 累计下载超 --max-gb（默认 4.5）即停下载、只留元数据
  *   （R6 红线检查本体已移到 cron 的缓存水位/远端用量，这里只护本地盘）
  *
- * 运行：bun scripts/x-media-backfill.ts [--limit N] [--no-download] [--max-gb 4.5] [--ids id1,id2]
+ * 运行：bun scripts/x-media-backfill.ts [--limit N] [--no-download] [--max-gb 4.5] [--ids id1,id2] [--all]
+ *   --all 全库纠正模式：遍历全部条目（忽略 synChecked；已带 enrichedV2 的跳过=断点续跑），
+ *   每条做原文纠正（翻译污染/前缀截断）+ t.co 展开 + 线程走链 + 头像 + 新媒体下载；
+ *   配 --limit N 先金丝雀。
  * 前置：~/.gaubee-skills/data/sources/x-likes/x.json 已由 x-archive-import / x-likes-fetch 建立
  *
  * 捕捉 v2（kzf 2026-10-09 裁决：头像覆盖 + 线程链 + 原文强制）：
@@ -25,6 +28,12 @@
  *   方向按 created_at 判，root=最早；上限 20 层、防环、失败即止拿多少拼多少），产出
  *   entry.thread = [{id, text, created_at?}]（最早→本条，含自身；段文本剔除链内互链）
  * - --ids a,b,c：强制重富化指定条目（忽略 synChecked），供已富化条目补线程/头像
+ * - [2026-10-09] --all 全库纠正（kzf 裁决：管道向前修复之后，存量也要处理纠正）：
+ *   遍历全部条目（忽略 synChecked，跳过已带 enrichedV2 的=断点续跑依据），每条一次
+ *   fetchSyn 复用做五类纠正：a 原文纠正（翻译污染→text 换 orig、原中文收割进 xTrans；
+ *   前缀截断→text 换 orig；皆非→不动）+ b t.co 短链按 entities 展开 + c walkThread
+ *   线程走链 + d 头像 upsert + e 新媒体下载（既有 canonical key 逻辑与 --max-gb 护栏）。
+ *   处理完打标 enrichedV2: true；失败逐条计数不中断；--limit N 先金丝雀
  */
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -52,6 +61,9 @@ interface Tweet {
   xTranslated?: boolean; // 捕捉时 X 自动翻译态：text 待 syndication 原文覆盖，富化后清除
   xTrans?: string; // X 自动译文收割（原文覆盖后保留，供译文复用）
   thread?: ThreadPart[]; // 同作者线程链（最早部分→本条，含自身；>1 段才写）
+  // --all 全库纠正（2026-10-09）：该条已按 v2 口径纠正过（原文/t.co/线程/头像/媒体），
+  // 审计与断点续跑依据——--all 跳过已标条目，不再重复打 syndication
+  enrichedV2?: boolean;
 }
 
 /** 线程链的一段（渲染器按 parts 顺序拼接，段间插 x-arch-thread-sep） */
@@ -152,6 +164,33 @@ function cleanText(text: string, entities: any): string {
     if (m.url) out = out.replaceAll(m.url, "");
   }
   return decodeEntities(out.trim());
+}
+
+// ---------- 原文纠正判定（--all 全库纠正，2026-10-09；纯函数供测试） ----------
+
+/** CJK 占比高（kzf 口径）：中文字符 >30% 或 >6 个 */
+function cjkHigh(s: string): boolean {
+  const n = (s.match(/[\u4e00-\u9fff]/g) ?? []).length;
+  return n > s.length * 0.3 || n > 6;
+}
+
+/** 原文纠正判定：存量 text 与 syndication 原文 orig 不一致时分类处置。
+ *  - "pollution"：存量 CJK 占比高而 orig 非 CJK 主导 → X 自动翻译污染
+ *    （browser 抓到的是 X 译文）——text 应换 orig，存量中文收割为 xTrans；
+ *  - "truncated"：存量是 orig 的前缀截断（len 更短且 orig 以存量前 80 字符开头）
+ *    ——text 应换 orig；
+ *  - "none"：两者皆非（如中文作者的中文原文）→ text 不动。
+ *  orig 为空或与存量一致时恒为 none。 */
+export function classifyTextCorrection(
+  stored: string,
+  orig: string,
+): { action: "pollution" | "truncated" | "none"; xTrans?: string } {
+  if (!orig || orig === stored) return { action: "none" };
+  if (cjkHigh(stored) && !cjkHigh(orig)) return { action: "pollution", xTrans: stored };
+  if (stored.length < orig.length && orig.startsWith(stored.slice(0, 80))) {
+    return { action: "truncated" };
+  }
+  return { action: "none" };
 }
 
 // ---------- 线程走链（捕捉 v2，2026-10-09；纯函数，fetcher 注入供测试） ----------
@@ -292,10 +331,12 @@ async function main() {
   let limit = Infinity;
   let noDownload = false;
   let maxGb = 4.5;
+  let allMode = false;
   const forceIds = new Set<string>();
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--limit") limit = Number.parseInt(argv[++i] ?? "0", 10) || Infinity;
     else if (argv[i] === "--no-download") noDownload = true;
+    else if (argv[i] === "--all") allMode = true;
     else if (argv[i] === "--max-gb") maxGb = Number.parseFloat(argv[++i] ?? "4.5") || 4.5;
     else if (argv[i] === "--ids")
       for (const s of (argv[++i] ?? "").split(",")) {
@@ -311,12 +352,15 @@ async function main() {
     process.exit(2);
   }
   const store: XStore = JSON.parse(await Bun.file(storeFile).text());
-  // 待回灌：无 synChecked 的新条目 + 翻译态条目（原文保证，无视 synChecked）+ --ids 强制清单
+  // 待回灌优先级：--ids 强制清单 > --all 全库纠正（忽略 synChecked，跳过已纠正的
+  // enrichedV2=断点续跑）> 默认（无 synChecked 的新条目 + 翻译态条目）
   const todo = forceIds.size
     ? ([...forceIds].map((id) => store.items[id]).filter((t) => Boolean(t)) as Tweet[])
-    : Object.values(store.items).filter((t) => !t.synChecked || t.xTranslated);
+    : allMode
+      ? Object.values(store.items).filter((t) => !t.enrichedV2)
+      : Object.values(store.items).filter((t) => !t.synChecked || t.xTranslated);
   console.error(
-    `待回灌 ${todo.length} 条（库存 ${Object.keys(store.items).length}${forceIds.size ? `，--ids 强制 ${forceIds.size}` : ""}）`,
+    `待回灌 ${todo.length} 条（库存 ${Object.keys(store.items).length}${forceIds.size ? `，--ids 强制 ${forceIds.size}` : ""}${allMode ? "，--all 全库纠正" : ""}）`,
   );
 
   // 头像 upsert（捕捉 v2）：随每次 fetchSyn 成功新增/更新，与库存同节奏落盘
@@ -341,6 +385,11 @@ async function main() {
     avatars: 0,
     threads: 0,
     synCalls: 0,
+    // --all 全库纠正（2026-10-09）分类计数
+    polluted: 0, // 翻译污染修复（= xTrans 收割数）
+    truncated: 0, // 前缀截断补全
+    placeholder: 0, // "(archive)"/空占位被真实原文替换
+    tco: 0, // t.co 短链展开（按 entities 展开/媒体占位剔除）
   };
 
   // 线程走链的 fetcher：与主循环同一礼貌限速（每跳后 280ms），计数 syndication 调用
@@ -383,6 +432,8 @@ async function main() {
       t.synChecked = true;
       // 翻译态条目已删除/不可见：原文无处可取，清标记防每轮重拉（X 译文留在 xTrans）
       delete t.xTranslated;
+      // --all 全库纠正：404/不可见是永久终态，同样打标防断点续跑时反复重拉
+      if (allMode) t.enrichedV2 = true;
       stats.unavailable++;
       continue;
     }
@@ -394,16 +445,44 @@ async function main() {
     }
 
     // 正文富化。捕捉 v2 原文保证：翻译态条目无条件用 syndication 原文覆盖
-    //（X 译文留在 xTrans，富化后清 xTranslated）；其余按占位/更长才覆盖的旧规则
+    //（X 译文留在 xTrans，富化后清 xTranslated）；其余按占位/更长才覆盖的旧规则。
+    // --all 全库纠正（或 --ids 强制）：改走分类纠正——翻译污染收割 xTrans、
+    // 前缀截断补全；皆非（如中文作者中文原文）text 不动
     const text = cleanText(String(syn.text ?? ""), syn.entities);
+    const correctAll = allMode || forceIds.has(t.id);
     if (t.xTranslated) {
       stats.translated++;
       if (text && text !== t.text) stats.text++;
       if (text) t.text = text;
       delete t.xTranslated;
-    } else if (text && (t.text === "(archive)" || t.text === "" || text.length > t.text.length)) {
+    } else if (text && (t.text === "(archive)" || t.text === "")) {
+      // 占位规则（既有）：真实原文替换占位符
       if (text !== t.text) stats.text++;
       t.text = text;
+      if (correctAll) stats.placeholder++;
+    } else if (correctAll && text) {
+      const cls = classifyTextCorrection(t.text, text);
+      if (cls.action === "pollution") {
+        // X 翻译污染：text 换原文，存量中文收割为 xTrans（已有 xTrans 不覆盖）
+        if (!t.xTrans) t.xTrans = cls.xTrans;
+        t.text = text;
+        stats.polluted++;
+      } else if (cls.action === "truncated") {
+        t.text = text;
+        stats.truncated++;
+      }
+    } else if (text && text.length > t.text.length) {
+      if (text !== t.text) stats.text++;
+      t.text = text;
+    }
+    // t.co 展开（全库纠正）：存量正文里的短链按 syndication entities 展开、媒体占位
+    // 剔除（沿用既有 cleanText 规则）；污染/截断路径的 text 已是 cleanText 产物，此处为幂等
+    if (correctAll && !t.xTranslated && t.text.includes("t.co")) {
+      const fixed = cleanText(t.text, syn.entities);
+      if (fixed && fixed !== t.text) {
+        t.text = fixed;
+        stats.tco++;
+      }
     }
     if (!t.author && syn.user?.screen_name) t.author = syn.user.screen_name;
 
@@ -473,6 +552,8 @@ async function main() {
     }
 
     t.synChecked = true;
+    // 全库纠正标记（审计与断点续跑依据）：成功富化的条目不再被 --all 重拉
+    if (correctAll) t.enrichedV2 = true;
     stats.ok++;
 
     if (stats.ok % 50 === 0) {
@@ -489,6 +570,7 @@ async function main() {
     `完成：ok=${stats.ok} 不可用=${stats.unavailable} 网络失败=${stats.netFail}（下次重试）\n` +
       `富化：正文 ${stats.text} 条、媒体推文 ${stats.mediaTweets}、含视频 ${stats.videoTweets}\n` +
       `捕捉 v2：翻译态原文覆盖 ${stats.translated}、头像新增/更新 ${stats.avatars}、线程链 ${stats.threads} 条（syndication 共 ${stats.synCalls} 次调用）\n` +
+      `全库纠正：翻译污染修复 ${stats.polluted}（xTrans 收割同数）、前缀截断补全 ${stats.truncated}、占位替换 ${stats.placeholder}、t.co 展开 ${stats.tco}\n` +
       `下载：${dlFiles} 文件 ${(bytes / 1024 / 1024).toFixed(1)} MB${guardTripped ? `（护栏 ${maxGb}GB 触发，历史剩余未下载）` : ""}`,
   );
 }
