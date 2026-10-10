@@ -4,15 +4,16 @@
 	正交意图：
 	1. 原始需求（2026-07-21）：列表正确渲染 Markdown（时间线式阅读）。
 	2. 从内容管道（contentQuery）按时间倒序读取 events。
-	3. URL 承载状态（裁决 1）：?month=YYYY-MM（必显式，缺失/非法时规范化为最新月并 REPLACE
-	   回写）+ ?item=<stem>（可选，选中条目）。刷新/分享/前进后退完整还原；选 search 而非
-	   路径段是因 ActivityRouter 按 route id 保活组件，同 route 仅 search 变化时中段列表
-	   DOM 与滚动位置不销毁。旧 /article/events/<stem> 深链不受影响（独立路由继续渲染）。
+	3. URL 状态（2026-10-10 hash 化，kzf：ToC 锚点走片段）：?month=YYYY-MM（必显式，缺失/
+	   非法时规范化为最新月并 REPLACE 回写）+ #<stem>（阅读流定位锚，ToC 语义——
+	   点标题=滚动定位而非选中渲染）。锚点走 hash 而非 query：hashchange 原生入历史栈，
+	   同路由导航不销毁列表 DOM；2026-10-10 前的 ?item= 深链自动迁移到 hash 并 REPLACE
+	   清 query。旧 /article/events/<stem> 深链不受影响（独立路由继续渲染）。
 	4. 三段布局（kzf 2026-10-10 定稿，桌面 >=1024px）：左「月份」（年分层时间轴）+ 中
-	   「events-title」= 纯 ToC（当月标题紧凑行，固定 w-80，点标题=滚动定位）+ 右
-	   「events-list」= 当月全部事件的连续阅读流（每段 EventBody 全文 + sticky 段头）。
-	   ?item= 是阅读流的定位锚而非"选中渲染"；eventDetail（/article/events/<stem>）仍是
-	   独立页面，入口在各段头与 ToC 行内「详情 ↗」。三段各自独立滚动。
+	   「events-title」= 纯 ToC（当月标题紧凑行，固定 w-80，点标题=滚动定位，滚动=高亮跟随）
+	   + 右「events-list」= 当月全部事件的连续阅读流（每段 EventBody 全文 + sticky 段头）。
+	   eventDetail（/article/events/<stem>）仍是独立页面，入口在各段头与 ToC 行内「详情 ↗」。
+	   三段各自独立滚动。
 	5. 移动端（<1024px）单段钻取：月份折叠为顶部横向 chips，点 ToC 行推入全屏阅读流并
 	   定位到该事件（带常驻返回钮），列表不卸载（后退滚动位置保留）。
 	6. [2026-10-05] 列表客观渲染 markdown（与详情同源）。
@@ -39,7 +40,8 @@
 
   import '$lib/styles/x-archive.css'
 
-  /** search schema 与 builtin/event.ts 的 leafRoute 声明同形（?month=&item=）。 */
+  /** search schema 与 builtin/event.ts 的 leafRoute 声明同形（?month=）。
+   *  item 仅用于旧链接迁移输入（2026-10-10 前的 ?item= 深链），新状态一律走 hash。 */
   type EventSearch = { month?: string; item?: string }
   const getSearch = useSearch<EventSearch>()
   const getRoute = useRoute()
@@ -93,9 +95,22 @@
   /** 当前 activity 的绝对基路径（/app/event；旧别名场景为 /app/shout），URL 拼接用。 */
   const basePath = $derived(getRoute?.()?.absolutePattern || '/app/event')
 
-  /** URL 状态（zod 已 parse；缺省为空串）。 */
+  /** URL 状态（zod 已 parse；缺省为空串）。urlItem 仅作旧链接迁移输入（见迁移 effect）。 */
   const urlMonth = $derived(getSearch?.()?.month ?? '')
   const urlItem = $derived(getSearch?.()?.item ?? '')
+
+  /** 阅读流锚点（kzf 2026-10-10：ToC 走 hash 片段，query 只留 month）。
+   *  响应源 = hashchange（原生锚点赋值与前进后退都会触发）+ 导航时显式赋值
+   *  （navigateMain 的 pushState 不触发 hashchange）。 */
+  let hashItem = $state('')
+  $effect(() => {
+    const read = () => {
+      hashItem = decodeURIComponent(window.location.hash.slice(1))
+    }
+    read()
+    window.addEventListener('hashchange', read)
+    return () => window.removeEventListener('hashchange', read)
+  })
 
   /** 生效月份：URL 合法月份优先，否则回落最新月份（URL 由规范化 effect 回写）。 */
   const currentMonth = $derived.by(() => {
@@ -104,36 +119,48 @@
   })
   const visible = $derived(events.filter((e) => monthKeyOf(e.date) === currentMonth))
 
-  /** 选中条目（全局按 stem 反查，容错月参错位——同步 effect 会把月参修正为条目所在月）。 */
+  /** 锚点条目（全局按 stem 反查，容错月参错位——同步 effect 会把月参修正为条目所在月）。 */
   const detailPost = $derived.by<ContentEntry | null>(() => {
     void contentQuery.version
-    if (!urlItem) return null
-    return contentQuery.findPost('events', urlItem)
+    if (!hashItem) return null
+    return contentQuery.findPost('events', hashItem)
   })
 
-  type UrlState = { month?: string; item?: string }
+  type UrlState = { month?: string; hash?: string }
 
-  /** 工作区导航（统一走当前 activity 基路径 + search，编码由 URLSearchParams 承担）。 */
+  /** 工作区导航：query 只承载 month，锚点走 hash 片段（controller 全程保留 hash）。 */
   function go(state: UrlState, action: 'PUSH' | 'REPLACE' = 'PUSH'): void {
     const params = new URLSearchParams()
     if (state.month) params.set('month', state.month)
-    if (state.item) params.set('item', state.item)
     const qs = params.toString()
-    navController.navigateMain(`${basePath}${qs ? `?${qs}` : ''}`, action)
+    navController.navigateMain(`${basePath}${qs ? `?${qs}` : ''}${state.hash ? `#${state.hash}` : ''}`, action)
   }
 
-  // 规范化 1（月份必显式）：URL 无月份或非法月份 → REPLACE 为最新月份（保留 item 让同步修正）
+  /** 纯切月（无锚点）：hash 一并清除（URL 不带片段即清）。 */
+  function setMonth(key: string, action: 'PUSH' | 'REPLACE' = 'PUSH'): void {
+    hashItem = ''
+    go({ month: key }, action)
+  }
+
+  // 规范化 1（月份必显式）：URL 无月份或非法月份 → REPLACE 为最新月份（保留 hash 锚点）
   $effect(() => {
     if (!contentQuery.initialized || months.length === 0) return
     if (urlMonth && months.some(([k]) => k === urlMonth)) return
-    go({ month: months[0][0], item: urlItem || undefined }, 'REPLACE')
+    go({ month: months[0][0], hash: hashItem || undefined }, 'REPLACE')
   })
 
-  // 规范化 2（条目定位）：深链 item 与月参错位时，以条目所在月份修正（列表同步定位）
+  // 旧链接迁移（2026-10-10 前的 ?item= 深链）：迁到 hash 片段并 REPLACE 清 query 残留
   $effect(() => {
-    if (!contentQuery.initialized || !urlItem || !detailPost) return
+    if (!urlItem) return
+    hashItem = urlItem
+    go({ month: currentMonth, hash: urlItem }, 'REPLACE')
+  })
+
+  // 规范化 2（锚点定位）：hash 锚点与月参错位时，以锚点所在月份修正
+  $effect(() => {
+    if (!contentQuery.initialized || !hashItem || !detailPost) return
     const m = monthKeyOf(detailPost.date)
-    if (m !== currentMonth) go({ month: m, item: detailPost.id.stem }, 'REPLACE')
+    if (m !== currentMonth) go({ month: m, hash: hashItem }, 'REPLACE')
   })
 
   /** 列表滚动容器（滚动重置的遍历起点；真实滚动容器是段级 overflow-auto）。 */
@@ -171,13 +198,35 @@
     })
   }
 
-  /** ToC 锚点语义（kzf 2026-10-10）：?item= 是阅读流内的定位锚——点标题滚动到该事件
-   *  所在段，而非"选中谁只渲染谁"。换月时上面的重置先生效，这里再定位。 */
+  /** ToC 锚点语义（kzf 2026-10-10）：hash 片段是阅读流内的定位锚——点标题滚动到该事件
+   *  所在段，而非"选中谁只渲染谁"。换月时上面的重置先生效，这里再定位。
+   *  读 visible 作为内容就绪依赖：深链早于内容就绪到达时空跑，段集渲染后重跑补定位。
+   *  scrollIntoView 后正文仍会异步增长（实证：早期滚动落点 9191，内容膨胀后目标漂到
+   *  18724）——3 秒收敛窗内有界重锚，新锚点/清锚立即失效旧窗。 */
+  let anchorToken = 0
+  function anchorWithRetry(): void {
+    const token = ++anchorToken
+    const pane = pane3El
+    if (!pane || !hashItem) return
+    const reanchor = (tries: number): void => {
+      if (token !== anchorToken || !hashItem || !pane3El) return
+      const t = pane3El.querySelector(`[data-stem="${CSS.escape(hashItem)}"]`)
+      if (!t) return
+      const drift = t.getBoundingClientRect().top - pane3El.getBoundingClientRect().top
+      if (Math.abs(drift) > 24 && tries > 0) {
+        t.scrollIntoView({ block: 'start' })
+        setTimeout(() => reanchor(tries - 1), 250)
+      }
+    }
+    pane.querySelector(`[data-stem="${CSS.escape(hashItem)}"]`)?.scrollIntoView({ block: 'start' })
+    setTimeout(() => reanchor(12), 250)
+  }
+
+  /** 锚点定位 effect：hash/内容就绪/段集变化时定位（带重锚收敛窗）。 */
   $effect(() => {
-    void urlItem
-    if (!urlItem || !detailPost) return
-    activeStem = urlItem
-    pane3El?.querySelector(`[data-stem="${urlItem}"]`)?.scrollIntoView({ block: 'start' })
+    if (!hashItem) return
+    void visible
+    anchorWithRetry()
   })
 
   // 激活月份滚入视野（移动 chips 横向居中；桌面时间轴纵向定位——深链直达时
@@ -189,41 +238,47 @@
   })
 
   function pickMonth(key: string): void {
-    go({ month: key })
+    setMonth(key)
   }
 
+  /** ToC 行内锚（同页 hash 形态）：中键/修饰键点击走浏览器默认（新标签打开同页锚）。 */
   function workspaceHref(entry: ContentEntry): string {
-    const params = new URLSearchParams({ month: monthKeyOf(entry.date), item: entry.id.stem })
-    return `${basePath}?${params.toString()}`
+    return `${basePath}?month=${monthKeyOf(entry.date)}#${entry.id.stem}`
   }
 
-  /** 条目卡片整卡点击（事件委托）：内部 a/button/label/媒体控件自行处理。 */
+  /** ToC 锚点导航：URL = ?month=<月>#<stem>（kzf 2026-10-10：锚点走 hash 片段）。 */
+  function openAnchor(entry: ContentEntry): void {
+    hashItem = entry.id.stem
+    go({ month: monthKeyOf(entry.date), hash: entry.id.stem })
+  }
+
+  /** 条目行整行点击（事件委托）：内部 a/button/label/媒体控件自行处理。 */
   function openItem(event: MouseEvent, entry: ContentEntry): void {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     const t = event.target as HTMLElement | null
     if (t?.closest('a, button, input, label, video, audio')) return
-    go({ month: monthKeyOf(entry.date), item: entry.id.stem })
+    openAnchor(entry)
   }
 
   /** 卡片内标题/日期锚：拦截默认整页跳转走 SPA（修饰键放行新标签 fallback）。 */
   function openItemFromLink(event: MouseEvent, entry: ContentEntry): void {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     event.preventDefault()
-    go({ month: monthKeyOf(entry.date), item: entry.id.stem })
+    openAnchor(entry)
   }
 
-  /** 键盘可达：标题锚天然支持 Enter；卡片 Enter/Space 亦推详情。 */
+  /** 键盘可达：标题锚天然支持 Enter；行 Enter/Space 亦定位。 */
   function openItemByKey(event: KeyboardEvent, entry: ContentEntry): void {
     if (event.key !== 'Enter' && event.key !== ' ') return
     const t = event.target as HTMLElement | null
     if (t?.closest('a, button')) return
     event.preventDefault()
-    go({ month: monthKeyOf(entry.date), item: entry.id.stem })
+    openAnchor(entry)
   }
 
-  /** 移动端详情返回列表（留在当月，条目出栈）。 */
+  /** 移动端返回 ToC（留在当月，锚点出栈）。 */
   function backToList(): void {
-    go({ month: currentMonth || undefined })
+    setMonth(currentMonth || months[0]?.[0] || '')
   }
 
   function titleFor(entry: ContentEntry): string {
@@ -377,7 +432,7 @@
            谁渲染谁"的单条详情——ToC 点标题=滚动定位到对应段；每段 sticky 头=标题+日期+
            独立详情页入口。移动端点 ToC 推入全屏并定位，返回钮常驻不随流滚动） -->
       <section
-        class="min-h-0 min-w-0 flex-1 border-border {urlItem
+        class="min-h-0 min-w-0 flex-1 border-border {hashItem
           ? 'absolute inset-0 z-20 flex flex-col bg-background'
           : 'hidden'} lg:static lg:flex lg:border-l"
         aria-label="事件内容"

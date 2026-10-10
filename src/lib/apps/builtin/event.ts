@@ -9,9 +9,11 @@ import { createFileSearchService } from "$lib/search/file-service";
  * 功能：三段布局工作区浏览事件（GitHub 日报 / X 日报 / X 历史归档 / 碎碎念）。
  * 数据来自内容管道（底层 readonlyVfs 构建时静态数据），无需登录即可阅读。
  *
- * URL 状态（2026-10-09 三段布局裁决 1+2）：列表工作区状态走 search 参数——
+ * URL 状态（2026-10-10 hash 化，kzf：ToC 锚点走片段）：
  * - ?month=YYYY-MM：当前月份（必显式；缺失/非法时视图规范化为最新月份并 REPLACE 回 URL）
- * - ?item=<stem>：当前选中条目（可选；详情内嵌第三段渲染，中段列表同步高亮）
+ * - #<stem>：阅读流定位锚（ToC 语义——点标题滚动定位，滚动高亮跟随）；hashchange
+ *   原生入历史栈，同路由导航不销毁列表 DOM。2026-10-10 前的 ?item= 深链由视图自动
+ *   迁移到 hash 后 REPLACE 清除（schema 保留 item 字段仅为解析旧链接）。
  * 选 search 而非路径段：ActivityRouter 按 route id 保活组件，同 route 仅 search
  * 变化时列表 DOM/滚动位置不销毁（后退表现正确），与 ?file=/?sha= 的「单屏内
  * 视图状态走 query」惯例同族。
