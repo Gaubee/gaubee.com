@@ -5,6 +5,8 @@
 
 | 日期       | 工具         | 路径                           | 一句话                                                                                      | 状态     | 裁决备注 |
 | ---------- | ------------ | ------------------------------ | ------------------------------------------------------------------------------------------- | -------- | -------- |
+| 2026-10-10 | patch-precheck | tools/2026-10-10-patch-precheck/ | cdn-media 同日补丁卷闸门预检——cron 第 4 步前置，撞名组动手前就知道 | proposed |          |
+| 2026-10-10 | translations-doctor | tools/2026-10-10-translations-doctor/ | X 译文覆盖率体检（按日缺口 + 门禁退出码），配套 export/merge 三件套 | proposed |          |
 | 2026-10-03 | stars-search | tools/2026-10-03-stars-search/ | 本地星标多关键词速查（分类/语言过滤）——回答"收藏里有没有 X"的可验证候选器                   | proposed |          |
 | 2026-10-03 | stale-check  | tools/2026-10-03-stale-check/  | 收藏保鲜检查：archived 与超 N 年未推送的仓库按分类盘点（首跑：119 archived / 138 stale@5y） | proposed |          |
 | 2026-10-04 | deps-why     | tools/2026-10-04-deps-why/     | “我在哪里用的 X？”——依赖按项目溯源（版本/分区/首见时间，存量如实标注）                      | proposed |          |

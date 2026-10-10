@@ -3024,7 +3024,6 @@
   "2106399710433218690": "上海人工智能实验室有免费的DeepseekFlash\n科研导向 比官网API智商还高\n每天签到领五亿token\n入口:\nhttps://\ndiscovery.intern-ai.org.cn",
   "2106612988669284802": "很多人觉得 Apple Music 的推荐算法没有 Spotify好，其实这是 Apple 故意的。\n\n它并不会像网易云或者 Spotify 那样，靠算法推荐用户喜欢听什么，而是一贯的苹果的作风：「教」用户辨别什么是好音乐。\n\nApple Music… https://t.co/i8q2jcxgTW",
   "2106687088766947628": "@VersunPan Pro 才 5 块钱 18 个月，要什么自行车。",
-  "2107253190873993292": "重大消息：我们的编程 Agent 刚把免费每日用量提升了 50%（！）🎉\n\n每天可免费用满 10 小时 DeepSeek V4.1 Flash（因国家/地区而异）\n\n立即试用：https://freebuff.com",
   "2107501133602103588": "正陷在周中冲刺里吗？☕️\n\n花 10 分钟了解 Angular 构建性能的未来：ngp、Rust 🦀 与 Oxc 如何融入我们的 TypeScript 7 编译器战略。\n\n阅读更新：https://g.dev/cloud/angular-compiler-update 💡",
   "2107415202190987345": "我的 ~/dev 目录里有 128 个 node_modules 文件夹，共 59 GB。\n\nnpx npkill 用 13 秒就把它们全找出来，还列出每个的体积和多少天没碰过。\n\n用 -s last-mod 排序，按空格键删除。它连 ~/.cursor 这类应用文件夹都能识别。\n\n我清出了 49 GB！\n\nhttps://flaviocopes.com/npkill/",
   "2107308615661162970": "Moli 是一个用 Rust 写的、专为 AI Agent 打造的开源无头浏览器，只在 Agent 需要时才渲染布局和像素。\n\n→ 开发者实测内存 73MB，无头 Chrome 要 773MB\n→ 支持 Chrome DevTools 协议，所以",
@@ -3048,5 +3047,16 @@
   "2108227127103656441": "📢 React Aria Sheet 组件来了！\n\n‣ 基于 CSS scroll snapping 的原生滑动手势\n‣ 手势同步动画\n‣ 吸附点\n‣ 层叠\n‣ 弹性过滚动\n‣ 键盘感知\n\n写了篇博客讲它的工作原理！https://react-aria.adobe.com/blog/sheet",
   "2107803133233471626": "🚨 腾讯刚被泄出一个碾压所有翻译 AI 的模型，而且免费\n\n完全离线可用：仅 440 MB，手机装得下。\n\n开源，谁都能下载、使用、集成进自己的应用。\n\n名字叫 Hy-MT2。\n\n它带来：\n→ 33 种语言……",
   "2107910755194634376": "这里的工作很漂亮：用 #CSS scroll snap 做手势驱动的底部抽屉\n\nhttps://github.com/viliket/pure-web-bottom-sheet",
-  "2107985803301281882": "Liquid Glass 的 Web 实现，开源。\n\n在任意浏览器复现 Apple 液态玻璃观感：Chromium、Safari、Firefox、Electron 等。\n\n还很早期、有毛边。桌面 Chromium 上跑得很顺（本视频即是），Safari 和移动端暂时较糙，而这正是……"
+  "2107985803301281882": "Liquid Glass 的 Web 实现，开源。\n\n在任意浏览器复现 Apple 液态玻璃观感：Chromium、Safari、Firefox、Electron 等。\n\n还很早期、有毛边。桌面 Chromium 上跑得很顺（本视频即是），Safari 和移动端暂时较糙，而这正是……",
+  "2107253190873993292": "重大消息：我们的编程 Agent 刚把免费每日用量提升了 50%（！）🎉\n\n每天可免费用满 10 小时 DeepSeek V4.1 Flash（因国家/地区而异）\n\n立即试用：https://freebuff.com",
+  "2108552027962036228": "你的 UI 看着不错，但有点太静态了？👀\n\n6 个动效图标站：\n\n→ https://lucide-animated.com/\n→ https://lordicon.com/\n→ https://www.flaticon.com/animated-icons\n→ https://allsvgicons.com/\n→ https://useanimations.com/\n→ https://www.svgator.com/\n\n小动效，大不同。",
+  "2108590241988710429": "Bun 的 AoT 实验走的似乎是「简单」路线：\n- 容易原生编译的就编译\n- 其余全部保持动态\n- 对能编译的部分从严\n\n纸上说得通，现实里行不通。用 Perry 时我们最初也这么试过：",
+  "2108574564586332615": "好了，我把 shadcn/ui 技能的 𝙳𝙴𝚂𝙸𝙶𝙽.𝚖𝚍 磨得相当能打。\n\n你要一个设计系统，它会选好预设然后全套建出来：配色、令牌、字阶、投影、样式化基础组件与区块。\n\n先打稳地基，再造点独一无二的。",
+  "2108227167880421692": "Transitions Builder 和社区正式上线。\n\n这些组件全部由 Transition UI Agent 用一条 prompt 生成，默认配置，没有提供任何设计稿。\n\nAgent 基于组件库知识、UI 工艺原则和相关库生态生成，还有……",
+  "2108269386431951139": "React Aria 今天刚发布新的 Sheet 组件！\n\n既然行为和 Drawer 一样，我决定移除 Drawer、统一用 Sheet。\n\n文档里也补了几个新示例。",
+  "2108438860640436350": "各种尺寸都有。\n\nDecision 2.0：六个开放决策模型，0.6B 到 27B。在 #Jev 决策指数 0.3 上，每一个都赢了对标的同尺寸开放模型。\n\n#Hugging Face 热门合集 🤗 \n\nDecision 2.0：https://huggingface.co/collections/vllm-sr/decision-20\nVela 2.0：https://huggingface.co/collections/vllm-sr/vela-20",
+  "2108456177029845346": "给 Opus 5.5 一套动效设计工具栈，而不只是一句 prompt。\n\n20 个 GitHub 仓库，覆盖动画技能、声音、视频渲染与交互动效：\n\n*技能与工作流*\n\n 1. claude-motion\n代码生成的动效指导、逐帧检查与声音。",
+  "2108492839546147149": "Claude Code 终于能做出不像 AI 做的 UI 了 https://uiarc.dev",
+  "2108279639538012265": "iPhone AGI 达成了 🔥🔥\n\n一个完全跑在我 iPhone 上的 Agent，全程没有电脑接入或人在环，能操控我 iPhone 上的任何东西。\n\n✨ iPhone computer use ✨\n\n第一条消息之后的一切，都是 Agent 在点、在打。",
+  "2108512911626825966": "Xcode 27 内置了现代最佳实践与新 API 的 Agent 技能。\n\n一条命令即可导出这些技能、在 Xcode 之外使用：\n\nxcrun agent skills export --output-dir ~/Downloads/xcode-skills"
 }
