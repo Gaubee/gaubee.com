@@ -3058,5 +3058,15 @@
   "2108456177029845346": "给 Opus 5.5 一套动效设计工具栈，而不只是一句 prompt。\n\n20 个 GitHub 仓库，覆盖动画技能、声音、视频渲染与交互动效：\n\n*技能与工作流*\n\n 1. claude-motion\n代码生成的动效指导、逐帧检查与声音。",
   "2108492839546147149": "Claude Code 终于能做出不像 AI 做的 UI 了 https://uiarc.dev",
   "2108279639538012265": "iPhone AGI 达成了 🔥🔥\n\n一个完全跑在我 iPhone 上的 Agent，全程没有电脑接入或人在环，能操控我 iPhone 上的任何东西。\n\n✨ iPhone computer use ✨\n\n第一条消息之后的一切，都是 Agent 在点、在打。",
-  "2108512911626825966": "Xcode 27 内置了现代最佳实践与新 API 的 Agent 技能。\n\n一条命令即可导出这些技能、在 Xcode 之外使用：\n\nxcrun agent skills export --output-dir ~/Downloads/xcode-skills"
+  "2108512911626825966": "Xcode 27 内置了现代最佳实践与新 API 的 Agent 技能。\n\n一条命令即可导出这些技能、在 Xcode 之外使用：\n\nxcrun agent skills export --output-dir ~/Downloads/xcode-skills",
+  "2108815189508546945": "重做了 SlicedWaves 组件，看看这效果。\n\n多预设，高度可定制。\nhttps://reactbits.dev/backgrounds/sliced-waves",
+  "2108625984585170988": "更多 𝚌𝚕𝚎𝚏 动态：\n • 全新 𝚌𝚕𝚎𝚏-𝚘𝚖𝚗𝚒——同时吃音频、视频、图像和文本\n • 𝚌𝚕𝚎𝚏-𝚏𝚕𝚊𝚜𝚑 现在比 jev 还便宜\n • 𝚌𝚕𝚎𝚏 提速约 2 倍\nhttps://blog.cloudflare.com/clef-faster-cheaper-multimodal/",
+  "2108959518386458695": "我们把 clef-flash 蒸馏成了 0.6B 模型，并支持 ANE（苹果神经网络引擎）。\n\nM5 Pro 上 57 秒分类完 1000 条工单：逐条给出团队、紧急度与退款判定，单条 48ms，分类精度与 9B 模型只差几个点。\n\n 🤗 https://huggingface.co/FluidInference/clef-text-0.6b-coreml\n 💻 https://github.com/FluidInference/FluidUse",
+  "2108730052078871018": "几分钟后发布 Liquid Glass v0.0.2，这是前后对比：\n\n1. Safari\n2. Firefox (Zen)\n\n效果天差地别。",
+  "2108779027796472178": "手工打磨的 #UI，好看到像专业的。\n\n6 个让你的 UI 显贵的组件库：\n\n1. morphin → https://morphin.dev/\n@morphindev\n\n2. viora ui → https://vioraui.dedyn.io/\n@otisuiux\n\n3. tween ui → https://tween-ui.vercel.app/\nhttps://github.com/StaticMania/tween-ui\n\n4. scrollx ui →",
+  "2108251509830140401": "想看 Paper Mono 发布视频的完整制作过程吗？\n\n全都是代码，但我一行都没写 🔥\n\n来了：",
+  "2108652628590944540": "Google AI Pro 套餐现在打包了 Colab 高级权益，直接给你 80GB 显存的 A100（Ultra 订阅甚至解锁 H100 🔥）。\n\n这 80GB 在浏览器里能直接做什么：\n\n✨ bf16 跑 Gemma 4 31B\n✨ bf16 全参微调到 Gemma 4 E4B\n✨ LoRA 微调到……",
+  "2108525252460605617": "我们解决了 SQLite 的单写者限制。\n\n✅ 多个并发写者。\n✅ 多进程。\n✅ 还是同一个 SQLite。\n✅ 零改动。\n\nhttps://marcobambini.substack.com/p/we-solved-sqlites-single-writer-limitation",
+  "2108779088001241139": "Liquid Glass v0.0.2 发布\n\n性能全面大幅提升\n\n- 现在真的能在所有浏览器用了，不只是 Chrome。\n- Firefox：每类交互省 59–91% CPU（滚动、菜单、开关、滑杆、标签页、拖拽），并跑满 120fps。\n- Safari：11–31%",
+  "2108793934256525570": "Bun v1.4.3\n- 修复 166 个问题（响应 122 个 👍）\n- `bun check`：内置于 Bun 的高速 TypeScript 类型检查器\n- 服务器空转 CPU 降低 67%\n- `Bun.FetchSession`\n- 更快的 JSON.parse\n- Node.js 兼容性修复与大量 bugfix\n\nhttps://bun.com/blog/bun-v1.4.3"
 }
