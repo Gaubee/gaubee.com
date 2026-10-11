@@ -5,6 +5,8 @@
 
 | 日期       | 工具         | 路径                           | 一句话                                                                                      | 状态     | 裁决备注 |
 | ---------- | ------------ | ------------------------------ | ------------------------------------------------------------------------------------------- | -------- | -------- |
+| 2026-10-11 | x-daily-backfill | tools/2026-10-11-x-daily-backfill/ | X 日报缺口检测——有归档无日报的日子 + 差分运行日建议与补跑命令 | proposed |          |
+| 2026-10-11 | avatar-healthcheck | tools/2026-10-11-avatar-healthcheck/ | 作者头像 URL 健康抽样（404 检出 → backfill --ids 指引），防归档裂图 | proposed |          |
 | 2026-10-10 | patch-precheck | tools/2026-10-10-patch-precheck/ | cdn-media 同日补丁卷闸门预检——cron 第 4 步前置，撞名组动手前就知道 | proposed |          |
 | 2026-10-10 | translations-doctor | tools/2026-10-10-translations-doctor/ | X 译文覆盖率体检（按日缺口 + 门禁退出码），配套 export/merge 三件套 | proposed |          |
 | 2026-10-03 | stars-search | tools/2026-10-03-stars-search/ | 本地星标多关键词速查（分类/语言过滤）——回答"收藏里有没有 X"的可验证候选器                   | proposed |          |
