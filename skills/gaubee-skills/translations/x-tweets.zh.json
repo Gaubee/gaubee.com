@@ -3068,5 +3068,11 @@
   "2108652628590944540": "Google AI Pro 套餐现在打包了 Colab 高级权益，直接给你 80GB 显存的 A100（Ultra 订阅甚至解锁 H100 🔥）。\n\n这 80GB 在浏览器里能直接做什么：\n\n✨ bf16 跑 Gemma 4 31B\n✨ bf16 全参微调到 Gemma 4 E4B\n✨ LoRA 微调到……",
   "2108525252460605617": "我们解决了 SQLite 的单写者限制。\n\n✅ 多个并发写者。\n✅ 多进程。\n✅ 还是同一个 SQLite。\n✅ 零改动。\n\nhttps://marcobambini.substack.com/p/we-solved-sqlites-single-writer-limitation",
   "2108779088001241139": "Liquid Glass v0.0.2 发布\n\n性能全面大幅提升\n\n- 现在真的能在所有浏览器用了，不只是 Chrome。\n- Firefox：每类交互省 59–91% CPU（滚动、菜单、开关、滑杆、标签页、拖拽），并跑满 120fps。\n- Safari：11–31%",
-  "2108793934256525570": "Bun v1.4.3\n- 修复 166 个问题（响应 122 个 👍）\n- `bun check`：内置于 Bun 的高速 TypeScript 类型检查器\n- 服务器空转 CPU 降低 67%\n- `Bun.FetchSession`\n- 更快的 JSON.parse\n- Node.js 兼容性修复与大量 bugfix\n\nhttps://bun.com/blog/bun-v1.4.3"
+  "2108793934256525570": "Bun v1.4.3\n- 修复 166 个问题（响应 122 个 👍）\n- `bun check`：内置于 Bun 的高速 TypeScript 类型检查器\n- 服务器空转 CPU 降低 67%\n- `Bun.FetchSession`\n- 更快的 JSON.parse\n- Node.js 兼容性修复与大量 bugfix\n\nhttps://bun.com/blog/bun-v1.4.3",
+  "2108864148658356375": "我们花了很多功夫让 2D 和 3D 效果无缝协同。看到实际跑起来太酷了 👀",
+  "2108935225334014402": "发布：Google Glassea",
+  "2109182449179836579": "做视觉讲解的绝佳技能。纯 SVG 且带动画。\n\n我用的 prompt：\n\nhttps://github.com/wheresryan22/anatomy install skill\n\n/anatomy 解释 Seedream 5.0 如何把图像拆分成图层，以及你能用它做出什么好玩的东西。做成单个 HTML 文件。\n\n再改一下……",
+  "2108852592247779527": "5 个让你下一个 UI 更精致的组件库。先收藏 ↓\n\n- https://useplanes.co\n- https://obsidianui.dev\n- https://paceui.com\n- https://vantaui.com\n- https://spaceui.one\n\n下一个想让我加哪个组件库？",
+  "2108855541812646004": "我去这也太酷了：https://www.mdxcn.dev/",
+  "2108847656424583307": "Bun AoT 开始上路了\n\n用 Bun AoT 构建的 TypeScript 6 在单线程下对 Effect 的类型检查比 TypeScript 7 还快。"
 }

@@ -5,7 +5,7 @@
  * 文件意图（正交意图清单）：
  * - [2026-10-03] 原始需求（kzf）：日报之外还要周报/月报；未来接入更多信号源后报告自动纳管。
  * - 1. 逐源读取 data/sources 下各源的 changes 目录，聚合指定周期（新增源零改动接入）
- * - 2. --weekly [reports/weekly/YYYY-Www.md] / --monthly [reports/monthly/YYYY-MM.md] / --yearly [YYYY]（默认上一年，reports/yearly/YYYY.md）
+ * - 2. --weekly [reports/weekly/YYYY-Www.md，上一个完整周] / --monthly [reports/monthly/YYYY-MM.md] / --yearly [YYYY]（默认上一年，reports/yearly/YYYY.md）
  * 叙述分析（品味信号、主题归纳）由 agent 在骨架上补充，脚本只负责事实聚合。
  * 注意：本文件注释与字符串里禁止出现「星号+斜杠」序列（JSDoc 会提前闭合，2026-10-03 复核实证）。
  */
@@ -40,6 +40,41 @@ function mondayOf(d: Date): Date {
   const t = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   t.setDate(t.getDate() - ((t.getDay() + 6) % 7));
   return t;
+}
+
+const ANALYSIS_MARKER = "## 分析（agent 补充";
+
+/** 分析段是否已有实际内容（占位骨架只有注释行，不算）。 */
+export function hasRealAnalysis(text: string): boolean {
+  const idx = text.indexOf(ANALYSIS_MARKER);
+  if (idx < 0) return false;
+  return text
+    .slice(idx)
+    .split("\n")
+    .some((line) => {
+      const t = line.trim();
+      return t !== "" && !t.startsWith("<!--") && !t.endsWith("-->") && !t.startsWith("#");
+    });
+}
+
+/** 重生成骨架时保留 agent 已写的分析段（2026-10-12 实证：整文件覆写会冲掉已补充的分析）。 */
+export function preserveAnalysis(prevText: string, nextText: string): string {
+  if (!hasRealAnalysis(prevText) || hasRealAnalysis(nextText)) return nextText;
+  const cut = nextText.indexOf(ANALYSIS_MARKER);
+  const from = prevText.indexOf(ANALYSIS_MARKER);
+  if (cut < 0 || from < 0) return nextText;
+  return nextText.slice(0, cut).replace(/\s*$/, "\n\n") + prevText.slice(from);
+}
+
+/** 周报窗口：上一个完整周（周一~周日）。纯函数，供回归守卫测试（2026-10-12 窗口 bug）。 */
+export function weeklyWindow(now: Date): { from: string; to: string; year: number; week: number } {
+  const thisMon = mondayOf(now);
+  const lastMon = new Date(thisMon);
+  lastMon.setDate(lastMon.getDate() - 7);
+  const lastSun = new Date(thisMon);
+  lastSun.setDate(lastSun.getDate() - 1);
+  const { year, week } = isoWeek(lastMon);
+  return { from: localDate(lastMon), to: localDate(lastSun), year, week };
 }
 
 /** 聚合所有源在 [from, to] 的变更文件 */
@@ -147,15 +182,17 @@ function main(): void {
   const now = new Date();
 
   if (mode === "--weekly") {
-    const mon = mondayOf(now);
-    const entries = loadChanges(localDate(mon), today);
-    const { year, week } = isoWeek(now);
-    const out = path.join(REPORTS, "weekly", `${year}-W${p2(week)}.md`);
+    // 周报覆盖上一个完整周：cron 在周一早晨生成时本周刚开始，取本周会只剩当天（2026-10-12 实证）。
+    const win = weeklyWindow(now);
+    const entries = loadChanges(win.from, win.to);
+    const label = `${win.year}-W${p2(win.week)}`;
+    const out = path.join(REPORTS, "weekly", `${label}.md`);
+    const rendered = render("weekly", entries, `${label}（${win.from} ~ ${win.to}）`);
+    const content = existsSync(out)
+      ? preserveAnalysis(readFileSync(out, "utf8"), rendered)
+      : rendered;
     mkdirSync(path.dirname(out), { recursive: true });
-    writeFileAtomic(
-      out,
-      render("weekly", entries, `${year}-W${p2(week)}（${localDate(mon)} ~ ${today}）`),
-    );
+    writeFileAtomic(out, content);
     console.log(`written ${out} (${entries.length} change files)`);
   } else if (mode === "--monthly") {
     const from = `${today.slice(0, 7)}-01`;
@@ -182,9 +219,11 @@ function main(): void {
   }
 }
 
-try {
-  main();
-} catch (err) {
-  console.error(err instanceof Error ? err.message : err);
-  process.exit(1);
+if (import.meta.main) {
+  try {
+    main();
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  }
 }
