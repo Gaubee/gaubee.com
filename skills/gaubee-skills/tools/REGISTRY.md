@@ -21,3 +21,5 @@
 | 2026-10-08 | ci-duration-trends | tools/2026-10-08-ci-duration-trends/ | Actions 耗时趋势速览：按 workflow 分组均值/极值/近5次趋势 + 最耗时 top5（首跑实证 Docker 构建均值 13m41s→2m49s） | proposed |          |
 | 2026-10-09 | pipeline-env-doctor | tools/2026-10-09-pipeline-env-doctor/ | 管道环境自检：二进制/gh 登录/数据根可写/.env 键名（首跑复现裁剪 PATH 故障 exit 1，修复后 12 项全绿） | proposed |          |
 | 2026-10-09 | x-window-entries | tools/2026-10-09-x-window-entries/ | X 日报 T-1 本地日窗选择器：UTC 窗口换算+媒体 manifest 对账（首跑与人工筛选 3/3 一致，并抓出 10-07 窗口 1 条迟到期） | proposed |          |
+| 2026-10-13 | deploy-smoke | tools/2026-10-13-deploy-smoke/ | 发布后公网冒烟：最新 N 篇 event 详情页 GET 断言（200/非壳/非 WAF 拦截页/title 匹配）——首跑即复现 WAF `.git` 误伤事故面 | proposed |          |
+| 2026-10-13 | ai-tone-one | tools/2026-10-13-ai-tone-one/ | ai-tone 单文件体检 wrapper：只出目标文件的段与退出码（原脚本无参数处理全目录扫描；退出码可直接接发布门禁） | proposed |          |

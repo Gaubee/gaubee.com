@@ -3074,5 +3074,6 @@
   "2109182449179836579": "做视觉讲解的绝佳技能。纯 SVG 且带动画。\n\n我用的 prompt：\n\nhttps://github.com/wheresryan22/anatomy install skill\n\n/anatomy 解释 Seedream 5.0 如何把图像拆分成图层，以及你能用它做出什么好玩的东西。做成单个 HTML 文件。\n\n再改一下……",
   "2108852592247779527": "5 个让你下一个 UI 更精致的组件库。先收藏 ↓\n\n- https://useplanes.co\n- https://obsidianui.dev\n- https://paceui.com\n- https://vantaui.com\n- https://spaceui.one\n\n下一个想让我加哪个组件库？",
   "2108855541812646004": "我去这也太酷了：https://www.mdxcn.dev/",
-  "2108847656424583307": "Bun AoT 开始上路了\n\n用 Bun AoT 构建的 TypeScript 6 在单线程下对 Effect 的类型检查比 TypeScript 7 还快。"
+  "2108847656424583307": "Bun AoT 开始上路了\n\n用 Bun AoT 构建的 TypeScript 6 在单线程下对 Effect 的类型检查比 TypeScript 7 还快。",
+  "2109293910178582804": "到底是哪个天才想出来的这玩意儿，笑死"
 }
