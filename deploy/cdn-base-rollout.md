@@ -291,3 +291,14 @@ bun cdn-media/tools/staging-clean.ts --execute
 cd cdn-media && bun test tools/staging-clean.test.ts   # 2026-10-07 实测 6/6 绿
 ```
 
+
+## 运维收据（追加）
+
+### 2026-10-13 GitHub 日报详情全量 403（WAF 误伤）
+
+- 症状（kzf：官网没更新）：GitHub 日报事件页（slug 含 .github-daily）打开即「请求拦截」页；X 日报/周报正常。发布链（CI→GHCR→watchtower 5 分钟兜底）本身健康——镜像 sha-293abcc00:55:34 构建、00:58:19 容器重建，页面文件在镜像内完整（docker cp 实证 01824=91979B/01826=151027B）。
+- 根因：1Panel WAF（openresty 1pwaf）defaultUrlBlack 的 dirFilter1 规则 `\.(htaccess|...|git|...)` 中裸 `\.git` 子串命中 `.github-daily`——所有 GitHub 日报详情 URL（含 __data.json）被 403。req_log.db 实证 exec_rule=defaultUrlBlack/rule_type=dirFilter。
+- 修复：只改 gaubee.com 站点级副本（data/sites/gaubee.com/rules/defaultUrlBlack.json，与全局副本 md5 一致后分裂）——dirFilter1 移除裸 git 令牌，新增 dirFilter1b `\.git(/|\?|$)`（锚定，仍拦 /.git/ 探测）。nginx -s reload 生效（无需重启容器）。
+- 同场修复：/article/ 旧前缀深链 404（预渲染在 srv/pages/ 下）→ openresty `location ^~ /article/ { return 301 /pages$uri; }`（备份 gaubee.com.conf.bak-20261013）。EventView「详情 ↗」等真实 anchor 经此恢复；SPA 内部 navigateMain("/article/...") 走客户端路由不受影响。
+- 验证：01823/01825（.github-daily）200 真实内容；/.git/config 探测仍 403；/article/ 深链 301 落地 /pages/article/ 后 200。
+- 教训：发布链健康 ≠ 站点可达——WAF 在代理层，nginx→容器之间的拦截从容器侧不可见；「官网没更新」先分层取证（容器内文件 → 直连容器端口 → 过 openresty 的公网请求）再动手。
