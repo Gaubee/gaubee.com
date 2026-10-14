@@ -25,3 +25,4 @@
 | 2026-10-13 | ai-tone-one | tools/2026-10-13-ai-tone-one/ | ai-tone 单文件体检 wrapper：只出目标文件的段与退出码（原脚本无参数处理全目录扫描；退出码可直接接发布门禁） | proposed |          |
 | 2026-10-14 | git-ahead-guard | tools/2026-10-14-git-ahead-guard/ | 发布预检「本地超前」守卫：rev-list 对 origin/main 计数，ahead>0 列待推提交（aaa55d49f 忘推实证；publish 预检只查落后不查超前的补位） | proposed |          |
 | 2026-10-14 | deps-digest | tools/2026-10-14-deps-digest/ | 依赖变更人话化：相邻 history 快照对比出「X 1.0→2.0/新增/移除」明细（首跑实证 changes.bumpedCount 口径宽于快照真值，日报可诚实区分升级与抖动） | proposed |          |
+| 2026-10-14 | event-date-anchor | tools/2026-10-14-event-date-anchor/ | 报告类 event 日期锚定修复（kzf R8 裁决的存量执行）：19 处漂移/缺失 frontmatter 一次修复，幂等可重跑（publish 直通 bug 的 9 份 + 发布时刻 date 的 10 份） | proposed |          |

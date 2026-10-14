@@ -94,17 +94,20 @@ async function main() {
   const fileName = `${serial}.${args.slug}.md`;
   const raw = readFileSync(reportPath, "utf8");
   // frontmatter 直通（2026-10-09 X 日报卡片化）：生成器产物自带 frontmatter
-  //（title/date/tags 已是权威值），直通不再包第二层——旧手写报告无 frontmatter 时
-  // 仍按 --title/--tags 包一层（历史行为不变）。
+  //（title/date/tags 已是权威值），直通原样保留——2026-10-14 修复：此前实现把
+  // frontmatter 剥掉后只写 body，event 丢失 date（排序沉到 1970、最近列表不可见，
+  // 实证 01818~01830 九份报告）；旧手写报告无 frontmatter 时仍按 --title/--tags
+  // 包一层（date 锚定报告日，kzf 2026-10-14：报告跟随对应当天，不随发布漂移）。
   const fmRe = /^---\r?\n[\s\S]*?\r?\n---\r?\n/;
   const hasFrontmatter = fmRe.test(raw);
-  const body = hasFrontmatter ? raw.replace(fmRe, "") : raw;
+  const reportDay = args.report.match(/(\d{4}-\d{2}-\d{2})/)?.[1] ?? new Date().toISOString().slice(0, 10);
+  const body = raw;
   const front = hasFrontmatter
     ? ""
     : [
         "---",
         `title: ${args.title}`,
-        `date: "${new Date().toISOString()}"`,
+        `date: "${reportDay}"`,
         "tags:",
         ...args.tags.map((t) => `  - ${t}`),
         "---",

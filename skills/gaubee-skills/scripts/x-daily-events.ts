@@ -158,14 +158,9 @@ async function main() {
   }
 
   const body = renderDayBody(entries, { authors, translations, mediaMeta });
-  // date 是发布事实，不随重渲染漂移（kzf 2026-10-10：--force 重写保留既有时间戳；
-  // 实证 01811/01814/01816 曾被重渲染改到当天，页面发布时间全错）
-  let dateIso = new Date().toISOString();
-  const existingEvent = eventFileFor(date);
-  if (existingEvent) {
-    const m = readFileSync(existingEvent.abs, "utf8").match(/^date: "([^"]+)"/m);
-    if (m?.[1]) dateIso = m[1];
-  }
+  // date 锚定报告日（kzf 2026-10-14：报告跟随对应当天，不随抓取/发布/重渲染漂移；
+  // date-only 与归档 event 口径一致，排序稳定，天然满足「重渲染不漂移」）
+  const dateIso = date;
   const content = [
     "---",
     `title: "X 日报：${date}"`,

@@ -302,3 +302,11 @@ cd cdn-media && bun test tools/staging-clean.test.ts   # 2026-10-07 实测 6/6 �
 - 同场修复：/article/ 旧前缀深链 404（预渲染在 srv/pages/ 下）→ openresty `location ^~ /article/ { return 301 /pages$uri; }`（备份 gaubee.com.conf.bak-20261013）。EventView「详情 ↗」等真实 anchor 经此恢复；SPA 内部 navigateMain("/article/...") 走客户端路由不受影响。
 - 验证：01823/01825（.github-daily）200 真实内容；/.git/config 探测仍 403；/article/ 深链 301 落地 /pages/article/ 后 200。
 - 教训：发布链健康 ≠ 站点可达——WAF 在代理层，nginx→容器之间的拦截从容器侧不可见；「官网没更新」先分层取证（容器内文件 → 直连容器端口 → 过 openresty 的公网请求）再动手。
+
+### 2026-10-14 媒体交付慢性失效（token 过期 + 两处机制缺陷）
+
+- 症状：deploy-smoke 媒体抽检 23/23 → 404（页面正常）。容器 stats：manifest gen=6（本地缓存回退），线上已是 gen-8。
+- 根因链：① 10-10 配置的 fine-grained PAT 已全线 401（过期/吊销）→ 服务器对 cdn-media.gaubee.com 的 raw/api manifest 刷新持续失败 → 启动回退本地缓存 manifest（gen-6）→ gen-7/8 对象 404；② publish.ts「直通」实现剥掉生成器 frontmatter（9 份报告 event 无 date，最近列表沉底）；③ CI checkout 未初始化 cdn-media submodule（对现架构无害——manifest 本就走远程拉取，但镜像内无 cdn-media 文件这一事实曾误导取证方向）。
+- 已修：② publish.ts 保留 frontmatter（无 frontmatter 时 date 锚定报告日）；报告 date 口径全面锚定报告日（x-daily-events 生成器 + 存量 19 处修复，见 tools/2026-10-14-event-date-anchor）；deploy-smoke 增加媒体交付抽检（①的发现者）。
+- 待 kzf：新 token（需 Gaubee/cdn-media.gaubee.com 的 Contents: read，覆盖 manifest 拉取与 release 资产下载；现有 fine-grained PAT 与 gh keyring OAuth token 均验证过——前者 401，后者有权限但属用户凭据需 Owner 决定是否下发服务器）。token 更新后：改 compose 的 CDN_GITHUB_TOKEN → docker compose up -d（或等下次 watchtower），容器启动即拉 gen-8。
+- 教训：硬门绿（打包完整性）≠ 交付绿（公网可达）；「缓存回退 + 刷新失败」是静默降级，manifest 状态必须进交付冒烟的可观测面。

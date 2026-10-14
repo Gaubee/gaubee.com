@@ -3,7 +3,9 @@
 ## 是什么
 从公网侧对站点仓库 `src/content/events` 最新 N 篇 event 的详情页逐个 GET，断言四件事：
 HTTP 200、非 SPA 壳（字节数 > 5000B 基线）、非「请求拦截」页（WAF 拦截特征）、
-title 含 stem 或 frontmatter 标题。只读；零第三方依赖（内建 fetch）。
+title 含 stem 或 frontmatter 标题。另做**媒体交付抽检**（kzf 2026-10-14 裁决：图片
+视频正确交付才算完全交付）：抽取这 N 篇源文件里的 /cdn-media/ 引用（等距至多 24
+条），HEAD 断言 200/206 且 content-length > 0。只读；零第三方依赖（内建 fetch）。
 
 ## 解决什么
 2026-10-13 WAF 事故实证：CI 绿 + watchtower 重建 ≠ 站点可达——1Panel WAF 的

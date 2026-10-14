@@ -67,7 +67,42 @@ async function main(): Promise<void> {
     }
   }
   console.log(failed === 0 ? `SMOKE OK：${stems.length} 篇全过` : `SMOKE FAIL：${failed}/${stems.length} 不过`);
-  process.exit(failed === 0 ? 0 : 1);
+  const pageFailed = failed;
+
+  // 媒体交付校验（kzf 2026-10-14 裁决：图片视频等媒体正确交付才算完全交付）：
+  // 从这 N 篇 event 源文件抽 /cdn-media/ 引用（等距至多 mediaCap 条），HEAD 断言
+  // 200/206 且 content-length > 0。
+  const MEDIA_CAP = 24;
+  const refs = new Set<string>();
+  for (const stem of stems) {
+    const md = await Bun.file(`${eventsDir}/${stem}.md`).text();
+    for (const m of md.matchAll(/(?:src="|href=")?(\/cdn-media\/[^"\s)>]+)/g)) refs.add(m[1]!);
+  }
+  const list = [...refs];
+  const picked = list.length <= MEDIA_CAP ? list : list.filter((_, i) => i % Math.ceil(list.length / MEDIA_CAP) === 0);
+  let mediaFailed = 0;
+  for (const ref of picked) {
+    try {
+      const res = await fetch(`${base}${ref}`, { method: "HEAD", redirect: "follow" });
+      const len = Number(res.headers.get("content-length") ?? 0);
+      if (res.status !== 200 && res.status !== 206) {
+        mediaFailed++;
+        console.log(`FAIL media ${ref} → HTTP ${res.status}`);
+      } else if (len <= 0) {
+        mediaFailed++;
+        console.log(`FAIL media ${ref} → content-length ${len}`);
+      }
+    } catch (e) {
+      mediaFailed++;
+      console.log(`FAIL media ${ref} → 网络异常: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  console.log(
+    mediaFailed === 0
+      ? `MEDIA OK：${picked.length}/${list.length} 条引用抽检全过`
+      : `MEDIA FAIL：${mediaFailed}/${picked.length} 不过（总引用 ${list.length}）`,
+  );
+  process.exit(pageFailed === 0 && mediaFailed === 0 ? 0 : 1);
 }
 
 main();
