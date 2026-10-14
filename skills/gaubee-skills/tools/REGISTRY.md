@@ -23,3 +23,5 @@
 | 2026-10-09 | x-window-entries | tools/2026-10-09-x-window-entries/ | X 日报 T-1 本地日窗选择器：UTC 窗口换算+媒体 manifest 对账（首跑与人工筛选 3/3 一致，并抓出 10-07 窗口 1 条迟到期） | proposed |          |
 | 2026-10-13 | deploy-smoke | tools/2026-10-13-deploy-smoke/ | 发布后公网冒烟：最新 N 篇 event 详情页 GET 断言（200/非壳/非 WAF 拦截页/title 匹配）——首跑即复现 WAF `.git` 误伤事故面 | proposed |          |
 | 2026-10-13 | ai-tone-one | tools/2026-10-13-ai-tone-one/ | ai-tone 单文件体检 wrapper：只出目标文件的段与退出码（原脚本无参数处理全目录扫描；退出码可直接接发布门禁） | proposed |          |
+| 2026-10-14 | git-ahead-guard | tools/2026-10-14-git-ahead-guard/ | 发布预检「本地超前」守卫：rev-list 对 origin/main 计数，ahead>0 列待推提交（aaa55d49f 忘推实证；publish 预检只查落后不查超前的补位） | proposed |          |
+| 2026-10-14 | deps-digest | tools/2026-10-14-deps-digest/ | 依赖变更人话化：相邻 history 快照对比出「X 1.0→2.0/新增/移除」明细（首跑实证 changes.bumpedCount 口径宽于快照真值，日报可诚实区分升级与抖动） | proposed |          |
