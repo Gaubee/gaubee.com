@@ -30,6 +30,13 @@ function git(args: string[], cwd: string): { out: string; code: number } {
 }
 
 let failed = 0;
+// 未跟踪 event 文件检查（2026-10-15 实证：01832 untracked 不拦发布，CI checkout 无此文件，
+// 预渲染缺页）：发布视图目录下的新文件必须已提交，否则构建出的镜像不含它
+const untracked = git(["ls-files", "--others", "--exclude-standard", "src/content/events"], REPO_ROOT).out;
+if (untracked) {
+  failed++;
+  console.log(`FAIL gaubee.com：src/content/events 有未跟踪文件（镜像将不含它们）：\n${untracked}`);
+}
 for (const repo of REPOS) {
   if (doFetch) git(["fetch", "origin"], repo.path);
   const branch = git(["rev-parse", "--abbrev-ref", "HEAD"], repo.path).out;
