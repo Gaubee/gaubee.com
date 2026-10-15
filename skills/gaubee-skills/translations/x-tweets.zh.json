@@ -3075,5 +3075,10 @@
   "2108852592247779527": "5 个让你下一个 UI 更精致的组件库。先收藏 ↓\n\n- https://useplanes.co\n- https://obsidianui.dev\n- https://paceui.com\n- https://vantaui.com\n- https://spaceui.one\n\n下一个想让我加哪个组件库？",
   "2108855541812646004": "我去这也太酷了：https://www.mdxcn.dev/",
   "2108847656424583307": "Bun AoT 开始上路了\n\n用 Bun AoT 构建的 TypeScript 6 在单线程下对 Effect 的类型检查比 TypeScript 7 还快。",
-  "2109293910178582804": "到底是哪个天才想出来的这玩意儿，笑死"
+  "2109293910178582804": "到底是哪个天才想出来的这玩意儿，笑死",
+  "2110267783661625714": "下一个项目开始前，先收藏这些动效设计工具 🎬\n\nhttps://prompt-motion.com - 用提示词和技能做 AI 动效设计\n\nhttps://arqe.ai - 动效模板、设备动画 mockup、素材库，一站搞定。\n\nhttps://www.swishy.ai - AI 动效设计师",
+  "2110089095208927641": "我们的 PixiJS 3D 动画和 demo 搬新家了 🎉\n\n后续会持续上新！\n\nhttps://goodstuff.pixijs.io/",
+  "2110058905875460393": "发布 Indra，一个 1M 参数的 OCR 模型：\n\n- CPU 上每秒 49 页，比 PaddleOCR 快 11 倍、比 Tesseract 快 17 倍\n- 在 OmniParseBench 文本上击败两者（41.3 vs 35.8 与 19.3）\n- 完整的版面与行级边界框",
+  "2110410655165779985": "刚发布了 Trace，一个展示 agent 活动的新组件。它把推理、工具调用、队列、思维链、子代理……抽象成了一层。\n\n本次发布还包括：Code Block 和 AI Elements。\n\nhttps://ui.shadcn.com/docs/changelog/2026-10-ai-elements",
+  "2109620371628622158": "中国把整个向量数据库行业干没了。\n\n他们开源了 TencentDB Agent Memory，让任何 AI agent 拥有 100% 本地运行的长期记忆。\n\n不用 Pinecone，不接云 API，不用每次会话重复自我介绍。\n\n- token 省 61%\n- PersonaMem 准确率：48% → 76%"
 }
