@@ -28,3 +28,5 @@
 | 2026-10-14 | event-date-anchor | tools/2026-10-14-event-date-anchor/ | 报告类 event 日期锚定修复（kzf R8 裁决的存量执行）：19 处漂移/缺失 frontmatter 一次修复，幂等可重跑（publish 直通 bug 的 9 份 + 发布时刻 date 的 10 份） | proposed |          |
 | 2026-10-15 | manifest-lag-watch | tools/2026-10-15-manifest-lag-watch/ | 服务器交付滞后早警：本地指针 gen vs admin stats gen + token 认证探针（token 失效静默降级的早警，比公网 404 早一个发布周期） | proposed |          |
 | 2026-10-15 | daily-digest | tools/2026-10-15-daily-digest/ | 日报动笔前跨源事实清单：各源计数 + deps 首见明细 + X kind 分布，changes 日与报告日双标注（T-1 防误引） | proposed |          |
+| 2026-10-16 | token-swap-apply | tools/2026-10-16-token-swap-apply/ | CDN token 更换一键应用：本地双探针验证→服务器侧替换（stdin 传值+备份）→重建轮询 gen 追平→媒体抽验收据；坏 token 永不进 compose（ABORT 路径已实测） | proposed |          |
+| 2026-10-16 | deps-jitter-report | tools/2026-10-16-deps-jitter-report/ | deps changes 重复抖动仓识别：点名次数 vs 快照真实变化次数（首跑实证三仓连续 7 天点名零版本变化，21 次点名全为噪声） | proposed |          |

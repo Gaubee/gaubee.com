@@ -3080,5 +3080,10 @@
   "2110089095208927641": "我们的 PixiJS 3D 动画和 demo 搬新家了 🎉\n\n后续会持续上新！\n\nhttps://goodstuff.pixijs.io/",
   "2110058905875460393": "发布 Indra，一个 1M 参数的 OCR 模型：\n\n- CPU 上每秒 49 页，比 PaddleOCR 快 11 倍、比 Tesseract 快 17 倍\n- 在 OmniParseBench 文本上击败两者（41.3 vs 35.8 与 19.3）\n- 完整的版面与行级边界框",
   "2110410655165779985": "刚发布了 Trace，一个展示 agent 活动的新组件。它把推理、工具调用、队列、思维链、子代理……抽象成了一层。\n\n本次发布还包括：Code Block 和 AI Elements。\n\nhttps://ui.shadcn.com/docs/changelog/2026-10-ai-elements",
-  "2109620371628622158": "中国把整个向量数据库行业干没了。\n\n他们开源了 TencentDB Agent Memory，让任何 AI agent 拥有 100% 本地运行的长期记忆。\n\n不用 Pinecone，不接云 API，不用每次会话重复自我介绍。\n\n- token 省 61%\n- PersonaMem 准确率：48% → 76%"
+  "2109620371628622158": "中国把整个向量数据库行业干没了。\n\n他们开源了 TencentDB Agent Memory，让任何 AI agent 拥有 100% 本地运行的长期记忆。\n\n不用 Pinecone，不接云 API，不用每次会话重复自我介绍。\n\n- token 省 61%\n- PersonaMem 准确率：48% → 76%",
+  "2110771556184129784": "轰！！",
+  "2110738519597437387": "这个 Fluid Glass 组件迎来了一次应得的更新。\n\n点击时，它会流变形变成下一个形状。很流体。\nhttps://reactbits.dev/components/fluid-glass",
+  "2110456607297749099": "/hairline-adopt 现已推出！\n\n把你已有的 SVG 丢进来，它会变回一个 figure 图形。",
+  "2110456607977152564": "npx skills add lucasmarkes/hairline\n\n→ https://hairline.lucasmarkes.com/skills",
+  "2110557373651931267": "亲爱的朋友们，给你们看看我最新的玩具项目\n\n介绍 Handwired：把你普通的 JavaScript 代码变成一个神经网络！\n- 无需训练\n- 输出与 JS 程序完全一致\n- 完全可微分\n\n全部可在浏览器里运行，不需要 GPU"
 }
