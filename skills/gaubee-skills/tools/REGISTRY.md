@@ -30,3 +30,5 @@
 | 2026-10-15 | daily-digest | tools/2026-10-15-daily-digest/ | 日报动笔前跨源事实清单：各源计数 + deps 首见明细 + X kind 分布，changes 日与报告日双标注（T-1 防误引） | proposed |          |
 | 2026-10-16 | token-swap-apply | tools/2026-10-16-token-swap-apply/ | CDN token 更换一键应用：本地双探针验证→服务器侧替换（stdin 传值+备份）→重建轮询 gen 追平→媒体抽验收据；坏 token 永不进 compose（ABORT 路径已实测） | proposed |          |
 | 2026-10-16 | deps-jitter-report | tools/2026-10-16-deps-jitter-report/ | deps changes 重复抖动仓识别：点名次数 vs 快照真实变化次数（首跑实证三仓连续 7 天点名零版本变化，21 次点名全为噪声） | proposed |          |
+| 2026-10-17 | star-flow-weekly | tools/2026-10-17-star-flow-weekly/ | 星标兴趣周流向：过去 N 天星标按 taxonomy/catalog 分类聚合（分类计数+带行为日期明细），周一周报主题聚类直接引用 | proposed |          |
+| 2026-10-17 | deps-jitter-probe | tools/2026-10-17-deps-jitter-probe/ | deps 日噪根因解剖：远端 package.json 依赖表 vs 本地快照逐项对比（首跑判定 B 成立：三仓内容零变化，changed[] 为 fetcher 误报，为 fetch 定点修复留证） | proposed |          |
