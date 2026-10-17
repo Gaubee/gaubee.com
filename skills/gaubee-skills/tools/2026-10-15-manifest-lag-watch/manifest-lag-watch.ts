@@ -52,8 +52,10 @@ if (remote.manifest.gen < local.gen) {
   console.log(`FAIL 滞后：服务器 gen-${remote.manifest.gen} 落后本地 gen-${local.gen}（gen-7 起的对象公网 404）`);
 }
 // token 健康：从服务器 compose 取 token（值不出服务器），对 cdn-media 仓做一次认证探针
+// 注意：fine-grained PAT 后缀含下划线，字符类必须含 _（2026-10-17 实证：漏 _ 会截断
+// token 使探针恒 401，把「指针镜像停更」误诊为「token 失效」）
 const probe = sh(
-  `command ssh ${sshHost} "TOKEN=\\$(grep -o 'github_pat_[A-Za-z0-9]*' /opt/1panel/apps/local/gaubeeos/GaubeeOS/docker-compose.yml | head -1); curl -s -o /dev/null -m 10 -w '%{http_code}' -H \\"Authorization: Bearer \\$TOKEN\\" https://api.github.com/rate_limit"`,
+  `command ssh ${sshHost} "TOKEN=\\$(grep -o 'github_pat_[A-Za-z0-9_]*' /opt/1panel/apps/local/gaubeeos/GaubeeOS/docker-compose.yml | head -1); curl -s -o /dev/null -m 10 -w '%{http_code}' -H \\"Authorization: Bearer \\$TOKEN\\" https://api.github.com/rate_limit"`,
 );
 console.log(`token 探针（rate_limit 认证）：HTTP ${probe.out}`);
 if (probe.out.trim() !== "200") {

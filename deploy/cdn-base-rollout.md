@@ -310,3 +310,12 @@ cd cdn-media && bun test tools/staging-clean.test.ts   # 2026-10-07 实测 6/6 �
 - 已修：② publish.ts 保留 frontmatter（无 frontmatter 时 date 锚定报告日）；报告 date 口径全面锚定报告日（x-daily-events 生成器 + 存量 19 处修复，见 tools/2026-10-14-event-date-anchor）；deploy-smoke 增加媒体交付抽检（①的发现者）。
 - 待 kzf：新 token（需 Gaubee/cdn-media.gaubee.com 的 Contents: read，覆盖 manifest 拉取与 release 资产下载；现有 fine-grained PAT 与 gh keyring OAuth token 均验证过——前者 401，后者有权限但属用户凭据需 Owner 决定是否下发服务器）。token 更新后：改 compose 的 CDN_GITHUB_TOKEN → docker compose up -d（或等下次 watchtower），容器启动即拉 gen-8。
 - 教训：硬门绿（打包完整性）≠ 交付绿（公网可达）；「缓存回退 + 刷新失败」是静默降级，manifest 状态必须进交付冒烟的可观测面。
+
+### 2026-10-17 媒体交付恢复（真凶：指针镜像停更；token 探针截断曾误导诊断）
+
+- 恢复链：kzf 下发新 fine-grained PAT → token-swap-apply 本地双探针验证通过 → 服务器侧替换 compose（sudo；远端脚本经 stdin 上传执行，token 不进 argv）→ 重建容器。但 gen 仍 6：**真凶是 /srv/cdn-media-pointer 指针镜像（git 检出，current_url 指向它）自 10-11 起无人 git pull，停在 gen-6**——与 token 无关（旧 token 是否真失效已不可考，见下）。
+- 诊断纠偏：manifest-lag-watch 的 token 探针 grep 模式 `[A-Za-z0-9]*` 在 `_` 处截断 fine-grained PAT → 探针恒 401，把「指针停更」误诊为「token 失效」。已修为 `[A-Za-z0-9_]*`，新 token 探针 200。
+- 防复发：/srv/cdn-media-pointer 加 root crontab 每 10 分钟 `git pull -q origin main`（日志 /var/log/cdn-media-pointer-pull.log）；容器 refresh_interval_secs=300 自行跟随。
+- 恢复收据：admin stats gen=11（=本地指针 gen-11）；gen-8 对象 200（801KB 视频）、gen-11 对象 206（Range）；deploy-smoke 8 篇页 + 媒体抽检 13/13 全过（exit 0）。
+- token-swap-apply 工具本次实战修复两处：嵌套引号炸远端执行（改为两步 stdin：先传脚本再喂 token）+ compose 目录非 ssh 用户可写（改 sudo -n）；服务名实为 GaubeeOS（非 gaubeeos）。
+- 教训：探针自身有 bug 时，它的输出会把诊断引向歧途——「401=token 坏」的结论建立在截断串上；多证据交叉（媒体 404 与 token 探针无因果链）才能定位真因（镜像停更）。

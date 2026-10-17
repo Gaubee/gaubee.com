@@ -35,7 +35,8 @@ function sh(cmd: string, input?: string): { out: string; code: number } {
   return { out: (r.stdout ?? "").trim(), code: r.status ?? 1 };
 }
 function ssh(cmd: string, input?: string): { out: string; code: number } {
-  return sh(`command ssh ${sshHost} ${JSON.stringify(cmd)}`, input);
+  // 远端命令单引号包裹：$/?、; 等留给远端 shell（cmd 内不得含单引号）
+  return sh(`command ssh ${sshHost} '${cmd}'`, input);
 }
 
 // 1. 本地验证新 token（fake / real 检查点都不打 token）
@@ -60,15 +61,31 @@ if (!execute) {
   process.exit(0);
 }
 
-// 2. 服务器侧替换（token 经 stdin 进远端 python3，不进 argv）
+// 2. 服务器侧替换：先传远端脚本（无 token），再单独喂 token 到其 stdin——
+//    两步各自单层引号，杜绝多层转义；token 不进远端 argv、不落本地日志
 const COMPOSE = "/opt/1panel/apps/local/gaubeeos/GaubeeOS/docker-compose.yml";
-const swap = ssh(
-  `python3 -c "import sys,re,shutil,datetime; p='${COMPOSE}'; s=open(p).read(); t=sys.stdin.read().strip(); shutil.copy(p, p+'.bak-'+datetime.datetime.now().strftime('%Y%m%d%H%M%S')); n=re.sub(r'CDN_GITHUB_TOKEN: *\\\\S+', 'CDN_GITHUB_TOKEN: '+t, s); assert n!=s, 'old token line not found'; open(p,'w').write(n); print('compose updated')"`,
-  token,
-);
-console.log(swap.out);
+const SWAP_SCRIPT = `import sys, re, shutil, datetime
+p = "/opt/1panel/apps/local/gaubeeos/GaubeeOS/docker-compose.yml"
+s = open(p).read()
+t = sys.stdin.read().strip()
+if not t:
+    sys.exit("empty token on stdin")
+bak = p + ".bak-" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+shutil.copy(p, bak)
+n = re.sub(r"CDN_GITHUB_TOKEN: *\\S+", "CDN_GITHUB_TOKEN: " + t, s)
+if n == s:
+    sys.exit("old token line not found in compose")
+open(p, "w").write(n)
+print("compose updated (backup: %s)" % bak)`;
+const up1 = ssh(`cat > /tmp/gaubee-tokenswap.py`, SWAP_SCRIPT);
+if (up1.code !== 0) {
+  console.log(`ABORT：脚本上传失败`);
+  process.exit(1);
+}
+const swap = ssh(`sudo -n python3 /tmp/gaubee-tokenswap.py; rc=$?; rm -f /tmp/gaubee-tokenswap.py; exit $rc`, token);
+console.log(swap.out || `（远端无输出，exit ${swap.code}）`);
 if (swap.code !== 0) {
-  console.log(`ABORT：替换失败（${swap.out.slice(0, 120)}）`);
+  console.log(`ABORT：替换失败`);
   process.exit(1);
 }
 
