@@ -210,4 +210,47 @@ app.get("/auth/github/callback", async (c) => {
   return c.redirect(`${c.env.APP_ORIGIN}/#auth_token=${token}`);
 });
 
+// ===== twimg 头像反代（kzf 2026-10-19 指令）=====
+// X 侧对 pbs.twimg.com 直连热链加了防护，站点卡片头像裂图；且源站（国内服务器）
+// 直连 twimg 网络不可达（实测连接层即断），无法自建反代。故由本 Worker（海外边缘、
+// 自有域名）反向代理：GET /twimg/<path> → https://pbs.twimg.com/<path>。
+// 实时性说明：twimg URL 是内容寻址（用户换头像=新 URL），页面里的 URL 每天由
+// 富化管道更新；本路由按 URL 走 Cache API 遵循上游 Cache-Control 缓存，不会导致
+// 头像过期。路径白名单限定 twimg 已知资产前缀，防被当作公共图床代理滥用。
+const TWIMG_PREFIXES = [
+  "profile_images/",
+  "media/",
+  "ext_tw_video_thumb/",
+  "card_img/",
+  "emoji/",
+];
+
+app.get("/twimg/*", async (c) => {
+  const path = c.req.path.slice("/twimg/".length);
+  if (!TWIMG_PREFIXES.some((p) => path.startsWith(p))) {
+    return c.json({ error: "path not allowed" }, 404);
+  }
+  const query = c.req.url.includes("?") ? `?${c.req.url.split("?")[1]}` : "";
+  const upstream = `https://pbs.twimg.com/${path}${query}`;
+
+  // Cache API：URL 即缓存键（内容寻址），遵循上游 Cache-Control（twimg 通常 7 天）
+  const cache = caches.default;
+  const cacheKey = new Request(upstream, { method: "GET" });
+  const hit = await cache.match(cacheKey);
+  if (hit) return hit;
+
+  const upstreamRes = await fetch(upstream, {
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; gaubee-avatar-proxy/1.0)" },
+    cf: { cacheEverything: true },
+  });
+  if (!upstreamRes.ok) {
+    return c.json({ error: "upstream error", status: upstreamRes.status }, 502);
+  }
+  const res = new Response(upstreamRes.body, upstreamRes);
+  res.headers.set("Cache-Control", upstreamRes.headers.get("Cache-Control") ?? "public, max-age=604800");
+  res.headers.set("X-Proxy-Through", "gaubee-auth-worker");
+  await cache.put(cacheKey, res.clone());
+  return res;
+});
+
 export default app;

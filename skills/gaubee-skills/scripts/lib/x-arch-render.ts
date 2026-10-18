@@ -49,8 +49,17 @@ export interface AuthorInfo {
 
 export type MediaMeta = Record<string, { w: number; h: number; ms?: number }>;
 
-export function escapeHtml(s: string): string {
-  return s
+/** twimg 头像直连热链被 X 防护拦截（kzf 2026-10-19 指令）：改走 auth.gaubee.com
+ * Worker 反代（/twimg/*）。twimg URL 内容寻址（换头像=新 URL），Worker 按 URL 缓存
+ * 不损失实时性；authors.json 数据层仍存原 URL，仅渲染出口转换。 */
+const TWIMG_PROXY_BASE = "https://auth.gaubee.com/twimg/";
+export function twimgProxy(url: string | undefined): string {
+  return url && url.startsWith("https://pbs.twimg.com/")
+    ? TWIMG_PROXY_BASE + url.slice("https://pbs.twimg.com/".length)
+    : (url ?? "");
+}
+
+export function escapeHtml(s: string): string {  return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -165,7 +174,10 @@ export function itemCard(
   const statusUrl = `https://x.com/${author}/status/${t.id}`;
   const time = hhmm(t.created_at);
   const parts: string[] = [];
-  const avatar = authors[author]?.avatar;
+  // twimg 头像直连热链被 X 侧防护拦截（kzf 2026-10-19 指令）：统一改走
+  // auth.gaubee.com Worker 反代（/twimg/*，上游带缓存）。twimg URL 是内容寻址
+  //（换头像=新 URL），按 URL 缓存不损失实时性；authors.json 仍存原 URL。
+  const avatar = twimgProxy(authors[author]?.avatar ?? "");
   const avatarImg = avatar
     ? `<img class="x-arch-avatar" src="${escapeHtml(avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`
     : "";
@@ -193,7 +205,7 @@ export function itemCard(
   const info = authors[author];
   const authorData =
     (info?.name ? ` data-name="${escapeHtml(info.name)}"` : "") +
-    (info?.avatar ? ` data-avatar="${escapeHtml(info.avatar)}"` : "");
+    (info?.avatar ? ` data-avatar="${escapeHtml(twimgProxy(info.avatar))}"` : "");
   parts.push(
     `    ${langInputs}<div class="x-arch-head">${avatarImg}${kindIcon}` +
       `<a class="x-arch-author" href="https://x.com/${author}" target="_blank" rel="nofollow noopener"${authorData}>@${escapeHtml(author)}</a>` +
