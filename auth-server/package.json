@@ -1,0 +1,17 @@
+{
+	"name": "gaubee-auth-server",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"test": "vitest run",
+		"build": "bun build --compile --target=bun-linux-x64 src/main.ts --outfile dist/gaubee-auth-linux-x64"
+	},
+	"dependencies": {
+		"hono": "^4.6.10"
+	},
+	"devDependencies": {
+		"@types/bun": "^1.1.13",
+		"typescript": "^5.7.2",
+		"vitest": "^2.1.8"
+	}
+}

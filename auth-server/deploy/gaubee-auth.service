@@ -1,0 +1,17 @@
+[Unit]
+Description=Gaubee Auth Server (self-hosted OAuth/upload/geo, ex-CF worker)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=service
+WorkingDirectory=/opt/gaubee-auth
+EnvironmentFile=/opt/gaubee-auth/.env
+ExecStart=/opt/gaubee-auth/gaubee-auth
+Restart=always
+RestartSec=3
+# 只读二进制 + 可写 data/（geo 规则文档）；环境变量文件 600
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

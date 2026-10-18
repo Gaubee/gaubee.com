@@ -67,9 +67,11 @@ custom_domain = true
 # 当前 Worker 域名：https://auth.gaubee.com
 #   callback URL 须为：https://auth.gaubee.com/auth/github/callback
 #
-# 域名机制：auth.gaubee.com 经 Cloudflare Workers Custom Domain 绑定（zone 须在 Cloudflare，
-# Cloudflare 自动签边缘证书 + 建路由）。不可用裸 CNAME 指向 *.workers.dev——workers.dev 默认
-# 域的证书不覆盖 CNAME 进来的自定义主机名，会导致 ERR_SSL_VERSION_OR_CIPHER_MISMATCH。
+# 域名机制（2026-10-18 更新）：OAuth/上传已自托管到源站（auth-server/，openresty 反代
+# 127.0.0.1:17090），auth.gaubee.com 域名不变故三方清单仍成立；本 Worker 只剩头像反代，
+# 自定义域为 twimg.tweb.xin（上方 routes 声明）。历史教训：不可用裸 CNAME 指向 *.workers.dev
+# ——workers.dev 默认域的证书不覆盖 CNAME 进来的自定义主机名（2026-08-15 DNS 迁阿里云时
+# 即因该形态导致 auth 域全球 TLS 失败两个月）。
 
 # 本地开发：wrangler dev 默认 http://localhost:8787
 # 生产：auth.gaubee.com（Workers Custom Domain）
