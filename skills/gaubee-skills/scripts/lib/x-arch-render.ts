@@ -52,7 +52,7 @@ export type MediaMeta = Record<string, { w: number; h: number; ms?: number }>;
 /** twimg 头像直连热链被 X 防护拦截（kzf 2026-10-19 指令）：改走 auth.gaubee.com
  * Worker 反代（/twimg/*）。twimg URL 内容寻址（换头像=新 URL），Worker 按 URL 缓存
  * 不损失实时性；authors.json 数据层仍存原 URL，仅渲染出口转换。 */
-const TWIMG_PROXY_BASE = "https://auth.gaubee.com/twimg/";
+const TWIMG_PROXY_BASE = "https://twimg.tweb.xin/twimg/";
 export function twimgProxy(url: string | undefined): string {
   return url && url.startsWith("https://pbs.twimg.com/")
     ? TWIMG_PROXY_BASE + url.slice("https://pbs.twimg.com/".length)

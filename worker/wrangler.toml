@@ -51,6 +51,14 @@ bindings = [
   { name = "GEO_RULES_DO", class_name = "GeoRulesDO" },
 ]
 
+# 头像反代自定义域（2026-10-18 kzf 裁决：头像域名迁 tweb.xin）：
+# auth.gaubee.com 的 Custom Domain 因 gaubee.com zone 2026-08-15 迁往阿里云 DNS 已失效
+# （CF 边缘无证书，全球 TLS alert 40），头像域名改挂 tweb.xin（同账号 zone，国内可达已实测）。
+# /twimg/ 路由对 hostname 不敏感，同一 Worker 可同时服务多个自定义域。
+[[env.production.routes]]
+pattern = "twimg.tweb.xin"
+custom_domain = true
+
 # ===== 三方一致性检查清单（改动任一处，必须同步其余两处）=====
 # Worker 用 WORKER_ORIGIN 构造 GitHub OAuth 的 redirect_uri，故下面三处的「Worker 域名」必须相同：
 #   1. 本文件上方 WORKER_ORIGIN                          （Worker 自身认知）
