@@ -32,3 +32,5 @@
 | 2026-10-16 | deps-jitter-report | tools/2026-10-16-deps-jitter-report/ | deps changes 重复抖动仓识别：点名次数 vs 快照真实变化次数（首跑实证三仓连续 7 天点名零版本变化，21 次点名全为噪声） | proposed |          |
 | 2026-10-17 | star-flow-weekly | tools/2026-10-17-star-flow-weekly/ | 星标兴趣周流向：过去 N 天星标按 taxonomy/catalog 分类聚合（分类计数+带行为日期明细），周一周报主题聚类直接引用 | proposed |          |
 | 2026-10-17 | deps-jitter-probe | tools/2026-10-17-deps-jitter-probe/ | deps 日噪根因解剖：远端 package.json 依赖表 vs 本地快照逐项对比（首跑判定 B 成立：三仓内容零变化，changed[] 为 fetcher 误报，为 fetch 定点修复留证） | proposed |          |
+| 2026-10-18 | cron-day-briefing | tools/2026-10-18-cron-day-briefing/ | 每日维护开工面板：今天/YESTERDAY/星期几 + 周一专属步骤判定 + 近 3 天 changes→日报对照（把周日误当周一事故的开机防线） | proposed |          |
+| 2026-10-18 | t1-window-guard | tools/2026-10-18-t1-window-guard/ | T-1 归窗硬守卫：报告日 < 差分运行日 + 常规应为昨天 + --scan 批量体检 frontmatter（事故场景实测 FAIL 拦截） | proposed |          |
