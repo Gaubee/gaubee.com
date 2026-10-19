@@ -34,3 +34,5 @@
 | 2026-10-17 | deps-jitter-probe | tools/2026-10-17-deps-jitter-probe/ | deps 日噪根因解剖：远端 package.json 依赖表 vs 本地快照逐项对比（首跑判定 B 成立：三仓内容零变化，changed[] 为 fetcher 误报，为 fetch 定点修复留证） | proposed |          |
 | 2026-10-18 | cron-day-briefing | tools/2026-10-18-cron-day-briefing/ | 每日维护开工面板：今天/YESTERDAY/星期几 + 周一专属步骤判定 + 近 3 天 changes→日报对照（把周日误当周一事故的开机防线） | proposed |          |
 | 2026-10-18 | t1-window-guard | tools/2026-10-18-t1-window-guard/ | T-1 归窗硬守卫：报告日 < 差分运行日 + 常规应为昨天 + --scan 批量体检 frontmatter（事故场景实测 FAIL 拦截） | proposed |          |
+| 2026-10-19 | oauth-flow-smoke | tools/2026-10-19-oauth-flow-smoke/ | 登录链路冒烟断言：健康检查+OAuth 302+client_id/redirect_uri/cookie 五断言（auth 自托管上线的回归门，client_id=undefined 事故实测可拦） | proposed |          |
+| 2026-10-19 | media-meta-freshness | tools/2026-10-19-media-meta-freshness/ | media-meta 悬空守卫：manifest 当前代对象键 vs media-meta.json 覆盖对账，缺口非零 exit 1（10-18 media-meta 未接入管道事故的复发防线，fixture FAIL 路径已实测） | proposed |          |
