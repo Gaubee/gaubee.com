@@ -36,12 +36,14 @@ const PENDING = path.join(sourceDir("x-likes"), "retro-hd-pending-render.json");
 const NOGAIN = path.join(sourceDir("x-likes"), "retro-hd-nogain.json");
 /** 单条下载预算：长视频（47 分钟 720p 约 220MB）走代理需十几分钟；助手 -N 8 并发 + 续传，超时只丢本条。 */
 const DOWNLOAD_TIMEOUT_MS = 45 * 60_000;
-/** 限流信号（见主循环注释）；连续 3 次即退避 8 分钟，最多 3 轮；条目间 2s 节流。 */
+/** 限流信号（见主循环注释）；连续 3 次即退避 15 分钟，最多 3 轮；条目间 15s 节流。
+ *  节流依据（2026-10-21 02:1x 实证）：每个候选 spawn 一次 yt-dlp = 申请一枚 guest token，2s 间隔下一小时
+ *  上百枚，8 分钟退避后仍连续失败；同一时刻隔离单测却全部正常——限的是发放节奏不是具体推文。 */
 const THROTTLE_SIGNS = /No video could be found|Unable to download JSON metadata|HTTP Error 429/i;
 const STREAK_BACKOFF_AT = 3;
-const BACKOFF_MS = 8 * 60_000;
+const BACKOFF_MS = 15 * 60_000;
 const MAX_BACKOFFS = 3;
-const PACE_MS = 2_000;
+const PACE_MS = 15_000;
 
 interface Item {
 	id: string;
@@ -135,6 +137,7 @@ async function main(): Promise<number> {
 	// 单独复测均能拿到格式）。连续命中即暂停让窗口过去；多轮仍限流则停批次，剩余下次续跑。
 	let streak = 0;
 	let backoffs = 0;
+	let processed = 0;
 
 	for (const it of candidates.slice(0, limit)) {
 		if (until && nowHHMM() >= until) {
@@ -142,6 +145,7 @@ async function main(): Promise<number> {
 			console.error(`  到达截止 ${until}，停止开新条目（剩余 ${deferred} 条下次续跑）`);
 			break;
 		}
+		if (processed++ > 0) Bun.sleepSync(PACE_MS); // 每个候选（含失败路径）之间统一节流
 		const oldKey = it.videoLocal![0]!;
 		const oldH = meta[oldKey]!.h;
 		const month = (it.created_at ?? "").slice(0, 7);
@@ -166,7 +170,6 @@ async function main(): Promise<number> {
 			continue;
 		}
 		streak = 0;
-		Bun.sleepSync(PACE_MS);
 		const mp4 = dl.file;
 		if (dl.ext !== "mp4") {
 			failed++;
