@@ -101,7 +101,10 @@ interface SynMedia {
 
 /** 挑 mp4 变体（2026-10-20 kzf：默认 1080p + 分片存储）：≤1080p 里取最高分辩率/
  *  码率。分片后不再受 media-pack 单卷 200MiB 单文件限制，原 190MB 预估体积降档
- *  护栏退役；仅保留 2GB 预估上限防失控（超限降档）。 */
+ *  护栏退役。现行上限 300MB 由 cron 时间预算决定（本脚本在 cron 代理的 Bash 工具里
+ *  前台运行、上限 600s，整文件 fetch 无超时，GB 级变体会让整次回灌被外层超时杀掉）；
+ *  超限自动降一档，<720p 的结果日后由 tools/2026-10-20-video-retro-hd 离线追平。 */
+const INLINE_MAX_BYTES = 300 * 1024 ** 2;
 function pickMp4(videoInfo: SynMedia["video_info"]): string | null {
   const mp4 = (videoInfo?.variants ?? []).filter((v) => v.content_type === "video/mp4");
   if (!mp4.length) return null;
@@ -112,9 +115,7 @@ function pickMp4(videoInfo: SynMedia["video_info"]): string | null {
     bitrate: (v as { bitrate?: number }).bitrate ?? 0,
   }));
   const estBytes = (v: { bitrate: number }) => (v.bitrate / 8) * durS;
-  const fit = withMeta.filter(
-    (v) => v.h > 0 && v.h <= 1080 && (estBytes(v) === 0 || estBytes(v) < 2000 * 1024 ** 2),
-  );
+  const fit = withMeta.filter((v) => v.h > 0 && v.h <= 1080 && (estBytes(v) === 0 || estBytes(v) < INLINE_MAX_BYTES));
   const pool = fit.length ? fit : withMeta.slice().sort((a, b) => estBytes(a) - estBytes(b));
   return pool.sort((a, b) => (b.h - a.h) || (b.bitrate - a.bitrate))[0]!.url;
 }

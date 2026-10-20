@@ -349,8 +349,10 @@ async function main() {
     if ((t.hasVideo || (t.video?.length ?? 0) > 0) && !t.videoLocal && !directVideo) {
       const statusUrl = `https://x.com/${t.author || store.user.username}/status/${t.id}`;
       // 先落临时目录、拿到完整产物才迁入 staging（半成品绝不进打包源）；
-      // 质量阶梯 / 并发拉段 / 续传 / 错误行提取统一在 lib/x-video-dl.ts
-      const dl = downloadVideo(statusUrl, path.join(STAGING, month), `${t.id}-video`, 600_000);
+      // 质量阶梯 / 并发拉段 / 续传 / 错误行提取统一在 lib/x-video-dl.ts。
+      // 单条预算 300s：本脚本在 cron 代理的 Bash 工具里前台运行（工具上限 600s），预算过大叠加多条视频
+      // 会让整次抓取被外层超时杀掉（丢整天捕获）；超预算的长视频留给 x-media-backfill / video-retro-hd 兜底
+      const dl = downloadVideo(statusUrl, path.join(STAGING, month), `${t.id}-video`, 300_000);
       if (!dl.ok) {
         console.error(`WARN yt-dlp 失败 ${statusUrl}：${dl.error}`);
       } else {
