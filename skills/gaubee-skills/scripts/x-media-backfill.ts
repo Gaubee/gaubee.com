@@ -39,6 +39,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { localDate, sourceDir, writeFileAtomic } from "./lib.ts";
+import { remuxToHls } from "./lib/x-hls.ts";
 
 const SRC = sourceDir("x-likes");
 // token 参数必填但值任意（实测空值返回空对象）；固定一个随机串即可
@@ -98,10 +99,9 @@ interface SynMedia {
   };
 }
 
-/** 挑 mp4 变体（2026-10-20 kzf：默认 1080p）：≤1080p 里优先高分辨率/高码率，
- *  预估体积（bitrate×duration）超 190MB 的自动降档——单文件须能装进 media-pack
- *  单卷（200MiB 上限留 tar 头/对齐余量；Phase 3 起媒体不进 git，原 100MB push
- *  红线作废） */
+/** 挑 mp4 变体（2026-10-20 kzf：默认 1080p + 分片存储）：≤1080p 里取最高分辩率/
+ *  码率。分片后不再受 media-pack 单卷 200MiB 单文件限制，原 190MB 预估体积降档
+ *  护栏退役；仅保留 2GB 预估上限防失控（超限降档）。 */
 function pickMp4(videoInfo: SynMedia["video_info"]): string | null {
   const mp4 = (videoInfo?.variants ?? []).filter((v) => v.content_type === "video/mp4");
   if (!mp4.length) return null;
@@ -113,7 +113,7 @@ function pickMp4(videoInfo: SynMedia["video_info"]): string | null {
   }));
   const estBytes = (v: { bitrate: number }) => (v.bitrate / 8) * durS;
   const fit = withMeta.filter(
-    (v) => v.h > 0 && v.h <= 1080 && (estBytes(v) === 0 || estBytes(v) < 190 * 1024 ** 2),
+    (v) => v.h > 0 && v.h <= 1080 && (estBytes(v) === 0 || estBytes(v) < 2000 * 1024 ** 2),
   );
   const pool = fit.length ? fit : withMeta.slice().sort((a, b) => estBytes(a) - estBytes(b));
   return pool.sort((a, b) => (b.h - a.h) || (b.bitrate - a.bitrate))[0]!.url;
@@ -509,7 +509,7 @@ async function main() {
     if (photos.length || videos.length) stats.mediaTweets++;
     if (videos.length) stats.videoTweets++;
 
-    // 媒体下载（图片 name=large；视频挑好的 ≤720p 变体；防护栏）。
+    // 媒体下载（图片 name=large；视频挑 ≤1080p 最优变体 → 落盘后无损切 HLS 分片）。
     // Phase 3：落点 staging/x/<月>/，x.json 记 canonical media key cdn-media/x/<月>/…
     const month = (t.created_at || localDate()).slice(0, 7);
     if (!noDownload && !guardTripped && (t.media?.length || t.video?.length)) {
@@ -517,13 +517,18 @@ async function main() {
         if (t.video?.length && !t.videoLocal) {
           const rel = `cdn-media/x/${month}/${t.id}-video.mp4`;
           const abs = path.join(SITE, "cdn-media", "staging", "x", month, `${t.id}-video.mp4`);
-          if (existsSync(abs)) {
-            t.videoLocal = [rel];
+          const absM3u8 = path.join(SITE, "cdn-media", "staging", "x", month, `${t.id}.m3u8`);
+          if (existsSync(absM3u8)) {
+            t.videoLocal = [`cdn-media/x/${month}/${t.id}.m3u8`];
           } else {
-            const size = await download(t.video[0]!, abs);
-            bytes += size;
-            dlFiles++;
-            t.videoLocal = [rel];
+            if (!existsSync(abs)) {
+              const size = await download(t.video[0]!, abs);
+              bytes += size;
+              dlFiles++;
+            }
+            // 分片存储（2026-10-20 kzf 裁决）：remux 成功 videoLocal 指 .m3u8；失败保留 mp4 旧键
+            const hls = remuxToHls(abs, month, t.id);
+            t.videoLocal = [hls ? hls.m3u8Key : rel];
           }
         }
         if (!t.video?.length && t.media?.length && !t.mediaLocal?.length) {

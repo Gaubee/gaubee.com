@@ -53,6 +53,7 @@ function main(): number {
 	let total = 0;
 	for (const o of manifest.objects ?? []) {
 		if (typeof o.key !== "string") continue;
+		if (/\.seg\d+\.ts$/.test(o.key)) continue; // HLS 段对象无独立元数据（按设计），只对账 .m3u8
 		total++;
 		const key = `cdn-media/${o.key}`;
 		if (!(key in meta)) missing.push(key);

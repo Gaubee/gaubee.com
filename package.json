@@ -42,6 +42,7 @@
     "@zenfs/dom": "^1.2.9",
     "buffer": "^6.0.3",
     "codemirror": "^6.0.2",
+    "hls.js": "^1.7.3",
     "hosted-git-info": "^10.1.1",
     "idb": "^8.0.3",
     "isomorphic-git": "^1.38.9",

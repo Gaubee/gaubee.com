@@ -147,6 +147,14 @@ async function main() {
 	}
 
 	// —— 对账 2：staging 状态 ——
+	// HLS 段由 playlist 隐式引用（2026-10-20 分片存储）：x.json 只记 <id>.m3u8，
+	// 段 <id>.segNNNN.ts 随 playlist 同生同灭——不这样算会把每条分片视频的几百个段全判成孤儿。
+	const hlsSeg = /^(x\/\d{4}-\d{2}\/[^/]+)\.seg\d+\.ts$/;
+	const isReferenced = (key: string): boolean => {
+		if (refs.has(`cdn-media/${key}`)) return true;
+		const m = hlsSeg.exec(key);
+		return !!m && refs.has(`cdn-media/${m[1]}.m3u8`);
+	};
 	const cleanup: string[] = []; // 已在 manifest（7 天保留期清理候选）
 	const orphan: string[] = []; // 无 manifest 记录且无条目引用（硬门禁）
 	for (const [key] of staging) {
@@ -154,18 +162,15 @@ async function main() {
 			cleanup.push(key);
 			continue;
 		}
-		const canonical = `cdn-media/${key}`;
-		if (refs.has(canonical)) continue; // 待打包（awaitingPack 已统计）
+		if (isReferenced(key)) continue; // 待打包（awaitingPack 已统计；段随 playlist）
 		orphan.push(key);
 	}
 
 	// —— 体积构成 ——
-	const stagingPending = [...staging.entries()].filter(
-		([k]) => !manifestKeys.has(k) && refs.has(`cdn-media/${k}`),
-	);
+	const stagingPending = [...staging.entries()].filter(([k]) => !manifestKeys.has(k) && isReferenced(k));
 	const stagingPendingBytes = stagingPending.reduce((s, [, b]) => s + b, 0);
 	const cleanupBytes = cleanup.reduce((s, k) => s + (staging.get(k) ?? 0), 0);
-	const isVideoKey = (k: string) => k.endsWith(".mp4");
+	const isVideoKey = (k: string) => k.endsWith(".mp4") || k.endsWith(".m3u8"); // 分片视频以 .m3u8 计一条，.ts 段不单计
 	const manifestVideo = [...manifestKeys].filter(isVideoKey).length;
 
 	// —— 报告 ——

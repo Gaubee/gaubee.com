@@ -214,6 +214,23 @@ DO binding 缺失/不可达/无状态/损坏时回退内置默认规则（A8 同
 - 媒体不再进主仓库 git 提交；存量 `static/x-media` 已摘除（git rm --cached + dockerignore，
   2026-10-07 提交 877ad11a），git 历史重写为可选后续。
 - cron 的体积红线检查改为检查缓存水位（cache.rs high 500MB/low 300MB）与远端用量。
+- **视频分片存储（2026-10-20 kzf 裁决）**：抓取到的 mp4 必须（SHALL）经无损 remux 切成 HLS
+  再入 staging——canonical key `x/YYYY-MM/<id>.m3u8`（playlist）+ `x/YYYY-MM/<id>.segNNNN.ts`
+  （段，同目录扁平；playlist 以相对文件名引用段，故 geo 重写 base 后段随 playlist 同源解析，
+  不跨 base 混源）。remux 成功即删 mp4 不双存；失败保留 mp4 走旧 `-video.mp4` 键。由此
+  单卷 200MiB 硬限不再约束视频质量（任意长度 1080p 都能入卷），下载阶梯 1080p→720p→任意，
+  仅留 2GB 整体上限。manifest 对 `.m3u8`/`.ts` 必须（SHALL）写 `application/vnd.apple.mpegurl`
+  / `video/mp2t`（Safari 原生 HLS 依赖 playlist 类型；对象一经发布不可改写）。
+  `x.json videoLocal` 与 media-meta 以 `.m3u8` 键为视频元数据主键，段对象不单独记元数据。
+- **下载原子性**：视频下载器必须（SHALL）先落系统临时目录、拿到完整产物才迁入 staging；
+  打包扫描跳过下载器半成品（`.part`/`.ytdl`/`.part-Frag*`）并打日志——半成品入卷会污染
+  不可改写的发布卷，100MB+ 的半成品还会撞单卷硬限让整次打包失败（2026-10-20 实证）。
+
+#### Scenario: HLS 视频入卷与播放
+
+- WHEN 抓取到一条 1080p 长视频（单文件 >200MiB）
+- THEN remux 产出的 playlist 与段全部入补丁卷（每段数 MB），事件页 `<video src=…/<id>.m3u8>`
+  在 Safari 原生播放、在其余浏览器经 hls.js 播放，首屏布局由 media-meta 的 `.m3u8` 键尺寸稳定
 
 ## Shutdown（非目标）
 

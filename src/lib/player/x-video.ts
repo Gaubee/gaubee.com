@@ -46,8 +46,84 @@ function saveMutedPref(muted: boolean): void {
   }
 }
 
+// ---- HLS 分片视频（2026-10-20 kzf 裁决：视频分片存储，1080p 任意长度可上线）----
+// Safari 原生播 m3u8；其余浏览器懒加载 hls.js 经 MSE 挂载。挂载是异步的：
+// IO 自动播放可能先于挂载到达，先记 wantPlay，MANIFEST_PARSED 后补发播放。
+// hls.js 用 autoStartLoad=false + 60s 前向缓冲上限（实测默认会把低码率 VOD 的
+// 前向拉取放大到 600s：一页多个视频、未播放就灌几十 MB，对 cdn-base 不礼貌）。
+import type HlsType from "hls.js";
+
+interface HlsState {
+  attached: boolean;
+  wantPlay: boolean;
+  started: boolean;
+  hls?: HlsType;
+  destroy?: () => void;
+}
+const hlsState = new WeakMap<HTMLVideoElement, HlsState>();
+
+function isHlsSource(src: string): boolean {
+  return /\.m3u8(\?|$)/.test(src);
+}
+
+function nativeHls(video: HTMLVideoElement): boolean {
+  return video.canPlayType("application/vnd.apple.mpegurl") !== "";
+}
+
+/** autoStartLoad=false：首次播放意图才启动片段加载（幂等）。 */
+function startFragments(st: HlsState): void {
+  if (st.started || !st.hls) return;
+  st.started = true;
+  st.hls.startLoad();
+}
+
+async function attachHls(video: HTMLVideoElement, src: string): Promise<void> {
+  const st: HlsState = { attached: false, wantPlay: false, started: false };
+  hlsState.set(video, st);
+  const fallbackNative = () => {
+    // 回退：交还浏览器原生（支持 HLS 的能播；不支持的会报错但不炸页面）
+    video.src = src;
+    st.attached = true;
+    if (st.wantPlay) playVideo(video);
+  };
+  try {
+    const { default: Hls } = await import("hls.js");
+    if (!Hls.isSupported()) {
+      fallbackNative();
+      return;
+    }
+    const hls = new Hls({ enableWorker: true, autoStartLoad: false, maxBufferLength: 30, maxMaxBufferLength: 60, backBufferLength: 30 });
+    st.hls = hls;
+    st.destroy = () => hls.destroy();
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      st.attached = true;
+      if (st.wantPlay) {
+        startFragments(st);
+        playVideo(video);
+      }
+    });
+    hls.on(Hls.Events.ERROR, (_evt, data) => {
+      if (!data.fatal) return;
+      hls.destroy();
+      st.hls = undefined;
+      st.destroy = undefined;
+      fallbackNative();
+    });
+    hls.loadSource(src);
+    hls.attachMedia(video);
+  } catch {
+    fallbackNative();
+  }
+}
+
 /** 播放：先按记忆的静音偏好尝试；被浏览器拒绝则静音兜底重试。 */
 function playVideo(video: HTMLVideoElement): void {
+  const hls = hlsState.get(video);
+  if (hls && !hls.attached) {
+    hls.wantPlay = true; // HLS 尚未挂载：记下意图，MANIFEST_PARSED 后补发
+    return;
+  }
+  if (hls) startFragments(hls);
   if (current && current !== video) {
     current.pause();
   }
@@ -572,6 +648,14 @@ function enhanceVideo(video: HTMLVideoElement, coarse: boolean): () => void {
   video.setAttribute("playsinline", "");
   video.loop = true; // X 时间线语义：循环播放
 
+  // HLS 分片源：非原生支持的浏览器先摘掉 src（避免原生加载 m3u8 失败报错），
+  // 懒加载 hls.js 挂载；Safari 保留 src 原生播放
+  const srcAttr = video.getAttribute("src") ?? "";
+  if (isHlsSource(srcAttr) && !nativeHls(video)) {
+    video.removeAttribute("src");
+    void attachHls(video, srcAttr);
+  }
+
   // 初始化布局稳定（kzf 2026-10-18）：生成器带 width/height/poster/data-duration——
   // preload="none" 下元数据不可用，按属性预留 aspect-ratio，封面即首帧布局，零跳动
   const w = Number(video.getAttribute("width")) || 0;
@@ -611,6 +695,8 @@ function enhanceVideo(video: HTMLVideoElement, coarse: boolean): () => void {
   const cleanups: (() => void)[] = [];
   cleanups.push(coarse ? attachGestures(video, wrap, (t) => flashText.flash(t)) : attachFine(video, wrap, enhance, bar));
   cleanups.push(() => {
+    hlsState.get(video)?.destroy?.();
+    hlsState.delete(video);
     bar.destroy();
     centerFlash.destroy();
     flashText.destroy();

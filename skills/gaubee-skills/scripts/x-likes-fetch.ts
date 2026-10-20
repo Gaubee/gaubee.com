@@ -19,6 +19,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { localDate, sourceDir, writeFileAtomic } from "./lib.ts";
+import { remuxToHls } from "./lib/x-hls.ts";
+import { downloadVideo } from "./lib/x-video-dl.ts";
 
 const SRC = sourceDir("x-likes");
 const APP = "kzf-agent";
@@ -346,40 +348,24 @@ async function main() {
     const directVideo = (t.mediaLocal ?? []).some((p) => p.endsWith(".mp4"));
     if ((t.hasVideo || (t.video?.length ?? 0) > 0) && !t.videoLocal && !directVideo) {
       const statusUrl = `https://x.com/${t.author || store.user.username}/status/${t.id}`;
-      const absNoExt = path.join(STAGING, month, `${t.id}-video`);
-      try {
-        mkdirSync(path.dirname(absNoExt), { recursive: true });
-        execFileSync(
-          "yt-dlp",
-          [
-            // 质量阶梯（2026-10-20 kzf：默认 1080p，至少 720p）：≤190MB 里取最高
-            // 1080p，超限降 720p，再降 480p，再不行取任意——单文件硬上限 190MB
-            // （media-pack 单卷 200MiB 上限要留 tar 头/对齐余量；Phase 3 起媒体
-            // 不进 git，原 100MB push 红线作废）
-            "-f",
-            "bv*[height<=1080][size<190M]+ba/b[height<=1080][size<190M]/bv*[height<=720][size<190M]+ba/b[height<=720][size<190M]/bv*[height<=480]+ba/b[height<=480]/b",
-            "--no-playlist",
-            "--merge-output-format",
-            "mp4",
-            "-o",
-            `${absNoExt}.%(ext)s`,
-            statusUrl,
-          ],
-          { stdio: ["pipe", "pipe", "pipe"], timeout: 300_000 },
-        );
-        for (const ext of ["mp4", "mkv", "webm"]) {
-          const absVideo = `${absNoExt}.${ext}`;
-          if (existsSync(absVideo)) {
-            t.videoLocal = [`cdn-media/x/${month}/${t.id}-video.${ext}`];
-            mediaBytes += statSync(absVideo).size;
-            mediaFiles++;
-            break;
-          }
+      // 先落临时目录、拿到完整产物才迁入 staging（半成品绝不进打包源）；
+      // 质量阶梯 / 并发拉段 / 续传 / 错误行提取统一在 lib/x-video-dl.ts
+      const dl = downloadVideo(statusUrl, path.join(STAGING, month), `${t.id}-video`, 600_000);
+      if (!dl.ok) {
+        console.error(`WARN yt-dlp 失败 ${statusUrl}：${dl.error}`);
+      } else {
+        // 分片存储（2026-10-20 kzf 裁决）：mp4 无损切 HLS，videoLocal 指向 .m3u8；
+        // remux 失败保留 mp4 走旧键（WARN 已由助手打印）
+        const hls = dl.ext === "mp4" ? remuxToHls(dl.file, month, t.id) : null;
+        if (hls) {
+          t.videoLocal = [hls.m3u8Key];
+          mediaBytes += hls.bytes;
+          mediaFiles += hls.segments + 1;
+        } else {
+          t.videoLocal = [`cdn-media/x/${month}/${t.id}-video.${dl.ext}`];
+          mediaBytes += statSync(dl.file).size;
+          mediaFiles++;
         }
-        if (!t.videoLocal) console.error(`WARN yt-dlp 无产物 ${statusUrl}`);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`WARN yt-dlp 失败 ${statusUrl}：${msg.slice(0, 160).split("\n").pop()}`);
       }
     }
   }
