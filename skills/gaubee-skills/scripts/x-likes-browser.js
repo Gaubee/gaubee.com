@@ -52,7 +52,10 @@ for (const s of STREAMS) {
       await page.waitForSelector('article[data-testid="tweet"]', { timeout: 15000 });
     } catch {
       const url = await page.url();
-      if (url.includes("/login") || url.includes("/i/flow")) {
+      // 登录墙形态（2026-10-21 实证新增）：/i/jf/onboarding/web?redirect_after_login=…&mode=login；
+      // 未登录访问 /likes 会被静默退回个人主页（公开页无「喜欢」tab），同样按未登录处理
+      const bouncedFromLikes = s.key === "likes" && !url.includes("/likes");
+      if (url.includes("/login") || url.includes("/i/flow") || url.includes("/i/jf/onboarding") || url.includes("mode=login") || bouncedFromLikes) {
         sawLoginWall = true;
         result.extracted[s.key] = { error: "not-logged-in" };
       } else {
