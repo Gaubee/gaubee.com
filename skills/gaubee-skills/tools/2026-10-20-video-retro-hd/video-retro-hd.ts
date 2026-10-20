@@ -36,6 +36,12 @@ const PENDING = path.join(sourceDir("x-likes"), "retro-hd-pending-render.json");
 const NOGAIN = path.join(sourceDir("x-likes"), "retro-hd-nogain.json");
 /** 单条下载预算：长视频（47 分钟 720p 约 220MB）走代理需十几分钟；助手 -N 8 并发 + 续传，超时只丢本条。 */
 const DOWNLOAD_TIMEOUT_MS = 45 * 60_000;
+/** 限流信号（见主循环注释）；连续 3 次即退避 8 分钟，最多 3 轮；条目间 2s 节流。 */
+const THROTTLE_SIGNS = /No video could be found|Unable to download JSON metadata|HTTP Error 429/i;
+const STREAK_BACKOFF_AT = 3;
+const BACKOFF_MS = 8 * 60_000;
+const MAX_BACKOFFS = 3;
+const PACE_MS = 2_000;
 
 interface Item {
 	id: string;
@@ -124,6 +130,11 @@ async function main(): Promise<number> {
 	let bytes = 0;
 	let deferred = 0;
 	const touchedDays = new Set<string>();
+	// 限流识别（2026-10-21 实证）：X 对被限流的 guest token 返回去掉媒体的降级推文，yt-dlp 报
+	// 「No video could be found」——孤立出现是真没视频，连续出现是限流（批次尾部连续 25 条全失败，
+	// 单独复测均能拿到格式）。连续命中即暂停让窗口过去；多轮仍限流则停批次，剩余下次续跑。
+	let streak = 0;
+	let backoffs = 0;
 
 	for (const it of candidates.slice(0, limit)) {
 		if (until && nowHHMM() >= until) {
@@ -141,8 +152,21 @@ async function main(): Promise<number> {
 		if (!dl.ok) {
 			failed++;
 			console.error(`  FAIL 下载 ${it.id}：${dl.error}`);
+			if (THROTTLE_SIGNS.test(dl.error) && ++streak >= STREAK_BACKOFF_AT) {
+				if (backoffs >= MAX_BACKOFFS) {
+					deferred = candidates.length - upgraded - noGain - failed;
+					console.error(`  连续失败 ${streak} 次且已退避 ${backoffs} 轮，疑似持续限流——停止本次批次（剩余 ${deferred} 条下次续跑）`);
+					break;
+				}
+				backoffs++;
+				console.error(`  连续失败 ${streak} 次（疑似限流）：暂停 ${BACKOFF_MS / 60_000} 分钟后继续（第 ${backoffs}/${MAX_BACKOFFS} 轮）`);
+				Bun.sleepSync(BACKOFF_MS);
+				streak = 0;
+			}
 			continue;
 		}
+		streak = 0;
+		Bun.sleepSync(PACE_MS);
 		const mp4 = dl.file;
 		if (dl.ext !== "mp4") {
 			failed++;
@@ -172,7 +196,11 @@ async function main(): Promise<number> {
 		it.videoLocal = [hls.m3u8Key];
 		bytes += hls.bytes;
 		upgraded++;
-		if (it.created_at) touchedDays.add(localDay(it.created_at));
+		if (it.created_at) {
+			const day = localDay(it.created_at);
+			touchedDays.add(day);
+			if (noRender) addPendingDay(day); // 逐条记 pending：批次被 kill 也不丢待渲染日期（首轮实证丢了 74 日，靠日志捞回）
+		}
 		console.error(`  升级 ${it.id}：${oldH}p → ${newMeta.h}p，${hls.segments} 段 ${(hls.bytes / 1048576).toFixed(1)} MB`);
 	}
 
@@ -182,10 +210,8 @@ async function main(): Promise<number> {
 
 	if (upgraded > 0) {
 		if (noRender) {
-			// 页面引用推迟到媒体入卷发布之后（R9：媒体可达才闭环）；日期并入 pending，--render-pending 消费
-			const merged = [...new Set([...readPending(), ...touchedDays])].sort();
-			writeFileAtomic(PENDING, JSON.stringify({ days: merged }, null, 1));
-			console.error(`  涉及日期已记入待渲染清单（共 ${merged.length} 日）：媒体发布后执行 --render-pending`);
+			// 页面引用推迟到媒体入卷发布之后（R9：媒体可达才闭环）；日期已逐条记入 pending，--render-pending 消费
+			console.error(`  涉及日期已记入待渲染清单（累计 ${readPending().length} 日）：媒体发布后执行 --render-pending`);
 		} else {
 			rerenderDays(touchedDays);
 		}
@@ -202,6 +228,11 @@ function readPending(): string[] {
 	if (!existsSync(PENDING)) return [];
 	const d = JSON.parse(readFileSync(PENDING, "utf8")) as { days?: string[] };
 	return Array.isArray(d.days) ? d.days : [];
+}
+
+function addPendingDay(day: string): void {
+	const merged = [...new Set([...readPending(), day])].sort();
+	writeFileAtomic(PENDING, JSON.stringify({ days: merged }, null, 1));
 }
 
 function readNoGain(): Record<string, { h: number; at: string }> {
