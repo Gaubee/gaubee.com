@@ -36,3 +36,5 @@
 | 2026-10-18 | t1-window-guard | tools/2026-10-18-t1-window-guard/ | T-1 归窗硬守卫：报告日 < 差分运行日 + 常规应为昨天 + --scan 批量体检 frontmatter（事故场景实测 FAIL 拦截） | proposed |          |
 | 2026-10-19 | oauth-flow-smoke | tools/2026-10-19-oauth-flow-smoke/ | 登录链路冒烟断言：健康检查+OAuth 302+client_id/redirect_uri/cookie 五断言（auth 自托管上线的回归门，client_id=undefined 事故实测可拦） | proposed |          |
 | 2026-10-19 | media-meta-freshness | tools/2026-10-19-media-meta-freshness/ | media-meta 悬空守卫：manifest 当前代对象键 vs media-meta.json 覆盖对账，缺口非零 exit 1（10-18 media-meta 未接入管道事故的复发防线，fixture FAIL 路径已实测） | proposed |          |
+| 2026-10-20 | auth-server-deploy | tools/2026-10-20-auth-server-deploy/ | auth-server 一键部署器：交叉编译+scp+原子替换+健康断言+失败自动回滚（真实部署 exit 0、回滚演练 exit 1 双路径实测） | proposed |          |
+| 2026-10-20 | x-posters-backfill | tools/2026-10-20-x-posters-backfill/ | 视频 poster 缺口审计+本地回灌：全库 <video> 覆盖对账（首跑 1202 缺 78）+staging 副本 ffmpeg 抽首帧回灌（首跑填 48） | proposed |          |
