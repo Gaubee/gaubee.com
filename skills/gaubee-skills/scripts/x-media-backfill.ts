@@ -98,9 +98,10 @@ interface SynMedia {
   };
 }
 
-/** 挑 mp4 变体：≤720p 里优先高码率，但预估体积（bitrate×duration）超 190MB 的降档
- *  ——单文件须能装进 media-pack 单卷（200MiB 上限留 tar 头/对齐余量；
- *  Phase 3 起媒体不进 git，原 100MB push 红线作废） */
+/** 挑 mp4 变体（2026-10-20 kzf：默认 1080p）：≤1080p 里优先高分辨率/高码率，
+ *  预估体积（bitrate×duration）超 190MB 的自动降档——单文件须能装进 media-pack
+ *  单卷（200MiB 上限留 tar 头/对齐余量；Phase 3 起媒体不进 git，原 100MB push
+ *  红线作废） */
 function pickMp4(videoInfo: SynMedia["video_info"]): string | null {
   const mp4 = (videoInfo?.variants ?? []).filter((v) => v.content_type === "video/mp4");
   if (!mp4.length) return null;
@@ -112,7 +113,7 @@ function pickMp4(videoInfo: SynMedia["video_info"]): string | null {
   }));
   const estBytes = (v: { bitrate: number }) => (v.bitrate / 8) * durS;
   const fit = withMeta.filter(
-    (v) => v.h > 0 && v.h <= 720 && (estBytes(v) === 0 || estBytes(v) < 190 * 1024 ** 2),
+    (v) => v.h > 0 && v.h <= 1080 && (estBytes(v) === 0 || estBytes(v) < 190 * 1024 ** 2),
   );
   const pool = fit.length ? fit : withMeta.slice().sort((a, b) => estBytes(a) - estBytes(b));
   return pool.sort((a, b) => (b.h - a.h) || (b.bitrate - a.bitrate))[0]!.url;

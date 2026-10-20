@@ -352,11 +352,12 @@ async function main() {
         execFileSync(
           "yt-dlp",
           [
-            // 体积阶梯：≤190MB 里取最高 720p；超限降 480p；再不行取任意——单文件
-            // 硬上限 190MB（media-pack 单卷 200MiB 上限要留 tar 头/对齐余量；
-            // Phase 3 起媒体不进 git，原 100MB push 红线作废）
+            // 质量阶梯（2026-10-20 kzf：默认 1080p，至少 720p）：≤190MB 里取最高
+            // 1080p，超限降 720p，再降 480p，再不行取任意——单文件硬上限 190MB
+            // （media-pack 单卷 200MiB 上限要留 tar 头/对齐余量；Phase 3 起媒体
+            // 不进 git，原 100MB push 红线作废）
             "-f",
-            "bv*[height<=720][size<190M]+ba/b[height<=720][size<190M]/bv*[height<=480]+ba/b[height<=480]/b",
+            "bv*[height<=1080][size<190M]+ba/b[height<=1080][size<190M]/bv*[height<=720][size<190M]+ba/b[height<=720][size<190M]/bv*[height<=480]+ba/b[height<=480]/b",
             "--no-playlist",
             "--merge-output-format",
             "mp4",
