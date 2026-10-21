@@ -3100,5 +3100,14 @@
   "2111575997359513751": "好些人问玻璃录音器能不能买，于是我把它打磨了一下，来了：\n\nhttps://experiments.thisiswhitespace.com/liquid-glass-recorder",
   "2111472054293913749": "这是 Pele，我的新图表渲染库，兼容最新的 Mermaid 语法。\n\n- 比 mermaid.js 快 100-500 倍\n- 体积小 6 倍\n- 零依赖\n- 主题定制容易\n- 响应式适配设备宽度\n\n为了把 Obsidian 做到极致之快，并且",
   "2111778331062624385": "React Bits 推出 Sound Lab：给你的界面和视频配声音。\n\n• 100 个界面音效\n• 100 个视频剪辑音效\n• 可调音高、音色、时长与空间感\n• 用 shadcn 安装，或下载 WAV/MP3/OGG\n\n100% 免费。音效以代码形式安装，而不是音频文件。",
-  "2111927727318245426": "earshot v0.3 发布！\n\n新增：\n- 201 个音效的库，全部用代码生成\n- earshot kit 能做出整套音效包\n- earshot sfx 可将音效精确对齐到帧（已改进）\n\n另外 earshot 现已被 cinetic（动态设计 skill）采用\n\n会继续打磨！"
+  "2111927727318245426": "earshot v0.3 发布！\n\n新增：\n- 201 个音效的库，全部用代码生成\n- earshot kit 能做出整套音效包\n- earshot sfx 可将音效精确对齐到帧（已改进）\n\n另外 earshot 现已被 cinetic（动态设计 skill）采用\n\n会继续打磨！",
+  "2112422551150620733": "https://x.com/i/article/2112413838180233216",
+  "2112579971952910540": "🚨 发布一个新数据库：PGX 🐘 ⏎ 给 AI agent 用的 Postgres，Rust 写的。https://pgx.dev ⏎ 一个运行时，跑几千个 Postgres 数据库。⏎ ⚡ 空闲内存最多省 100 倍 ⏎ ⚡ 659 MB 内存装下 1,000 个数据库 ⏎ ⚡ 674 MB 的数据库 85 ms 克隆完成 ⏎ ⚡ 每个空闲数据库约 0.7 MB",
+  "2112276766718845024": "Genex 0.1.10 发布，登上 Windows 了！⏎ 开源应用：用任意 AI 做游戏 ⏎ 本周还有大更新 👨‍🍳 ⏎ https://genex.games/desktop",
+  "2112247522429440260": "我们发布了一种新型模型：提取模型！把非结构化数据丢给它，拿回一份带概率的明细清单。来试试，告诉我们你的看法！https://blog.cloudflare.com/clairic-extraction-model/",
+  "2111882479774896338": "Animate UI 2.0 发布 🎉 ⏎ 基于 Motion 打造、面向 Radix UI、Base UI 和 React Aria 的动画原语。⏎ 保留你现有的 shadcn/ui 组件。⏎ ✔ 一条命令为组件加上动画的 CLI ⏎ ✔ 一个能给任何东西（组件、图标、交互）加动画并审查动效的 AI skill",
+  "2112241006104244584": "全新的模型范式！介绍 𝚌𝚕𝚊𝚒𝚛𝚒𝚌：一个从非结构化输入里做提取、计算、估计与预测的系统级单模型。https://blog.cloudflare.com/clairic-extraction-model/",
+  "2112310950309355943": "让我豁然开朗的一点：用决策模型，你得先定义类别，它再返回输入匹配各类别的概率。⏎ 但我们接触的数据大多对我们是完全陌生的，对一个你从没",
+  "2112272567809822722": "@michellechen 嗯，看起来可以用它搭一套不错的 stack / 工作流，客服场景尤其合适。⏎ 先把乱糟糟的客户邮件丢给 Clairic，让它抽出真正关键的东西：订单号、实付金额、送达日期、已过天数，甚至接着做",
+  "2112531228981366863": "Cloudflare 接手了 tsrs（TypeScript 的 Rust 移植）：比 TypeScript 7.0 快 8 倍、省 70% 内存。⏎ 我们不是在 fork TypeScript，而是在和 TypeScript 团队合作，所以 7.1 也已经快了约 2.5 倍。⏎ https://blog.cloudflare.com/typescript-rust-port"
 }
