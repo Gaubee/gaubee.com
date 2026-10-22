@@ -3109,5 +3109,13 @@
   "2112241006104244584": "全新的模型范式！介绍 𝚌𝚕𝚊𝚒𝚛𝚒𝚌：一个从非结构化输入里做提取、计算、估计与预测的系统级单模型。https://blog.cloudflare.com/clairic-extraction-model/",
   "2112310950309355943": "让我豁然开朗的一点：用决策模型，你得先定义类别，它再返回输入匹配各类别的概率。⏎ 但我们接触的数据大多对我们是完全陌生的，对一个你从没",
   "2112272567809822722": "@michellechen 嗯，看起来可以用它搭一套不错的 stack / 工作流，客服场景尤其合适。⏎ 先把乱糟糟的客户邮件丢给 Clairic，让它抽出真正关键的东西：订单号、实付金额、送达日期、已过天数，甚至接着做",
-  "2112531228981366863": "Cloudflare 接手了 tsrs（TypeScript 的 Rust 移植）：比 TypeScript 7.0 快 8 倍、省 70% 内存。⏎ 我们不是在 fork TypeScript，而是在和 TypeScript 团队合作，所以 7.1 也已经快了约 2.5 倍。⏎ https://blog.cloudflare.com/typescript-rust-port"
+  "2112531228981366863": "Cloudflare 接手了 tsrs（TypeScript 的 Rust 移植）：比 TypeScript 7.0 快 8 倍、省 70% 内存。⏎ 我们不是在 fork TypeScript，而是在和 TypeScript 团队合作，所以 7.1 也已经快了约 2.5 倍。⏎ https://blog.cloudflare.com/typescript-rust-port",
+  "2113005140559196533": "给 Claude 一套更好的 Markdown 组件审美 ⏎ https://mdxcn.dev",
+  "2113260669781070301": "Claude 最好用的 UI 库 ⏎ https://hextaui.com",
+  "2113299853359149360": "把 https://gpu-lexer.vercel.app 优化到 3.8 倍速：850ms → 221ms。不过离 @pierrecomputer 的 https://diffs.com/highlights 还差得远（非常厉害的工作！）⏎ 顺便写了一点思路：https://shud.in/thoughts/ideas-behind-gpu-lexer",
+  "2113040509966905792": "又玩起贴纸了 🕹️ ⏎ 不同材质、音效、磨损痕迹 ⏎ 用 css 或 webgl 实现 🧑‍🍳",
+  "2113300317584720259": "今天我们发布 Ideogram 的首个矢量模型。⏎ 一句提示词就能生成干净、可编辑、渐变平滑、字形锐利的 SVG，或把任意图片转成精细的可缩放矢量。⏎ 已在 Ideogram 和 API 上线：https://ideogram.ai/models/vector",
+  "2113213103660032209": "Bun v1.4.4 ⏎ - 修复 271 个 issue，关账 544 个 👍 ⏎ - `bun fmt`：与 Prettier 兼容的快速代码格式化器 ⏎ - `bun check` 提速 1.4～7.8 倍 ⏎ - Bun.SQL 与 WebSocket 新特性 ⏎ - 安全修复：Brotli、TLS 证书、HTTP/3 等 ⏎ https://bun.com/blog/bun-v1.4.4",
+  "2112939091880726882": "SQLite 是全世界用得最多的数据库，它最大的弱点始终没变：只跑在一台机器上，机器一挂数据就没了。常规解法是 Litestream，但那是个需要人看管的 Go 二进制。⏎ 于是我们（@platformatic）用……重写了它",
+  "2112595451530654176": "Eleven v4 Turbo 上线。约 150ms 首字出声，REST + 流式 + SDK，一个 model_id 即可在 v4 与 v4 Turbo 之间切换。"
 }

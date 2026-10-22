@@ -42,3 +42,5 @@
 | 2026-10-21 | hls-live-check | tools/2026-10-21-hls-live-check/ | 线上 HLS 内容级验收：playlist MIME/#EXTM3U + 首段 video/mp2t + 事件页引用三方对齐，四态收据（OK/MEDIA_ONLY/UNPUBLISHED/BROKEN）；直连源站绕开代理与 fake-ip（首跑过渡态 UNPUBLISHED 3，预期 cron 后转 OK） | proposed |          |
 | 2026-10-22 | x-session-probe | tools/2026-10-22-x-session-probe/ | X 会话健康探针（抓取前置门禁）：书签页 8 秒判定登录态，登录流重定向 exit 1 早警；沉淀新登录墙 /i/jf/onboarding 与 /i/bookmarks→/i/history 重定向两处实测形态 | proposed |          |
 | 2026-10-22 | cdn-usage-report | tools/2026-10-22-cdn-usage-report/ | cdn-media 用量与增长报告（R2 决策支持）：最新代按月统计 + 相邻代补丁增量 + 代际趋势与单代最大增量 + 500MB 水位建议，全本地零网络秒级退出 | proposed |          |
+| 2026-10-23 | retro-status | tools/2026-10-23-retro-status/ | HLS 追溯完成度报告：全库视频 HLS 化/候选/无增益分布 + 剩余按月 + 续跑命令（首跑：1208 条视频已 HLS 120，候选 332→3，实质追平） | proposed |          |
+| 2026-10-23 | xd-window-audit | tools/2026-10-23-xd-window-audit/ | X 日报归窗对账：changes added 逐条核对「恰一窗」（报告日=R−1），缺窗/重复 exit 1（首跑 151 条恰一窗 114，异常 37 全为 10-18 定窗前历史代差，10-18 起全净） | proposed |          |
