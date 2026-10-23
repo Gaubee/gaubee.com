@@ -3117,5 +3117,6 @@
   "2113300317584720259": "今天我们发布 Ideogram 的首个矢量模型。⏎ 一句提示词就能生成干净、可编辑、渐变平滑、字形锐利的 SVG，或把任意图片转成精细的可缩放矢量。⏎ 已在 Ideogram 和 API 上线：https://ideogram.ai/models/vector",
   "2113213103660032209": "Bun v1.4.4 ⏎ - 修复 271 个 issue，关账 544 个 👍 ⏎ - `bun fmt`：与 Prettier 兼容的快速代码格式化器 ⏎ - `bun check` 提速 1.4～7.8 倍 ⏎ - Bun.SQL 与 WebSocket 新特性 ⏎ - 安全修复：Brotli、TLS 证书、HTTP/3 等 ⏎ https://bun.com/blog/bun-v1.4.4",
   "2112939091880726882": "SQLite 是全世界用得最多的数据库，它最大的弱点始终没变：只跑在一台机器上，机器一挂数据就没了。常规解法是 Litestream，但那是个需要人看管的 Go 二进制。⏎ 于是我们（@platformatic）用……重写了它",
-  "2112595451530654176": "Eleven v4 Turbo 上线。约 150ms 首字出声，REST + 流式 + SDK，一个 model_id 即可在 v4 与 v4 Turbo 之间切换。"
+  "2112595451530654176": "Eleven v4 Turbo 上线。约 150ms 首字出声，REST + 流式 + SDK，一个 model_id 即可在 v4 与 v4 Turbo 之间切换。",
+  "2113510571329163650": "https://github.com/EthanArbuckle/fairplay-decrypt"
 }
