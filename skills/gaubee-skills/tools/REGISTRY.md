@@ -46,3 +46,5 @@
 | 2026-10-23 | xd-window-audit | tools/2026-10-23-xd-window-audit/ | X 日报归窗对账：changes added 逐条核对「恰一窗」（报告日=R−1），缺窗/重复 exit 1（首跑 151 条恰一窗 114，异常 37 全为 10-18 定窗前历史代差，10-18 起全净） | proposed |          |
 | 2026-10-24 | x-thread-backfill | tools/2026-10-24-x-thread-backfill/ | X 线程兜底工具化：扫描疑似缺链（🧵/n/m 标记无 thread 字段）+ ego-browser 抓同作者全链原子写回（首跑 36 条疑似缺链；DeepSeek 1/6 线程实抓 6 段收尾对齐） | proposed |          |
 | 2026-10-24 | trans-quality-sampler | tools/2026-10-24-trans-quality-sampler/ | 译文质量抽查器：随机抽样原文/译文对照 + URL/emoji 保留率 + 机械红旗（首跑 n=8 抓到 2 条 t.co 残留——历史译文带原文没有的短链） | proposed |          |
+| 2026-10-25 | stars-drift | tools/2026-10-25-stars-drift/ | 星标兴趣漂移月览：catalog 分类 × starred_at 双窗口聚合 + 主力语言（首跑：近 30 天 90 星 vs 前 54，AI Agent 类 +21 近两倍漂移） | proposed |          |
+| 2026-10-25 | vault-verify | tools/2026-10-25-vault-verify/ | vault.enc.sqlite 只读校验：逐行 GCM 解密 + 行内哈希 + --workspace 双向对账（首跑 171 行全绿，抓到 taxonomy/profile/feedback-log 3 条已改未回灌） | proposed |          |
