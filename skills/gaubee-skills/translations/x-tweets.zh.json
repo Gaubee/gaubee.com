@@ -3120,5 +3120,7 @@
   "2112595451530654176": "Eleven v4 Turbo 上线。约 150ms 首字出声，REST + 流式 + SDK，一个 model_id 即可在 v4 与 v4 Turbo 之间切换。",
   "2113510571329163650": "https://github.com/EthanArbuckle/fairplay-decrypt",
   "2113648465926361372": "我们起了 100 台 https://instabox.sh 虚拟机，在每一台里都跑上 Claude Code（桌面全程录屏）\n\n总共 400 vCPU、800 GB 内存\n\n10 秒全部就绪，成本只要 $0.01",
-  "2113507665733197892": "让我再戴一分钟 TypeScript 的帽子\n\nContent mappers（内容映射器）简直让人兴奋到不行。现在可以这样：\n\n1. 导入任意非 TypeScript 文件（markdown、vue、svelte）\n2. 写一个 content mapper 从中提取类型\n3. 用 --runExternalCode 跑 tsc\n4. 你就能拿到类型"
+  "2113507665733197892": "让我再戴一分钟 TypeScript 的帽子\n\nContent mappers（内容映射器）简直让人兴奋到不行。现在可以这样：\n\n1. 导入任意非 TypeScript 文件（markdown、vue、svelte）\n2. 写一个 content mapper 从中提取类型\n3. 用 --runExternalCode 跑 tsc\n4. 你就能拿到类型",
+  "2113982009185857771": "我们发放免费素材可能有点上头了 👀\n\n937 个免费 3D 资产，直接丢进你的下一个游戏就能用。\n\n去做点酷的东西吧 🚀\n\nhttps://threejsassets.com/assets/free",
+  "2114065796964270089": "在我的自研 Rust 框架里加了一个 WebGPU 形变（morphing）引擎，带后期特效，还支持 GPU 资源懒加载。"
 }

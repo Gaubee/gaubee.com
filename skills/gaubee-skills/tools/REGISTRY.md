@@ -48,3 +48,5 @@
 | 2026-10-24 | trans-quality-sampler | tools/2026-10-24-trans-quality-sampler/ | 译文质量抽查器：随机抽样原文/译文对照 + URL/emoji 保留率 + 机械红旗（首跑 n=8 抓到 2 条 t.co 残留——历史译文带原文没有的短链） | proposed |          |
 | 2026-10-25 | stars-drift | tools/2026-10-25-stars-drift/ | 星标兴趣漂移月览：catalog 分类 × starred_at 双窗口聚合 + 主力语言（首跑：近 30 天 90 星 vs 前 54，AI Agent 类 +21 近两倍漂移） | proposed |          |
 | 2026-10-25 | vault-verify | tools/2026-10-25-vault-verify/ | vault.enc.sqlite 只读校验：逐行 GCM 解密 + 行内哈希 + --workspace 双向对账（首跑 171 行全绿，抓到 taxonomy/profile/feedback-log 3 条已改未回灌） | proposed |          |
+| 2026-10-26 | x-top-authors | tools/2026-10-26-x-top-authors/ | X 点赞作者榜：x.json liked 按作者聚合双窗口计数（首跑：30 天 228 条赞 top10 占 38，@bkdgiffug 7 条居首） | proposed |          |
+| 2026-10-26 | vault-drift-sync | tools/2026-10-26-vault-drift-sync/ | vault 漂移回灌（vault-verify 姊妹动作）：agent 脚本直写绕过加密镜像的分叉一键补齐，vaultPut 语义幂等（首跑 dry 3 → 回灌 3 → 复核归零，实证根因为 python 直写 taxonomy） | proposed |          |
