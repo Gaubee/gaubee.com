@@ -50,3 +50,5 @@
 | 2026-10-25 | vault-verify | tools/2026-10-25-vault-verify/ | vault.enc.sqlite 只读校验：逐行 GCM 解密 + 行内哈希 + --workspace 双向对账（首跑 171 行全绿，抓到 taxonomy/profile/feedback-log 3 条已改未回灌） | proposed |          |
 | 2026-10-26 | x-top-authors | tools/2026-10-26-x-top-authors/ | X 点赞作者榜：x.json liked 按作者聚合双窗口计数（首跑：30 天 228 条赞 top10 占 38，@bkdgiffug 7 条居首） | proposed |          |
 | 2026-10-26 | vault-drift-sync | tools/2026-10-26-vault-drift-sync/ | vault 漂移回灌（vault-verify 姊妹动作）：agent 脚本直写绕过加密镜像的分叉一键补齐，vaultPut 语义幂等（首跑 dry 3 → 回灌 3 → 复核归零，实证根因为 python 直写 taxonomy） | proposed |          |
+| 2026-10-27 | pipeline-gap-check | tools/2026-10-27-pipeline-gap-check/ | 每日管道漏跑门禁：四源 changes（按各自命名口径）+ 双日报 event 对账，缺口 exit 1（首跑即正确复现 10-21 会话事故形态；发布前缺口 2 = 未发布的双日报） | proposed |          |
+| 2026-10-27 | data-write | tools/2026-10-27-data-write/ | 私有数据安全写包装：writeFileAtomic 通道治「脚本直写绕过 vault 镜像」根因，盘写去重时镜像层仍对账（验证：taxonomy 漂移 1→0，测试残留双侧清理） | proposed |          |

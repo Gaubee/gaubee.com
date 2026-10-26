@@ -3122,5 +3122,12 @@
   "2113648465926361372": "我们起了 100 台 https://instabox.sh 虚拟机，在每一台里都跑上 Claude Code（桌面全程录屏）\n\n总共 400 vCPU、800 GB 内存\n\n10 秒全部就绪，成本只要 $0.01",
   "2113507665733197892": "让我再戴一分钟 TypeScript 的帽子\n\nContent mappers（内容映射器）简直让人兴奋到不行。现在可以这样：\n\n1. 导入任意非 TypeScript 文件（markdown、vue、svelte）\n2. 写一个 content mapper 从中提取类型\n3. 用 --runExternalCode 跑 tsc\n4. 你就能拿到类型",
   "2113982009185857771": "我们发放免费素材可能有点上头了 👀\n\n937 个免费 3D 资产，直接丢进你的下一个游戏就能用。\n\n去做点酷的东西吧 🚀\n\nhttps://threejsassets.com/assets/free",
-  "2114065796964270089": "在我的自研 Rust 框架里加了一个 WebGPU 形变（morphing）引擎，带后期特效，还支持 GPU 资源懒加载。"
+  "2114065796964270089": "在我的自研 Rust 框架里加了一个 WebGPU 形变（morphing）引擎，带后期特效，还支持 GPU 资源懒加载。",
+  "2114753914939863260": "有了新的 Advanced Delegation 模式插件，Hermes Agent 的编排器可以按你设置的路由，为每个子代理挑选不同的模型或档案。让每份工作都配上合适的模型。\n\nhttps://hermes-agent.nousresearch.com/docs/plugins/advanced-delegation",
+  "2114348757076889996": "CSS 小技巧 📍 — 同一个 :𝚝𝚊𝚛𝚐𝚎𝚝-𝚌𝚞𝚛𝚛𝚎𝚗𝚝 不用一行 JS 就能做出 scrollspy（目录高亮）。",
+  "2114648227169665455": "CSS 小技巧：\n\n我们都写过从 height: 0 动画到 height: auto 的各种奇怪变通，现在有更干净的做法了：\n\n:𝚛𝚘𝚘𝚝 {\n  𝚒𝚗𝚝𝚎𝚛𝚙𝚘𝚕𝚊𝚝𝚎-𝚜𝚒𝚣𝚎: 𝚊𝚕𝚕𝚘𝚠-𝚔𝚎𝚢𝚠𝚘𝚛𝚍𝚜;\n}",
+  "2114125784688271524": "我终于做出了梦想中的乐高 App！\n\n◆ 超快：快 2.8 倍，JS 堆小 67 倍\n◆ 可交互的拼搭说明\n◆ 雕塑生成\n◆ iOS 上有 AR 预览\n◆ 物理引擎跑在 worker 里\n◆ 完全免费！\n\n试一试：\nhttps://lego.bacon.md",
+  "2114578128924492069": "基于 MyGo 的 CrychicUI 快完工了！！！！ @localhost_5173",
+  "2113990638748241966": "我们刚刚开源了 1300+ 个 3D 模型。\n\n全部 39 GB 可在 Hugging Face 免费下载。\n\nhttps://huggingface.co/datasets/scenario-labs/3d-collection\n\n> 由 Hitem3D、Meshy、Rodin、Tripo、Claude Opus 5.5 3D 和 GPT-6 Astra 3D 制作，全部跑在 Scenario 上\n> 附带输入图片、提示词与生成参数",
+  "2114227957640122619": "CSS 小技巧：别再用 px 硬编码图标尺寸。\n\n把图标高度设成 1cap 就好。1cap 是当前字体大写字母的高度，所以图标在任何字号下都会自动匹配文字。"
 }
