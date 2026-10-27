@@ -3129,5 +3129,12 @@
   "2114125784688271524": "我终于做出了梦想中的乐高 App！\n\n◆ 超快：快 2.8 倍，JS 堆小 67 倍\n◆ 可交互的拼搭说明\n◆ 雕塑生成\n◆ iOS 上有 AR 预览\n◆ 物理引擎跑在 worker 里\n◆ 完全免费！\n\n试一试：\nhttps://lego.bacon.md",
   "2114578128924492069": "基于 MyGo 的 CrychicUI 快完工了！！！！ @localhost_5173",
   "2113990638748241966": "我们刚刚开源了 1300+ 个 3D 模型。\n\n全部 39 GB 可在 Hugging Face 免费下载。\n\nhttps://huggingface.co/datasets/scenario-labs/3d-collection\n\n> 由 Hitem3D、Meshy、Rodin、Tripo、Claude Opus 5.5 3D 和 GPT-6 Astra 3D 制作，全部跑在 Scenario 上\n> 附带输入图片、提示词与生成参数",
-  "2114227957640122619": "CSS 小技巧：别再用 px 硬编码图标尺寸。\n\n把图标高度设成 1cap 就好。1cap 是当前字体大写字母的高度，所以图标在任何字号下都会自动匹配文字。"
+  "2114227957640122619": "CSS 小技巧：别再用 px 硬编码图标尺寸。\n\n把图标高度设成 1cap 就好。1cap 是当前字体大写字母的高度，所以图标在任何字号下都会自动匹配文字。",
+  "2114877623021293892": "他们把 Notion 替代品开源了！\n\n不只替代 Notion，还是个聚合所有邮箱账户的邮件客户端，能顶掉 Spark 或系统邮件 App。\n\n我没有利益关系，纯粹是粉丝。\n\n也没有 AI 垃圾内容的痕迹。\n\n可以自己跑开源版，也可以直接",
+  "2115010493899502058": "本地 LLM 推理的大胜利！\n\n这个新推理引擎跑 LLM 比 llama.cpp 快 4 倍：\n\n我在基础款 M5 MacBook Pro 上用三个引擎跑 Qwen3.5 9B：\n\n- llama.cpp：22.0 tokens/s\n- MLX：25.1 tokens/s\n- uzu：92.1 tokens/s\n\n下面视频是三次运行同屏对比。",
+  "2114910381311512987": "Unlimited OCR 2 来了，而且开源了 📖 ✨\n\n长文档意味着多得多的注意力计算。新的 SR-SWA 机制把文本-视觉注意力交互压缩进一组固定大小的工作引用，控制住这个开销。\n\n它带来的是：",
+  "2114732325674336580": "Rivet 3.0（预览版）发布\n\n构建在 S3 上，却有 SSD 级速度\n\n🏎️ actor 冷启动 8ms\n🪶 SQLite 写入 0.7ms\n🤏 每 actor 仅 78 KB 内存\n🍱 可嵌入、自托管或 BYOC\n 📁 唯一依赖是 S3，没有数据库",
+  "2114867142286078359": "整个 RAG 行业正在被……一个单文件挑战 🤯\n\n它叫 Memvid。把你的 agent 数据、embedding、搜索索引和元数据打包进一个可移植的 .mv2 文件。\n\n初版用 MP4，现在的版本换成了专门设计的二进制格式。",
+  "2108919102085759230": "🔥 Qwen-Image-2.1-Turbo 上线。\nQwen-Image 家族里最快、最便宜的型号——Qwen-Image-2.1-Pro 的加速版。\n• 10-20 秒出一张图\n• $0.016 / 张",
+  "2114952765193732418": "CSS 小技巧：会变的数字用 tabular-nums。\n\n大多数字体每个数字宽度不同，所以计时器或计数器跳动时会晃。\n\ntabular-nums 让每个数字等宽，数字就稳住了。\n\n.timer {\n  font-variant-numeric: tabular-nums;\n}"
 }

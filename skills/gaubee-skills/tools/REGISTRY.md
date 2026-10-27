@@ -52,3 +52,5 @@
 | 2026-10-26 | vault-drift-sync | tools/2026-10-26-vault-drift-sync/ | vault 漂移回灌（vault-verify 姊妹动作）：agent 脚本直写绕过加密镜像的分叉一键补齐，vaultPut 语义幂等（首跑 dry 3 → 回灌 3 → 复核归零，实证根因为 python 直写 taxonomy） | proposed |          |
 | 2026-10-27 | pipeline-gap-check | tools/2026-10-27-pipeline-gap-check/ | 每日管道漏跑门禁：四源 changes（按各自命名口径）+ 双日报 event 对账，缺口 exit 1（首跑即正确复现 10-21 会话事故形态；发布前缺口 2 = 未发布的双日报） | proposed |          |
 | 2026-10-27 | data-write | tools/2026-10-27-data-write/ | 私有数据安全写包装：writeFileAtomic 通道治「脚本直写绕过 vault 镜像」根因，盘写去重时镜像层仍对账（验证：taxonomy 漂移 1→0，测试残留双侧清理） | proposed |          |
+| 2026-10-28 | trans-tco-scrub | tools/2026-10-28-trans-tco-scrub/ | 译文 t.co 残留全库扫描与清洗：只剥译文多余短链（原文有的不动）；首跑 dry 抓到 1222 条/1610 链（占库近四成），--fix 因牵动大规模历史重渲染留 kzf 裁决 | proposed |          |
+| 2026-10-28 | remux-probe | tools/2026-10-28-remux-probe/ | 本地媒体无损重封装可行性探针：ffprobe 只读判读哪些流可 copy、字幕容器限制、数据流去留（staging 双样本实测：h264+aac 全 copy；无音轨动图不误报） | proposed |          |
