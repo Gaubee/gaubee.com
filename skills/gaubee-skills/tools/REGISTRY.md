@@ -54,3 +54,5 @@
 | 2026-10-27 | data-write | tools/2026-10-27-data-write/ | 私有数据安全写包装：writeFileAtomic 通道治「脚本直写绕过 vault 镜像」根因，盘写去重时镜像层仍对账（验证：taxonomy 漂移 1→0，测试残留双侧清理） | proposed |          |
 | 2026-10-28 | trans-tco-scrub | tools/2026-10-28-trans-tco-scrub/ | 译文 t.co 残留全库扫描与清洗：只剥译文多余短链（原文有的不动）；首跑 dry 抓到 1222 条/1610 链（占库近四成），--fix 因牵动大规模历史重渲染留 kzf 裁决 | proposed |          |
 | 2026-10-28 | remux-probe | tools/2026-10-28-remux-probe/ | 本地媒体无损重封装可行性探针：ffprobe 只读判读哪些流可 copy、字幕容器限制、数据流去留（staging 双样本实测：h264+aac 全 copy；无音轨动图不误报） | proposed |          |
+| 2026-10-29 | star-readme | tools/2026-10-29-star-readme/ | 星标仓库 README 首屏速览：catalog 模糊匹配 + gh api 抽首段（跳徽章/图片/目录），回答「这个 star 到底是干嘛的」（mkvgo 实测） | proposed |          |
+| 2026-10-29 | x-archive-coverage | tools/2026-10-29-x-archive-coverage/ | X 归档覆盖对账：posted/reposted 按日 vs 站点 x-archive-<date> 双侧核对（首跑抓到 10-02~04 真缺档 3 天 9 条；812 天孤档判读为 Data Archive 历史口径差异） | proposed |          |

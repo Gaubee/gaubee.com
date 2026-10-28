@@ -3136,5 +3136,8 @@
   "2114732325674336580": "Rivet 3.0（预览版）发布\n\n构建在 S3 上，却有 SSD 级速度\n\n🏎️ actor 冷启动 8ms\n🪶 SQLite 写入 0.7ms\n🤏 每 actor 仅 78 KB 内存\n🍱 可嵌入、自托管或 BYOC\n 📁 唯一依赖是 S3，没有数据库",
   "2114867142286078359": "整个 RAG 行业正在被……一个单文件挑战 🤯\n\n它叫 Memvid。把你的 agent 数据、embedding、搜索索引和元数据打包进一个可移植的 .mv2 文件。\n\n初版用 MP4，现在的版本换成了专门设计的二进制格式。",
   "2108919102085759230": "🔥 Qwen-Image-2.1-Turbo 上线。\nQwen-Image 家族里最快、最便宜的型号——Qwen-Image-2.1-Pro 的加速版。\n• 10-20 秒出一张图\n• $0.016 / 张",
-  "2114952765193732418": "CSS 小技巧：会变的数字用 tabular-nums。\n\n大多数字体每个数字宽度不同，所以计时器或计数器跳动时会晃。\n\ntabular-nums 让每个数字等宽，数字就稳住了。\n\n.timer {\n  font-variant-numeric: tabular-nums;\n}"
+  "2114952765193732418": "CSS 小技巧：会变的数字用 tabular-nums。\n\n大多数字体每个数字宽度不同，所以计时器或计数器跳动时会晃。\n\ntabular-nums 让每个数字等宽，数字就稳住了。\n\n.timer {\n  font-variant-numeric: tabular-nums;\n}",
+  "2114903912478364055": "现在你可以在 NSH 应用里写 WGSL 自定义着色器，加各种动态视觉效果。\n\n把 Shader 当容器用在 Rust 或 TSX 里，普通 UI 元素叠在其上。颜色、数值和原生动画通过 uniforms 传入。\n\n同一份着色器源码跨移动端",
+  "2115301992235217167": "🌏 介绍 x18n，管理 i18n 文件的终极工具箱！\n\nCLI、linter、交互式 UI、LSP、编辑器支持、CI/CD 和原生 agent 集成全都有。保证你的多语言文件随时最新，并让 agent 参与进来。\n\n适配任意框架！\nhttps://x18n.dev/",
+  "2115015660292182353": "上周我们发布了 3 份安全公告，涉及 Brotli、TLS 证书和 QUIC。\n\n作为后续加固，我们会把 Bun 的大部分 C/C++ 依赖替换成自己的安全 Rust 实现。\n\n从 libarchive 开始\n\nhttps://github.com/oven-sh/bun/pull/46638"
 }
