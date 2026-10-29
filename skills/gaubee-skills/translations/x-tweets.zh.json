@@ -3139,5 +3139,10 @@
   "2114952765193732418": "CSS 小技巧：会变的数字用 tabular-nums。\n\n大多数字体每个数字宽度不同，所以计时器或计数器跳动时会晃。\n\ntabular-nums 让每个数字等宽，数字就稳住了。\n\n.timer {\n  font-variant-numeric: tabular-nums;\n}",
   "2114903912478364055": "现在你可以在 NSH 应用里写 WGSL 自定义着色器，加各种动态视觉效果。\n\n把 Shader 当容器用在 Rust 或 TSX 里，普通 UI 元素叠在其上。颜色、数值和原生动画通过 uniforms 传入。\n\n同一份着色器源码跨移动端",
   "2115301992235217167": "🌏 介绍 x18n，管理 i18n 文件的终极工具箱！\n\nCLI、linter、交互式 UI、LSP、编辑器支持、CI/CD 和原生 agent 集成全都有。保证你的多语言文件随时最新，并让 agent 参与进来。\n\n适配任意框架！\nhttps://x18n.dev/",
-  "2115015660292182353": "上周我们发布了 3 份安全公告，涉及 Brotli、TLS 证书和 QUIC。\n\n作为后续加固，我们会把 Bun 的大部分 C/C++ 依赖替换成自己的安全 Rust 实现。\n\n从 libarchive 开始\n\nhttps://github.com/oven-sh/bun/pull/46638"
+  "2115015660292182353": "上周我们发布了 3 份安全公告，涉及 Brotli、TLS 证书和 QUIC。\n\n作为后续加固，我们会把 Bun 的大部分 C/C++ 依赖替换成自己的安全 Rust 实现。\n\n从 libarchive 开始\n\nhttps://github.com/oven-sh/bun/pull/46638",
+  "2115513890075296029": "LFM3-1.7B 在 M5 Pro 上用 MLX 读完了整本《傲慢与偏见》。\n\n约 28 秒读完 10 万 token（视频里加速 8 倍），然后连续回答 100 个问题只花 27 秒——包括找出藏在书里某处的密码。\n\nhttps://huggingface.co/alexwengg/LFM3-1.7B-Base-MLX-5bit",
+  "2115719048143249807": "Bun AOT 的目标是让现有 Bun 和 Node 应用不改代码就能跑\n\neval、new Function 和 node:vm 都还能用，Bun 与 Node 的 API 也全部支持\n\n我预期性能、内存和安全性的改进最终会让 AOT 成为服务端 JS 的默认选择",
+  "2115494319968891312": "🚨 一个装进手机的无审查 AI 模型💀💀\n\nLFM3-1.7B Uncensored——为日常硬件设计的轻量本地模型。\n\n有意思的点：\n量化版约 1 GB\n模型家族最高支持 256K 上下文\n完全本地运行",
+  "2115413780322718020": "Sheet——@paper 的开源替代——现已登陆 macOS、Linux 和 Windows。还兼容 Paper 的着色器，去建吧，可劲建。\n\n下载：https://sheet.dipxsy.app\nGitHub：https://github.com/DeepanshuMishraa/sheet",
+  "2115523314420769085": "在 GPUI 里跑通了 Chrome DevTools\n\n这对 AI agent 造出更好的 GPUI 应用很有用——它们可以通过 CDP 或未来的 CLI 连上去\n\n更多东西在路上…"
 }
