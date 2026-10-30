@@ -58,3 +58,5 @@
 | 2026-10-29 | x-archive-coverage | tools/2026-10-29-x-archive-coverage/ | X 归档覆盖对账：posted/reposted 按日 vs 站点 x-archive-<date> 双侧核对（首跑抓到 10-02~04 真缺档 3 天 9 条；812 天孤档判读为 Data Archive 历史口径差异） | proposed |          |
 | 2026-10-30 | commits-digest | tools/2026-10-30-commits-digest/ | 日报提交素材一条命令：各仓公私分布 + 私有仓样本消息（本地素材，写入日报前须重写为人话——R5） | proposed |          |
 | 2026-10-30 | ssh-channel-doctor | tools/2026-10-30-ssh-channel-doctor/ | gaubee-cloud ssh 通道检查（lag-watch 前置早警）：known_hosts 快检 + kaku 在位 + BatchMode 试连，--fix 键缺失 keyscan 补录（首跑试连即 OK） | proposed |          |
+| 2026-10-31 | registry-digest | tools/2026-10-31-registry-digest/ | 工坊待裁决清单汇总卡：proposed 行汇总成打勾卡（--md 落文件），首跑揭底——53 个提案 0 裁决，裁决环节从未启动 | proposed |          |
+| 2026-10-31 | llm-mem-fit | tools/2026-10-31-llm-mem-fit/ | 端侧 LLM 内存适配估算：参数×位宽+KV 上界+运行时 vs 可用内存三档判定（首跑 1.7B/4bit 2.6GB 轻松、7B/8bit 11.3GB 贴线；KV 口径显式标注为 MHA 上界） | proposed |          |

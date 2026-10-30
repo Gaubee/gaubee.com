@@ -3144,5 +3144,6 @@
   "2115719048143249807": "Bun AOT 的目标是让现有 Bun 和 Node 应用不改代码就能跑\n\neval、new Function 和 node:vm 都还能用，Bun 与 Node 的 API 也全部支持\n\n我预期性能、内存和安全性的改进最终会让 AOT 成为服务端 JS 的默认选择",
   "2115494319968891312": "🚨 一个装进手机的无审查 AI 模型💀💀\n\nLFM3-1.7B Uncensored——为日常硬件设计的轻量本地模型。\n\n有意思的点：\n量化版约 1 GB\n模型家族最高支持 256K 上下文\n完全本地运行",
   "2115413780322718020": "Sheet——@paper 的开源替代——现已登陆 macOS、Linux 和 Windows。还兼容 Paper 的着色器，去建吧，可劲建。\n\n下载：https://sheet.dipxsy.app\nGitHub：https://github.com/DeepanshuMishraa/sheet",
-  "2115523314420769085": "在 GPUI 里跑通了 Chrome DevTools\n\n这对 AI agent 造出更好的 GPUI 应用很有用——它们可以通过 CDP 或未来的 CLI 连上去\n\n更多东西在路上…"
+  "2115523314420769085": "在 GPUI 里跑通了 Chrome DevTools\n\n这对 AI agent 造出更好的 GPUI 应用很有用——它们可以通过 CDP 或未来的 CLI 连上去\n\n更多东西在路上…",
+  "2115804919303172360": "别再猜 UI 表单的间距了"
 }
