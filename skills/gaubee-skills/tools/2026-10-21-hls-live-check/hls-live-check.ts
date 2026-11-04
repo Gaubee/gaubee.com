@@ -41,8 +41,10 @@ interface Resp {
 
 /** curl 直连源站（--noproxy 绕开 clash，--resolve 绕开 fake-ip DNS）：状态码 + content-type + 正文（超 64KB 截断，playlist 够用）。
  *  头块可能不止一个（代理 CONNECT 的 200 / 1xx 续行），取最后一个真实响应头。 */
-function get(host: string, ip: string, pathname: string, range?: string): Resp {
-	const args = ["curl", "-sS", "-m", "20", "--noproxy", "*", "--resolve", `${host}:443:${ip}`, "-D", "-", "-o", "-"];
+function get(host: string, ip: string, pathname: string, range?: string, timeoutSec = 20): Resp {
+	// 超时按资源分档：playlist 20s 够用；分片首次冷取要整对象回源，源站慢时可达 40s+
+	//（2026-11-04 实证：Range 0-0 也走「整取入缓存再回 206」，20s 会造成 BROKEN 误报）
+	const args = ["curl", "-sS", "-m", String(timeoutSec), "--noproxy", "*", "--resolve", `${host}:443:${ip}`, "-D", "-", "-o", "-"];
 	if (range) args.push("-r", range);
 	args.push(`https://${host}${pathname}`);
 	const p = Bun.spawnSync(args, { stdout: "pipe", stderr: "pipe" });
@@ -89,7 +91,7 @@ function main(): number {
 		const key = it.videoLocal![0]!; // cdn-media/x/<月>/<id>.m3u8
 		const pl = get(host, ip, `/${key}`);
 		const plOk = pl.status === 200 && pl.ctype === "application/vnd.apple.mpegurl" && pl.body.startsWith("#EXTM3U");
-		const seg = get(host, ip, `/${key.replace(/\.m3u8$/, ".seg0000.ts")}`, "0-0");
+		const seg = get(host, ip, `/${key.replace(/\.m3u8$/, ".seg0000.ts")}`, "0-0", 120);
 		const segOk = (seg.status === 206 || seg.status === 200) && seg.ctype === "video/mp2t";
 		const mediaOk = plOk && segOk;
 		const page = refs.get(it.id);

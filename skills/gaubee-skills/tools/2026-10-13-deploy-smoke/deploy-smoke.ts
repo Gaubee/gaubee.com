@@ -76,7 +76,15 @@ async function main(): Promise<void> {
   const refs = new Set<string>();
   for (const stem of stems) {
     const md = await Bun.file(`${eventsDir}/${stem}.md`).text();
-    for (const m of md.matchAll(/(?:src="|href=")?(\/cdn-media\/[^"\s)>]+)/g)) refs.add(m[1]!);
+    // 只收「有文件名（末段含扩展名）」的引用：报告正文里可能出现描述迁移路径的
+    // 纯文本片段（如 /x-media/→/cdn-media/x/），它不是媒体对象，请求必然 400
+    //（2026-11-04 月报 smoke 误报实证）。
+    for (const m of md.matchAll(/(?:src="|href=")?(\/cdn-media\/[^"\s)>]+)/g)) {
+      const ref = m[1]!;
+      const last = ref.slice(ref.lastIndexOf("/") + 1);
+      if (!last.includes(".")) continue;
+      refs.add(ref);
+    }
   }
   const list = [...refs];
   const picked = list.length <= MEDIA_CAP ? list : list.filter((_, i) => i % Math.ceil(list.length / MEDIA_CAP) === 0);
