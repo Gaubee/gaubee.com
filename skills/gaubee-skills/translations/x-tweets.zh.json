@@ -3145,5 +3145,10 @@
   "2115494319968891312": "🚨 一个装进手机的无审查 AI 模型💀💀\n\nLFM3-1.7B Uncensored——为日常硬件设计的轻量本地模型。\n\n有意思的点：\n量化版约 1 GB\n模型家族最高支持 256K 上下文\n完全本地运行",
   "2115413780322718020": "Sheet——@paper 的开源替代——现已登陆 macOS、Linux 和 Windows。还兼容 Paper 的着色器，去建吧，可劲建。\n\n下载：https://sheet.dipxsy.app\nGitHub：https://github.com/DeepanshuMishraa/sheet",
   "2115523314420769085": "在 GPUI 里跑通了 Chrome DevTools\n\n这对 AI agent 造出更好的 GPUI 应用很有用——它们可以通过 CDP 或未来的 CLI 连上去\n\n更多东西在路上…",
-  "2115804919303172360": "别再猜 UI 表单的间距了"
+  "2115804919303172360": "别再猜 UI 表单的间距了",
+  "2117701538126962767": "原理说明 📚\n\n一个看不见的滚动容器用 CSS 滚动驱动动画带动旋转\n\n只构建并揭示球体的正面\n\n这段视频拆解了它 ↓",
+  "2117588845864575397": "这可能是史上最强的一份 issue 报告\n\n有人为我的 /retro skill 写了篇论文来评估它的效果\n\n难以置信\n\nhttps://arxiv.org/pdf/2610.34938",
+  "2117297575070240831": "我在 @shadcn 的数据表格里跑起了 doom，30 fps。\n\n23,040 个单元格，用 @tan_stack 的 table 渲染。",
+  "2117678349828976746": "介绍 terminal-mac。\n\n一整个跑在你现有终端里的 macOS。\n\n- 给你的 agent 一台自己的 Mac，你自己那台留着\n- 在终端旁边实时看它干活\n- 内建 computer use：MCP、CLI 和 skill\n- 免费开源",
+  "2117404998468555211": "更多 CSS 离开主线程！\n\n我刚实现了并行滚动驱动动画，主线程繁忙时它们也能更新！🤓\n\n左边：@ladybirdbrowser\n右边：Chrome（但其它浏览器看起来都一样）"
 }

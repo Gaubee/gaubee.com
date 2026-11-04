@@ -166,16 +166,18 @@ function render(
 function main(): void {
   const mode = process.argv[2];
   const argc = process.argv.length;
-  // 合法形态：--weekly/--monthly（无附加参数）；--yearly [YYYY]
+  // 合法形态：--weekly（无附加参数）；--monthly [YYYY-MM]；--yearly [YYYY]
   const valid =
-    mode === "--weekly" || mode === "--monthly"
+    mode === "--weekly"
       ? argc === 3
-      : mode === "--yearly"
-        ? argc === 3 || (argc === 4 && /^\d{4}$/.test(process.argv[3] ?? ""))
-        : false;
+      : mode === "--monthly"
+        ? argc === 3 || (argc === 4 && /^\d{4}-\d{2}$/.test(process.argv[3] ?? ""))
+        : mode === "--yearly"
+          ? argc === 3 || (argc === 4 && /^\d{4}$/.test(process.argv[3] ?? ""))
+          : false;
   if (!valid) {
     console.error(`无法识别的参数：${process.argv.slice(3).join(" ")}（一次只跑一种模式）`);
-    console.error("usage: bun scripts/build-report.ts --weekly|--monthly|--yearly [YYYY]");
+    console.error("usage: bun scripts/build-report.ts --weekly|--monthly [YYYY-MM]|--yearly [YYYY]");
     process.exit(2);
   }
   const today = localDate();
@@ -195,11 +197,29 @@ function main(): void {
     writeFileAtomic(out, content);
     console.log(`written ${out} (${entries.length} change files)`);
   } else if (mode === "--monthly") {
-    const from = `${today.slice(0, 7)}-01`;
-    const entries = loadChanges(from, today);
-    const out = path.join(REPORTS, "monthly", `${today.slice(0, 7)}.md`);
+    // 月报覆盖上一个完整月：cron 在 1 号早晨生成时本月刚开始，取本月会只剩当天
+    //（2026-11-04 补跑实证：旧实现硬取 today 的月份，1 号跑只会写出一份近乎空月的文件）。
+    // 也接受显式 YYYY-MM 供补跑：bun scripts/build-report.ts --monthly 2026-10
+    const monthArg = process.argv[3];
+    let monthKey: string;
+    if (monthArg) {
+      monthKey = monthArg;
+    } else {
+      const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      monthKey = `${prev.getFullYear()}-${p2(prev.getMonth() + 1)}`;
+    }
+    const [y, m] = monthKey.split("-").map(Number) as [number, number];
+    const from = `${monthKey}-01`;
+    const lastDay = new Date(y, m, 0).getDate();
+    const to = `${monthKey}-${p2(lastDay)}`;
+    const entries = loadChanges(from, to);
+    const out = path.join(REPORTS, "monthly", `${monthKey}.md`);
+    const rendered = render("monthly", entries, monthKey);
+    const content = existsSync(out)
+      ? preserveAnalysis(readFileSync(out, "utf8"), rendered)
+      : rendered;
     mkdirSync(path.dirname(out), { recursive: true });
-    writeFileAtomic(out, render("monthly", entries, today.slice(0, 7)));
+    writeFileAtomic(out, content);
     console.log(`written ${out} (${entries.length} change files)`);
   } else if (mode === "--yearly") {
     // 年报：默认上一年度整年；显式传年份则取该年（未结束的年份截至今天）

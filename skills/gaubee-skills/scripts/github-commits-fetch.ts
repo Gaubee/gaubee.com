@@ -93,86 +93,160 @@ async function main() {
     target = dateArg;
   }
 
-  // 事件流按时间倒序；翻页直到遇到早于目标日期的本地日期事件（上限 5 页）
-  const events: GHEvent[] = [];
-  for (let page = 1; page <= 5; page++) {
-    const batch = (await ghJson(`/users/${login}/events?per_page=100&page=${page}`)) as GHEvent[];
-    events.push(...batch);
-    const last = batch.at(-1);
-    if (batch.length < 100 || (last?.created_at && localDate(new Date(last.created_at)) < target))
-      break;
+  // ---- 路径 A：事件流（默认）----
+  // 事件流按时间倒序；翻页直到遇到早于目标日期的本地日期事件（上限 5 页）。
+  // 已知硬限（2026-11-04 补跑实证）：/users/{login}/events 只保留最近 300 事件，
+  // 第 4 页起 422，超活跃日（300+ push）无法覆盖目标日期 —— 此时自动改走路径 B。
+  const forceRepos = argv.includes("--via-repos");
+  let pushes: RepoPush[] = [];
+  let viaRepos = forceRepos;
+  if (!forceRepos) {
+    const events: GHEvent[] = [];
+    let eventsOk = true;
+    try {
+      for (let page = 1; page <= 5; page++) {
+        const batch = (await ghJson(`/users/${login}/events?per_page=100&page=${page}`)) as GHEvent[];
+        events.push(...batch);
+        const last = batch.at(-1);
+        if (batch.length < 100 || (last?.created_at && localDate(new Date(last.created_at)) < target))
+          break;
+      }
+    } catch (err) {
+      eventsOk = false;
+      console.error(
+        `事件流翻页失败（${err instanceof Error ? err.message : String(err)}）→ 改用按仓库回溯`,
+      );
+    }
+    const oldest = events.at(-1);
+    const covered = !!oldest && localDate(new Date(oldest.created_at)) <= target;
+    if (!eventsOk || !covered) {
+      if (eventsOk)
+        console.error(
+          `事件流最早只到 ${oldest ? localDate(new Date(oldest.created_at)) : "未知"}，覆盖不住 ${target} → 改用按仓库回溯`,
+        );
+      viaRepos = true;
+    } else {
+      // 今天的 PushEvent 原始事件（payload 只有 before/head/ref，提交明细需 compare API 补取）。
+      // 隐私关键（2026-10-03 复核 A1）：认证后的 /user 事件流【包含私有仓】——
+      // history 保留全量（本地档案）；changes 是发布视图，只允许公开仓。
+      const rawPushes: { repo: string; before: string; head: string; created_at: string }[] = [];
+      for (const e of events) {
+        if (e.type !== "PushEvent") continue;
+        if (localDate(new Date(e.created_at)) !== target) continue;
+        const repo = e.repo?.name ?? "unknown";
+        if (!e.payload?.before || !e.payload?.head) continue;
+        rawPushes.push({
+          repo,
+          before: e.payload.before,
+          head: e.payload.head,
+          created_at: e.created_at,
+        });
+      }
+
+      // 私有标志：owner 仓复用 deps.json，其它仓查 /repos/{repo} 并缓存
+      const privateFlag = new Map<string, boolean>();
+      const depsFile = path.join(sourceDir("github-deps"), "deps.json");
+      if (existsSync(depsFile)) {
+        const deps = JSON.parse(await Bun.file(depsFile).text()) as {
+          repos: { repo: string; private: boolean }[];
+        };
+        for (const r of deps.repos) privateFlag.set(r.repo, r.private);
+      }
+      async function isPrivate(repo: string): Promise<boolean> {
+        const cached = privateFlag.get(repo);
+        if (cached !== undefined) return cached;
+        try {
+          const info = (await ghJson(`/repos/${repo}`)) as { private?: boolean };
+          privateFlag.set(repo, !!info.private);
+          return !!info.private;
+        } catch {
+          return true; // 查不到的仓按私有处理（宁可不公开，不可泄漏）
+        }
+      }
+
+      // 按时间序处理（事件流最新在前），保证 entry.commits 跨多次推送也是旧→新
+      const byRepo = new Map<string, RepoPush>();
+      for (const p of [...rawPushes].reverse()) {
+        const entry = byRepo.get(p.repo) ?? {
+          repo: p.repo,
+          url: `https://github.com/${p.repo}`,
+          count: 0,
+          commits: [],
+          pushed_at: localStamp(new Date(p.created_at)),
+          private: await isPrivate(p.repo),
+        };
+        entry.private = await isPrivate(p.repo);
+        entry.pushed_at = localStamp(new Date(p.created_at));
+        try {
+          const cmp = (await ghJson(
+            `/repos/${p.repo}/compare/${p.before}...${p.head}`,
+          )) as CompareResult;
+          entry.count += cmp.total_commits ?? cmp.commits.length;
+          // compare 返回最新在前，转为时间序（旧→新），摘要取最新 3 条时语义正确
+          entry.commits.push(
+            ...cmp.commits
+              .slice()
+              .reverse()
+              .map((c) => ({ sha: c.sha.slice(0, 7), message: c.commit.message })),
+          );
+        } catch {
+          entry.count += 0; // 明细不可用（force push / 分支删除等），仅记录事件发生
+        }
+        byRepo.set(p.repo, entry);
+      }
+      pushes = [...byRepo.values()].sort((a, b) => (a.repo < b.repo ? -1 : 1));
+    }
   }
 
-  // 今天的 PushEvent 原始事件（payload 只有 before/head/ref，提交明细需 compare API 补取）。
-  // 隐私关键（2026-10-03 复核 A1）：认证后的 /user 事件流【包含私有仓】——
-  // history 保留全量（本地档案）；changes 是发布视图，只允许公开仓。
-  const rawPushes: { repo: string; before: string; head: string; created_at: string }[] = [];
-  for (const e of events) {
-    if (e.type !== "PushEvent") continue;
-    if (localDate(new Date(e.created_at)) !== target) continue;
-    const repo = e.repo?.name ?? "unknown";
-    if (!e.payload?.before || !e.payload?.head) continue;
-    rawPushes.push({
-      repo,
-      before: e.payload.before,
-      head: e.payload.head,
-      created_at: e.created_at,
-    });
-  }
-
-  // 私有标志：owner 仓复用 deps.json，其它仓查 /repos/{repo} 并缓存
-  const privateFlag = new Map<string, boolean>();
-  const depsFile = path.join(sourceDir("github-deps"), "deps.json");
-  if (existsSync(depsFile)) {
+  // ---- 路径 B：按仓库回溯（事件流覆盖不住时的兜底，--via-repos 可强制） ----
+  // 遍历 deps.json 的 owner 仓清单，逐仓问 author=<login> 在目标本地日的提交。
+  // 语义差异：路径 A 计一次 push 里的全部提交，路径 B 只计本人 authored 的提交——
+  // 对「我的提交日志」这个用途后者更准；两路径产物结构完全一致。
+  if (viaRepos) {
+    const depsFile = path.join(sourceDir("github-deps"), "deps.json");
+    if (!existsSync(depsFile)) {
+      console.error("按仓库回溯需要 github-deps/deps.json（先跑 github-deps-fetch）");
+      process.exit(2);
+    }
     const deps = JSON.parse(await Bun.file(depsFile).text()) as {
       repos: { repo: string; private: boolean }[];
     };
-    for (const r of deps.repos) privateFlag.set(r.repo, r.private);
-  }
-  async function isPrivate(repo: string): Promise<boolean> {
-    const cached = privateFlag.get(repo);
-    if (cached !== undefined) return cached;
-    try {
-      const info = (await ghJson(`/repos/${repo}`)) as { private?: boolean };
-      privateFlag.set(repo, !!info.private);
-      return !!info.private;
-    } catch {
-      return true; // 查不到的仓按私有处理（宁可不公开，不可泄漏）
-    }
-  }
-
-  // 按时间序处理（事件流最新在前），保证 entry.commits 跨多次推送也是旧→新
-  const byRepo = new Map<string, RepoPush>();
-  for (const p of [...rawPushes].reverse()) {
-    const entry = byRepo.get(p.repo) ?? {
-      repo: p.repo,
-      url: `https://github.com/${p.repo}`,
-      count: 0,
-      commits: [],
-      pushed_at: localStamp(new Date(p.created_at)),
-      private: await isPrivate(p.repo),
-    };
-    entry.private = await isPrivate(p.repo);
-    entry.pushed_at = localStamp(new Date(p.created_at));
-    try {
-      const cmp = (await ghJson(
-        `/repos/${p.repo}/compare/${p.before}...${p.head}`,
-      )) as CompareResult;
-      entry.count += cmp.total_commits ?? cmp.commits.length;
-      // compare 返回最新在前，转为时间序（旧→新），摘要取最新 3 条时语义正确
-      entry.commits.push(
-        ...cmp.commits
-          .slice()
-          .reverse()
-          .map((c) => ({ sha: c.sha.slice(0, 7), message: c.commit.message })),
+    const since = encodeURIComponent(`${target}T00:00:00+08:00`);
+    const until = encodeURIComponent(`${target}T23:59:59+08:00`);
+    const out: RepoPush[] = [];
+    let scanned = 0;
+    for (const r of deps.repos) {
+      scanned++;
+      if (scanned % 50 === 0) console.error(`  回溯进度 ${scanned}/${deps.repos.length}`);
+      const all: { sha: string; commit: { message: string; author?: { date?: string } } }[] = [];
+      try {
+        for (let page = 1; page <= 2; page++) {
+          const batch = (await ghJson(
+            `/repos/${r.repo}/commits?author=${login}&since=${since}&until=${until}&per_page=100&page=${page}`,
+          )) as { sha: string; commit: { message: string; author?: { date?: string } } }[];
+          all.push(...batch);
+          if (batch.length < 100) break;
+        }
+      } catch {
+        continue; // 空仓 / 无权限 / 已删除：跳过
+      }
+      const mine = all.filter(
+        (c) => c.commit.author?.date && localDate(new Date(c.commit.author.date)) === target,
       );
-    } catch {
-      entry.count += 0; // 明细不可用（force push / 分支删除等），仅记录事件发生
+      if (mine.length === 0) continue;
+      const sorted = mine.slice().reverse(); // API 最新在前 → 时间序
+      out.push({
+        repo: r.repo,
+        url: `https://github.com/${r.repo}`,
+        count: sorted.length,
+        commits: sorted.map((c) => ({ sha: c.sha.slice(0, 7), message: c.commit.message })),
+        pushed_at: localStamp(new Date(sorted.at(-1)!.commit.author!.date!)),
+        private: !!r.private,
+      });
     }
-    byRepo.set(p.repo, entry);
+    pushes = out.sort((a, b) => (a.repo < b.repo ? -1 : 1));
+    console.error(`按仓库回溯完成：扫描 ${scanned} 仓，命中 ${pushes.length} 仓`);
   }
-
-  const pushes = [...byRepo.values()].sort((a, b) => (a.repo < b.repo ? -1 : 1));
   const totalCommits = pushes.reduce((n, p) => n + p.count, 0);
   const publicPushes = pushes.filter((p) => !p.private);
   const hidden = pushes.length - publicPushes.length;

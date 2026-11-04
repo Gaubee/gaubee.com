@@ -60,3 +60,5 @@
 | 2026-10-30 | ssh-channel-doctor | tools/2026-10-30-ssh-channel-doctor/ | gaubee-cloud ssh 通道检查（lag-watch 前置早警）：known_hosts 快检 + kaku 在位 + BatchMode 试连，--fix 键缺失 keyscan 补录（首跑试连即 OK） | proposed |          |
 | 2026-10-31 | registry-digest | tools/2026-10-31-registry-digest/ | 工坊待裁决清单汇总卡：proposed 行汇总成打勾卡（--md 落文件），首跑揭底——53 个提案 0 裁决，裁决环节从未启动 | proposed |          |
 | 2026-10-31 | llm-mem-fit | tools/2026-10-31-llm-mem-fit/ | 端侧 LLM 内存适配估算：参数×位宽+KV 上界+运行时 vs 可用内存三档判定（首跑 1.7B/4bit 2.6GB 轻松、7B/8bit 11.3GB 贴线；KV 口径显式标注为 MHA 上界） | proposed |          |
+| 2026-11-04 | catchup-scan | tools/2026-11-04-catchup-scan/ | 补跑缺口扫描：区间内逐日核对四源 changes + 双日报，硬缺口（commits/GitHub 日报）与累积差分源的正常缺口分离（11-04 补跑即按此表执行） | proposed |          |
+| 2026-11-04 | x-daily-guard | tools/2026-11-04-x-daily-guard/ | X 日报归窗防线：发布前查目标日报的推文是否跨窗重复（11-04 抓到生成器给出的 10-31 重复窗；另抓出 10-22/10-23 两条历史跨窗条目） | proposed |          |
