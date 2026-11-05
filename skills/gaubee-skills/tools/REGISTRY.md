@@ -62,3 +62,5 @@
 | 2026-10-31 | llm-mem-fit | tools/2026-10-31-llm-mem-fit/ | 端侧 LLM 内存适配估算：参数×位宽+KV 上界+运行时 vs 可用内存三档判定（首跑 1.7B/4bit 2.6GB 轻松、7B/8bit 11.3GB 贴线；KV 口径显式标注为 MHA 上界） | proposed |          |
 | 2026-11-04 | catchup-scan | tools/2026-11-04-catchup-scan/ | 补跑缺口扫描：区间内逐日核对四源 changes + 双日报，硬缺口（commits/GitHub 日报）与累积差分源的正常缺口分离（11-04 补跑即按此表执行） | proposed |          |
 | 2026-11-04 | x-daily-guard | tools/2026-11-04-x-daily-guard/ | X 日报归窗防线：发布前查目标日报的推文是否跨窗重复（11-04 抓到生成器给出的 10-31 重复窗；另抓出 10-22/10-23 两条历史跨窗条目） | proposed |          |
+| 2026-11-05 | cdn-cache-doctor | tools/2026-11-05-cdn-cache-doctor/ | cdn-base 缓存/单飞滞留探测：inflight_reserved 两次相同即判滞留（11-04 锁泄漏事故的工具化），附缓存水位与真实对象抽样、gen 滞后提示 | proposed |          |
+| 2026-11-05 | star-timeline | tools/2026-11-05-star-timeline/ | 星标时间线：按 starred_at 精确输出每日新增与期末累计（补跑时「总数」心算差一的根治；首跑复现 1731/1739/1740/1748/1749 口径） | proposed |          |
