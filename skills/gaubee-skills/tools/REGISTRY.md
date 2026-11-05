@@ -64,3 +64,5 @@
 | 2026-11-04 | x-daily-guard | tools/2026-11-04-x-daily-guard/ | X 日报归窗防线：发布前查目标日报的推文是否跨窗重复（11-04 抓到生成器给出的 10-31 重复窗；另抓出 10-22/10-23 两条历史跨窗条目） | proposed |          |
 | 2026-11-05 | cdn-cache-doctor | tools/2026-11-05-cdn-cache-doctor/ | cdn-base 缓存/单飞滞留探测：inflight_reserved 两次相同即判滞留（11-04 锁泄漏事故的工具化），附缓存水位与真实对象抽样、gen 滞后提示 | proposed |          |
 | 2026-11-05 | star-timeline | tools/2026-11-05-star-timeline/ | 星标时间线：按 starred_at 精确输出每日新增与期末累计（补跑时「总数」心算差一的根治；首跑复现 1731/1739/1740/1748/1749 口径） | proposed |          |
+| 2026-11-06 | media-unref-report | tools/2026-11-06-media-unref-report/ | 已入卷但无内容引用的媒体盘点（存储/R2 决策用）：manifest 全量 vs 站点引用，按月与体积汇总（首跑 74 对象/79MB=1.2%，大头是 HLS 化后的旧 mp4） | proposed |          |
+| 2026-11-06 | report-lint | tools/2026-11-06-report-lint/ | 报告一致性门禁：已发布报告的占位残留 + 日报「总数」与 starred_at 实际累计对账（首跑抓出已发布 01869 的总数少 3，已修正报告源与事件） | proposed |          |
