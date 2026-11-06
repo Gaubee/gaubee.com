@@ -66,3 +66,5 @@
 | 2026-11-05 | star-timeline | tools/2026-11-05-star-timeline/ | 星标时间线：按 starred_at 精确输出每日新增与期末累计（补跑时「总数」心算差一的根治；首跑复现 1731/1739/1740/1748/1749 口径） | proposed |          |
 | 2026-11-06 | media-unref-report | tools/2026-11-06-media-unref-report/ | 已入卷但无内容引用的媒体盘点（存储/R2 决策用）：manifest 全量 vs 站点引用，按月与体积汇总（首跑 74 对象/79MB=1.2%，大头是 HLS 化后的旧 mp4） | proposed |          |
 | 2026-11-06 | report-lint | tools/2026-11-06-report-lint/ | 报告一致性门禁：已发布报告的占位残留 + 日报「总数」与 starred_at 实际累计对账（首跑抓出已发布 01869 的总数少 3，已修正报告源与事件） | proposed |          |
+| 2026-11-07 | vol-name-plan | tools/2026-11-07-vol-name-plan/ | 补丁卷名排期预演：未来 N 天各月份组卷名、跨月撞名实际落成什么名字、当月组哪天只能等（补 patch-precheck 只看当天） | proposed |          |
+| 2026-11-07 | x-daily-trans-coverage | tools/2026-11-07-x-daily-trans-coverage/ | X 日报渲染产物译文覆盖率审计：逐条判语言并点名「非中文没译文」（首跑抓到日文漏译 1 条，已补译并归零） | proposed |          |

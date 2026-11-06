@@ -20,7 +20,10 @@ const DATA = process.env.GAUBEE_SKILLS_DATA ?? path.join(process.env.HOME!, ".ga
 const X = path.join(DATA, "sources", "x-likes", "x.json");
 const ZH = path.resolve(import.meta.dir, "..", "..", "translations", "x-tweets.zh.json");
 
-const hasCJK = (s: string): boolean => /[\u4e00-\u9fff]/.test(s);
+// 中文判定：有汉字且不含假名/谚文（与 x-translations-export 同口径；纯汉字判定会把
+// 夹汉字的日文当成中文放过，2026-11-06 实证）。
+const hasCJK = (s: string): boolean =>
+  /[\u4e00-\u9fff]/.test(s) && !/[\u3040-\u30ff\uac00-\ud7af]/.test(s);
 
 interface Tweet { id: string; text?: string; created_at?: string }
 const store = JSON.parse(readFileSync(X, "utf8")) as { items: Record<string, Tweet> };

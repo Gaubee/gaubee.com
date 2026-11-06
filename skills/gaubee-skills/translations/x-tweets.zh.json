@@ -3162,5 +3162,16 @@
   "2118347243518570659": "这是用 https://nsh.dev 做的。\n\n全部用 TSX 写，没有 Rust，没有 Node.js。\n\n你能得到和 macOS、iOS 应用一样的液态玻璃效果。\n\n最重要的是，一份代码可以同时用于桌面、移动、Web，甚至 TUI。\n\nNoop 是开源的",
   "2118332755410878885": "NSH 的 TUI 版",
   "2118255995088756837": "npx skills add longbridge/nsh",
-  "2118139561503006904": "Electrobun 2.0.6 刚发布\n\n- 新的 GPU UI，细粒度响应式，来自 Bun、Zig、Rust 和 Odin\n- 应用更新改为流式补丁重建，占用更少磁盘\n- 完整 changelog https://docs.electrobun.dev/electrobun/guides/changelog/v2-0-6/\n\n这个 demo 直出 GPU UI，完全看不到 webview。"
+  "2118139561503006904": "Electrobun 2.0.6 刚发布\n\n- 新的 GPU UI，细粒度响应式，来自 Bun、Zig、Rust 和 Odin\n- 应用更新改为流式补丁重建，占用更少磁盘\n- 完整 changelog https://docs.electrobun.dev/electrobun/guides/changelog/v2-0-6/\n\n这个 demo 直出 GPU UI，完全看不到 webview。",
+  "2118763633828397060": "XState v6 进入 beta 🚀\n\nAPI 面积更小（transition 就是普通函数），类型强得多，支持持久化执行，新工具（CLI、可视化、编辑器）陆续到位。\n\n为人类*也*为 agent 打造 🤝\n\nnpm i xstate@beta\n\nhttps://stately.ai/blog/2026-11-05-xstate-v6-beta",
+  "2118755687274532893": "目前这套跑得很好。以前试过，效果没这么好。几个细节\n\n- 每个项目用长会话\n- 让 opus 把所有活都交给 deepseek 子代理干\n- 建任务时严格限定范围\n- 要交付证据，而不是要总结\n\n-",
+  "2118598845366231389": "你也该去看看 @localhost_5173 的 https://mygo.egoist.dev。\n\n跨平台桌面应用，可以用 GPU 渲染的 UI，也可以用系统 WebView，全部由 Go 驱动。\n\n如果 Rust 不合你口味，又在意构建速度，MyGo 就是给你的。",
+  "2118383938871664784": "刚为游戏开发发了个新的像素画模型：\n\n- 精确控制尺寸\n- 用参考精灵图保持风格一致\n\n配合 Claude 或 Codex 使用：https://www.spritefusion.com/pixel-art-generator/editor",
+  "2118582237738234338": "算了，解释 rune 干嘛，直接看这个，看看有多疯，我们已经活在未来，你还在干嘛，直接把 UI 点着吧，Mac、Windows、Linux 全平台",
+  "2118317430665613741": "https://x.com/i/article/2118298893238845441",
+  "2118425482135826501": "给你的编码 agent 补上 HTML-in-Canvas 的最佳实践。\n\n用 Modern Web Guidance 的 agent 会在 canvas 上设置 content=\"drawable\"，把 HTML 元素放进去，并把内部 HTML 元素标为 drawable。它还会为不支持的浏览器准备回退。\n\n安装",
+  "2118479744979079669": "Hermes Agent v0.23.0：Hearth 版本\n\n亮点：\n- 桌面装进浏览器标签页\n- 一个网关接所有对话\n- /Rewind\n- 带自动路由的群聊\n- 付费工具的花费上限\n- 更轻更快\n还有更多\n\n更新日志见下",
+  "2118490890927067597": "Chrome 157 发布了，期待已久的「HTML-in-Canvas」正式内置。\n\n把 HTML 与 CSS 的布局直接搬进 <canvas>，随便加效果！\n这是网页表达上革命级的新能力。",
+  "2111319218692280472": "大致上，大家都在按各自的想法做这个东西\nhttps://github.com/google-research/harness2",
+  "2115599934380806255": "Shopify 的专题站，这次也很猛！\n\n这是 HTML-in-Canvas 的先进案例。在 Chrome 还在 origin trial 阶段就用到生产环境，这点也很酷。"
 }

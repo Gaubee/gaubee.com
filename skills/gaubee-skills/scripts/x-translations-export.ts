@@ -29,7 +29,10 @@ const REPO = path.resolve(import.meta.dir, "..", "..", "..");
 const TRANSLATIONS = path.resolve(import.meta.dir, "..", "translations", "x-tweets.zh.json");
 const SRC = path.join(sourceDir("x-likes"), "x.json");
 
-const hasCJK = (s: string): boolean => /[\u4e00-\u9fff]/.test(s);
+// 中文判定：有汉字且不含假名/谚文。日文常夹汉字，只看汉字会把日文当中文整条漏译
+// （2026-11-06 @clockmaker 的 Chrome 157 日文公告实证）。
+const hasCJK = (s: string): boolean =>
+  /[\u4e00-\u9fff]/.test(s) && !/[\u3040-\u30ff\uac00-\ud7af]/.test(s);
 
 // --verify：校验 out-NN 与 src-NN 键一一对应（merge 前置自检，不做写入）
 if (verifyOnly) {
