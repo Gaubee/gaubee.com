@@ -259,7 +259,7 @@
           class:app-overlay-hidden={!isThisActive}
           use:blurTransition={{ hiddenClass: "app-overlay-hidden" }}
         >
-          <AppShell app={manifest} activity={entryActivity} {location} />
+          <AppShell app={manifest} activity={entryActivity} {location} isActive={isThisActive} />
         </div>
       {/each}
 

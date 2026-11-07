@@ -28,12 +28,15 @@
     app,
     activity,
     location,
+    isActive = true,
   }: {
     app: AppManifest;
     /** 当前激活的 Activity（AreaOutlet 从 manifest.activities 中匹配得到）。 */
     activity: AppActivity;
     /** 当前 area 的 location（main/bottom/pop 之一）。 */
     location: HistoryLocation;
+    /** 本应用是否在前台可见（main 区按 tab 保活，后台视图传 false）。 */
+    isActive?: boolean;
   } = $props();
 
   let portalRoot = $state<HTMLElement | null>(null);
@@ -55,7 +58,7 @@
 </script>
 
 <div class="app-shell">
-  <ActivityRouter {activity} {location} />
+  <ActivityRouter {activity} {location} active={isActive} />
   <!-- 应用内浮层挂载点：bits-ui Portal 默认挂这里，不逃逸到 body -->
   <div class="app-portal-root" bind:this={portalRoot}></div>
 </div>

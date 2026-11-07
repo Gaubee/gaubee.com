@@ -32,9 +32,12 @@
   let {
     activity,
     location,
+    active = true,
   }: {
     activity: AppActivity;
     location: HistoryLocation;
+    /** 本应用是否在前台可见（AreaOutlet 按 tab 激活态传入；后台保活视图为 false）。 */
+    active?: boolean;
   } = $props();
 
   // root 在 AppActivity 类型层带泛型 P/S，运行时擦除后是 ErasedRouteContract。
@@ -106,10 +109,11 @@
       });
   });
 
-  // 5. 注入 Router 上下文（供子组件 useRoute/useParams/useSearch 消费）
-  //    用 $derived 保证 location 变化时 context 数据是最新的
+  // 5. 注入 Router 上下文（供子组件 useRoute/useParams/useSearch/useActive 消费）
+  //    用 $derived 保证 location / active 变化时 context 数据是最新的
   const ctxValue: RouterContextValue = $derived({
     activity,
+    active,
     location: { pathname: location.pathname, search: location.search },
     match: matchResult,
     params: parsedParams as Readonly<Record<string, unknown>> | undefined,

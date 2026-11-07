@@ -62,6 +62,7 @@ export {
   useParams,
   useSearch,
   useActivity,
+  useActive,
   useRouterContext,
 } from "./hooks.svelte";
 export type { RouterContextValue } from "./hooks.svelte";

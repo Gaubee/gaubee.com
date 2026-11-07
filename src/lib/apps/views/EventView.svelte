@@ -23,7 +23,7 @@
   import { contentQuery } from '$lib/content-pipeline/query.svelte'
   import type { ContentEntry } from '$lib/content-pipeline/types'
   import { navController } from '$lib/nav/nav-controller-instance'
-  import { useRoute, useSearch } from '$lib/router'
+  import { useRoute, useSearch, useActive } from '$lib/router'
   import { OWNER } from '$lib/github/client'
   import { authStore } from '$lib/auth/session.svelte'
   import NewContentDialog from './NewContentDialog.svelte'
@@ -45,6 +45,9 @@
   type EventSearch = { month?: string; item?: string }
   const getSearch = useSearch<EventSearch>()
   const getRoute = useRoute()
+  /** 本应用是否在前台（后台保活时不要跑 URL 规范化回写，见下面三个 effect）。 */
+  const getActive = useActive()
+  const isActive = $derived(getActive?.() ?? true)
 
   const isOwner = $derived(
     !!authStore.state.user && authStore.state.user.login.toLowerCase() === OWNER.toLowerCase(),
@@ -143,7 +146,10 @@
   }
 
   // 规范化 1（月份必显式）：URL 无月份或非法月份 → REPLACE 为最新月份（保留 hash 锚点）
+  // 仅在本应用前台时执行：后台保活视图拿到的是全局 location，别的应用导航（如回桌面）
+  // 会让 urlMonth 变空——不加这道门就会把 URL 抢回 /app/event（2026-11-08 桌面入口实证）。
   $effect(() => {
+    if (!isActive) return
     if (!contentQuery.initialized || months.length === 0) return
     if (urlMonth && months.some(([k]) => k === urlMonth)) return
     go({ month: months[0][0], hash: hashItem || undefined }, 'REPLACE')
@@ -151,6 +157,7 @@
 
   // 旧链接迁移（2026-10-10 前的 ?item= 深链）：迁到 hash 片段并 REPLACE 清 query 残留
   $effect(() => {
+    if (!isActive) return
     if (!urlItem) return
     hashItem = urlItem
     go({ month: currentMonth, hash: urlItem }, 'REPLACE')
@@ -158,6 +165,7 @@
 
   // 规范化 2（锚点定位）：hash 锚点与月参错位时，以锚点所在月份修正
   $effect(() => {
+    if (!isActive) return
     if (!contentQuery.initialized || !hashItem || !detailPost) return
     const m = monthKeyOf(detailPost.date)
     if (m !== currentMonth) go({ month: m, hash: hashItem }, 'REPLACE')

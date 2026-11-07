@@ -36,6 +36,10 @@ export interface RouterActivity {
 export interface RouterContextValue {
   /** 当前激活的 Activity。 */
   readonly activity: RouterActivity;
+  /** 本应用当前是否在前台可见。main 区按 tab 保活：后台应用同样常驻 DOM，且拿到的是
+   *  全局 location。依赖「自己是当前路由」的 effect（如 URL 规范化回写）必须先判这个，
+   *  否则会在别处导航时把 URL 抢回去（2026-11-08 桌面入口被后台 EventView 拉回的实证）。 */
+  readonly active: boolean;
   /** 完整 location（含 pathname / search）。 */
   readonly location: {
     readonly pathname: string;
@@ -129,4 +133,10 @@ export function useSearch<T = Record<string, unknown>>(): (() => T | undefined) 
 export function useActivity(): () => RouterActivity {
   const get = requireContextGetter();
   return () => get().activity;
+}
+
+/** 本应用是否在前台可见（getter，可响应）。后台保活的视图在跑 URL 类 effect 前应判它。 */
+export function useActive(): () => boolean {
+  const get = requireContextGetter();
+  return () => get().active;
 }
