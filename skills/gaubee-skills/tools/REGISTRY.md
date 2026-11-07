@@ -68,3 +68,5 @@
 | 2026-11-06 | report-lint | tools/2026-11-06-report-lint/ | 报告一致性门禁：已发布报告的占位残留 + 日报「总数」与 starred_at 实际累计对账（首跑抓出已发布 01869 的总数少 3，已修正报告源与事件） | proposed |          |
 | 2026-11-07 | vol-name-plan | tools/2026-11-07-vol-name-plan/ | 补丁卷名排期预演：未来 N 天各月份组卷名、跨月撞名实际落成什么名字、当月组哪天只能等（补 patch-precheck 只看当天） | proposed |          |
 | 2026-11-07 | x-daily-trans-coverage | tools/2026-11-07-x-daily-trans-coverage/ | X 日报渲染产物译文覆盖率审计：逐条判语言并点名「非中文没译文」（首跑抓到日文漏译 1 条，已补译并归零） | proposed |          |
+| 2026-11-08 | nav-effect-lint | tools/2026-11-08-nav-effect-lint/ | 后台保活视图「抢导航」静态检查：$effect 内导航必须判前台（isActive/useActive），外壳级例外标 nav-effect-allow（用修复前 EventView 回归，抓到 3 处） | proposed |          |
+| 2026-11-08 | x-daily-thread-gaps | tools/2026-11-08-x-daily-thread-gaps/ | X 日报线程标记缺链审计：按报告日逐条查 🧵/n-m 与 thread，直接给出 --ids 命令（首跑确认 11-07 hunch 已补链，演示删链可检出） | proposed |          |

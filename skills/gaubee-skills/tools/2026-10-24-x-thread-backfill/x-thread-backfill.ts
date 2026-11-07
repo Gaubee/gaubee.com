@@ -53,8 +53,10 @@ function scan(items: Entry[]): Entry[] {
     .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
 }
 
-/** ego-browser 打开推文页，收集页面上同作者的 status 链与各条正文（API 约定同 x-session-probe） */
-function grabThread(statusUrl: string): { links: [string, string][]; texts: string[] } | null {
+/** ego-browser 打开推文页，只收集页面上同作者的 status 链（id + 作者）。
+ *  正文不从这里取：X 会话开了自动翻译时 DOM 里是译文，而且 article 顺序含广告/推荐，
+ *  按 DOM 下标对齐会错位（2026-11-08 实证：thread 里写进了中文译文与外人回复）。 */
+function grabThread(statusUrl: string): { links: [string, string][] } | null {
   const script = `
 const task = await taskSpace("x-thread-backfill");
 const page = await task.newPage();
@@ -66,10 +68,7 @@ const data = await page.evaluate(() => {
     const m = a.href.match(/https:\\/\\/x\\.com\\/([A-Za-z0-9_]+)\\/status\\/(\\d{15,})/);
     if (m) seen.set(m[2], m[1]);
   }
-  const texts = [...document.querySelectorAll('article [data-testid="tweetText"]')].map(
-    (el) => el.innerText.trim()
-  );
-  return { links: [...seen.entries()], texts };
+  return { links: [...seen.entries()] };
 });
 console.log("GRAB:" + JSON.stringify(data));
 `;
@@ -86,14 +85,28 @@ console.log("GRAB:" + JSON.stringify(data));
     if (!line) return null;
     return JSON.parse(line.slice(line.indexOf("GRAB:") + 5)) as {
       links: [string, string][];
-      texts: string[];
     };
   } finally {
     rmSync(tmp, { force: true });
   }
 }
 
-function main(): number {
+/** syndication 取单条原文（免登录；X 会话的自动翻译不会污染这里）。 */
+async function fetchOriginal(id: string): Promise<{ id: string; text: string; author: string } | null> {
+  try {
+    const res = await fetch(`https://cdn.syndication.twimg.com/tweet-result?id=${id}&token=x`, {
+      headers: { "user-agent": "gaubee-skills-thread-backfill/1.0 (+https://gaubee.com)" },
+    });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { text?: string; user?: { screen_name?: string } };
+    if (!j.text || !j.user?.screen_name) return null;
+    return { id, text: j.text, author: j.user.screen_name };
+  } catch {
+    return null;
+  }
+}
+
+async function main(): Promise<number> {
   const argv = process.argv.slice(2);
   const idsIdx = argv.indexOf("--ids");
   const items = loadX();
@@ -130,26 +143,27 @@ function main(): number {
     }
     // 只留同作者链（剔除引用/转发的外人推文），按 id 数序 = 发帖序
     const own = grabJson.links.filter(([, name]) => name === t.author);
-    const linkMap = new Map(own);
-    const parts: ThreadPart[] = [...linkMap.entries()]
-      .sort((a, b) => (BigInt(a[0]) < BigInt(b[0]) ? -1 : 1))
-      .map(([pid]) => ({ id: pid, text: "" }));
-    // 正文按页面 DOM 顺序对齐（推文页时间线即线程顺序）；外人段落不占位
-    const ownIds = new Set(own.map(([pid]) => pid));
-    let di = 0;
-    for (const a of grabJson.links) {
-      if (!ownIds.has(a[0])) continue;
-      if (parts[di]) parts[di]!.text = grabJson.texts[di] ?? "";
-      di++;
+    const ownIds = own.map(([pid]) => pid).sort((a, b) => (BigInt(a) < BigInt(b) ? -1 : 1));
+    const parts: ThreadPart[] = [];
+    for (const pid of ownIds) {
+      const original = await fetchOriginal(pid);
+      if (!original || original.author !== t.author) {
+        // 取不到原文或作者对不上（已删/转发）→ 不写空壳段，留给下次重试
+        continue;
+      }
+      // 推文页会把作者对别人的回复也列出来（同作者但不在本线程里）：以「@ 开头」识别并剔除，
+      // 目标条目自身例外（它可能就是一条回复）。
+      if (pid !== id && /^@[A-Za-z0-9_]+/.test(original.text.trim())) continue;
+      parts.push({ id: pid, text: original.text });
     }
     if (parts.length <= 1) {
-      console.error(`  ${id}：页面只见到 ${parts.length} 条 status 链，不成链（可能已删或非线程）`);
+      console.error(`  ${id}：可取到原文的同作者段只有 ${parts.length} 条，不成链（可能已删或非线程）`);
       fail++;
       continue;
     }
     t.thread = parts;
     ok++;
-    console.log(`  ${id}：写回 ${parts.length} 段（@${t.author}）`);
+    console.log(`  ${id}：写回 ${parts.length} 段（@${t.author}，原文经 syndication 校正）`);
   }
   if (ok > 0) {
     const { writeFileAtomic } = require(path.resolve(import.meta.dir, "..", "..", "scripts", "lib.ts")) as {
@@ -161,4 +175,4 @@ function main(): number {
   return fail ? 2 : 0;
 }
 
-process.exit(main());
+process.exit(await main());

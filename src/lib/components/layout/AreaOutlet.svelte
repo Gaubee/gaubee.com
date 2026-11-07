@@ -200,6 +200,7 @@
   // ---- NotFound 处理 ----
   let lastNotFoundPath = "";
   $effect(() => {
+    // nav-effect-allow：外壳级重定向，按定义就发生在「当前 URL 无归属应用」时，不需要前台判断。
     if (!isNotFound) {
       lastNotFoundPath = "";
       return;

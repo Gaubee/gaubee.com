@@ -289,13 +289,13 @@ describe("reduceKernel: MOVE_TAB", () => {
 describe("reduceKernel: REORDER", () => {
   it("重排 main tabs", () => {
     const state = makeInitialState();
-    const newOrder: TabId[] = ["/app/shout", "/app/articles", ...state.mainTabs.slice(2)];
+    const newOrder: TabId[] = ["/app/event", "/app/articles", ...state.mainTabs.slice(2)];
     const result = reduceKernel(state, {
       type: "REORDER",
       area: "main",
       tabIds: newOrder,
     });
-    expect(result.nextState.mainTabs.slice(0, 2)).toEqual(["/app/shout", "/app/articles"]);
+    expect(result.nextState.mainTabs.slice(0, 2)).toEqual(["/app/event", "/app/articles"]);
     expect(result.persist).toBe("local");
   });
 
@@ -314,13 +314,13 @@ describe("reduceKernel: REORDER", () => {
     const result = reduceKernel(state, {
       type: "REORDER",
       area: "main",
-      tabIds: ["/app/shout"], // 只给一个，其余应被追加
+      tabIds: ["/app/event"], // 只给一个，其余应被追加
     });
     expect(result.nextState.mainTabs).toHaveLength(state.mainTabs.length);
-    expect(result.nextState.mainTabs[0]).toBe("/app/shout");
+    expect(result.nextState.mainTabs[0]).toBe("/app/event");
     // 补全的 tab 保留原相对顺序
     expect(result.nextState.mainTabs.slice(1)).toEqual(
-      state.mainTabs.filter((t: string) => t !== "/app/shout"),
+      state.mainTabs.filter((t: string) => t !== "/app/event"),
     );
   });
 
