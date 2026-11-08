@@ -53,13 +53,13 @@
 | 2026-10-27 | pipeline-gap-check | tools/2026-10-27-pipeline-gap-check/ | 每日管道漏跑门禁：四源 changes（按各自命名口径）+ 双日报 event 对账，缺口 exit 1（首跑即正确复现 10-21 会话事故形态；发布前缺口 2 = 未发布的双日报） | approved |          |
 | 2026-10-27 | data-write | tools/2026-10-27-data-write/ | 私有数据安全写包装：writeFileAtomic 通道治「脚本直写绕过 vault 镜像」根因，盘写去重时镜像层仍对账（验证：taxonomy 漂移 1→0，测试残留双侧清理） | approved |          |
 | 2026-10-28 | trans-tco-scrub | tools/2026-10-28-trans-tco-scrub/ | 译文 t.co 残留全库扫描与清洗：只剥译文多余短链（原文有的不动）；首跑 dry 抓到 1222 条/1610 链（占库近四成），--fix 因牵动大规模历史重渲染留 kzf 裁决 | approved |          |
-| 2026-10-28 | remux-probe | tools/2026-10-28-remux-probe/ | 本地媒体无损重封装可行性探针：ffprobe 只读判读哪些流可 copy、字幕容器限制、数据流去留（staging 双样本实测：h264+aac 全 copy；无音轨动图不误报） | proposed |          |
+| 2026-10-28 | remux-probe | tools/2026-10-28-remux-probe/ | 本地媒体无损重封装可行性探针：ffprobe 只读判读哪些流可 copy、字幕容器限制、数据流去留（staging 双样本实测：h264+aac 全 copy；无音轨动图不误报） | approved | 2026-11-08 kzf 授权 agent 自决：保留为 agent 内部工具（判断「这视频能不能无损换容器」时用），非用户日常入口 |
 | 2026-10-29 | star-readme | tools/2026-10-29-star-readme/ | 星标仓库 README 首屏速览：catalog 模糊匹配 + gh api 抽首段（跳徽章/图片/目录），回答「这个 star 到底是干嘛的」（mkvgo 实测） | approved |          |
 | 2026-10-29 | x-archive-coverage | tools/2026-10-29-x-archive-coverage/ | X 归档覆盖对账：posted/reposted 按日 vs 站点 x-archive-<date> 双侧核对（首跑抓到 10-02~04 真缺档 3 天 9 条；812 天孤档判读为 Data Archive 历史口径差异） | approved |          |
 | 2026-10-30 | commits-digest | tools/2026-10-30-commits-digest/ | 日报提交素材一条命令：各仓公私分布 + 私有仓样本消息（本地素材，写入日报前须重写为人话——R5） | approved |          |
 | 2026-10-30 | ssh-channel-doctor | tools/2026-10-30-ssh-channel-doctor/ | gaubee-cloud ssh 通道检查（lag-watch 前置早警）：known_hosts 快检 + kaku 在位 + BatchMode 试连，--fix 键缺失 keyscan 补录（首跑试连即 OK） | approved |          |
 | 2026-10-31 | registry-digest | tools/2026-10-31-registry-digest/ | 工坊待裁决清单汇总卡：proposed 行汇总成打勾卡（--md 落文件），首跑揭底——53 个提案 0 裁决，裁决环节从未启动 | approved |          |
-| 2026-10-31 | llm-mem-fit | tools/2026-10-31-llm-mem-fit/ | 端侧 LLM 内存适配估算：参数×位宽+KV 上界+运行时 vs 可用内存三档判定（首跑 1.7B/4bit 2.6GB 轻松、7B/8bit 11.3GB 贴线；KV 口径显式标注为 MHA 上界） | proposed |          |
+| 2026-10-31 | llm-mem-fit | tools/2026-10-31-llm-mem-fit/ | 端侧 LLM 内存适配估算：参数×位宽+KV 上界+运行时 vs 可用内存三档判定（首跑 1.7B/4bit 2.6GB 轻松、7B/8bit 11.3GB 贴线；KV 口径显式标注为 MHA 上界） | approved | 2026-11-08 kzf 授权 agent 自决：保留为 agent 内部工具（回答「这模型塞得进 16GB Mac 吗」时算账），非用户日常入口 |
 | 2026-11-04 | catchup-scan | tools/2026-11-04-catchup-scan/ | 补跑缺口扫描：区间内逐日核对四源 changes + 双日报，硬缺口（commits/GitHub 日报）与累积差分源的正常缺口分离（11-04 补跑即按此表执行） | approved |          |
 | 2026-11-04 | x-daily-guard | tools/2026-11-04-x-daily-guard/ | X 日报归窗防线：发布前查目标日报的推文是否跨窗重复（11-04 抓到生成器给出的 10-31 重复窗；另抓出 10-22/10-23 两条历史跨窗条目） | approved |          |
 | 2026-11-05 | cdn-cache-doctor | tools/2026-11-05-cdn-cache-doctor/ | cdn-base 缓存/单飞滞留探测：inflight_reserved 两次相同即判滞留（11-04 锁泄漏事故的工具化），附缓存水位与真实对象抽样、gen 滞后提示 | approved |          |
