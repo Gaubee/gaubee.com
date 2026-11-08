@@ -41,18 +41,22 @@ const count = (s: string, re: RegExp): number => (s.match(re) ?? []).length;
 
 /** 语言判定：假名/谚文优先，再看拉丁字母与汉字的比例；纯链接视为无需翻译 */
 function detectLang(text: string): Item["lang"] {
+  // <br> 链化会把 "https://" 与域名拆成两行：先冲掉完整 URL，再清残留的 scheme 词与裸域名
   const bare = text
-    .replace(/https?:\/\/\S+/g, "")
-    .replace(/\b(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}(?:\/\S*)?/g, "")
+    .replace(/https?:\/\/\S*/g, " ")
+    .replace(/\bhttps?\b/gi, " ")
+    .replace(/\b(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}(?:\/\S*)?/g, " ")
     .trim();
   if (bare.length === 0) return "url";
   if (count(bare, /[\u3040-\u30ff]/g) > 0) return "ja";
   if (count(bare, /[\uac00-\ud7af]/g) > 0) return "ko";
   const han = count(bare, /[\u4e00-\u9fff]/g);
   const latinWords = count(bare, /\b[A-Za-z][A-Za-z'-]*\b/g);
-  if (han === 0) return latinWords > 0 ? "en" : "other";
+  // 单个拉丁词（品牌名/术语，如「MacOS：⤵」）不算英文正文，避免把中文线程的首段误判
+  if (han === 0) return latinWords >= 2 ? "en" : "other";
   if (han >= 4 && latinWords <= 4) return "zh";
-  if (latinWords > han) return "en";
+  // 中文正文里夹产品名/技术词是常态（如「Rust 重写的 IntelliJ 风格 IDE」），要给汉字留余量
+  if (latinWords > han * 1.5) return "en";
   return "zh";
 }
 
@@ -62,12 +66,13 @@ function parseItems(html: string): Item[] {
   for (const chunk of chunks) {
     const author = stripTags(chunk.match(/class="x-arch-author"[^>]*>([^<]*)</)?.[1] ?? "?");
     const hasTrans = chunk.includes("x-arch-lang-switch") || chunk.includes("x-arch-trans");
-    // 有译文时原文在 x-arch-orig，没译文时正文就是裸 x-arch-text
-    const raw =
-      chunk.match(/class="x-arch-text x-arch-orig">([\s\S]*?)<\/div>/)?.[1] ??
-      chunk.match(/class="x-arch-text">([\s\S]*?)<\/div>/)?.[1] ??
-      "";
-    const text = stripTags(raw);
+    // 线程条目会把多段正文拆成多个 div：有译文时只看 orig 段，没译文时聚合全部正文
+    const divs = [...chunk.matchAll(/class="x-arch-text([^"]*)">([\s\S]*?)<\/div>/g)].map((m) => ({
+      cls: m[1] ?? "",
+      body: stripTags(m[2] ?? ""),
+    }));
+    const origs = divs.filter((d) => d.cls.includes("x-arch-orig"));
+    const text = (origs.length > 0 ? origs : divs).map((d) => d.body).join("\n");
     const lang = detectLang(text);
     const gap = !hasTrans && (lang === "ja" || lang === "ko" || lang === "en");
     items.push({ author, text, hasTrans, lang, gap });

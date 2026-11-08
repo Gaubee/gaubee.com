@@ -70,3 +70,5 @@
 | 2026-11-07 | x-daily-trans-coverage | tools/2026-11-07-x-daily-trans-coverage/ | X 日报渲染产物译文覆盖率审计：逐条判语言并点名「非中文没译文」（首跑抓到日文漏译 1 条，已补译并归零） | approved |          |
 | 2026-11-08 | nav-effect-lint | tools/2026-11-08-nav-effect-lint/ | 后台保活视图「抢导航」静态检查：$effect 内导航必须判前台（isActive/useActive），外壳级例外标 nav-effect-allow（用修复前 EventView 回归，抓到 3 处） | approved |          |
 | 2026-11-08 | x-daily-thread-gaps | tools/2026-11-08-x-daily-thread-gaps/ | X 日报线程标记缺链审计：按报告日逐条查 🧵/n-m 与 thread，直接给出 --ids 命令（首跑确认 11-07 hunch 已补链，演示删链可检出） | approved |          |
+| 2026-11-09 | x-daily-staleness | tools/2026-11-09-x-daily-staleness/ | X 日报陈旧稿检测：译文已入库但日报没渲染译/原切换的条目（今日人眼在 10-18/10-29 各抓到 1 条，工具化后全量 0 陈旧） | proposed |          |
+| 2026-11-09 | stars-integrity-audit | tools/2026-11-09-stars-integrity-audit/ | 星标完整性审计：改名配对（OpenMontage 换 owner）+ starred_at 静默修订（cicada 11-03→11-08，解释 report-lint 漂移） | proposed |          |

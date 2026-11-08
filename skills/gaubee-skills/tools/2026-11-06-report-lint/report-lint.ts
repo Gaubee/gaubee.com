@@ -34,15 +34,48 @@ function localDay(iso: string): string {
   return new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Asia/Shanghai" });
 }
 
-/** 日期 → 该日收盘（含当日）星标累计数 */
-function cumulativeByDay(): Map<string, number> {
+/**
+ * starred_at 静默修订：上游偶尔改写某仓库的 starred_at（2026-11-09 实证：cicada
+ * 11-03→11-08），历史累计会整体平移，但当时的日报并没有算错。这里用 changes 历史里
+ * 最后一次新增记录的旧值重建「当时的累计」，避免把数据修订误判成算术错误。
+ */
+function revisionSnapshot(): { recorded: Map<string, string>; cutoff: string } {
+  const recorded = new Map<string, string>();
+  const dir = path.join(DATA, "sources", "github-stars", "changes");
+  if (!existsSync(dir) || !existsSync(STARS)) return { recorded, cutoff: "" };
+  const files = readdirSync(dir).filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort();
+  if (files.length === 0) return { recorded, cutoff: "" };
+  const lastAdded = new Map<string, string>();
+  for (const f of files) {
+    const c = JSON.parse(readFileSync(path.join(dir, f), "utf8")) as {
+      added?: { full_name: string; starred_at?: string }[];
+    };
+    for (const a of c.added ?? []) if (a.starred_at) lastAdded.set(a.full_name, a.starred_at);
+  }
+  const current = new Map<string, string>();
+  const raw = JSON.parse(readFileSync(STARS, "utf8")) as {
+    repos: { full_name: string; starred_at?: string }[];
+  };
+  for (const r of raw.repos) if (r.starred_at) current.set(r.full_name, r.starred_at);
+  for (const [name, old] of lastAdded) {
+    const now = current.get(name);
+    if (now && localDay(now) !== localDay(old)) recorded.set(name, old);
+  }
+  return { recorded, cutoff: files.at(-1)!.slice(0, 10) };
+}
+
+/** 日期 → 该日收盘（含当日）星标累计数；historical=true 时用修订前的 starred_at */
+function cumulativeByDay(historical: { recorded: Map<string, string> } | null): Map<string, number> {
   const byDay = new Map<string, number>();
   if (!existsSync(STARS)) return byDay;
-  const raw = JSON.parse(readFileSync(STARS, "utf8")) as { repos: { starred_at?: string }[] };
+  const raw = JSON.parse(readFileSync(STARS, "utf8")) as {
+    repos: { full_name: string; starred_at?: string }[];
+  };
   const counts = new Map<string, number>();
   for (const r of raw.repos) {
-    if (!r.starred_at) continue;
-    const d = localDay(r.starred_at);
+    const starred = (historical && historical.recorded.get(r.full_name)) || r.starred_at;
+    if (!starred) continue;
+    const d = localDay(starred);
     counts.set(d, (counts.get(d) ?? 0) + 1);
   }
   let cum = 0;
@@ -68,7 +101,9 @@ function main(): number {
     console.error(`reports 目录缺失：${REPORTS}`);
     return 2;
   }
-  const cum = cumulativeByDay();
+  const cum = cumulativeByDay(null);
+  const revision = revisionSnapshot();
+  const cumHistorical = cumulativeByDay(revision);
   const problems: string[] = [];
 
   // 1) 占位残留（周/月/年报 + 日报）
@@ -102,7 +137,9 @@ function main(): number {
       const text = readFileSync(path.join(dailyDir, f), "utf8");
       const claimed = text.match(/总数\s*([0-9]+)/)?.[1];
       if (!claimed) continue; // 无星标节的日报（如零变更日）不校验
-      const real = cumAt(cum, day);
+      // 修订发生日之前的日报，用当时的 starred_at 口径对账（否则数据修订会被当成算错）
+      const map = revision.cutoff && day < revision.cutoff ? cumHistorical : cum;
+      const real = cumAt(map, day);
       if (real !== null && Number(claimed) !== real)
         problems.push(`daily/${f}：写「总数 ${claimed}」，实测该日累计 ${real}`);
     }
