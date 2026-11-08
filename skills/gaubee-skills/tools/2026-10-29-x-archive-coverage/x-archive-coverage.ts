@@ -3,8 +3,10 @@
  * x-archive-coverage — X 归档覆盖对账（posted/reposted 维度）
  *
  * xd-window-audit 管 liked 的「恰一窗」（日报维度）；本工具管 posted/reposted 的
- * 归档覆盖：x.json 里这两类条目按推文本地日聚合，逐日核对 src/content/events
- * 是否存在 x-archive-<date>.md。缺档/孤儿双侧报告。
+ * 归档覆盖：x.json 里这两类条目按推文本地日聚合，逐日核对是否已有 x-archive-<date>.md
+ * 或 X 日报（x-daily / 旧混合报）覆盖。缺档/孤档双侧报告。
+ * 口径（2026-11-08 修）：GitHub 日报不算 X 覆盖（它不含 X 内容）；孤档只算「有归档
+ * 但库存该日完全无条目」，只有 liked 的日子不再误报。
  *
  * 用法：bun tools/2026-10-29-x-archive-coverage/x-archive-coverage.ts
  * 退出码：0 = 双侧对齐；1 = 有缺口。纯本地秒级。
@@ -33,21 +35,29 @@ function main(): number {
   };
   // 推文本地日 → posted/reposted 条数
   const want = new Map<string, number>();
+  // 任意 kind 的本地日集合（孤儿判定用：有 liked 的日期不算无源）
+  const anyDay = new Set<string>();
   for (const t of Object.values(x.items)) {
-    if (t.kind !== "posted" && t.kind !== "reposted") continue;
     if (!t.created_at) continue;
     const d = localDay(t.created_at);
+    anyDay.add(d);
+    if (t.kind !== "posted" && t.kind !== "reposted") continue;
     want.set(d, (want.get(d) ?? 0) + 1);
   }
-  // 站点侧已有归档日期集合
+  // 站点侧已有归档日期集合 + 策展日报覆盖日期（x-daily / 旧混合报）
   const have = new Set<string>();
+  const dailyCovered = new Set<string>();
   for (const f of readdirSync(EVENTS)) {
     const m = f.match(/^0\d+\.x-archive-(\d{4}-\d{2}-\d{2})\.md$/);
     if (m) have.add(m[1]!);
+    const d = f.match(/(?:signals-daily|x-daily)-(\d{4}-\d{2}-\d{2})/)?.[1];
+    if (d) dailyCovered.add(d);
   }
 
-  const missing = [...want.keys()].filter((d) => !have.has(d)).sort();
-  const orphan = [...have].filter((d) => !want.has(d)).sort();
+  // 缺档 = 有 posted/reposted、既没有归档也没有 X 日报覆盖（GitHub 日报不算 X 覆盖）
+  const missing = [...want.keys()].filter((d) => !have.has(d) && !dailyCovered.has(d)).sort();
+  // 孤档 = 有归档但库存里该日完全没有 X 条目（旧口径把「只有 liked」的日子全判成孤档，噪声 812 天）
+  const orphan = [...have].filter((d) => !anyDay.has(d)).sort();
   console.log(`x.json posted/reposted 共 ${[...want.values()].reduce((a, b) => a + b, 0)} 条、分布 ${want.size} 天；站点归档 ${have.size} 天`);
   if (missing.length) {
     console.log(`缺档 ${missing.length} 天：`);

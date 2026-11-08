@@ -63,10 +63,12 @@ async function main() {
     : {};
 
   // 已有策展日报覆盖的日期归档跳过（避免与策展层重复）：
-  // signals-daily-（旧混合报）、github-daily-（GitHub 日报，2026-10-05 拆分）、x-daily-（X 日报）
+  // signals-daily-（旧混合报）、x-daily-（X 日报）。
+  // 不把 github-daily- 算作覆盖：GitHub 日报不含 X 内容，若据此跳过，那些只有 GitHub
+  // 日报的日期，X 动态就永远没有落点（2026-11-08 实证：10-02~04 等 7 天 X 条目无归档）。
   const dailyCovered = new Set(
     readdirSync(EVENTS_DIR)
-      .map((f) => f.match(/(?:signals-daily|github-daily|x-daily)-(\d{4}-\d{2}-\d{2})/)?.[1])
+      .map((f) => f.match(/(?:signals-daily|x-daily)-(\d{4}-\d{2}-\d{2})/)?.[1])
       .filter(Boolean) as string[],
   );
 
@@ -99,7 +101,12 @@ async function main() {
     list.push(t);
     byDay.set(day, list);
   }
-  const days = [...byDay.keys()].filter((d) => !dailyCovered.has(d)).sort();
+  // 已有归档即使日报已覆盖也要重写（内容是派生数据）：后续补的 poster/译文/线程
+  // 得能回流，否则一旦某天出了策展日报，旧归档就永久冻结（2026-11-08 实证：18 条
+  // 视频缺 poster 全卡在 10-12~17 的冻结归档里）。日报覆盖只拦「新生成」。
+  const days = [...byDay.keys()]
+    .filter((d) => !dailyCovered.has(d) || existingByDay.has(d))
+    .sort();
   console.error(
     `有动态的日期 ${byDay.size} 天；跳过日报已覆盖 ${dailyCovered.size} 天；待生成 ${days.length} 天（新日子从 ${String(nextFree).padStart(5, "0")} 起续号）`,
   );
