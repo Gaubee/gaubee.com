@@ -72,3 +72,5 @@
 | 2026-11-08 | x-daily-thread-gaps | tools/2026-11-08-x-daily-thread-gaps/ | X 日报线程标记缺链审计：按报告日逐条查 🧵/n-m 与 thread，直接给出 --ids 命令（首跑确认 11-07 hunch 已补链，演示删链可检出） | approved |          |
 | 2026-11-09 | x-daily-staleness | tools/2026-11-09-x-daily-staleness/ | X 日报陈旧稿检测：译文已入库但日报没渲染译/原切换的条目（今日人眼在 10-18/10-29 各抓到 1 条，工具化后全量 0 陈旧） | proposed |          |
 | 2026-11-09 | stars-integrity-audit | tools/2026-11-09-stars-integrity-audit/ | 星标完整性审计：改名配对（OpenMontage 换 owner）+ starred_at 静默修订（cicada 11-03→11-08，解释 report-lint 漂移） | proposed |          |
+| 2026-11-10 | weekly-digest | tools/2026-11-10-weekly-digest/ | 周报动笔前的跨源素材：区间内各仓提交数与代表消息、星标按 taxonomy 分类、X 按 kind 计数（11-02~08 首跑 7 仓/24 星标/6 组 X） | proposed |          |
+| 2026-11-10 | repo-rename-reconciler | tools/2026-11-10-repo-rename-reconciler/ | 星标改名对账（gh 301 探测）：抓「改名+改描述」漏网（douyin-comments→saas-growth-agents），核对 taxonomy 引用 | proposed |          |
