@@ -36,18 +36,27 @@ function daysBetween(from: string, to: string): string[] {
 	return out;
 }
 
-/** 各源 changes 目录里最晚的日期（用于推断缺口起点） */
-function latestChangeDate(): string {
+/** 单个源 changes 目录里最晚的日期（只看 <= 昨天，今天的抓取不算已覆盖） */
+function latestFor(src: string, yesterday: string): string {
 	let best = "";
-	for (const src of ["github-stars", "github-commits", "github-deps", "x-likes"]) {
-		const dir = path.join(SOURCES, src, "changes");
-		if (!existsSync(dir)) continue;
-		for (const f of readdirSync(dir)) {
-			const m = f.match(/^(\d{4}-\d{2}-\d{2})\.json$/);
-			if (m && m[1]! > best) best = m[1]!;
-		}
+	const dir = path.join(SOURCES, src, "changes");
+	if (!existsSync(dir)) return "";
+	for (const f of readdirSync(dir)) {
+		const m = f.match(/^(\d{4}-\d{2}-\d{2})\.json$/);
+		if (m && m[1]! <= yesterday && m[1]! > best) best = m[1]!;
 	}
 	return best;
+}
+
+/** 缺口起点按「最早断掉的源」算：取各源最晚日期的最小值。
+ *  2026-11-11 实证：今天的 stars fetch 先写了当日 changes，若取最大值会把区间
+ *  压成「今天..昨天」而空转，commits 明明缺一天却报「无硬缺口」。 */
+function latestChangeDate(yesterday: string): string {
+	const dates = ["github-stars", "github-commits", "github-deps", "x-likes"]
+		.map((src) => latestFor(src, yesterday))
+		.filter(Boolean)
+		.sort();
+	return dates[0] ?? "";
 }
 
 function eventExists(slug: string): boolean {
@@ -62,14 +71,18 @@ function main(): number {
 		return i >= 0 ? (argv[i + 1] ?? dflt) : dflt;
 	};
 	const yesterday = localDay(Date.now() - 24 * 3600_000);
-	const latest = latestChangeDate();
+	const latest = latestChangeDate(yesterday);
 	const fromDefault = latest
 		? localDay(new Date(`${latest}T00:00:00+08:00`).getTime() + 24 * 3600_000)
 		: yesterday;
 	const from = arg("--from", fromDefault);
 	const to = arg("--to", yesterday);
 
-	console.log(`补跑区间 ${from} .. ${to}（数据最晚 ${latest || "无"}，考察口径：报告日 = T-1）`);
+	if (from > to) {
+		console.log(`区间为空：各源 changes 已覆盖到 ${to}（最早断源的最晚日期 ${latest || "无"}），无需补跑`);
+		return 0;
+	}
+	console.log(`补跑区间 ${from} .. ${to}（最早断源 ${latest || "无"}，考察口径：报告日 = T-1）`);
 	const days = daysBetween(from, to);
 	const gaps: string[] = [];
 	const soft: string[] = [];

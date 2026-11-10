@@ -74,3 +74,5 @@
 | 2026-11-09 | stars-integrity-audit | tools/2026-11-09-stars-integrity-audit/ | 星标完整性审计：改名配对（OpenMontage 换 owner）+ starred_at 静默修订（cicada 11-03→11-08，解释 report-lint 漂移） | proposed |          |
 | 2026-11-10 | weekly-digest | tools/2026-11-10-weekly-digest/ | 周报动笔前的跨源素材：区间内各仓提交数与代表消息、星标按 taxonomy 分类、X 按 kind 计数（11-02~08 首跑 7 仓/24 星标/6 组 X） | proposed |          |
 | 2026-11-10 | repo-rename-reconciler | tools/2026-11-10-repo-rename-reconciler/ | 星标改名对账（gh 301 探测）：抓「改名+改描述」漏网（douyin-comments→saas-growth-agents），核对 taxonomy 引用 | proposed |          |
+| 2026-11-11 | privacy-audit | tools/2026-11-11-privacy-audit/ | 发布仓隐私红线体检：私有数据是否进 git（data/sources、profile、feedback-log、vault、.env）+ 发布内容本机绝对路径（首跑 4 条误报已收窄，现 0） | proposed |          |
+| 2026-11-11 | event-number-audit | tools/2026-11-11-event-number-audit/ | 站点 event 编号/slug 完整性：重号与重复 slug 硬错、编号空洞提示（首跑 1410 个 event、0 重号 0 重复 slug、490 个历史空洞） | proposed |          |
