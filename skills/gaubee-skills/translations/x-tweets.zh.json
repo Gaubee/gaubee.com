@@ -3201,5 +3201,17 @@
   "2119790369621655647": "让 Claude 加上这 8 个东西，打击手感立刻变好\n\n1. 顿帧：命中时双方冻结 5 帧\n2. 受击闪白：敌人纯白 2 帧\n3. 击退：往后推 12px，8 帧内缓出\n4. 屏幕震动：3px，10 帧内稳定\n5.",
   "2119853374158032950": "1/ 宣布我们最小、最高效的小模型来了：muse ember 🔥\n\n它专为 agent 整天重复的工作打造，在任意推理档位下，每美元能换到的智能都超过 Haiku、Luna 等所有 flash 模型，成本还只有三分之一或更低！",
   "2119787088631435314": "unfake.js\n\n把 AI 像素画清理成真正的 1x 精灵图：尺寸固定、调色板收紧、没有模糊\n\nunfake.js 把 AI 图变成干净可用的素材。它的像素画模式会修正像素大小不均、颜色溢出等瑕疵。\n\n它会探测真实像素尺寸，即使在",
-  "2119683891577733247": "NSH 生态在长大。@wwwalkerrun 把 NativeScript 跑进了 NSH 的 JavaScript VM。\n\n用 NSH TSX 写 UI。需要某个 NSH 还没封装的 AppKit、UIKit 或 Android API？有了这层桥，你可以直接从 TypeScript 调。\n\n原生遇上原生！"
+  "2119683891577733247": "NSH 生态在长大。@wwwalkerrun 把 NativeScript 跑进了 NSH 的 JavaScript VM。\n\n用 NSH TSX 写 UI。需要某个 NSH 还没封装的 AppKit、UIKit 或 Android API？有了这层桥，你可以直接从 TypeScript 调。\n\n原生遇上原生！",
+  "2120347559239811222": "https://github.com/vurglepuddle/raster_to_pixel\n…",
+  "2120509393666281835": "你的笔记本现在成了整栋房子的嗓子。\n\nBoubou 用一条命令把开源 TTS 模型变成本地运行时。同一 Wi-Fi 下的手机、机器人或智能家居都能和它说话。\n\n100% 本地。基于 @LiquidAI_ 与 @huggingface 🤗\n\nhttps://github.com/runboubou/boubou",
+  "2120360869192425670": "Eldiron\n\n做 2D、等距或第一人称的复古 RPG\n\nEldiron 把世界编辑、游戏引擎、渲染与程序化美术合成一个创作者工具，支持 Windows、macOS 与 Linux。它支持多人游戏与程序化内容生成。\n\nMaterialZ 工具可以编辑 PBR",
+  "2120421268046422237": "PixelCraft\n\n在独立桌面编辑器里画精灵图并做动画\n\nPixelCraft 是像素画、精灵图与动画的早期 alpha 编辑器。它不依赖 Aseprite，自带 Lua 运行时、扩展与项目存储。\n\n图层分组、索引调色板编辑，",
+  "2120540672696451162": "一家中国大实验室联系我，想让我帮忙把 Fable 蒸馏进他们的模型。我拒绝了。\n\n我建议他们去用那几百万本没有版权的书。我提出可以帮忙挑书，并用另一种方式训练模型。他们只想要蒸馏，而这",
+  "2120436519215481216": "Skills CLI v1.8 现在带程序化 API 了！试试看，我们很想听你的反馈！",
+  "2120490516471259237": "NSH v0.5.0 发布了！\n\n- TUI：用 Ratatui 后端在终端里跑 NSH 应用。新的 Terminal 组件还能让你在应用里嵌入终端。\n- 桌面应用：多窗口、系统托盘、全局快捷键、单实例模式、通知、URL scheme 与文件",
+  "2119850259115278777": "✨ 共享 UI 不再是预览功能了。\n\nCompose Multiplatform 在 Android、iOS 与桌面端稳定，Web 端 Beta。\n\n还有热重载即时更新，以及 Junie——JetBrains 的 AI 编码 agent——可以生成整屏界面。\n\n更快交付惊艳的共享 UI 👇",
+  "2120202137200218314": "💥Modern Web Guidance 到 1.0 了！\n\n编码模型的训练数据容易停留在旧时代，MWG 是一套由行业专家审过的技能。它覆盖性能、可访问性、安全与最前沿的 Web 技术\n\n上手很简单：\n🛠️ npx modern-web-guidance@latest install\n或者你",
+  "2120157431409910270": "抱歉我不在乎这是哪个模型做的，但这是 LLM 做的、还能在浏览器里跑，这让我震惊\n\nhttps://claude.ai/artifact/BGY1SztrAYcJQHSsnHHGmp",
+  "2120243978679321060": "flip to tip v2 🪙\n\n没有慢动作，只有缓动带来的细节悬停感",
+  "2120285372458360988": "raster_to_pixel\n\n把照片和粗糙草图变成像素画，不用上传图片\n\nREADME 里叫 Pixeline，raster_to_pixel 把模糊的位图转成像素画 PNG。浏览器应用无需安装，图片留在你的设备上。\n\n它能检测"
 }
