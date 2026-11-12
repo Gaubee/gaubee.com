@@ -156,6 +156,23 @@ secret、零入站端口、零面板暴露；CI 推完 ghcr 后至多 5 分钟�
      属主变成 `admin:admin(1000)`，而容器内进程是 `nonroot(65532)`，导致
      `logins.json: permission denied`。修复：`chown -R 65532:65532` 后重启容器。
 
+### magpie 的出站代理：香港机已关闭（2026-11-12 实证）
+
+`magpie`（上游 OpenCode / Command Code / OpenDesign / moxuna / Zhipu 等的聚合网关）
+的代理配置在 `config-b/magpie/settings.json` 的 `proxy` 字段。
+
+- **北京机必须走代理**：直连 `api.ipify.org` 超时（被墙），故配
+  `http://<user>:<pass>@aiweb-clash:7893`。这是代理存在的**唯一原因**。
+- **香港机直连即可**：实测 6 个上游各 10 次全部 **10/10** 零丢包
+  （opencode.ai / api.commandcode.ai / jpn.cdn.moxuna.com / open.bigmodel.cn /
+  cn2.s2api.top / api.apib.ai），境外通用站（Google/OpenAI/Anthropic/GitHub）8/8。
+  2026-11-12 已切 `"proxy": "direct"`，回归 7/7 模型 200、连续 15 次零失败、
+  并发 5/5 全通；出口 IP 由 `16.106.72.210` 变为本机 `47.82.76.102`；
+  内存占用 347MB → 191MB。
+- **直连比代理更快**：Zhipu（国内接口）经境外代理绕行时 0.65s，直连 0.08s（快 8 倍）。
+- **回滚**：`settings.json` 里 `proxy` 改回 `proxyCustom` 的值（保留未删）后重启容器；
+  备份文件 `settings.json.bak-before-direct-*`。`aiweb-clash` 容器暂不删，观察后再决定。
+
 ### 文件结构
 
 ```
