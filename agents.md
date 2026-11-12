@@ -60,23 +60,32 @@
 - 使用 `pnpm -w run dev` 可以启动http服务
 - 使用 `pnpm -w run check` 来获取ts类型检查，使用`pnpm -w run check:watch`可以实时监控
 
-## 部署架构（2026-08-14 更新：双通道）
+## 部署架构（2026-11-12 更新：源站迁香港）
 
 ### 心智模型
 
 ```
-gaubee.com（zone 在 Cloudflare，A 记录 → 国内服务器，灰云 DNS-only）
-├── 主站静态站（国内服务器单通道，2026-08-15 起）
-│   docker.io/gaubee/gaubee.com 镜像（Rust scratch）→ docker compose
-│   外层反代 8080 → 443 + TLS（1Panel 管）
-│   （GitHub Pages 部署已随 DNS 切换退役，最后部署版本留作灾备快照不再更新）
-└── auth.gaubee.com ── Cloudflare Worker「gaubae-auth」
-                      经 Workers Custom Domain 绑定（自动签边缘证书 + 建路由）
-                      职责：/auth/github（OAuth 发起）+ /auth/github/callback + /upload/image
+gaubee.com（zone 在阿里云 DNS，NS=dns9/dns10.hichina.com）
+│
+├── 生产源站 = 阿里云香港 47.82.76.102（2026-11-12 起，A 记录 @/www/auth/* 全指此机）
+│   docker.io/gaubee/gaubee.com 镜像（Rust scratch）→ docker compose @17080
+│   openresty（1Panel v1.10.34，host 网络）终结 TLS，443 → 17080
+│   auth.gaubee.com → 本机 gaubee-auth systemd @17090
+│   cdn-media.gaubee.com → 同 17080（cdn-base 的 Host 路由）
+│   watchtower（label-enable，5min）自动跟进 ghcr latest
+│
+└── 灾备源站 = 阿里云北京 39.107.213.167（2026-11-12 起降级，DNS 不再指向）
+    同一套 1Panel + compose 布局；保留至观察期满，回滚只需改 4 条 A 记录
 ```
 
-主站域名不变（gaubee.com），前端直连 api.github.com + OAuth 跳 auth.gaubee.com，
-故主站迁移不影响 Worker 的 CORS 白名单与 OAuth 三方一致性。
+**迁移裁决（2026-11-12，Owner）**：北京机被 magpie/weknora/postgres 等非站点服务
+拖垮（1.8GB 内存 + load 26 + swap 耗尽），整站迁香港（3.5GB 内存，load 4-6）。
+新加坡机 47.79.238.118 曾试但**废弃**：大陆链路 TCP 可通、TLS 握手被切断
+（`no peer certificate available`），不可用。
+
+**香港的真实代价（实测，不可忽略）**：大陆 → 香港 跨境 TTFB 1.0–2.6s，
+北京源站为 0.2–0.7s。香港机器本机 17080 响应 1ms、本机 443 全链路 15ms，
+证明延迟全在跨境链路而非服务器。若日后大陆体验变差，回滚北京即可。
 
 ### 静态服务器（static-server/，2026-08-15：nginx → Rust）
 
@@ -127,7 +136,8 @@ ghcr.io 为备用通道（国内直连极慢，仅境外/加速器失效时用�
 
 ### 服务器自动拉取（2026-10-09 简化定稿：watchtower 现役，webhook 废弃）
 
-gaubee-cloud（1Panel 应用 `gaubeeos`）现役机制 = **compose 内置 watchtower 轮询**：
+现役源站（香港 `gaubee-hk`，2026-11-12 起；北京 `gaubee-cloud` 同构保留作热备）的
+1Panel 应用 `gaubeeos` 机制 = **compose 内置 watchtower 轮询**：
 每 5 分钟检查镜像 latest 变化，只更新带 `watchtower.enable=true` label 的 web 容器，
 已实跑验证一轮真实更新（2026-10-09，扫描→停旧→起新→清旧镜像全自动）。零 GitHub
 secret、零入站端口、零面板暴露；CI 推完 ghcr 后至多 5 分钟自动上线。
@@ -136,8 +146,15 @@ secret、零入站端口、零面板暴露；CI 推完 ghcr 后至多 5 分钟�
   API + `WATCHTOWER_WEBHOOK_URL`）已废弃不再使用；CI 的 notify 步骤在两个 secret 均未
   配置时自动跳过，无需改动。
 - 仓库模板 `docker-compose.yml` 的 watchtower 在 `profiles: [auto-update]` 下默认不启动
-  （自管服务器模板语义不变）；gaubee-cloud 的 1Panel compose 为无 profile 常驻版，见
+  （自管服务器模板语义不变）；现役机的 1Panel compose 为无 profile 常驻版，见
   `deploy/cdn-base-rollout.md` §2.1 现役拓扑收据。
+- **镜像克隆机必须校验的两处（2026-11-12 实证）**：
+  1. **WAF 站点注册表** `1pwaf/data/conf/sites.json` 不会随镜像更新——香港机带的是
+     2026-08-12 的旧快照，缺 `auth.gaubee.com` / `status.gaubee.com` 等条目，
+     未注册 Host 被 WAF 直接 403。修复：从旧机拷 sites.json 进容器 + `openresty -s reload`。
+  2. **挂载目录的数字 UID** 丢失——`rsync`/`tar` 克隆后 `/home/admin/apps/magpie/config-b`
+     属主变成 `admin:admin(1000)`，而容器内进程是 `nonroot(65532)`，导致
+     `logins.json: permission denied`。修复：`chown -R 65532:65532` 后重启容器。
 
 ### 文件结构
 

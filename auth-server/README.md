@@ -2,6 +2,8 @@
 
 Cloudflare Worker（`worker/`）中除头像反代外的全部职责的自托管实现。
 **2026-10-18 kzf 裁决**：登录/上传迁国内服务器（gaubee-cloud），不再依赖 CF；
+**2026-11-12 更新**：整个源站（含本服务）迁至阿里云香港 47.82.76.102，
+SSH 别名 `gaubee-cloud` 已指向香港（北京旧机改名 `gaubee-cloud-old` 作热备）。
 头像反代留守 CF（自定义域 `twimg.tweb.xin`，源站不可达 pbs.twimg.com 实证）。
 
 ## 迁移动机与背景

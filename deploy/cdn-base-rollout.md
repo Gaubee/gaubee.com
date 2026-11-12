@@ -162,9 +162,15 @@ npx wrangler deploy --env production   # 首次部署自动应用 migrations（n
 - 未来接入加速域（ESA 等）：新域同样 CNAME/Host 路由到 8080，规则里 `mediaBase` 填该域——
   灰度/回滚都改规则，不碰 DNS。
 
-### 2.1 存量国内服务器现役拓扑（gaubee-cloud，2026-10-09 实配收据）
+### 2.1 存量服务器现役拓扑（2026-10-09 实配收据；2026-11-12 源站迁香港）
 
-事实前提：该服务器（Aliyun 北京）**到 `raw.githubusercontent.com` 无可靠通路**
+> **2026-11-12 迁移**：源站从阿里云北京 39.107.213.167 迁至香港 47.82.76.102，
+> 4 条 A 记录（`@`/`www`/`auth`/`*`）已切；北京机保留为热备（别名 `gaubee-cloud-old`），
+> SSH 别名 `gaubee-cloud` 现在指香港。本节拓扑**两台机器同构**，下述路径与端口在
+> 香港机逐条实测通过（`lag-watch` gen 34、`cdn-cache-doctor` 8961 对象、auth 200）。
+> 迁移动机与香港的跨境延迟代价见 `agents.md` §部署架构。
+
+事实前提：北京机**到 `raw.githubusercontent.com` 无可靠通路**
 （v4 间歇性 RST/超时，无全局 IPv6，clash 节点当时不可用），而 `api.github.com`、
 `github.com`（含 git over 443）、`objects.githubusercontent.com` 均直连可用。
 cdn-base 的 manifest 指针链只依赖 raw 一处，故在服务器本地建指针镜像：
