@@ -80,3 +80,5 @@
 | 2026-11-12 | report-commit-count-audit | tools/2026-11-12-report-commit-count-audit/ | 日报「公开/私有提交数」与 history 对账（首跑 19 份抓到 4 处偏差，含 11-10 的 95→94，报告与 event 同步修正） | proposed |          |
 | 2026-11-14 | pipeline-completeness-audit | tools/2026-11-14-pipeline-completeness-audit/ | 每日管道六项体检（提交/双日报/媒体入卷/Graph/发布），补 catchup-scan 管不到的后半段（首跑抓到 11-13 缺提交与 GitHub 日报） | proposed |          |
 | 2026-11-14 | backfill-plan | tools/2026-11-14-backfill-plan/ | 漏跑补给的逐日命令清单，X 行自动算正确 run-date（首跑给出 11-13 的三步，含 github-commits-fetch 与 x-daily-events --run-date 2026-11-14） | proposed |          |
+| 2026-11-15 | rename-impact-audit | tools/2026-11-15-rename-impact-audit/ | 星标改名的影响面清单：从 changes 认改名，扫 taxonomy/历史报告/已发布 event 的旧名残留（首跑 19 对改名、35 文件残留，抓到 agent2api 大小写与 facebook→meta/lexical 两处 taxonomy 错误） | proposed |          |
+| 2026-11-15 | x-daily-rundate-check | tools/2026-11-15-x-daily-rundate-check/ | 补跑前预演 X 日报 run-date 配对与预计条数（按生成器真实口径去重，四天预估 16/2/16/13 与实际完全一致） | proposed |          |

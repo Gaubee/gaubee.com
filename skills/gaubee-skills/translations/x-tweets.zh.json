@@ -3220,5 +3220,13 @@
   "2120942205124886879": "image-to-world 2.0 上线了 @theworldlabs",
   "2120960992700145711": "有意思：😀😀\n\n「一个鸡蛋，从外面打破是食物；从里面打破是生命。」\n\n这个比喻来自中国的民间智慧，讲的道理简单却深刻：真正的改变与重生只能",
   "2121210951961641451": "我们开始做「behavior」这个概念时，就想让 agent 真正把可访问性做对。我们在 UI SDK 的 behavior 如何处理并校验无障碍界面上花了很多心思。\n\n所以当你要 agent 用 UI SDK 构建界面时，",
-  "2120974803406377280": "📣 宣布稳定的原生直接互操作 → https://goo.gle/4fnjpY3\n\n面向 Objective-C 的 FFIgen 与面向 Java/Kotlin 的 JNIgen 都已稳定，Pigeon 把它们串起来，让插件可以直接调用原生代码。"
+  "2120974803406377280": "📣 宣布稳定的原生直接互操作 → https://goo.gle/4fnjpY3\n\n面向 Objective-C 的 FFIgen 与面向 Java/Kotlin 的 JNIgen 都已稳定，Pigeon 把它们串起来，让插件可以直接调用原生代码。",
+  "2121616609987203466": "哈哈，看来中国以外有很多人发现了 CrommaCode 的视频，所以我正式发一条英文帖：\n\n简单说，它是一个游戏化的 ADE。它把 agent 的工具调用，以及以前默默做的事，全都变成漂亮的视觉呈现。声音和音效是核心",
+  "2121393022353215679": "Budget3D\n\n任意令牌预算下的图像到 3D 生成\n\nHF：https://huggingface.co/BudgetAny",
+  "2121505142487081422": "我不觉得 GPU 价格在暴跌，它仍然比 6 个月前高\n\n但市面上飘着很多货在找买家，尤其是风冷的那些\n\n接下来几个月要是出现更多，我也不会意外",
+  "2121309080350322876": "Cloudflare 把专为智能体设计的 Kitesurf 浏览器开源了！\n\nKitesurf 实际上是 headless 浏览器，用 Rust 和 WebAssembly 写的，不用 chromium 引擎，很容易在 Worker 上跑起来！\n\n好处是 CPU 和内存占用比原来低到约七分之一",
+  "2120821389267800317": "Firefox 现在支持用 Fetch API 流式上传，Web 应用可以用 ReadableStream 增量发送请求体，不必先把整个 body 缓冲下来。\nhttps://bugzilla.mozilla.org/20894581",
+  "2121234887000649805": "🌊 Distortion Wave 现已上线 npm\n\n一个函数，形状和 startViewTransition() 一样，任何元素都能用，支持触摸、点击与键盘。\n\n零依赖，一次 WebGL2 pass，gzip 后约 17 kB。\n\n另外有个 CodePen，放了 40 个可点击的 UI 部件。\n\nhttps://codepen.io/LukyVj/pen/jEBJpLp",
+  "2121256840650801337": "我们把邮件 API 重写成 Go。\n\n花了 7 周、140 个 PR，已经在生产跑了几周：中位延迟约为原来一半，每个任务的内存约为七分之一。\n\n下面是我们把最关键的 API 迁到 Go 的全过程 👇",
+  "2121323444600291502": "为了理解 UI SDK，我用它和不用它各建了同一个页面，然后跑同一个 AI agent 在同一批任务上对比。\n\n结果：\n\n用 UI SDK：快 43%，工具调用少 74%，0 次截图。\n（Claude Sonnet 5.5，3 次运行取中位数）\n\nhttps://ui-sdkdemo.vercel.app"
 }
