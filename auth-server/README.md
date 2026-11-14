@@ -64,9 +64,9 @@ sudo cp deploy/auth.gaubee.com.conf（仓库内模板） /opt/1panel/apps/openre
 sudo /usr/local/openresty/nginx/sbin/nginx -t && sudo nginx -s reload   # 路径以服务器实际为准
 
 # 5. DNS 生效前预验证（无需改 DNS 即可全链路演练）
-curl --resolve auth.gaubee.com:443:39.107.213.167 https://auth.gaubee.com/
+curl --resolve auth.gaubee.com:443:47.82.76.102 https://auth.gaubee.com/
 
-# 6. kzf 在阿里云 DNS 控制台：auth 记录 CNAME(workers.dev) → A 39.107.213.167
+# 6. kzf 在阿里云 DNS 控制台：auth 记录 CNAME(workers.dev) → A 47.82.76.102（香港生产源站）
 # 7. geo 规则种子：从 CF DO 导出当前规则写入 /opt/gaubee-auth/data/geo-rules.json
 ```
 

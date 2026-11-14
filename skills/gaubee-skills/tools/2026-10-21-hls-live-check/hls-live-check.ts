@@ -9,8 +9,10 @@
  * 三态收据：OK（媒体+页面都对）｜MEDIA_ONLY（媒体可达但页面仍引用旧 mp4 → 待 --render-pending）｜
  * BROKEN（页面引用了但媒体不可达 → 真断链）｜UNPUBLISHED（媒体未发布且页面未引用 → 等 cron 入卷，正常）。
  * 直连源站 IP（curl --resolve）绕开本机 clash fake-ip 对 DNS 的污染。
+ * 默认源站 = 阿里云香港 47.82.76.102（2026-11-12 起的生产源站）。北京 39.107.213.167
+ * 已于 2026-11-14 下线，别再拿旧 IP 直连——连不上不是 HLS 坏了。
  *
- * 运行：bun hls-live-check.ts [--limit 20] [--all] [--ids a,b] [--host gaubee.com] [--ip 39.107.213.167]
+ * 运行：bun hls-live-check.ts [--limit 20] [--all] [--ids a,b] [--host gaubee.com] [--ip 47.82.76.102]
  * 退出码：0 = 无 BROKEN；1 = 存在 BROKEN。
  */
 import { readdirSync, readFileSync } from "node:fs";
@@ -65,7 +67,7 @@ function get(host: string, ip: string, pathname: string, range?: string, timeout
 
 function main(): number {
 	const host = argOf("--host") ?? "gaubee.com";
-	const ip = argOf("--ip") ?? "39.107.213.167";
+	const ip = argOf("--ip") ?? "47.82.76.102";
 	const all = process.argv.includes("--all");
 	const limit = all ? Infinity : Number(argOf("--limit") ?? 20);
 	const onlyIds = argOf("--ids")?.split(",").filter(Boolean);

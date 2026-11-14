@@ -74,8 +74,8 @@ gaubee.com（zone 在阿里云 DNS，NS=dns9/dns10.hichina.com）
 │   cdn-media.gaubee.com → 同 17080（cdn-base 的 Host 路由）
 │   watchtower（label-enable，5min）自动跟进 ghcr latest
 │
-└── 灾备源站 = 阿里云北京 39.107.213.167（2026-11-12 起降级，DNS 不再指向）
-    同一套 1Panel + compose 布局；保留至观察期满，回滚只需改 4 条 A 记录
+└── 灾备源站 = 阿里云北京 39.107.213.167（2026-11-12 起降级，**2026-11-14 下线**）
+    下线后回滚路径不再是「改 4 条 A 记录」；要回滚得先把北京机重新拉起并部署
 ```
 
 **迁移裁决（2026-11-12，Owner）**：北京机被 magpie/weknora/postgres 等非站点服务

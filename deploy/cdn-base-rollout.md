@@ -165,9 +165,10 @@ npx wrangler deploy --env production   # 首次部署自动应用 migrations（n
 ### 2.1 存量服务器现役拓扑（2026-10-09 实配收据；2026-11-12 源站迁香港）
 
 > **2026-11-12 迁移**：源站从阿里云北京 39.107.213.167 迁至香港 47.82.76.102，
-> 4 条 A 记录（`@`/`www`/`auth`/`*`）已切；北京机保留为热备（别名 `gaubee-cloud-old`），
-> SSH 别名 `gaubee-cloud` 现在指香港。本节拓扑**两台机器同构**，下述路径与端口在
-> 香港机逐条实测通过（`lag-watch` gen 34、`cdn-cache-doctor` 8961 对象、auth 200）。
+> 4 条 A 记录（`@`/`www`/`auth`/`*`）已切；SSH 别名 `gaubee-cloud` 现在指香港。
+> 本节拓扑下述路径与端口在香港机逐条实测通过（`lag-watch` gen 34、
+> `cdn-cache-doctor` 8961 对象、auth 200）。
+> **2026-11-14：北京机下线**（Owner 裁决），热备与「改 A 记录即回滚」的路径随之作废。
 > 迁移动机与香港的跨境延迟代价见 `agents.md` §部署架构。
 
 事实前提：北京机**到 `raw.githubusercontent.com` 无可靠通路**

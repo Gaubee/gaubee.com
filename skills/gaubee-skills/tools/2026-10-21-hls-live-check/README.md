@@ -24,7 +24,10 @@ bun tools/2026-10-21-hls-live-check/hls-live-check.ts --all           # 全量
 bun tools/2026-10-21-hls-live-check/hls-live-check.ts --ids 2111176930812998035
 ```
 
-旗标：`--limit N` / `--all` / `--ids a,b` / `--host gaubee.com` / `--ip 39.107.213.167`。前置：curl。
+旗标：`--limit N` / `--all` / `--ids a,b` / `--host gaubee.com` / `--ip 47.82.76.102`。前置：curl。
+
+默认 `--ip` 是香港生产源站 47.82.76.102（2026-11-12 起）。北京 39.107.213.167 已于
+2026-11-14 下线，旧默认值会让每条都报连不上——那是 IP 过期，不是 HLS 坏了。
 
 ## 真实示例输出（2026-10-21 01:5x，媒体尚未入卷的过渡态）
 
