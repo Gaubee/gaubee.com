@@ -41,6 +41,13 @@ function statusIdOf(htmlUrl: string): string {
   return htmlUrl.split("/status/")[1]?.split("?")[0] ?? "";
 }
 
+/** YYYY-MM-DD + n 天（按本地日，跨月/跨年由 Date 归一） */
+function addDaysStr(date: string, n: number): string {
+  const d = new Date(`${date}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return localDate(d);
+}
+
 /** 统一口径选条目（导出供测试）：
  * - liked/bookmarked 走抓取差分；差分未覆盖的存量赞（changes 追踪基线 2026-10-04 之前
  *   入账，任何 changes 文件都没有它）回退 created_at 本地日窗——基线后每条赞都恰好出现
@@ -58,8 +65,15 @@ export function selectDailyEntries(
   for (const a of changesAdded) {
     const id = statusIdOf(a.html_url ?? "");
     if (!id) continue;
-    if (items[id]) diffIds.push(id);
-    else unresolved++;
+    const t = items[id];
+    if (!t) {
+      unresolved++;
+      continue;
+    }
+    // posted/reposted 的口径是 created_at 时间窗（见上），差分只负责 liked/bookmarked。
+    // 跨多日补抓的差分里会混进别天的 post，顺着差分收进来就是越窗（2026-11-14 实证）。
+    if (t.kind === "posted" || t.kind === "reposted") continue;
+    diffIds.push(id);
   }
   // 2) 时间窗：posted/reposted 的 created_at 本地日 == date（与归档分组同一 localDateOf 口径）
   const windowIds = Object.values(items)
@@ -148,9 +162,24 @@ async function main() {
     ? JSON.parse(await Bun.file(mediaMetaFile).text())
     : {};
 
-  const { entries, unresolved, fallbackIds } = selectDailyEntries(store.items, changes.added ?? [], date, allChangesIds);
+  // 差分与报告日必须配对：liked/bookmarked 的归窗口径是 run-date − 1。
+  // 补跑漏掉的日期时 run-date 会晚于 date+1（一次抓取差分跨了两天），整份差分再算一次
+  // 就是同一批条目在相邻两天各发一份（2026-11-14 实证：11-12/11-13 各 18 条全同）。
+  // 不配对时差分不可用于该日，只按 posted/reposted 的 created_at 时间窗选条目。
+  const diffApplies = runDate === addDaysStr(date, 1);
+  if (!diffApplies) {
+    console.error(
+      `注意：run-date ${runDate} 不是 date ${date} 的次日，抓取差分不归属该日，仅按发布时间窗选条目`,
+    );
+  }
+  const { entries, unresolved, fallbackIds } = selectDailyEntries(
+    store.items,
+    diffApplies ? (changes.added ?? []) : [],
+    date,
+    allChangesIds,
+  );
   console.error(
-    `口径：date=${date} run-date=${runDate}；差分 added ${(changes.added ?? []).length}（回查未命中 ${unresolved}）；存量回退 ${fallbackIds.length}；选中 ${entries.length} 条`,
+    `口径：date=${date} run-date=${runDate}；差分 added ${diffApplies ? (changes.added ?? []).length : 0}（未采用 ${diffApplies ? 0 : (changes.added ?? []).length}；回查未命中 ${unresolved}）；存量回退 ${fallbackIds.length}；选中 ${entries.length} 条`,
   );
   if (entries.length === 0) {
     console.error("FAIL 选中条目为 0——不生成空日报（fail-closed）");

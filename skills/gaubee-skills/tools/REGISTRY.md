@@ -78,3 +78,5 @@
 | 2026-11-11 | event-number-audit | tools/2026-11-11-event-number-audit/ | 站点 event 编号/slug 完整性：重号与重复 slug 硬错、编号空洞提示（首跑 1410 个 event、0 重号 0 重复 slug、490 个历史空洞） | proposed |          |
 | 2026-11-12 | taxonomy-dedupe | tools/2026-11-12-taxonomy-dedupe/ | 策展分类重复条目体检：同分类重复直接删、跨分类重复交人工（首跑抓到 Agent2API 同分类重复与 solid-glass 跨分类，均已修） | proposed |          |
 | 2026-11-12 | report-commit-count-audit | tools/2026-11-12-report-commit-count-audit/ | 日报「公开/私有提交数」与 history 对账（首跑 19 份抓到 4 处偏差，含 11-10 的 95→94，报告与 event 同步修正） | proposed |          |
+| 2026-11-14 | pipeline-completeness-audit | tools/2026-11-14-pipeline-completeness-audit/ | 每日管道六项体检（提交/双日报/媒体入卷/Graph/发布），补 catchup-scan 管不到的后半段（首跑抓到 11-13 缺提交与 GitHub 日报） | proposed |          |
+| 2026-11-14 | backfill-plan | tools/2026-11-14-backfill-plan/ | 漏跑补给的逐日命令清单，X 行自动算正确 run-date（首跑给出 11-13 的三步，含 github-commits-fetch 与 x-daily-events --run-date 2026-11-14） | proposed |          |

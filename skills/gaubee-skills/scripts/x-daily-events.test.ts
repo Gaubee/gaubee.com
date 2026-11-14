@@ -26,8 +26,8 @@ import { selectDailyEntries } from "./x-daily-events.ts";
 const SCRIPT = path.resolve(import.meta.dir, "x-daily-events.ts");
 
 const DATE = "2026-10-07";
-const RUN = "2026-10-09";
-const OTHER_RUN = "2026-10-08";
+const RUN = "2026-10-08"; // 报告日的次日：差分配对成立
+const OTHER_RUN = "2026-10-09"; // 更晚的差分：不属于该报告日
 
 // 时间窗夹具用本机构造，保证任何时区下 localDateOf 归日均成立
 const insideIso = new Date(`${DATE}T10:00:00`).toISOString(); // 本地 10:00 → 本地日 = DATE
@@ -128,6 +128,13 @@ describe("selectDailyEntries（纯函数，统一口径核心）", () => {
     expect(fallbackIds).toEqual([]);
     expect(entries.map((e) => e.id)).not.toContain("l-legacy");
   });
+
+  test("差分里的 posted/reposted 不按差分入选：口径只认 created_at 时间窗", () => {
+    // 跨日补抓的差分会把别天的 post 卷进来（2026-11-14 实证）；差分只负责 liked/bookmarked
+    const added = [{ html_url: "https://x.com/whoever/status/p-out", language: "posted" }];
+    const { entries } = selectDailyEntries(fixtureItems, added, DATE);
+    expect(entries.map((e) => e.id)).not.toContain("p-out");
+  });
 });
 
 describe("x-daily-events CLI（隔离夹具端到端）", () => {
@@ -183,6 +190,27 @@ describe("x-daily-events CLI（隔离夹具端到端）", () => {
       expect(r.code).not.toBe(0);
       expect(r.stderr).toContain("fail-closed");
       expect(existsSync(path.join(fx.root, "site", "skills", "gaubee-skills", "reports", "daily", `${DATE}-x.md`))).toBe(false);
+    } finally {
+      rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+
+  test("run-date 不是次日：差分整份不归属，只按发布时间窗选条目", () => {
+    const fx = makeFixture();
+    try {
+      // 补跑漏掉的日子时 run-date 会晚于 date+1，一次差分跨了两天；
+      // 若不配对，同一批赞会在相邻两天各发一份（2026-11-14 实证 11-12/11-13 全同）
+      const r = runGen(fx.env, ["--date", DATE, "--run-date", OTHER_RUN]);
+      expect(r.code).toBe(0);
+      expect(r.stderr).toContain("不是 date");
+      const text = readFileSync(
+        path.join(fx.root, "site", "skills", "gaubee-skills", "reports", "daily", `${DATE}-x.md`),
+        "utf8",
+      );
+      // 差分条目（l-old）不入选；日期窗内的 p-in 与存量回退 l-legacy 仍在
+      expect(text).not.toContain("/status/l-old");
+      expect(text).toContain("/status/p-in");
+      expect(text).toContain("author_l-legacy");
     } finally {
       rmSync(fx.root, { recursive: true, force: true });
     }

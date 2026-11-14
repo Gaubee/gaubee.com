@@ -3213,5 +3213,12 @@
   "2120202137200218314": "💥Modern Web Guidance 到 1.0 了！\n\n编码模型的训练数据容易停留在旧时代，MWG 是一套由行业专家审过的技能。它覆盖性能、可访问性、安全与最前沿的 Web 技术\n\n上手很简单：\n🛠️ npx modern-web-guidance@latest install\n或者你",
   "2120157431409910270": "抱歉我不在乎这是哪个模型做的，但这是 LLM 做的、还能在浏览器里跑，这让我震惊\n\nhttps://claude.ai/artifact/BGY1SztrAYcJQHSsnHHGmp",
   "2120243978679321060": "flip to tip v2 🪙\n\n没有慢动作，只有缓动带来的细节悬停感",
-  "2120285372458360988": "raster_to_pixel\n\n把照片和粗糙草图变成像素画，不用上传图片\n\nREADME 里叫 Pixeline，raster_to_pixel 把模糊的位图转成像素画 PNG。浏览器应用无需安装，图片留在你的设备上。\n\n它能检测"
+  "2120285372458360988": "raster_to_pixel\n\n把照片和粗糙草图变成像素画，不用上传图片\n\nREADME 里叫 Pixeline，raster_to_pixel 把模糊的位图转成像素画 PNG。浏览器应用无需安装，图片留在你的设备上。\n\n它能检测",
+  "2121249063576228036": "我们刚把「基于 DOM 还是 WebGPU canvas」这场争论结了。\n\n这是我们的 WebGPU canvas 渲染约 7,000 个真实 HTML/CSS 帧、超过 200 万个元素，跑到 120 fps。\n\n而且不只是静态设计稿。每一帧都跑着你的完整应用，可以随便点。\n\n我们自研了 HTML",
+  "2121279422984851601": "我们把 Command Code GOAT 里的 GLM-5.3 额度从 20 美元提到 70 美元。\n\n- 10 美元/月就有 7 倍用量\n- 100 万 token 上下文\n- Pro 和 Max 更多\n\n🐐",
+  "2120994964255748490": "Exact 性能很强，但它也带来了极快的开发体验。\n\n今天我们公布两个服务，都还在 alpha：\n- Exact Build：高速（基于 Linux）的 iOS 构建服务\n- AppDrop：简单签名并把 IPA 分发给任何人",
+  "2120942205124886879": "image-to-world 2.0 上线了 @theworldlabs",
+  "2120960992700145711": "有意思：😀😀\n\n「一个鸡蛋，从外面打破是食物；从里面打破是生命。」\n\n这个比喻来自中国的民间智慧，讲的道理简单却深刻：真正的改变与重生只能",
+  "2121210951961641451": "我们开始做「behavior」这个概念时，就想让 agent 真正把可访问性做对。我们在 UI SDK 的 behavior 如何处理并校验无障碍界面上花了很多心思。\n\n所以当你要 agent 用 UI SDK 构建界面时，",
+  "2120974803406377280": "📣 宣布稳定的原生直接互操作 → https://goo.gle/4fnjpY3\n\n面向 Objective-C 的 FFIgen 与面向 Java/Kotlin 的 JNIgen 都已稳定，Pigeon 把它们串起来，让插件可以直接调用原生代码。"
 }
