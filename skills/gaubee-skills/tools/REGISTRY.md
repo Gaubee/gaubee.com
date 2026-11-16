@@ -84,3 +84,5 @@
 | 2026-11-15 | x-daily-rundate-check | tools/2026-11-15-x-daily-rundate-check/ | 补跑前预演 X 日报 run-date 配对与预计条数（按生成器真实口径去重，四天预估 16/2/16/13 与实际完全一致） | proposed |          |
 | 2026-11-16 | star-cumulative-attribution | tools/2026-11-16-star-cumulative-attribution/ | 星标累计漂移的归因：区分「改名被当新增」「starred_at 修订」与真正的算错（首跑 23 份全部归因、0 unknown，证实是 10-24 改名与 cicada 修订所致，不必改历史） | proposed |          |
 | 2026-11-16 | staging-clean-preview | tools/2026-11-16-staging-clean-preview/ | 周清理前的按条目归组核对视图：每组给文件数/大小/入卷比例 + 入卷/孤儿/HLS 完整三项自检（446 行平铺清单折成几十行，首跑 45 组全绿） | proposed |          |
+| 2026-11-17 | ai-tone-locate | tools/2026-11-17-ai-tone-locate/ | 把 ai-tone 的密度超标落到具体句子：逐句列出顿号/破折号/提示语等命中（11-16 实测把 4 处并列结构从「肉眼找」变成清单，修掉两个误判：误排列表项、误算星标条目） | proposed |          |
+| 2026-11-17 | taxo-note-guard | tools/2026-11-17-taxo-note-guard/ | taxonomy 链接位自洽检查：只比链接文字与 URL，注释里的历史名不算违规（解决「原 google/gvisor」被误判为残留引用的误报，首跑 158 链接全过） | proposed |          |
