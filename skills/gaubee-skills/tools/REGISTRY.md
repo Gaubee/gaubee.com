@@ -82,3 +82,5 @@
 | 2026-11-14 | backfill-plan | tools/2026-11-14-backfill-plan/ | 漏跑补给的逐日命令清单，X 行自动算正确 run-date（首跑给出 11-13 的三步，含 github-commits-fetch 与 x-daily-events --run-date 2026-11-14） | proposed |          |
 | 2026-11-15 | rename-impact-audit | tools/2026-11-15-rename-impact-audit/ | 星标改名的影响面清单：从 changes 认改名，扫 taxonomy/历史报告/已发布 event 的旧名残留（首跑 19 对改名、35 文件残留，抓到 agent2api 大小写与 facebook→meta/lexical 两处 taxonomy 错误） | proposed |          |
 | 2026-11-15 | x-daily-rundate-check | tools/2026-11-15-x-daily-rundate-check/ | 补跑前预演 X 日报 run-date 配对与预计条数（按生成器真实口径去重，四天预估 16/2/16/13 与实际完全一致） | proposed |          |
+| 2026-11-16 | star-cumulative-attribution | tools/2026-11-16-star-cumulative-attribution/ | 星标累计漂移的归因：区分「改名被当新增」「starred_at 修订」与真正的算错（首跑 23 份全部归因、0 unknown，证实是 10-24 改名与 cicada 修订所致，不必改历史） | proposed |          |
+| 2026-11-16 | staging-clean-preview | tools/2026-11-16-staging-clean-preview/ | 周清理前的按条目归组核对视图：每组给文件数/大小/入卷比例 + 入卷/孤儿/HLS 完整三项自检（446 行平铺清单折成几十行，首跑 45 组全绿） | proposed |          |
