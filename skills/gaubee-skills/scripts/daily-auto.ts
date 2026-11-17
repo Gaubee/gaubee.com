@@ -33,7 +33,7 @@
  * 退出码：0 = 全部硬步骤成功；1 = 有硬步骤失败（收据里列出）；2 = 用法错误。
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -296,6 +296,16 @@ function writeReceipt(): string {
     softFails: results.filter((r) => r.status === "fail" && r.hardness === "soft").map((r) => r.name),
   };
   writeFileSync(file, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  // 按天追加：last-run 只留最后一次，会把 06:00 那轮（真正的抓取）覆盖成 06:30 的幂等补齐。
+  // 06:30 接手时要判断的是「首轮跑成什么样」，所以每次运行都追加一行历史（dry-run 不入账）。
+  if (!dry) {
+    const ledger = path.join(RECEIPT_DIR, `runs-${TODAY}.jsonl`);
+    try {
+      appendFileSync(ledger, `${JSON.stringify({ ...payload, results: payload.results })}\n`, "utf8");
+    } catch {
+      // 账本写失败不影响主流程
+    }
+  }
   return file;
 }
 

@@ -86,3 +86,5 @@
 | 2026-11-16 | staging-clean-preview | tools/2026-11-16-staging-clean-preview/ | 周清理前的按条目归组核对视图：每组给文件数/大小/入卷比例 + 入卷/孤儿/HLS 完整三项自检（446 行平铺清单折成几十行，首跑 45 组全绿） | proposed |          |
 | 2026-11-17 | ai-tone-locate | tools/2026-11-17-ai-tone-locate/ | 把 ai-tone 的密度超标落到具体句子：逐句列出顿号/破折号/提示语等命中（11-16 实测把 4 处并列结构从「肉眼找」变成清单，修掉两个误判：误排列表项、误算星标条目） | proposed |          |
 | 2026-11-17 | taxo-note-guard | tools/2026-11-17-taxo-note-guard/ | taxonomy 链接位自洽检查：只比链接文字与 URL，注释里的历史名不算违规（解决「原 google/gvisor」被误判为残留引用的误报，首跑 158 链接全过） | proposed |          |
+| 2026-11-18 | morning-brief | tools/2026-11-18-morning-brief/ | 06:00 跑批后的一屏摘要：跑批结果/各源变更/媒体水位/待办清单（首跑暴露 last-run 被幂等补齐覆盖的问题，改为按天记账本并读首轮） | proposed |          |
+| 2026-11-18 | commit-workflow-groups | tools/2026-11-18-commit-workflow-groups/ | 日报提交段的工作流预聚类：按仓库+conventional 前缀分桶再按共享词合并（13 条→6 组，199 条→64 组） | proposed |          |
