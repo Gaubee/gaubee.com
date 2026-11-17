@@ -271,6 +271,12 @@ function stageVerify(): void {
   push(run("HLS 抽检", bun("tools/2026-10-21-hls-live-check/hls-live-check.ts", "--limit", "6"), { timeoutSec: 400 }), "soft");
   push(run("部署冒烟", bun("tools/2026-10-13-deploy-smoke/deploy-smoke.ts", "--n", "4"), { timeoutSec: 300 }), "soft");
   const ci = run("CI 状态", ["gh", "run", "list", "--repo", "Gaubee/gaubee.com", "--limit", "1", "--json", "status,conclusion", "-q", '.[] | "\\(.status) \\(.conclusion // \"-\")"'], { timeoutSec: 90 });
+  // gh 对「构建中」也返回 0；这里要区分「绿」与「还没跑完」，别把 in_progress 当通过
+  if (ci.status === "ok" && /in_progress|queued|pending/.test(ci.out ?? "")) {
+    ci.status = "skip";
+    ci.detail = "CI 构建中（稍后复跑 verify）";
+    console.log("  · CI 仍在构建，未判定为绿");
+  }
   push(ci, "soft");
 }
 

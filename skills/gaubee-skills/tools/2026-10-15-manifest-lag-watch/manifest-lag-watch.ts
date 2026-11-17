@@ -39,11 +39,40 @@ console.log(`本地指针 gen：${local.gen}`);
 const stats = sh(
   `command ssh ${sshHost} "curl -s -m 10 http://127.0.0.1:8081/cdn-media-admin/stats"`,
 );
-if (stats.code !== 0 || !stats.out.startsWith("{")) {
-  console.log(`FAIL 服务器 admin stats 不可达（${stats.out.slice(0, 80) || stats.code}）`);
-  process.exit(1);
+
+/**
+ * 2026-11-17 起服务器换了部署形态（/etc/edge + docker run，不再映射 8081 admin 端口），
+ * admin stats 变成连接被拒。此时改用两条只读证据对账，语义不变——都是「服务器实际在用的 gen」：
+ *   1. 容器日志里的 manifest 已加载：gen=N（真实交付状态，最可信）
+ *   2. 服务器指针镜像 /srv/cdn-media-pointer/manifest/current.json 的 gen（次之）
+ */
+function remoteGenViaSsh(): { gen: number; source: string } | null {
+  const loaded = sh(
+    `command ssh ${sshHost} "docker logs --tail 2000 gaubeeos 2>&1 | grep -o 'manifest 已加载：gen=[0-9]*' | tail -1"`,
+  );
+  const m1 = loaded.out.match(/gen=(\d+)/);
+  if (m1) return { gen: Number(m1[1]), source: "容器已加载" };
+
+  const ptr = sh(
+    `command ssh ${sshHost} "python3 -c \\"import json;print(json.load(open('/srv/cdn-media-pointer/manifest/current.json'))['gen'])\\""`,
+  );
+  const m2 = ptr.out.match(/^(\d+)$/m);
+  if (m2) return { gen: Number(m2[1]), source: "服务器指针文件" };
+  return null;
 }
-const remote = JSON.parse(stats.out) as { manifest: { gen: number; loaded: boolean } };
+
+let remote: { manifest: { gen: number; loaded: boolean } };
+if (stats.code !== 0 || !stats.out.startsWith("{")) {
+  const fb = remoteGenViaSsh();
+  if (!fb) {
+    console.log(`FAIL 服务器 admin stats 不可达（${stats.out.slice(0, 80) || stats.code}），且日志/指针兜底也取不到 gen`);
+    process.exit(1);
+  }
+  console.log(`admin stats 不可达（${(stats.out || String(stats.code)).slice(0, 40)}），改用${fb.source}对账`);
+  remote = { manifest: { gen: fb.gen, loaded: true } };
+} else {
+  remote = JSON.parse(stats.out) as { manifest: { gen: number; loaded: boolean } };
+}
 console.log(`服务器 manifest gen：${remote.manifest.gen}（loaded=${remote.manifest.loaded}）`);
 
 let failed = 0;
@@ -51,11 +80,12 @@ if (remote.manifest.gen < local.gen) {
   failed++;
   console.log(`FAIL 滞后：服务器 gen-${remote.manifest.gen} 落后本地 gen-${local.gen}（gen-7 起的对象公网 404）`);
 }
-// token 健康：从服务器 compose 取 token（值不出服务器），对 cdn-media 仓做一次认证探针
+// token 健康：从服务器取 token（值不出服务器，只回 HTTP 码），对 api.github.com 做认证探针
 // 注意：fine-grained PAT 后缀含下划线，字符类必须含 _（2026-10-17 实证：漏 _ 会截断
 // token 使探针恒 401，把「指针镜像停更」误诊为「token 失效」）
+// 2026-11-17：compose 文件随部署形态变化消失，优先从容器 env 取，旧 compose 路径留作兜底。
 const probe = sh(
-  `command ssh ${sshHost} "TOKEN=\\$(grep -o 'github_pat_[A-Za-z0-9_]*' /opt/1panel/apps/local/gaubeeos/GaubeeOS/docker-compose.yml | head -1); curl -s -o /dev/null -m 10 -w '%{http_code}' -H \\"Authorization: Bearer \\$TOKEN\\" https://api.github.com/rate_limit"`,
+  `command ssh ${sshHost} "TOKEN=\\$(docker inspect gaubeeos --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | sed -n 's/^CDN_GITHUB_TOKEN=//p' | head -1); [ -n \\"\\$TOKEN\\" ] || TOKEN=\\$(grep -o 'github_pat_[A-Za-z0-9_]*' /opt/1panel/apps/local/gaubeeos/GaubeeOS/docker-compose.yml 2>/dev/null | head -1); curl -s -o /dev/null -m 10 -w '%{http_code}' -H \\"Authorization: Bearer \\$TOKEN\\" https://api.github.com/rate_limit"`,
 );
 console.log(`token 探针（rate_limit 认证）：HTTP ${probe.out}`);
 if (probe.out.trim() !== "200") {
