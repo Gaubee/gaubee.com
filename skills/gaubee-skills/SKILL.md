@@ -134,7 +134,7 @@ GitHub 年报 `GitHub 年报：2026`。
 - **两段式（2026-11-17 起）**：机械步骤与判断步骤分离，机械部分收进 `scripts/daily-auto.ts`。
   - **06:00 launchd `com.kzf.gaubee-skills.daily-fetch`**：跑 `daily-auto --stage fetch`（环境自检、星标、提交、依赖、Graph、X 抓取富化封面、媒体打包发布、媒体元数据、发布硬门、译文导出）。日志 `~/.gaubee-skills/automation/launchd-fetch.log`，收据 `~/.gaubee-skills/automation/last-run-fetch.json`。
   - **06:30 ZCode 定时任务**：先跑一次 `daily-auto --stage fetch` 幂等补齐（已完成的跳过，通常几秒），再做判断类工作——taxonomy 策展、译文、日报正文、周月年报分析、工坊、发布、验收。
-- **为什么执行必须在 Mac**：gh 登录态、X 的 ego-browser 会话、私有数据根、cdn-media staging 都在本机。服务器（香港）没有这些，也没有 bun/node/gh。服务器若要当定时器，用 `deploy/server-daily-trigger.sh`（需先建 Mac→服务器 22 端口反向隧道并在 Mac 放行公钥，见脚本头注释）；未就绪时它会干净失败并留日志，不会误跑半截管道。
+- **为什么执行必须在 Mac**：gh 登录态、X 的 ego-browser 会话、私有数据根、cdn-media staging 都在本机。服务器（香港）没有这些，也没有 bun/node/gh。**Owner 2026-11-17 裁决：不依赖服务器**，定时器就跑在 iMac 的 06:00 launchd 上；`deploy/server-daily-trigger.sh` 是未启用的备选方案，不要在服务器安装。
 - **幂等口径（重要）**：`daily-auto` 对每个源先看 `changes/<date>.json` 在不在，在就跳过抓取。重抓会把差分窗口切成两段、破坏 X 归窗（见 §8 归窗规则），所以**不要用 `--force` 重抓当日**，除非确认要重算。
 - **每日 08:30 / 21:00 的旧双任务形态已合并**：08:30 主任务改为 06:30（见上），21:00 补漏任务若仍存在只应刷新数据、不重发报告。
 - **手动运行**（脚本顺序即管道顺序；日常不需要手跑，用 daily-auto）：
