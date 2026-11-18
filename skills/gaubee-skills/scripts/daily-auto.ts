@@ -269,12 +269,96 @@ function readToneRed(): number {
 
 // --------------------------------------------------------------- verify
 
+/** 等部署收敛：CI 跑完 + 容器换成新镜像。
+ *  2026-11-18/19 连续两天实证：发布后立刻跑 verify，HLS 会报 UNPUBLISHED 6 条、
+ *  冒烟 2/4 不过——不是断链，是 CI 还在构建、watchtower 还没换镜像。
+ *  这里先等，等不到就明确说「部署未收敛」，不要把时序问题记成内容故障。 */
+function waitDeploy(maxSec = 420): StepResult {
+  const started = Date.now();
+  const deadline = started + maxSec * 1000;
+  const eventsDir = path.join(SITE, "src", "content", "events");
+  const newest = existsSync(eventsDir)
+    ? readdirSync(eventsDir)
+        .filter((f) => f.endsWith(".md"))
+        .sort()
+        .at(-1)
+    : undefined;
+  const slug = newest?.replace(/^\d+\./, "").replace(/\.md$/, "");
+  if (!slug) return { name: "等待部署", status: "skip", seconds: 0, detail: "没有 event 可比对", hardness: "soft" };
+
+  let ciOk = false;
+  while (Date.now() < deadline) {
+    const r = spawnSync(
+      "gh",
+      ["run", "list", "--repo", "Gaubee/gaubee.com", "--limit", "1", "--json", "status,conclusion", "-q", '.[] | "\\(.status) \\(.conclusion // \"-\")"'],
+      { encoding: "utf8", timeout: 60_000 },
+    );
+    const out = `${r.stdout ?? ""}`.trim();
+    if (out.startsWith("completed success")) {
+      ciOk = true;
+      break;
+    }
+    if (out.startsWith("completed")) break; // 失败/取消，不必再等
+    spawnSync("sleep", ["20"]);
+  }
+  if (!ciOk) {
+    return { name: "等待部署", status: "fail", seconds: 0, detail: "CI 未在窗口内成功", hardness: "soft" };
+  }
+
+  // CI 绿了还要等容器换镜像（watchtower 周期 5 分钟）。用最新 event 页是否已是真实内容判断。
+  while (Date.now() < deadline) {
+    const r = spawnSync(
+      "curl",
+      ["-sS", "-m", "20", "--noproxy", "*", "-o", "/dev/null", "-w", "%{http_code} %{size_download}", `https://gaubee.com/pages/article/events/${newest!.replace(/\.md$/, "")}`],
+      { encoding: "utf8", timeout: 40_000 },
+    );
+    const m = `${r.stdout ?? ""}`.trim().match(/^(\d{3}) (\d+)$/);
+    if (m && m[1] === "200" && Number(m[2]) > 5000) {
+      const secs = Math.round((Date.now() - started) / 1000);
+      return { name: "等待部署", status: "ok", seconds: secs, detail: `CI 绿 + ${slug} 已上线（${m[2]}B）`, hardness: "soft" };
+    }
+    spawnSync("sleep", ["30"]);
+  }
+  return { name: "等待部署", status: "fail", seconds: 0, detail: "CI 绿但容器未在窗口内换镜像", hardness: "soft" };
+}
+
+/** 本机到站点的 TLS 可达性。2026-11-19 实证：本机出口偶发 TLS reset，
+ *  curl 返回 000 而服务器侧同一对象是 200——此时 HLS/冒烟的「失败」是假红。 */
+function siteReachable(): boolean {
+  const r = spawnSync(
+    "curl",
+    ["-sS", "-m", "15", "--noproxy", "*", "--resolve", "gaubee.com:443:47.82.76.102", "-o", "/dev/null", "-w", "%{http_code}", "https://gaubee.com/"],
+    { encoding: "utf8", timeout: 30_000 },
+  );
+  return `${r.stdout ?? ""}`.trim() === "200";
+}
+
 function stageVerify(): void {
   console.log(`\n[verify] 收敛验收`);
+  if (dry) {
+    console.log("  · [dry] 等待部署");
+  } else {
+    const w = waitDeploy();
+    // waitDeploy 不走 run()，这里自己打一行，否则收据里有它、日志里看不见
+    const mark = w.status === "ok" ? "✓" : w.status === "skip" ? "·" : "✗";
+    console.log(`  ${mark} ${w.name}（${w.seconds}s） ${w.detail}`);
+    push(w, "soft");
+  }
+  const reachable = dry ? true : siteReachable();
+  if (!reachable) {
+    console.log("  ! 本机到 gaubee.com 的 TLS 不可达：跳过依赖公网的两项，避免假红");
+    console.log("    （服务器侧抽查仍可用 ssh + --resolve 127.0.0.1 验证）");
+  }
   push(run("ssh 通道", bun("tools/2026-10-30-ssh-channel-doctor/ssh-channel-doctor.ts"), { timeoutSec: 120 }), "soft");
   push(run("manifest 对账", bun("tools/2026-10-15-manifest-lag-watch/manifest-lag-watch.ts"), { timeoutSec: 150 }), "soft");
-  push(run("HLS 抽检", bun("tools/2026-10-21-hls-live-check/hls-live-check.ts", "--limit", "6"), { timeoutSec: 400 }), "soft");
-  push(run("部署冒烟", bun("tools/2026-10-13-deploy-smoke/deploy-smoke.ts", "--n", "4"), { timeoutSec: 300 }), "soft");
+  if (reachable) {
+    push(run("HLS 抽检", bun("tools/2026-10-21-hls-live-check/hls-live-check.ts", "--limit", "6"), { timeoutSec: 400 }), "soft");
+    push(run("部署冒烟", bun("tools/2026-10-13-deploy-smoke/deploy-smoke.ts", "--n", "4"), { timeoutSec: 300 }), "soft");
+  } else {
+    for (const name of ["HLS 抽检", "部署冒烟"]) {
+      push({ name, status: "skip", seconds: 0, detail: "本机出口不可达，需换网络重跑", hardness: "soft" }, "soft");
+    }
+  }
   const ci = run("CI 状态", ["gh", "run", "list", "--repo", "Gaubee/gaubee.com", "--limit", "1", "--json", "status,conclusion", "-q", '.[] | "\\(.status) \\(.conclusion // \"-\")"'], { timeoutSec: 90 });
   // gh 对「构建中」也返回 0；这里要区分「绿」与「还没跑完」，别把 in_progress 当通过
   if (ci.status === "ok" && /in_progress|queued|pending/.test(ci.out ?? "")) {
