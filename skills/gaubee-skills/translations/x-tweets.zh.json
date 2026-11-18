@@ -3254,5 +3254,15 @@
   "2122470237144543572": "你可能想知道……没错，@rive_app 当然能渲染像素风的 Gaussian splats！\n\n我让 @claudeai 证明了一下：12 个像素风立体场景加 56 个小游戏，一次 2 小时的会话里做出来。\n\n玩一下顺便拿源码 👇",
   "2122391135129858507": "我认为 Trace 是软件开发与 agent 演化里必不可少的新原语。\n\nGit 改变了世界，靠的是让人围绕代码的差分单元协作。\n\nTrace 比那更强。它捕捉上游的意图、提示词、推理、技能",
   "2122518202039349649": "顺便说，那条社区注释是错的。这确实是这些 UIKit 组件 1:1 编译成 WASM / WebGPU 的版本。",
-  "2122600875562537329": "Operation GLM 第一阶段\n\n100 美元的 GLM 5.3 用量，只要 10 美元\n\n面向所有 OpenCode Go 订阅者"
+  "2122600875562537329": "Operation GLM 第一阶段\n\n100 美元的 GLM 5.3 用量，只要 10 美元\n\n面向所有 OpenCode Go 订阅者",
+  "2122977975507521855": "Asuka 0.2 现在既是语言，也是响应式 UI 框架\n\n底层驱动 UIKit、AppKit、win32、GTK4 和 DOM，编译器能抓住 UI 层面的 bug，支持即时热重载，wasm 构建体积小、跑得快\n\nhttps://asuka.egoist.dev 还在实验阶段",
+  "2122816672625275030": "新 skill：modern-web-guidance\n\n你的 agent 会去查 Chrome 的 Modern Web Guidance，把结论用到你的代码上，再到真实浏览器里验证结果\n\n布局位移、减少动效、暗色模式、dialog 焦点，还有更多\n\n从这里开始：\nnpx skills add vercel-labs/agent-browser",
+  "2122698154210644405": "@PacketBourne @noctus91 会这么想的人特别蠢，因为量化 deepseek 没有任何好处\n\n它已经预量化过了，没法再量化\n\n世界上没有人在提供额外量化的 deepseek",
+  "2122907264608825497": "NSH v0.6.0 发布！\n\n- Windows：渲染、重绘、IME 和窗口交互都改进了，加上 Windows 11 的暗色背景。\n- 动画：样式与布局支持 spring 过渡，动起来更自然。\n- 原生 UI：System Switch 与 DateTimePicker、原生菜单，还有分享",
+  "2122768111774629946": "官宣了。Solid 2.0 终于来了。\n\n5 年前 Signals 成为主流，今天我们带着 Async Signals 做同样的事。\n\nhttps://www.solidjs.com/blog/solid-2-0-the-long-hold/",
+  "2122869873265217753": "有点离谱！\n\n左边是 Fable 5.2，右边是 Astra 6.2。全用 TypeScript、@PixiJS 和 @NativeScript 写，跑在一台 Android 手机上。论视觉和 3D 场景，Astra 确实把水准又拉高了！",
+  "2122799732485411168": "👋 每周语音 AI 动态！\n\n全双工这周到处都是。@usebland 预览了 Tofu-1，一个为嘈杂高风险的电话场景做的语音到语音模型，能处理打断、背景噪声和弱信号。@FishAudio 发布了 Live 3，边说边听，已经",
+  "2122756485126226262": "哇，Parcel 做完这事 8 年之后，webpack 终于支持把 HTML 当入口了。看着挺魔幻的。😉",
+  "2122721897091633169": "宣布 Oxlint 的 tsrs 类型感知 lint ⚡️\n\n现在可以把 tsrs 当作 tsgolint 的直接替代，类型感知 lint 和类型检查都用它。\n\n结果：最快 7 倍，内存最多省 75%！\n\n详情看博客\nhttps://oxc.rs/blog/2026-11-17-faster-type-aware-linting-with-tsrs",
+  "2122763721923559595": "我们闲得慌，干脆直接做第二阶段了\n\n100 美元的 GLM 5.3 用量，10 美元拿走\n\n玩得开心"
 }

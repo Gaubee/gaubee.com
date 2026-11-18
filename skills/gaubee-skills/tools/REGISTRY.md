@@ -88,3 +88,5 @@
 | 2026-11-17 | taxo-note-guard | tools/2026-11-17-taxo-note-guard/ | taxonomy 链接位自洽检查：只比链接文字与 URL，注释里的历史名不算违规（解决「原 google/gvisor」被误判为残留引用的误报，首跑 158 链接全过） | proposed |          |
 | 2026-11-18 | morning-brief | tools/2026-11-18-morning-brief/ | 06:00 跑批后的一屏摘要：跑批结果/各源变更/媒体水位/待办清单（首跑暴露 last-run 被幂等补齐覆盖的问题，改为按天记账本并读首轮） | proposed |          |
 | 2026-11-18 | commit-workflow-groups | tools/2026-11-18-commit-workflow-groups/ | 日报提交段的工作流预聚类：按仓库+conventional 前缀分桶再按共享词合并（13 条→6 组，199 条→64 组） | proposed |          |
+| 2026-11-19 | report-facts-check | tools/2026-11-19-report-facts-check/ | 日报数字逐项对账：星标累计/新增、公私提交数、媒体 gen 与文件数、译文、图谱（首跑抓到补丁卷文件数写错 87→55，以及 11-16 把改名当新增的旧错） | proposed |          |
+| 2026-11-19 | taxonomy-coverage-audit | tools/2026-11-19-taxonomy-coverage-audit/ | 最近收藏的策展缺口：按 starred_at 倒序列出未进地图的仓库（首跑 3 条并当天补齐，缺口归零；修正了「人工精选 vs 全量索引」的口径混淆） | proposed |          |

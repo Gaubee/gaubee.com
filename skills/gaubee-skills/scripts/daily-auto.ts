@@ -172,9 +172,14 @@ function stageFetch(): void {
     push(run("媒体发布", bun("tools/media-pack.ts", "--publish"), { cwd: CDN, timeoutSec: 600 }), "hard");
     push(run("cdn-media 子仓提交", ["git", "add", "manifest/current.json", "manifest/"], { cwd: CDN, timeoutSec: 60 }), "hard");
     // 子仓必须单独推送：主仓 gitlink 更新不会顺带推子仓（2026-11-15 实证）
+    // 提交信息带上卷名与文件数，否则这条提交进日报时只剩「gen 换代」四个字（2026-11-19 实证）
+    const tarName = pack.out?.match(/patch-\d{4}-\d{2}-\d{2}(?:-\d+)?\.tar/)?.[0] ?? `${TODAY} 补丁卷`;
+    const fileCount = pack.out?.match(/(\d+)\s*新对象/)?.[1] ?? "?";
+    // 媒体打包日志形如 `完成: gen 37 → 38`，取箭头后的新代号（取第一个会拿到旧代号）
+    const gen = pack.out?.match(/gen\s*\d+\s*→\s*(\d+)/)?.[1];
     const commit = run(
       "cdn-media 子仓 commit",
-      ["git", "commit", "-m", `📦 gen 换代：${TODAY} 补丁卷`],
+      ["git", "commit", "-m", `📦 gen ${gen ?? "?"}：${tarName}（${fileCount} 文件）`],
       { cwd: CDN, timeoutSec: 60, silence: true },
     );
     push(commit, "soft");
