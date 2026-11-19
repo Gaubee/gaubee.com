@@ -90,3 +90,5 @@
 | 2026-11-18 | commit-workflow-groups | tools/2026-11-18-commit-workflow-groups/ | 日报提交段的工作流预聚类：按仓库+conventional 前缀分桶再按共享词合并（13 条→6 组，199 条→64 组） | proposed |          |
 | 2026-11-19 | report-facts-check | tools/2026-11-19-report-facts-check/ | 日报数字逐项对账：星标累计/新增、公私提交数、媒体 gen 与文件数、译文、图谱（首跑抓到补丁卷文件数写错 87→55，以及 11-16 把改名当新增的旧错） | proposed |          |
 | 2026-11-19 | taxonomy-coverage-audit | tools/2026-11-19-taxonomy-coverage-audit/ | 最近收藏的策展缺口：按 starred_at 倒序列出未进地图的仓库（首跑 3 条并当天补齐，缺口归零；修正了「人工精选 vs 全量索引」的口径混淆） | proposed |          |
+| 2026-11-20 | rename-similarity-audit | tools/2026-11-20-rename-similarity-audit/ | 用相似度认「描述也改了的改名」：starred_at/owner/名字/描述四信号打分（首跑把老工具漏掉的 pgx→pgboxdb、webrtc→libwebrtc 全抓到，3/3） | proposed |          |
+| 2026-11-20 | pipeline-facts | tools/2026-11-20-pipeline-facts/ | 写日报前的管道数字一次打全：补丁卷名与成员数/gen/卷数/对象数/译文/图谱/X 构成/staging（修了「卷名不在日志里、要从 manifest 取」的陷阱） | proposed |          |
