@@ -44,7 +44,7 @@ const localDay = (iso?: string): string =>
   iso ? new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Asia/Shanghai" }) : "1970-01-01";
 
 interface Cause {
-  kind: "rename" | "revision" | "unknown";
+  kind: "rename" | "revision" | "late" | "unknown";
   detail: string;
 }
 
@@ -94,6 +94,36 @@ function main(): number {
   // 修订事件：changes 里最后一次 added 的 starred_at 与当前快照不同
   const lastAdded = new Map<string, string>();
   for (const c of changes) for (const a of c.added ?? []) if (a.full_name && a.starred_at) lastAdded.set(a.full_name, a.starred_at);
+  // 迟到新增：starred_at 落在某日，却在那之后两天以上才第一次出现在 changes 里。
+  // 2026-11-21 实证：kinetic 与 moego 的 starred_at 都是 11-19，直到 11-21 的抓取才出现，
+  // 于是 11-19 的日报写 1805、真实累计 1807。这类漂移不是算术错，也不是改名，要单独归因。
+  const firstSeen = new Map<string, string>();
+  for (const c of changes) {
+    const d = c.date ?? "";
+    for (const a of c.added ?? []) {
+      if (a.full_name && !firstSeen.has(a.full_name)) firstSeen.set(a.full_name, d);
+    }
+  }
+  const lateByDay = new Map<string, string[]>();
+  if (existsSync(STARS)) {
+    const raw = JSON.parse(readFileSync(STARS, "utf8")) as { repos?: Repo[] };
+    for (const r of raw.repos ?? []) {
+      if (!r.full_name || !r.starred_at) continue;
+      const day = localDay(r.starred_at);
+      const seen = firstSeen.get(r.full_name);
+      if (!seen) continue;
+      // 正常应该出现在次日（抓取日 = 报告日 + 1）；晚于次日即迟到
+      const normal = new Date(`${day}T12:00:00`);
+      normal.setDate(normal.getDate() + 1);
+      const normalDay = normal.toLocaleDateString("sv-SE");
+      if (seen > normalDay) {
+        const arr = lateByDay.get(day) ?? [];
+        arr.push(`${r.full_name}（${day} 收藏，${seen} 才出现）`);
+        lateByDay.set(day, arr);
+      }
+    }
+  }
+
   const revisions: Array<{ name: string; from: string; to: string }> = [];
   if (existsSync(STARS)) {
     const raw = JSON.parse(readFileSync(STARS, "utf8")) as { repos?: Repo[] };
@@ -145,6 +175,12 @@ function main(): number {
     // （10-23 的报告不可能受 10-24 的改名影响）。
     const sameDay = renameDays.get(date) ?? [];
     for (const one of sameDay) causes.push({ kind: "rename", detail: `${date} 改名：${one}` });
+    // 迟到新增会直接推高该日及以后所有累计，比改名更优先说明
+    for (const [day, list] of lateByDay) {
+      if (day === date) {
+        for (const one of list) causes.push({ kind: "late", detail: one });
+      }
+    }
     for (const rv of revisions) {
       if (rv.from <= date && rv.to > date) {
         causes.push({ kind: "revision", detail: `${rv.name} starred_at ${rv.from} → ${rv.to}` });
@@ -186,7 +222,7 @@ function main(): number {
     return 1;
   }
   console.log(
-    `\n全部 ${rows.length} 份都有归因：改名会让当日多算 1（added 的新名被当新增），` +
+    `\n全部 ${rows.length} 份都有归因：改名会让当日多算 1（added 的新名被当新增），迟到新增会把该日累计整体推高，` +
       `starred_at 修订会让后续累计整体平移。这些是历史事实，不是算术错误，不必改历史日报。`,
   );
   return 0;

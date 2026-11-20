@@ -35,40 +35,39 @@ const PACK_DAY = ymd(addDays(new Date(`${REPORT_DAY}T12:00:00`), 1));
 function main(): number {
   console.log(`pipeline-facts：报告日 ${REPORT_DAY}（打包日 ${PACK_DAY}）\n`);
 
-  // 1) 补丁卷：卷名与成员数从 manifest 的最后一个补丁卷取（日志里只有汇总行，没有卷名）
+  // 1) 补丁卷：一次打包可能产出多个卷（2026-11-21 实证：2 个卷 / 293 新对象 / 265MB）。
+  //    日志里的汇总行给个数与总量，卷名从 manifest 末尾按同样个数取——两边必须配对，
+  //    否则会把昨天的单卷数字和今天的卷名拼在一起（首版就这么错了）。
   const pointerPath = path.join(CDN, "manifest", "current.json");
   const pointer = existsSync(pointerPath)
     ? (JSON.parse(readFileSync(pointerPath, "utf8")) as { gen?: number; volumes?: unknown[] })
     : null;
-  let patchName = "?";
-  let newFiles: string = "?";
-  let bytes: string = "?";
-  const manifestFile = pointer?.gen ? path.join(CDN, "manifest", `manifest-${pointer.gen}.json`) : "";
-  if (manifestFile && existsSync(manifestFile)) {
-    const m = JSON.parse(readFileSync(manifestFile, "utf8")) as {
-      object_count?: number;
-      volumes?: Array<{ name?: string; members?: number; size?: number }>;
-    };
-    const patches = (m.volumes ?? []).filter((v) => (v.name ?? "").startsWith("patch-"));
-    const last = patches.at(-1);
-    if (last?.name) {
-      patchName = last.name;
-      if (typeof last.members === "number") newFiles = String(last.members);
-      if (typeof last.size === "number") bytes = String(last.size);
-    }
-  }
-  // 日志里的字节数更准（含 tar 头开销时两者不同）：有就用日志的
+  let volumeCount = 0;
+  let newFiles = "?";
+  let bytes = "?";
   const logFile = path.join(AUTOMATION, "launchd-fetch.log");
   if (existsSync(logFile)) {
-    const packs = [...readFileSync(logFile, "utf8").matchAll(/补丁卷 1 个 \/ (\d+) 字节 \/ (\d+) 新对象/g)];
+    const packs = [...readFileSync(logFile, "utf8").matchAll(/补丁卷 (\d+) 个 \/ (\d+) 字节 \/ (\d+) 新对象/g)];
     const last = packs.at(-1);
     if (last) {
-      bytes = last[1]!;
-      newFiles = last[2]!;
+      volumeCount = Number(last[1]);
+      bytes = last[2]!;
+      newFiles = last[3]!;
     }
   }
+  const manifestFile = pointer?.gen ? path.join(CDN, "manifest", `manifest-${pointer.gen}.json`) : "";
+  let patchNames: string[] = [];
+  if (manifestFile && existsSync(manifestFile)) {
+    const m = JSON.parse(readFileSync(manifestFile, "utf8")) as {
+      volumes?: Array<{ name?: string }>;
+    };
+    const patches = (m.volumes ?? []).map((v) => v.name ?? "").filter((n) => n.startsWith("patch-"));
+    patchNames = volumeCount > 0 ? patches.slice(-volumeCount) : patches.slice(-1);
+  }
   const mb = bytes !== "?" ? (Number(bytes) / 1048576).toFixed(2) : "?";
-  console.log(`补丁卷：${patchName}，${newFiles} 个文件，${mb}MB`);
+  console.log(
+    `补丁卷：${patchNames.join(" + ") || "?"}，${volumeCount || 1} 个卷，${newFiles} 个新对象，${mb}MB`,
+  );
 
   // 2) 指针与卷数
   console.log(`媒体 gen：${pointer?.gen ?? "?"}（${pointer?.volumes?.length ?? "?"} 卷）`);

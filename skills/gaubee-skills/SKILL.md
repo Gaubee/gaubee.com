@@ -136,6 +136,7 @@ GitHub 年报 `GitHub 年报：2026`。
   - **06:30 ZCode 定时任务**：先跑一次 `daily-auto --stage fetch` 幂等补齐（已完成的跳过，通常几秒），再做判断类工作——taxonomy 策展、译文、日报正文、周月年报分析、工坊、发布、验收。
 - **为什么执行必须在 Mac**：gh 登录态、X 的 ego-browser 会话、私有数据根、cdn-media staging 都在本机。服务器（香港）没有这些，也没有 bun/node/gh。**Owner 2026-11-17 裁决：不依赖服务器**，定时器就跑在 iMac 的 06:00 launchd 上；`deploy/server-daily-trigger.sh` 是未启用的备选方案，不要在服务器安装。
 - **幂等口径（重要）**：`daily-auto` 对每个源先看 `changes/<date>.json` 在不在，在就跳过抓取。重抓会把差分窗口切成两段、破坏 X 归窗（见 §8 归窗规则），所以**不要用 `--force` 重抓当日**，除非确认要重算。
+- **迟到新增要回补前一天（2026-11-21 实证）**：收藏的 `starred_at` 可能早于它第一次出现在 changes 里的日期（kinetic 与 moego 的 starred_at 是 11-19，直到 11-21 才被抓到）。日报按 `starred_at` 归属，所以这类条目属于**更早那天**：发现后要回补那一天的 `reports/daily/<date>.md` 与已发布 event（同文件原地重写，编号不动），并改「新增 N（总数 M）」。只补当天会让此后每一天的累计都差上这个数。检测用 `tools/2026-11-21-late-star-backfill`，改完用 `tools/2026-11-19-report-facts-check <date>` 复核。
 - **每日 08:30 / 21:00 的旧双任务形态已合并**：08:30 主任务改为 06:30（见上），21:00 补漏任务若仍存在只应刷新数据、不重发报告。
 - **手动运行**（脚本顺序即管道顺序；日常不需要手跑，用 daily-auto）：
 
