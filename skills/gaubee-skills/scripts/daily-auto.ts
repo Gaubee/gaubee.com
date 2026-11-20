@@ -325,12 +325,18 @@ function waitDeploy(maxSec = 420): StepResult {
 /** 本机到站点的 TLS 可达性。2026-11-19 实证：本机出口偶发 TLS reset，
  *  curl 返回 000 而服务器侧同一对象是 200——此时 HLS/冒烟的「失败」是假红。 */
 function siteReachable(): boolean {
-  const r = spawnSync(
-    "curl",
-    ["-sS", "-m", "15", "--noproxy", "*", "--resolve", "gaubee.com:443:47.82.76.102", "-o", "/dev/null", "-w", "%{http_code}", "https://gaubee.com/"],
-    { encoding: "utf8", timeout: 30_000 },
-  );
-  return `${r.stdout ?? ""}`.trim() === "200";
+  // 单次探针太脆：2026-11-19~21 连续三天本机出口间歇性 reset，
+  // 常出现「同一分钟内一次 200、一次 000」。重试 3 次，任意一次成功即视为可达。
+  for (let i = 0; i < 3; i++) {
+    const r = spawnSync(
+      "curl",
+      ["-sS", "-m", "15", "--noproxy", "*", "--resolve", "gaubee.com:443:47.82.76.102", "-o", "/dev/null", "-w", "%{http_code}", "https://gaubee.com/"],
+      { encoding: "utf8", timeout: 30_000 },
+    );
+    if (`${r.stdout ?? ""}`.trim() === "200") return true;
+    spawnSync("sleep", ["5"]);
+  }
+  return false;
 }
 
 function stageVerify(): void {
