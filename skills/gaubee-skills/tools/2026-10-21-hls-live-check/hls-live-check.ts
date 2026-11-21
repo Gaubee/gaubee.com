@@ -9,8 +9,8 @@
  * 三态收据：OK（媒体+页面都对）｜MEDIA_ONLY（媒体可达但页面仍引用旧 mp4 → 待 --render-pending）｜
  * BROKEN（页面引用了但媒体不可达 → 真断链）｜UNPUBLISHED（媒体未发布且页面未引用 → 等 cron 入卷，正常）。
  * 直连源站 IP（curl --resolve）绕开本机 clash fake-ip 对 DNS 的污染。
- * 默认源站 = 阿里云香港 47.82.76.102（2026-11-12 起的生产源站）。北京 39.107.213.167
- * 已于 2026-11-14 下线，别再拿旧 IP 直连——连不上不是 HLS 坏了。
+ * 入口 IP 由 DoH 动态解析（2026-11-22 起）：站点一周内换过两次地址，硬编码 IP 会在换机后
+ * 把「入口变了」误报成「媒体 404」。需要指定时用 --ip。
  *
  * 运行：bun hls-live-check.ts [--limit 20] [--all] [--ids a,b] [--host gaubee.com] [--ip 47.82.76.102]
  * 退出码：0 = 无 BROKEN；1 = 存在 BROKEN。
@@ -19,6 +19,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { sourceDir } from "../../scripts/lib.ts";
+import { resolveSiteIpSync } from "../../scripts/lib/site-endpoint.ts";
 
 const SITE = process.env.GAUBEE_SITE ?? path.resolve(import.meta.dir, "..", "..", "..", "..");
 const EVENTS = path.join(SITE, "src", "content", "events");
@@ -67,7 +68,12 @@ function get(host: string, ip: string, pathname: string, range?: string, timeout
 
 function main(): number {
 	const host = argOf("--host") ?? "gaubee.com";
-	const ip = argOf("--ip") ?? "47.82.76.102";
+	// 入口 IP 不再硬编码：gaubee.com 一周内换过两次地址，写死会让工具在换机后误报 404。
+	const ip = argOf("--ip") ?? resolveSiteIpSync(host);
+	if (!ip) {
+		console.error(`FAIL 解析不到 ${host} 的 A 记录（DoH 不可达），请用 --ip 显式指定当前入口`);
+		return 2;
+	}
 	const all = process.argv.includes("--all");
 	const limit = all ? Infinity : Number(argOf("--limit") ?? 20);
 	const onlyIds = argOf("--ids")?.split(",").filter(Boolean);

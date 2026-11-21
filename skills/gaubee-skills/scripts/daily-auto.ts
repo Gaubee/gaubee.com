@@ -33,7 +33,8 @@
  * 退出码：0 = 全部硬步骤成功；1 = 有硬步骤失败（收据里列出）；2 = 用法错误。
  */
 import { spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
+import { resolveSiteIpSync } from "./lib/site-endpoint.ts";
 import os from "node:os";
 import path from "node:path";
 
@@ -207,6 +208,19 @@ function stageFinalize(): void {
   if (hasOut) {
     push(run("译文校验", bun("scripts/x-translations-export.ts", "--verify"), { timeoutSec: 120 }), "soft");
     push(run("译文合并", bun("scripts/x-translations-merge.ts"), { timeoutSec: 120 }), "hard");
+    // 合并成功后把 out-*.json 归档：它们留在 /tmp 会被下一次 finalize 重复合并，
+    // 把后来手工修过的译文覆盖回旧值（2026-11-22 实证：改完译文又被旧 out 覆盖）。
+    if (!dry) {
+      const merged = path.join(transDir, "merged");
+      try {
+        if (!existsSync(merged)) mkdirSync(merged, { recursive: true });
+        for (const f of readdirSync(transDir)) {
+          if (/^out-\d+\.json$/.test(f)) renameSync(path.join(transDir, f), path.join(merged, `${Date.now()}-${f}`));
+        }
+      } catch {
+        // 归档失败不影响主流程
+      }
+    }
   } else {
     push({ name: "译文合并", status: "skip", seconds: 0, detail: "没有 out-NN.json（未翻译）" }, "soft");
   }
@@ -306,10 +320,14 @@ function waitDeploy(maxSec = 420): StepResult {
   }
 
   // CI 绿了还要等容器换镜像（watchtower 周期 5 分钟）。用最新 event 页是否已是真实内容判断。
+  const probeIp = resolveSiteIpSync();
+  if (!probeIp) {
+    return { name: "等待部署", status: "fail", seconds: 0, detail: "解析不到入口 IP，无法判断是否上线", hardness: "soft" };
+  }
   while (Date.now() < deadline) {
     const r = spawnSync(
       "curl",
-      ["-sS", "-m", "20", "--noproxy", "*", "-o", "/dev/null", "-w", "%{http_code} %{size_download}", `https://gaubee.com/pages/article/events/${newest!.replace(/\.md$/, "")}`],
+      ["-sS", "-m", "20", "--noproxy", "*", "--resolve", `gaubee.com:443:${probeIp}`, "-o", "/dev/null", "-w", "%{http_code} %{size_download}", `https://gaubee.com/pages/article/events/${newest!.replace(/\.md$/, "")}`],
       { encoding: "utf8", timeout: 40_000 },
     );
     const m = `${r.stdout ?? ""}`.trim().match(/^(\d{3}) (\d+)$/);
@@ -328,9 +346,11 @@ function siteReachable(): boolean {
   // 单次探针太脆：2026-11-19~21 连续三天本机出口间歇性 reset，
   // 常出现「同一分钟内一次 200、一次 000」。重试 3 次，任意一次成功即视为可达。
   for (let i = 0; i < 3; i++) {
+    const ip = resolveSiteIpSync();
+    if (!ip) return false;
     const r = spawnSync(
       "curl",
-      ["-sS", "-m", "15", "--noproxy", "*", "--resolve", "gaubee.com:443:47.82.76.102", "-o", "/dev/null", "-w", "%{http_code}", "https://gaubee.com/"],
+      ["-sS", "-m", "15", "--noproxy", "*", "--resolve", `gaubee.com:443:${ip}`, "-o", "/dev/null", "-w", "%{http_code}", "https://gaubee.com/"],
       { encoding: "utf8", timeout: 30_000 },
     );
     if (`${r.stdout ?? ""}`.trim() === "200") return true;

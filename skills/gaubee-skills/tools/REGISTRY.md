@@ -94,3 +94,5 @@
 | 2026-11-20 | pipeline-facts | tools/2026-11-20-pipeline-facts/ | 写日报前的管道数字一次打全：补丁卷名与成员数/gen/卷数/对象数/译文/图谱/X 构成/staging（修了「卷名不在日志里、要从 manifest 取」的陷阱；单日多卷也要按个数配对） | proposed |          |
 | 2026-11-21 | late-star-backfill | tools/2026-11-21-late-star-backfill/ | 找出「starred_at 早于首次出现」的迟到收藏并给出回补清单（首跑抓到 11-19 两条、11-13 一条，回补后 report-facts-check 全绿） | proposed |          |
 | 2026-11-21 | event-sync-check | tools/2026-11-21-event-sync-check/ | 报告文件与已发布 event 的正文同步检查（回补要改两处，漏一处就出现两个版本；首跑 18 份一致、1 份未发布） | proposed |          |
+| 2026-11-22 | site-endpoint-doctor | tools/2026-11-22-site-endpoint-doctor/ | 站点入口体检：DoH 解析当前 IP、80/443 直连、证书到期、最新 event 页、边缘与源站对比（站点一周换两次地址，写死 IP 让验收连挂三天） | proposed |          |
+| 2026-11-22 | stale-out-guard | tools/2026-11-22-stale-out-guard/ | 检查 /tmp 残留译文批次会不会覆盖已合并译文（实证：手工修过的译文被旧批次写回；daily-auto 现已合并后归档批次） | proposed |          |
