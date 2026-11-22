@@ -287,9 +287,12 @@ function readToneRed(): number {
  *  2026-11-18/19 连续两天实证：发布后立刻跑 verify，HLS 会报 UNPUBLISHED 6 条、
  *  冒烟 2/4 不过——不是断链，是 CI 还在构建、watchtower 还没换镜像。
  *  这里先等，等不到就明确说「部署未收敛」，不要把时序问题记成内容故障。 */
-function waitDeploy(maxSec = 420): StepResult {
+function waitDeploy(ciSec = 240, pageSec = 300): StepResult {
   const started = Date.now();
-  const deadline = started + maxSec * 1000;
+  // 两段各自计时：CI 与容器换代是两个独立等待，共用 deadline 时若 CI 吃掉整个窗口，
+  // 页面探针一次都不会跑（2026-11-23 实证：报「容器未换镜像」但紧接着冒烟全过）。
+  const ciDeadline = started + ciSec * 1000;
+  const pageDeadline = started + pageSec * 1000;
   const eventsDir = path.join(SITE, "src", "content", "events");
   const newest = existsSync(eventsDir)
     ? readdirSync(eventsDir)
@@ -301,7 +304,7 @@ function waitDeploy(maxSec = 420): StepResult {
   if (!slug) return { name: "等待部署", status: "skip", seconds: 0, detail: "没有 event 可比对", hardness: "soft" };
 
   let ciOk = false;
-  while (Date.now() < deadline) {
+  while (Date.now() < ciDeadline) {
     const r = spawnSync(
       "gh",
       ["run", "list", "--repo", "Gaubee/gaubee.com", "--limit", "1", "--json", "status,conclusion", "-q", '.[] | "\\(.status) \\(.conclusion // \"-\")"'],
@@ -315,16 +318,17 @@ function waitDeploy(maxSec = 420): StepResult {
     if (out.startsWith("completed")) break; // 失败/取消，不必再等
     spawnSync("sleep", ["20"]);
   }
+  const ciElapsed = Math.round((Date.now() - started) / 1000);
   if (!ciOk) {
-    return { name: "等待部署", status: "fail", seconds: 0, detail: "CI 未在窗口内成功", hardness: "soft" };
+    return { name: "等待部署", status: "fail", seconds: ciElapsed, detail: `CI 未在 ${ciSec}s 内成功`, hardness: "soft" };
   }
 
   // CI 绿了还要等容器换镜像（watchtower 周期 5 分钟）。用最新 event 页是否已是真实内容判断。
   const probeIp = resolveSiteIpSync();
   if (!probeIp) {
-    return { name: "等待部署", status: "fail", seconds: 0, detail: "解析不到入口 IP，无法判断是否上线", hardness: "soft" };
+    return { name: "等待部署", status: "fail", seconds: ciElapsed, detail: "解析不到入口 IP，无法判断是否上线", hardness: "soft" };
   }
-  while (Date.now() < deadline) {
+  while (Date.now() < pageDeadline) {
     const r = spawnSync(
       "curl",
       ["-sS", "-m", "20", "--noproxy", "*", "--resolve", `gaubee.com:443:${probeIp}`, "-o", "/dev/null", "-w", "%{http_code} %{size_download}", `https://gaubee.com/pages/article/events/${newest!.replace(/\.md$/, "")}`],
@@ -337,7 +341,13 @@ function waitDeploy(maxSec = 420): StepResult {
     }
     spawnSync("sleep", ["30"]);
   }
-  return { name: "等待部署", status: "fail", seconds: 0, detail: "CI 绿但容器未在窗口内换镜像", hardness: "soft" };
+  return {
+    name: "等待部署",
+    status: "fail",
+    seconds: Math.round((Date.now() - started) / 1000),
+    detail: `CI 在 ${ciElapsed}s 后绿，但最新 event 页在 ${pageSec}s 内未更新为真实内容`,
+    hardness: "soft",
+  };
 }
 
 /** 本机到站点的 TLS 可达性。2026-11-19 实证：本机出口偶发 TLS reset，
