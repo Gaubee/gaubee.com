@@ -131,7 +131,9 @@ function main(): number {
   // 媒体：gen / 文件数 / MB（只对最新一天硬判）
   const runDay = ymd(addDays(new Date(`${date}T12:00:00`), 1));
   const pointer = readJson<{ gen?: number; manifest_path?: string }>(path.join(CDN, "manifest", "current.json"));
-  const genClaim = text.match(/gen\s*(\d+)/)?.[1];
+  // 只认「媒体入卷 gen N」这种管道段写法：正文里别处也可能出现 gen（例如提交段写
+  // 「媒体 gen 43 换代」），取第一个匹配会把两处混淆（2026-11-23 实证：报 43 实际 44）。
+  const genClaim = text.match(/媒体入卷\s*gen\s*(\d+)/)?.[1] ?? text.match(/gen\s*(\d+)/)?.[1];
   if (pointer?.gen && genClaim) {
     checks.push({
       name: "媒体 gen",

@@ -96,3 +96,5 @@
 | 2026-11-21 | event-sync-check | tools/2026-11-21-event-sync-check/ | 报告文件与已发布 event 的正文同步检查（回补要改两处，漏一处就出现两个版本；首跑 18 份一致、1 份未发布） | proposed |          |
 | 2026-11-22 | site-endpoint-doctor | tools/2026-11-22-site-endpoint-doctor/ | 站点入口体检：DoH 解析当前 IP、80/443 直连、证书到期、最新 event 页、边缘与源站对比（站点一周换两次地址，写死 IP 让验收连挂三天） | proposed |          |
 | 2026-11-22 | stale-out-guard | tools/2026-11-22-stale-out-guard/ | 检查 /tmp 残留译文批次会不会覆盖已合并译文（实证：手工修过的译文被旧批次写回；daily-auto 现已合并后归档批次） | proposed |          |
+| 2026-11-23 | ai-tone-explain | tools/2026-11-23-ai-tone-explain/ | 印出指标命中的原文片段并标疑似误报（实证：「图像模型」里的「像」被明喻检测器命中，花两次来回才定位） | proposed |          |
+| 2026-11-23 | weekly-theme-signals | tools/2026-11-23-weekly-theme-signals/ | 周报分析素材：提交按 scope 聚合、星标按分类聚合、抖动识别、工坊进展（W47 首跑：久点 9+9+8+7 条为绝对主线，21 个新增里 agent skills 占 6） | proposed |          |
