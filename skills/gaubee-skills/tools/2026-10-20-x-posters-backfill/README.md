@@ -50,3 +50,22 @@ AUDIT：缺口 78（--fill-local 可回灌：staging 有视频副本的抽帧，
 ```
 <video> 总数 1205｜带 poster 1157｜缺 poster 48
 ```
+
+## 自托管部署
+
+这个工具需要本地环境或私有数据，**不在 gaubee.com 网页里运行**。
+
+| 项 | 要求 |
+| --- | --- |
+| 依赖 | ffmpeg（取视频封面帧） |
+| 环境变量 | 无 |
+| 需要的数据 | 本地 `x.json` 与 `cdn-media/staging/` |
+
+```sh
+git clone https://github.com/Gaubee/gaubee-tool-x-posters-backfill
+cd gaubee-tool-x-posters-backfill
+bun install   # 如有依赖
+bun run x-posters-backfill.ts   # 具体参数见上文用法
+```
+
+仓库命名约定：`gaubee-tool-<slug>`（见 `openspec/changes/tool-body-economy`）。

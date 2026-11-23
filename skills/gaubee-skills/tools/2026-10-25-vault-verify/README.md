@@ -34,3 +34,22 @@ vault vault.enc.sqlite：171 行｜解密+哈希一致 171｜tag 失败 0｜行�
 - vault 本体 171 行全绿（密钥对、密文完好）；`.bak` 备份文件不入 vault 属预期（writeFileAtomic 只镜像正式数据路径）。
 - 首跑抓到 taxonomy/profile/feedback-log 三条「已改未回灌」——近两日 cron 的策展与蒸馏写入尚未镜像进 vault；下次触发 unlock/写入时自然会回灌，若长期漂移则说明镜像条件有缺口，值得排查 lib.ts 的写入路径约定。
 - 派生参数与 `scripts/vault.ts` 同源（scrypt N=16384/r=8/p=1，blob=iv(12)||ct||tag(16)），改动必须双向同步。
+
+## 自托管部署
+
+这个工具需要本地环境或私有数据，**不在 gaubee.com 网页里运行**。
+
+| 项 | 要求 |
+| --- | --- |
+| 依赖 | bun |
+| 环境变量 | GAUBEE_SKILLS_VAULT_KEY（不写入仓库） |
+| 需要的数据 | `~/.gaubee-skills/vault.enc.sqlite`（只读） |
+
+```sh
+git clone https://github.com/Gaubee/gaubee-tool-vault-verify
+cd gaubee-tool-vault-verify
+bun install   # 如有依赖
+bun run vault-verify.ts   # 具体参数见上文用法
+```
+
+仓库命名约定：`gaubee-tool-<slug>`（见 `openspec/changes/tool-body-economy`）。

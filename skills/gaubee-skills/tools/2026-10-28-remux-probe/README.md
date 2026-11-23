@@ -29,3 +29,22 @@ bun tools/2026-10-28-remux-probe/remux-probe.ts <media-file> [more...]
 
 - 只探测不执行——实际 remux 交给 mkvgo/ffmpeg；判读基于「主流容器 × 常见编码」经验规则，罕见组合（如 ProRes、真彩 HDR）以 ffprobe 原始输出为准。
 - 依赖系统 ffprobe（管道可选依赖，本机已装）。
+
+## 自托管部署
+
+这个工具需要本地环境或私有数据，**不在 gaubee.com 网页里运行**。
+
+| 项 | 要求 |
+| --- | --- |
+| 依赖 | ffmpeg · ffprobe |
+| 环境变量 | 无 |
+| 需要的数据 | 本地媒体文件（mp4/webm） |
+
+```sh
+git clone https://github.com/Gaubee/gaubee-tool-remux-probe
+cd gaubee-tool-remux-probe
+bun install   # 如有依赖
+bun run remux-probe.ts   # 具体参数见上文用法
+```
+
+仓库命名约定：`gaubee-tool-<slug>`（见 `openspec/changes/tool-body-economy`）。

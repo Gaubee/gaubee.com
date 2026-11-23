@@ -1,0 +1,238 @@
+{
+  "generatedAt": "2026-11-23T05:18:02.056Z",
+  "count": 21,
+  "tools": [
+    {
+      "id": "deps-digest",
+      "name": "deps-digest",
+      "summary": "依赖变更人话化：相邻 history 快照对比出「X 1.0→2.0/新增/移除」明细（首跑实证 changes.bumpedCount 口径宽于快照真值，日报可诚实区分升级与抖动）",
+      "form": "webapp",
+      "version": "0.1",
+      "updatedAt": "2026-10-14",
+      "dataNeeds": [
+        "deps"
+      ],
+      "dataFile": "/static/tools/data/deps.json"
+    },
+    {
+      "id": "deps-why",
+      "name": "deps-why",
+      "summary": "“我在哪里用的 X？”——依赖按项目溯源（版本/分区/首见时间，存量如实标注）",
+      "form": "webapp",
+      "version": "0.1",
+      "updatedAt": "2026-10-04",
+      "dataNeeds": [
+        "deps"
+      ],
+      "dataFile": "/static/tools/data/deps.json"
+    },
+    {
+      "id": "llm-mem-fit",
+      "name": "llm-mem-fit",
+      "summary": "端侧 LLM 内存适配估算：参数×位宽+KV 上界+运行时 vs 可用内存三档判定（首跑 1.7B/4bit 2.6GB 轻松、7B/8bit 11.3GB 贴线；KV 口径显式标注为 MHA 上界）",
+      "form": "webapp",
+      "version": "0.1",
+      "updatedAt": "2026-10-31",
+      "dataNeeds": [
+        "none"
+      ]
+    },
+    {
+      "id": "stale-check",
+      "name": "stale-check",
+      "summary": "收藏保鲜检查：archived 与超 N 年未推送的仓库按分类盘点（首跑：119 archived / 138 stale@5y）",
+      "form": "webapp",
+      "version": "0.1",
+      "updatedAt": "2026-10-03",
+      "dataNeeds": [
+        "stars"
+      ],
+      "dataFile": "/static/tools/data/stars.json"
+    },
+    {
+      "id": "star-at",
+      "name": "star-at",
+      "summary": "收藏序号查询：order 字段第一个消费者（正查 #N / 反查仓库名）",
+      "form": "webapp",
+      "version": "0.1",
+      "updatedAt": "2026-10-04",
+      "dataNeeds": [
+        "stars"
+      ],
+      "dataFile": "/static/tools/data/stars.json"
+    },
+    {
+      "id": "star-flow-weekly",
+      "name": "star-flow-weekly",
+      "summary": "星标兴趣周流向：过去 N 天星标按 taxonomy/catalog 分类聚合（分类计数+带行为日期明细），周一周报主题聚类直接引用",
+      "form": "webapp",
+      "version": "0.1",
+      "updatedAt": "2026-10-17",
+      "dataNeeds": [
+        "stars"
+      ],
+      "dataFile": "/static/tools/data/stars.json"
+    },
+    {
+      "id": "star-readme",
+      "name": "star-readme",
+      "summary": "星标仓库 README 首屏速览：catalog 模糊匹配 + gh api 抽首段（跳徽章/图片/目录），回答「这个 star 到底是干嘛的」（mkvgo 实测）",
+      "form": "webapp",
+      "version": "0.1",
+      "updatedAt": "2026-10-29",
+      "dataNeeds": [
+        "stars"
+      ]
+    },
+    {
+      "id": "star-timeline",
+      "name": "star-timeline",
+      "summary": "星标时间线：按 starred_at 精确输出每日新增与期末累计（补跑时「总数」心算差一的根治；首跑复现 1731/1739/1740/1748/1749 口径）",
+      "form": "webapp",
+      "version": "0.1",
+      "updatedAt": "2026-11-05",
+      "dataNeeds": [
+        "stars"
+      ],
+      "dataFile": "/static/tools/data/stars.json"
+    },
+    {
+      "id": "stars-drift",
+      "name": "stars-drift",
+      "summary": "星标兴趣漂移月览：catalog 分类 × starred_at 双窗口聚合 + 主力语言（首跑：近 30 天 90 星 vs 前 54，AI Agent 类 +21 近两倍漂移）",
+      "form": "webapp",
+      "version": "0.1",
+      "updatedAt": "2026-10-25",
+      "dataNeeds": [
+        "stars"
+      ],
+      "dataFile": "/static/tools/data/stars.json"
+    },
+    {
+      "id": "stars-search",
+      "name": "stars-search",
+      "summary": "本地星标多关键词速查（分类/语言过滤）——回答\"收藏里有没有 X\"的可验证候选器",
+      "form": "webapp",
+      "version": "0.1",
+      "updatedAt": "2026-10-03",
+      "dataNeeds": [
+        "stars"
+      ],
+      "dataFile": "/static/tools/data/stars.json"
+    },
+    {
+      "id": "x-search",
+      "name": "x-search",
+      "summary": "X 动态 3025 条速查：多关键词 AND + kind/作者/媒体/时间过滤 + --json 管道（--nolocal 与对账缺口口径互证）",
+      "form": "webapp",
+      "version": "0.1",
+      "updatedAt": "2026-10-05",
+      "dataNeeds": [
+        "x"
+      ],
+      "dataFile": "/static/tools/data/x.json"
+    },
+    {
+      "id": "x-top-authors",
+      "name": "x-top-authors",
+      "summary": "X 点赞作者榜：x.json liked 按作者聚合双窗口计数（首跑：30 天 228 条赞 top10 占 38，@bkdgiffug 7 条居首）",
+      "form": "webapp",
+      "version": "0.1",
+      "updatedAt": "2026-10-26",
+      "dataNeeds": [
+        "x"
+      ],
+      "dataFile": "/static/tools/data/x.json"
+    },
+    {
+      "id": "auth-server-deploy",
+      "name": "auth-server-deploy",
+      "summary": "auth-server 一键部署器：交叉编译+scp+原子替换+健康断言+失败自动回滚（真实部署 exit 0、回滚演练 exit 1 双路径实测）",
+      "form": "self-hosted",
+      "version": "0.1",
+      "updatedAt": "2026-10-20",
+      "dataNeeds": [],
+      "repo": "gaubee-tool-auth-server-deploy"
+    },
+    {
+      "id": "remux-probe",
+      "name": "remux-probe",
+      "summary": "本地媒体无损重封装可行性探针：ffprobe 只读判读哪些流可 copy、字幕容器限制、数据流去留（staging 双样本实测：h264+aac 全 copy；无音轨动图不误报）",
+      "form": "self-hosted",
+      "version": "0.1",
+      "updatedAt": "2026-10-28",
+      "dataNeeds": [],
+      "repo": "gaubee-tool-remux-probe"
+    },
+    {
+      "id": "token-swap-apply",
+      "name": "token-swap-apply",
+      "summary": "CDN token 更换一键应用：本地双探针验证→服务器侧替换（stdin 传值+备份）→重建轮询 gen 追平→媒体抽验收据；坏 token 永不进 compose（ABORT 路径已实测）",
+      "form": "self-hosted",
+      "version": "0.1",
+      "updatedAt": "2026-10-16",
+      "dataNeeds": [],
+      "repo": "gaubee-tool-token-swap-apply"
+    },
+    {
+      "id": "vault-drift-sync",
+      "name": "vault-drift-sync",
+      "summary": "vault 漂移回灌（vault-verify 姊妹动作）：agent 脚本直写绕过加密镜像的分叉一键补齐，vaultPut 语义幂等（首跑 dry 3 → 回灌 3 → 复核归零，实证根因为 python 直写 taxonomy）",
+      "form": "self-hosted",
+      "version": "0.1",
+      "updatedAt": "2026-10-26",
+      "dataNeeds": [],
+      "repo": "gaubee-tool-vault-drift-sync"
+    },
+    {
+      "id": "vault-verify",
+      "name": "vault-verify",
+      "summary": "vault.enc.sqlite 只读校验：逐行 GCM 解密 + 行内哈希 + --workspace 双向对账（首跑 171 行全绿，抓到 taxonomy/profile/feedback-log 3 条已改未回灌）",
+      "form": "self-hosted",
+      "version": "0.1",
+      "updatedAt": "2026-10-25",
+      "dataNeeds": [],
+      "repo": "gaubee-tool-vault-verify"
+    },
+    {
+      "id": "video-retro-hd",
+      "name": "video-retro-hd",
+      "summary": "存量低清视频追溯升级：重拉 1080p/720p 源→无损切 HLS 分片→改键→重渲染；--until 给 cron 让路、--no-render/--render-pending 让页面引用等媒体发布（首跑 47 分钟视频 360p→720p 472 段 235MB；候选 332）",
+      "form": "self-hosted",
+      "version": "0.1",
+      "updatedAt": "2026-10-20",
+      "dataNeeds": [],
+      "repo": "gaubee-tool-video-retro-hd"
+    },
+    {
+      "id": "x-posters-backfill",
+      "name": "x-posters-backfill",
+      "summary": "视频 poster 缺口审计+回灌：全库 <video> 覆盖对账（首跑 1202 缺 78）+staging 副本 ffmpeg 抽首帧 + x.json posterLocal 接线 + 重渲染（首版只写文件漏接线被审计判 30 孤儿，补课后覆盖 1124→1157）",
+      "form": "self-hosted",
+      "version": "0.1",
+      "updatedAt": "2026-10-20",
+      "dataNeeds": [],
+      "repo": "gaubee-tool-x-posters-backfill"
+    },
+    {
+      "id": "x-thread-backfill",
+      "name": "x-thread-backfill",
+      "summary": "X 线程兜底工具化：扫描疑似缺链（🧵/n/m 标记无 thread 字段）+ ego-browser 抓同作者全链原子写回（首跑 36 条疑似缺链；DeepSeek 1/6 线程实抓 6 段收尾对齐）",
+      "form": "self-hosted",
+      "version": "0.1",
+      "updatedAt": "2026-10-24",
+      "dataNeeds": [],
+      "repo": "gaubee-tool-x-thread-backfill"
+    },
+    {
+      "id": "x-time0-migration",
+      "name": "x-time0-migration",
+      "summary": "time=0 媒体路径迁移（一次性）",
+      "form": "self-hosted",
+      "version": "0.1",
+      "updatedAt": "2026-10-09",
+      "dataNeeds": [],
+      "repo": "gaubee-tool-x-time0-migration"
+    }
+  ]
+}

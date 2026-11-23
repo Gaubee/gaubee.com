@@ -43,3 +43,22 @@ bun tools/2026-10-24-x-thread-backfill/x-thread-backfill.ts --ids 20979306087901
 - ego-browser API 约定同 x-session-probe：`taskSpace()` + `newPage()`，console.log 混 stderr 双流找 GRAB 行。
 - `Bun.spawnSync` 不经 shell——脚本内容必须直接作 `-e` 参数，`$(cat …)` 命令替换不会被展开（首跑失败根因）。
 - 写回用 `scripts/lib.ts` 的 `writeFileAtomic` + 1 空格缩进，与 x-likes-fetch 序列化格式一致，不产生全文件重排。
+
+## 自托管部署
+
+这个工具需要本地环境或私有数据，**不在 gaubee.com 网页里运行**。
+
+| 项 | 要求 |
+| --- | --- |
+| 依赖 | bun（唯一运行时） |
+| 环境变量 | 无 |
+| 需要的数据 | 本地 `x.json`；抓取走 X 公开 syndication 接口，无需登录 |
+
+```sh
+git clone https://github.com/Gaubee/gaubee-tool-x-thread-backfill
+cd gaubee-tool-x-thread-backfill
+bun install   # 如有依赖
+bun run x-thread-backfill.ts   # 具体参数见上文用法
+```
+
+仓库命名约定：`gaubee-tool-<slug>`（见 `openspec/changes/tool-body-economy`）。

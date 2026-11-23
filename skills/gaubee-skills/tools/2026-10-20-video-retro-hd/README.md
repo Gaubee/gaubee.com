@@ -82,3 +82,22 @@ bun tools/2026-10-20-video-retro-hd/video-retro-hd.ts --render-pending          
 一夜合计：升级 95（加单条与冒烟共 97 条 HLS 视频）｜无增益 205（已持久化，续跑跳过）｜剩余候选 30（18 未碰 + 12 限流失败）｜新增分片约 1.25 GB。限额在数小时窗口上累计，饱和后 15 分钟退避也放不过一条，下一夜同一命令续跑即可。
 
 媒体由 06:30 cron 第 4 步入卷发布，之后由 cron 执行 `--render-pending`（SKILL.md 媒体管道节）让页面引用新键。
+
+## 自托管部署
+
+这个工具需要本地环境或私有数据，**不在 gaubee.com 网页里运行**。
+
+| 项 | 要求 |
+| --- | --- |
+| 依赖 | ffmpeg · ffprobe · yt-dlp（可选，重拉高清源用） |
+| 环境变量 | 无 |
+| 需要的数据 | 本地 `cdn-media/staging/x/` 与 `~/.gaubee-skills/data/sources/x-likes/x.json` |
+
+```sh
+git clone https://github.com/Gaubee/gaubee-tool-video-retro-hd
+cd gaubee-tool-video-retro-hd
+bun install   # 如有依赖
+bun run video-retro-hd.ts   # 具体参数见上文用法
+```
+
+仓库命名约定：`gaubee-tool-<slug>`（见 `openspec/changes/tool-body-economy`）。

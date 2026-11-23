@@ -1,0 +1,84 @@
+# internal 工具（维护管道组件）
+
+> 2026-11-23 从 `REGISTRY.md` 移出。判定标准：唯一消费者是每日维护任务本身。
+> 这类工具**不占体力、不进登记簿、不算工坊产出**——它们是我工作的一部分。
+
+共 75 个。
+
+| 日期 | 工具 | 路径 | 说明 | 状态 | 备注 |
+| --- | --- | --- | --- | --- | --- |
+| 2026-10-11 | x-daily-backfill | tools/2026-10-11-x-daily-backfill/ | X 日报缺口检测——有归档无日报的日子 + 差分运行日建议与补跑命令 | approved |  |
+| 2026-10-11 | avatar-healthcheck | tools/2026-10-11-avatar-healthcheck/ | 作者头像 URL 健康抽样（404 检出 → backfill --ids 指引），防归档裂图 | approved |  |
+| 2026-10-10 | patch-precheck | tools/2026-10-10-patch-precheck/ | cdn-media 同日补丁卷闸门预检——cron 第 4 步前置，撞名组动手前就知道 | approved |  |
+| 2026-10-10 | translations-doctor | tools/2026-10-10-translations-doctor/ | X 译文覆盖率体检（按日缺口 + 门禁退出码），配套 export/merge 三件套 | approved |  |
+| 2026-10-05 | x-media-audit | tools/2026-10-05-x-media-audit/ | X 媒体库对账（Phase 3 重写）：引用 ↔ manifest∪staging 对账（断链/待打包/待清理/孤儿）+ 本地化缺口（原 100MB push 门禁随媒体出 git 废除） | approved |  |
+| 2026-10-07 | manifest-lint | tools/2026-10-07-manifest-lint/ | cdn-media 清单体检：指针 sha256/offset 对齐/key 格式/卷集合一致 + 可选远端抽检（首跑 3413 对象 104 卷全过） | approved |  |
+| 2026-10-07 | event-frontmatter-lint | tools/2026-10-07-event-frontmatter-lint/ | 站点 events frontmatter 体检：报告类 title R2 规范/date/tags/媒体断链（首跑 1325 event、4510 引用 0 断链） | approved |  |
+| 2026-10-08 | taxonomy-count-doctor | tools/2026-10-08-taxonomy-count-doctor/ | taxonomy 括号计数体检：对账 categorize --stats 权威值，--fix 带备份修正（首跑抓出 2 处历史漂移并修正） | approved |  |
+| 2026-10-08 | ci-duration-trends | tools/2026-10-08-ci-duration-trends/ | Actions 耗时趋势速览：按 workflow 分组均值/极值/近5次趋势 + 最耗时 top5（首跑实证 Docker 构建均值 13m41s→2m49s） | approved |  |
+| 2026-10-09 | pipeline-env-doctor | tools/2026-10-09-pipeline-env-doctor/ | 管道环境自检：二进制/gh 登录/数据根可写/.env 键名（首跑复现裁剪 PATH 故障 exit 1，修复后 12 项全绿） | approved |  |
+| 2026-10-09 | x-window-entries | tools/2026-10-09-x-window-entries/ | X 日报 T-1 本地日窗选择器：UTC 窗口换算+媒体 manifest 对账（首跑与人工筛选 3/3 一致，并抓出 10-07 窗口 1 条迟到期） | approved |  |
+| 2026-10-13 | deploy-smoke | tools/2026-10-13-deploy-smoke/ | 发布后公网冒烟：最新 N 篇 event 详情页 GET 断言（200/非壳/非 WAF 拦截页/title 匹配）——首跑即复现 WAF `.git` 误伤事故面 | approved |  |
+| 2026-10-13 | ai-tone-one | tools/2026-10-13-ai-tone-one/ | ai-tone 单文件体检 wrapper：只出目标文件的段与退出码（原脚本无参数处理全目录扫描；退出码可直接接发布门禁） | approved |  |
+| 2026-10-14 | git-ahead-guard | tools/2026-10-14-git-ahead-guard/ | 发布预检「本地超前」守卫：rev-list 对 origin/main 计数，ahead>0 列待推提交（aaa55d49f 忘推实证；publish 预检只查落后不查超前的补位） | approved |  |
+| 2026-10-14 | event-date-anchor | tools/2026-10-14-event-date-anchor/ | 报告类 event 日期锚定修复（kzf R8 裁决的存量执行）：19 处漂移/缺失 frontmatter 一次修复，幂等可重跑（publish 直通 bug 的 9 份 + 发布时刻 date 的 10 份） | approved |  |
+| 2026-10-15 | manifest-lag-watch | tools/2026-10-15-manifest-lag-watch/ | 服务器交付滞后早警：本地指针 gen vs admin stats gen + token 认证探针（token 失效静默降级的早警，比公网 404 早一个发布周期） | approved |  |
+| 2026-10-15 | daily-digest | tools/2026-10-15-daily-digest/ | 日报动笔前跨源事实清单：各源计数 + deps 首见明细 + X kind 分布，changes 日与报告日双标注（T-1 防误引） | approved |  |
+| 2026-10-16 | deps-jitter-report | tools/2026-10-16-deps-jitter-report/ | deps changes 重复抖动仓识别：点名次数 vs 快照真实变化次数（首跑实证三仓连续 7 天点名零版本变化，21 次点名全为噪声） | approved |  |
+| 2026-10-17 | deps-jitter-probe | tools/2026-10-17-deps-jitter-probe/ | deps 日噪根因解剖：远端 package.json 依赖表 vs 本地快照逐项对比（首跑判定 B 成立：三仓内容零变化，changed[] 为 fetcher 误报，为 fetch 定点修复留证） | approved |  |
+| 2026-10-18 | cron-day-briefing | tools/2026-10-18-cron-day-briefing/ | 每日维护开工面板：今天/YESTERDAY/星期几 + 周一专属步骤判定 + 近 3 天 changes→日报对照（把周日误当周一事故的开机防线） | approved |  |
+| 2026-10-18 | t1-window-guard | tools/2026-10-18-t1-window-guard/ | T-1 归窗硬守卫：报告日 < 差分运行日 + 常规应为昨天 + --scan 批量体检 frontmatter（事故场景实测 FAIL 拦截） | approved |  |
+| 2026-10-19 | oauth-flow-smoke | tools/2026-10-19-oauth-flow-smoke/ | 登录链路冒烟断言：健康检查+OAuth 302+client_id/redirect_uri/cookie 五断言（auth 自托管上线的回归门，client_id=undefined 事故实测可拦） | approved |  |
+| 2026-10-19 | media-meta-freshness | tools/2026-10-19-media-meta-freshness/ | media-meta 悬空守卫：manifest 当前代对象键 vs media-meta.json 覆盖对账，缺口非零 exit 1（10-18 media-meta 未接入管道事故的复发防线，fixture FAIL 路径已实测） | approved |  |
+| 2026-10-21 | hls-live-check | tools/2026-10-21-hls-live-check/ | 线上 HLS 内容级验收：playlist MIME/#EXTM3U + 首段 video/mp2t + 事件页引用三方对齐，四态收据（OK/MEDIA_ONLY/UNPUBLISHED/BROKEN）；直连源站绕开代理与 fake-ip（首跑过渡态 UNPUBLISHED 3，预期 cron 后转 OK） | approved |  |
+| 2026-10-22 | x-session-probe | tools/2026-10-22-x-session-probe/ | X 会话健康探针（抓取前置门禁）：书签页 8 秒判定登录态，登录流重定向 exit 1 早警；沉淀新登录墙 /i/jf/onboarding 与 /i/bookmarks→/i/history 重定向两处实测形态 | approved |  |
+| 2026-10-22 | cdn-usage-report | tools/2026-10-22-cdn-usage-report/ | cdn-media 用量与增长报告（R2 决策支持）：最新代按月统计 + 相邻代补丁增量 + 代际趋势与单代最大增量 + 500MB 水位建议，全本地零网络秒级退出 | approved |  |
+| 2026-10-23 | retro-status | tools/2026-10-23-retro-status/ | HLS 追溯完成度报告：全库视频 HLS 化/候选/无增益分布 + 剩余按月 + 续跑命令（首跑：1208 条视频已 HLS 120，候选 332→3，实质追平） | approved |  |
+| 2026-10-23 | xd-window-audit | tools/2026-10-23-xd-window-audit/ | X 日报归窗对账：changes added 逐条核对「恰一窗」（报告日=R−1），缺窗/重复 exit 1（首跑 151 条恰一窗 114，异常 37 全为 10-18 定窗前历史代差，10-18 起全净） | approved |  |
+| 2026-10-24 | trans-quality-sampler | tools/2026-10-24-trans-quality-sampler/ | 译文质量抽查器：随机抽样原文/译文对照 + URL/emoji 保留率 + 机械红旗（首跑 n=8 抓到 2 条 t.co 残留——历史译文带原文没有的短链） | approved |  |
+| 2026-10-27 | pipeline-gap-check | tools/2026-10-27-pipeline-gap-check/ | 每日管道漏跑门禁：四源 changes（按各自命名口径）+ 双日报 event 对账，缺口 exit 1（首跑即正确复现 10-21 会话事故形态；发布前缺口 2 = 未发布的双日报） | approved |  |
+| 2026-10-27 | data-write | tools/2026-10-27-data-write/ | 私有数据安全写包装：writeFileAtomic 通道治「脚本直写绕过 vault 镜像」根因，盘写去重时镜像层仍对账（验证：taxonomy 漂移 1→0，测试残留双侧清理） | approved |  |
+| 2026-10-28 | trans-tco-scrub | tools/2026-10-28-trans-tco-scrub/ | 译文 t.co 残留全库扫描与清洗：只剥译文多余短链（原文有的不动）；首跑 dry 抓到 1222 条/1610 链（占库近四成），--fix 因牵动大规模历史重渲染留 kzf 裁决 | approved |  |
+| 2026-10-29 | x-archive-coverage | tools/2026-10-29-x-archive-coverage/ | X 归档覆盖对账：posted/reposted 按日 vs 站点 x-archive-<date> 双侧核对（首跑抓到 10-02~04 真缺档 3 天 9 条；812 天孤档判读为 Data Archive 历史口径差异） | approved |  |
+| 2026-10-30 | commits-digest | tools/2026-10-30-commits-digest/ | 日报提交素材一条命令：各仓公私分布 + 私有仓样本消息（本地素材，写入日报前须重写为人话——R5） | approved |  |
+| 2026-10-30 | ssh-channel-doctor | tools/2026-10-30-ssh-channel-doctor/ | gaubee-cloud ssh 通道检查（lag-watch 前置早警）：known_hosts 快检 + kaku 在位 + BatchMode 试连，--fix 键缺失 keyscan 补录（首跑试连即 OK） | approved |  |
+| 2026-10-31 | registry-digest | tools/2026-10-31-registry-digest/ | 工坊待裁决清单汇总卡：proposed 行汇总成打勾卡（--md 落文件），首跑揭底——53 个提案 0 裁决，裁决环节从未启动 | approved |  |
+| 2026-11-04 | catchup-scan | tools/2026-11-04-catchup-scan/ | 补跑缺口扫描：区间内逐日核对四源 changes + 双日报，硬缺口（commits/GitHub 日报）与累积差分源的正常缺口分离（11-04 补跑即按此表执行） | approved |  |
+| 2026-11-04 | x-daily-guard | tools/2026-11-04-x-daily-guard/ | X 日报归窗防线：发布前查目标日报的推文是否跨窗重复（11-04 抓到生成器给出的 10-31 重复窗；另抓出 10-22/10-23 两条历史跨窗条目） | approved |  |
+| 2026-11-05 | cdn-cache-doctor | tools/2026-11-05-cdn-cache-doctor/ | cdn-base 缓存/单飞滞留探测：inflight_reserved 两次相同即判滞留（11-04 锁泄漏事故的工具化），附缓存水位与真实对象抽样、gen 滞后提示 | approved |  |
+| 2026-11-06 | media-unref-report | tools/2026-11-06-media-unref-report/ | 已入卷但无内容引用的媒体盘点（存储/R2 决策用）：manifest 全量 vs 站点引用，按月与体积汇总（首跑 74 对象/79MB=1.2%，大头是 HLS 化后的旧 mp4） | approved |  |
+| 2026-11-06 | report-lint | tools/2026-11-06-report-lint/ | 报告一致性门禁：已发布报告的占位残留 + 日报「总数」与 starred_at 实际累计对账（首跑抓出已发布 01869 的总数少 3，已修正报告源与事件） | approved |  |
+| 2026-11-07 | vol-name-plan | tools/2026-11-07-vol-name-plan/ | 补丁卷名排期预演：未来 N 天各月份组卷名、跨月撞名实际落成什么名字、当月组哪天只能等（补 patch-precheck 只看当天） | approved |  |
+| 2026-11-07 | x-daily-trans-coverage | tools/2026-11-07-x-daily-trans-coverage/ | X 日报渲染产物译文覆盖率审计：逐条判语言并点名「非中文没译文」（首跑抓到日文漏译 1 条，已补译并归零） | approved |  |
+| 2026-11-08 | nav-effect-lint | tools/2026-11-08-nav-effect-lint/ | 后台保活视图「抢导航」静态检查：$effect 内导航必须判前台（isActive/useActive），外壳级例外标 nav-effect-allow（用修复前 EventView 回归，抓到 3 处） | approved |  |
+| 2026-11-08 | x-daily-thread-gaps | tools/2026-11-08-x-daily-thread-gaps/ | X 日报线程标记缺链审计：按报告日逐条查 🧵/n-m 与 thread，直接给出 --ids 命令（首跑确认 11-07 hunch 已补链，演示删链可检出） | approved |  |
+| 2026-11-09 | x-daily-staleness | tools/2026-11-09-x-daily-staleness/ | X 日报陈旧稿检测：译文已入库但日报没渲染译/原切换的条目（今日人眼在 10-18/10-29 各抓到 1 条，工具化后全量 0 陈旧） | proposed |  |
+| 2026-11-09 | stars-integrity-audit | tools/2026-11-09-stars-integrity-audit/ | 星标完整性审计：改名配对（OpenMontage 换 owner）+ starred_at 静默修订（cicada 11-03→11-08，解释 report-lint 漂移） | proposed |  |
+| 2026-11-10 | weekly-digest | tools/2026-11-10-weekly-digest/ | 周报动笔前的跨源素材：区间内各仓提交数与代表消息、星标按 taxonomy 分类、X 按 kind 计数（11-02~08 首跑 7 仓/24 星标/6 组 X） | proposed |  |
+| 2026-11-10 | repo-rename-reconciler | tools/2026-11-10-repo-rename-reconciler/ | 星标改名对账（gh 301 探测）：抓「改名+改描述」漏网（douyin-comments→saas-growth-agents），核对 taxonomy 引用 | proposed |  |
+| 2026-11-11 | privacy-audit | tools/2026-11-11-privacy-audit/ | 发布仓隐私红线体检：私有数据是否进 git（data/sources、profile、feedback-log、vault、.env）+ 发布内容本机绝对路径（首跑 4 条误报已收窄，现 0） | proposed |  |
+| 2026-11-11 | event-number-audit | tools/2026-11-11-event-number-audit/ | 站点 event 编号/slug 完整性：重号与重复 slug 硬错、编号空洞提示（首跑 1410 个 event、0 重号 0 重复 slug、490 个历史空洞） | proposed |  |
+| 2026-11-12 | taxonomy-dedupe | tools/2026-11-12-taxonomy-dedupe/ | 策展分类重复条目体检：同分类重复直接删、跨分类重复交人工（首跑抓到 Agent2API 同分类重复与 solid-glass 跨分类，均已修） | proposed |  |
+| 2026-11-12 | report-commit-count-audit | tools/2026-11-12-report-commit-count-audit/ | 日报「公开/私有提交数」与 history 对账（首跑 19 份抓到 4 处偏差，含 11-10 的 95→94，报告与 event 同步修正） | proposed |  |
+| 2026-11-14 | pipeline-completeness-audit | tools/2026-11-14-pipeline-completeness-audit/ | 每日管道六项体检（提交/双日报/媒体入卷/Graph/发布），补 catchup-scan 管不到的后半段（首跑抓到 11-13 缺提交与 GitHub 日报） | proposed |  |
+| 2026-11-14 | backfill-plan | tools/2026-11-14-backfill-plan/ | 漏跑补给的逐日命令清单，X 行自动算正确 run-date（首跑给出 11-13 的三步，含 github-commits-fetch 与 x-daily-events --run-date 2026-11-14） | proposed |  |
+| 2026-11-15 | rename-impact-audit | tools/2026-11-15-rename-impact-audit/ | 星标改名的影响面清单：从 changes 认改名，扫 taxonomy/历史报告/已发布 event 的旧名残留（首跑 19 对改名、35 文件残留，抓到 agent2api 大小写与 facebook→meta/lexical 两处 taxonomy 错误） | proposed |  |
+| 2026-11-15 | x-daily-rundate-check | tools/2026-11-15-x-daily-rundate-check/ | 补跑前预演 X 日报 run-date 配对与预计条数（按生成器真实口径去重，四天预估 16/2/16/13 与实际完全一致） | proposed |  |
+| 2026-11-16 | star-cumulative-attribution | tools/2026-11-16-star-cumulative-attribution/ | 星标累计漂移的归因：区分「改名被当新增」「starred_at 修订」与真正的算错（首跑 23 份全部归因、0 unknown，证实是 10-24 改名与 cicada 修订所致，不必改历史） | proposed |  |
+| 2026-11-16 | staging-clean-preview | tools/2026-11-16-staging-clean-preview/ | 周清理前的按条目归组核对视图：每组给文件数/大小/入卷比例 + 入卷/孤儿/HLS 完整三项自检（446 行平铺清单折成几十行，首跑 45 组全绿） | proposed |  |
+| 2026-11-17 | ai-tone-locate | tools/2026-11-17-ai-tone-locate/ | 把 ai-tone 的密度超标落到具体句子：逐句列出顿号/破折号/提示语等命中（11-16 实测把 4 处并列结构从「肉眼找」变成清单，修掉两个误判：误排列表项、误算星标条目） | proposed |  |
+| 2026-11-17 | taxo-note-guard | tools/2026-11-17-taxo-note-guard/ | taxonomy 链接位自洽检查：只比链接文字与 URL，注释里的历史名不算违规（解决「原 google/gvisor」被误判为残留引用的误报，首跑 158 链接全过） | proposed |  |
+| 2026-11-18 | morning-brief | tools/2026-11-18-morning-brief/ | 06:00 跑批后的一屏摘要：跑批结果/各源变更/媒体水位/待办清单（首跑暴露 last-run 被幂等补齐覆盖的问题，改为按天记账本并读首轮） | proposed |  |
+| 2026-11-18 | commit-workflow-groups | tools/2026-11-18-commit-workflow-groups/ | 日报提交段的工作流预聚类：按仓库+conventional 前缀分桶再按共享词合并（13 条→6 组，199 条→64 组） | proposed |  |
+| 2026-11-19 | report-facts-check | tools/2026-11-19-report-facts-check/ | 日报数字逐项对账：星标累计/新增、公私提交数、媒体 gen 与文件数、译文、图谱（首跑抓到补丁卷文件数写错 87→55，以及 11-16 把改名当新增的旧错） | proposed |  |
+| 2026-11-19 | taxonomy-coverage-audit | tools/2026-11-19-taxonomy-coverage-audit/ | 最近收藏的策展缺口：按 starred_at 倒序列出未进地图的仓库（首跑 3 条并当天补齐，缺口归零；修正了「人工精选 vs 全量索引」的口径混淆） | proposed |  |
+| 2026-11-20 | rename-similarity-audit | tools/2026-11-20-rename-similarity-audit/ | 用相似度认「描述也改了的改名」：starred_at/owner/名字/描述四信号打分（首跑把老工具漏掉的 pgx→pgboxdb、webrtc→libwebrtc 全抓到，3/3） | proposed |  |
+| 2026-11-20 | pipeline-facts | tools/2026-11-20-pipeline-facts/ | 写日报前的管道数字一次打全：补丁卷名与成员数/gen/卷数/对象数/译文/图谱/X 构成/staging（修了「卷名不在日志里、要从 manifest 取」的陷阱；单日多卷也要按个数配对） | proposed |  |
+| 2026-11-21 | late-star-backfill | tools/2026-11-21-late-star-backfill/ | 找出「starred_at 早于首次出现」的迟到收藏并给出回补清单（首跑抓到 11-19 两条、11-13 一条，回补后 report-facts-check 全绿） | proposed |  |
+| 2026-11-21 | event-sync-check | tools/2026-11-21-event-sync-check/ | 报告文件与已发布 event 的正文同步检查（回补要改两处，漏一处就出现两个版本；首跑 18 份一致、1 份未发布） | proposed |  |
+| 2026-11-22 | site-endpoint-doctor | tools/2026-11-22-site-endpoint-doctor/ | 站点入口体检：DoH 解析当前 IP、80/443 直连、证书到期、最新 event 页、边缘与源站对比（站点一周换两次地址，写死 IP 让验收连挂三天） | proposed |  |
+| 2026-11-22 | stale-out-guard | tools/2026-11-22-stale-out-guard/ | 检查 /tmp 残留译文批次会不会覆盖已合并译文（实证：手工修过的译文被旧批次写回；daily-auto 现已合并后归档批次） | proposed |  |
+| 2026-11-23 | ai-tone-explain | tools/2026-11-23-ai-tone-explain/ | 印出指标命中的原文片段并标疑似误报（实证：「图像模型」里的「像」被明喻检测器命中，花两次来回才定位） | proposed |  |
+| 2026-11-23 | weekly-theme-signals | tools/2026-11-23-weekly-theme-signals/ | 周报分析素材：提交按 scope 聚合、星标按分类聚合、抖动识别、工坊进展（W47 首跑：久点 9+9+8+7 条为绝对主线，21 个新增里 agent skills 占 6） | proposed |  |
+| 2026-10-12 | report-window-guard | tools/2026-10-12-report-window-guard/ | build-report 窗口口径回归守卫 | proposed |  |
+| 2026-10-12 | staging-forecast | tools/2026-10-12-staging-forecast/ | staging 到期预报 | proposed |  |

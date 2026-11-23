@@ -28,3 +28,24 @@ ABORT：新 token 未通过本地验证，服务器未被改动   （exit 1）
 ```
 无 token 输入 → 用法提示（exit 2）。好 token 的 execute 路径待真实 token 到手后
 首跑留档。
+
+## 自托管部署
+
+这个工具需要本地环境或私有数据，**不在 gaubee.com 网页里运行**。
+
+| 项 | 要求 |
+| --- | --- |
+| 依赖 | bun · ssh · jq |
+| 环境变量 | GitHub fine-grained PAT（写入服务器前经 stdin，不进 argv）（不写入仓库） |
+| 需要的数据 | 服务器 compose 配置 |
+
+```sh
+git clone https://github.com/Gaubee/gaubee-tool-token-swap-apply
+cd gaubee-tool-token-swap-apply
+bun install   # 如有依赖
+bun run token-swap-apply.ts   # 具体参数见上文用法
+```
+
+> 注意：涉及凭据轮换，操作前确认有回滚路径。
+
+仓库命名约定：`gaubee-tool-<slug>`（见 `openspec/changes/tool-body-economy`）。

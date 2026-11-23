@@ -4,3 +4,4 @@
 export { githubApp } from "./github";
 export { githubEditorApp } from "./github-editor";
 export { terminalApp } from "./terminal";
+export { toolsApp } from "./tools";

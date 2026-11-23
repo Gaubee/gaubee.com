@@ -34,3 +34,24 @@ bun tools/2026-10-25-vault-verify/vault-verify.ts --workspace      # 复核
 
 - 只处理「vault 落后于工作区」方向；「vault 有工作区缺」意味着明文被删，属 vault-verify 的报警范畴，本工具不逆推。
 - 派生与加解密参数和 `scripts/vault.ts` 同源（scrypt N=16384/r=8/p=1，blob=iv(12)||ct||tag(16)），改动必须双向同步。
+
+## 自托管部署
+
+这个工具需要本地环境或私有数据，**不在 gaubee.com 网页里运行**。
+
+| 项 | 要求 |
+| --- | --- |
+| 依赖 | bun |
+| 环境变量 | GAUBEE_SKILLS_VAULT_KEY（不写入仓库） |
+| 需要的数据 | `~/.gaubee-skills/vault.enc.sqlite`（读写） |
+
+```sh
+git clone https://github.com/Gaubee/gaubee-tool-vault-drift-sync
+cd gaubee-tool-vault-drift-sync
+bun install   # 如有依赖
+bun run vault-drift-sync.ts   # 具体参数见上文用法
+```
+
+> 注意：写操作，请先备份 vault。
+
+仓库命名约定：`gaubee-tool-<slug>`（见 `openspec/changes/tool-body-economy`）。

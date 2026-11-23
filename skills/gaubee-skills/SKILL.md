@@ -109,14 +109,46 @@ GitHub 年报 `GitHub 年报：2026`。
 
 红线：引用必须能在 `stars.json` / `tech-graph.json` 里验证，禁止编造收藏里不存在的项目；推荐收藏之外的项目必须显式标注"不在你的收藏里"。
 
-## 6. 小工具工坊
+## 6. 小工具工坊（2026-11-23 起：体力账本制）
 
-每天 2 个提案，由定时任务的运行内直接完成（闲时队列当前对本账号不可用，见 §8）。
+产出单位从「每天 2 个工具」改为 **每天 2 点体力**，跨日不累积。体力可用于三类操作，
+各计 1 点（实现见 `scripts/lib/body-ledger.ts`，账本在 `~/.gaubee-skills/tools/body-ledger.json`）：
 
-- **点子优先级**：`profile.md` 记录的痛点/需求 > 最近信号暴露的兴趣 > 收藏里的能力空档。避开 `REGISTRY.md` 已否定方向。
-- **铁律**：小而真——50 行解决一个具体痛点 > 500 行框架；零第三方依赖（bun/node 内置优先）；TypeScript 严格类型（无 any）。
-- **产出物**：`tools/<YYYY-MM-DD>-<slug>/`，含 `README.md`（是什么/解决什么/怎么跑/真实示例输出）+ 源码；必须真实运行验证一次，示例输出贴进 README；不得遗留常驻进程。
-- 完成后在 `REGISTRY.md` 追加一行状态 `proposed`，等 kzf 裁决，不催促。
+| 操作 | 含义 |
+| --- | --- |
+| `create` | 新建工具 |
+| `upgrade` | 升级；`merge`（多合一）/ `split`（一拆多）/ `rewrite`（换实现或换语言）都记 1 点 |
+| `delete` | 下线（目录保留，登记簿标 `retired` 并注明 replacedBy） |
+
+合并只记 1 点是刻意的：让「减少条目」和「增加条目」一样便宜。实测教训（2026-11-23）：
+旧规则下攒了 96 个工具，只有 15 个真的每天在跑——**工坊没有出口，产出就变成堆积**。
+
+### 每个工具必须有形态（form）
+
+| form | 判定 | 出口 |
+| --- | --- | --- |
+| `webapp` | 只读公开数据、无私有凭据、纯前端可算 | gaubee.com 的 `/app/tools/<id>` |
+| `self-hosted` | 需要私有数据/凭据/常驻进程 | 详情页给部署说明；可建 `gaubee-tool-<slug>` 仓库分发 |
+| `internal` | 唯一消费者是每日维护任务本身 | **不占体力、不进登记簿**，列 `tools/INTERNAL.md` |
+
+形态判定看源码实际行为，不看声明：`bun tools/tool-form-audit/tool-form-audit.ts` 逐个体检。
+清单在 `tools/FORM-INVENTORY.md`。
+
+### 出口与语言
+
+- **能部署的直接部署**：`bun scripts/build-tools-data.ts` 生成 `static/tools/data/*.json` 公开投影，
+  `bun scripts/build-tools-index.ts` 生成 `static/tools/index.json`；WebApp 纯前端读这两份，不发服务端请求。
+- **不能部署的**：README 必须有「## 自托管部署」段落（依赖/环境变量/数据/命令），仓库名 `gaubee-tool-<slug>`。
+- **语言优先 Go**：需要服务端能力、常驻进程或适合单二进制分发的工具用 Go（单二进制、静态链接，
+  `CGO_ENABLED=0 go build -trimpath -ldflags="-s -w"`）。已有 TS 工具不强制重写——只在 `upgrade` 时顺带迁移。
+- **升级由上游变化驱动**：工具声明 `dataNeeds`；收藏新增、仓库改名、README 大改时应触发 `upgrade`。
+  检测复用现有审计工具（`rename-similarity-audit`、`stars-integrity-audit`、`report-facts-check`），不新造机制。
+
+### 铁律（不变）
+
+- 小而真：50 行解决一个具体痛点 > 500 行框架；零第三方依赖（bun/node 内置优先）；严格类型（无 any）。
+- `README.md` 四段齐全（是什么/解决什么/怎么跑/真实示例输出），必须真实跑过一次并贴真实输出，不得遗留常驻进程。
+- 新建的在 `REGISTRY.md` 追加一行状态 `proposed`，等 kzf 裁决，不催促。
 
 ## 7. 价值判断学习闭环
 

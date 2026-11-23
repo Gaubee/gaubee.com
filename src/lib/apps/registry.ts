@@ -17,6 +17,7 @@ import { githubApp } from "./installable/github";
 import { githubEditorApp } from "./installable/github-editor";
 import { jsonViewerApp } from "./installable/json-viewer";
 import { terminalApp } from "./installable/terminal";
+import { toolsApp } from "./installable/tools";
 /**
  * GaubeeOS 应用注册中心。
  *
@@ -52,6 +53,7 @@ export function registerAllApps(): void {
   appManager.register(terminalApp);
   appManager.register(filesApp);
   appManager.register(jsonViewerApp);
+  appManager.register(toolsApp);
 
   // 初始化：恢复用户安装状态
   appManager.init();
@@ -71,7 +73,7 @@ export {
   skillGraphApp,
   geoRulesApp,
 };
-export { githubApp, githubEditorApp, terminalApp, filesApp, jsonViewerApp };
+export { githubApp, githubEditorApp, terminalApp, filesApp, jsonViewerApp, toolsApp };
 
 /** 获取所有已注册应用。 */
 export function getAllRegisteredApps(): AppEntry[] {
@@ -92,6 +94,7 @@ export function getAllRegisteredApps(): AppEntry[] {
     terminalApp,
     filesApp,
     jsonViewerApp,
+    toolsApp,
   ];
 }
 

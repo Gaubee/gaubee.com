@@ -43,3 +43,22 @@ FAIL 部署失败，已回滚（回滚后健康=true）
 [5/5] 部署收据：86.7 MB → /opt/gaubee-auth/gaubee-auth；健康响应 {"name":"gaubee-auth-server","ok":true}
 （真实 exit=0）
 ```
+
+## 自托管部署
+
+这个工具需要本地环境或私有数据，**不在 gaubee.com 网页里运行**。
+
+| 项 | 要求 |
+| --- | --- |
+| 依赖 | bun · ssh · systemctl |
+| 环境变量 | 服务器 SSH 凭据（不写入仓库） |
+| 需要的数据 | 服务器 `gaubee-auth` systemd 单元 |
+
+```sh
+git clone https://github.com/Gaubee/gaubee-tool-auth-server-deploy
+cd gaubee-tool-auth-server-deploy
+bun install   # 如有依赖
+bun run auth-server-deploy.ts   # 具体参数见上文用法
+```
+
+仓库命名约定：`gaubee-tool-<slug>`（见 `openspec/changes/tool-body-economy`）。

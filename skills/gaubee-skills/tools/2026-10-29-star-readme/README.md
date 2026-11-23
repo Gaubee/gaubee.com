@@ -8,6 +8,15 @@
 
 stars-search 能找到仓库名，但「它是干嘛的」还得开浏览器。收藏长尾里大量「当时一键星、现在想不起」的仓库需要一层无需跳转的速览。
 
+## 数据来源与浏览器可行性
+
+这个工具的数据是**公开投影**：`scripts/build-tools-data.ts` 把
+`data/sources/github-stars/stars.json` 里公开可验证的字段（仓库名/描述/语言/星数/收藏日）
+投影成 `static/tools/data/stars.json`，WebApp 读这份投影即可在浏览器里跑，不发服务端请求。
+
+README 首屏抓取需要网络，但它只是「打开 GitHub 页面看一眼」——在浏览器里等价于直连
+`github.com`（CORS 允许读公开 README），因此标注为 `webapp` 合规。
+
 ## 怎么跑
 
 ```bash
