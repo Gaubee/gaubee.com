@@ -96,6 +96,8 @@
     "deps-digest",
     "x-search",
     "x-top-authors",
+    "star-browse",
+    "tech-adoption",
   ]);
   const isRunnable = $derived(runnable.includes(toolId));
 </script>

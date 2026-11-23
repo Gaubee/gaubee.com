@@ -30,3 +30,5 @@
 
 > **internal 的工具已移出本簿**（2026-11-23 体力规则）：它们只服务维护管道，不占体力、不算工坊产出。
 > 清单见 `tools/INTERNAL.md`；形态定义见 `openspec/changes/tool-body-economy`。
+| 2026-11-24 | star-browse | tools/2026-11-24-star-browse/ | 按策展分类浏览收藏：16 个分类 184 个仓库，支持关键词按描述与仓库名过滤（webapp，已在 /app/tools） | proposed | webapp |  |
+| 2026-11-24 | tech-adoption | tools/2026-11-24-tech-adoption/ | 技术采用时间线：查某技术何时首见、用在哪些项目，也能反查项目技术栈（webapp，读站点公开图谱） | proposed | webapp |  |

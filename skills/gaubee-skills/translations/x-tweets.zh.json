@@ -3307,5 +3307,13 @@
   "2123237197050794364": "上世纪六十年代算力是集中的，直到 PC 把能力交到每个人手里。现在 AI 在数据中心训练好，再按 token 一点点租回给你。\n\n今天我们开源 Linger（@HeyLingerAl），一个活在你自家电脑上的个人 agent。\n\n我们相信智能",
   "2124269508127011001": "开源一个新项目！\n\nwland：跑在浏览器里的 Wayland 合成器。\n\n  • 最高 120 FPS ⚡\n  • Retina 上像素级精确 💎\n  • Zig 写，编译成 WebAssembly（gzip 后约 65 kB）",
   "2124265777217802707": "我们今天戳破了定价泡沫\n\n从 deepseek flash 和 glm 5.3 开始，我们比 fireworks 和 baseten 便宜 60%，同时吞吐还比它们大\n\n全跑在我们的自有 GPU 上，没理由再去别家买\n\n我们现在第一，其他人好运",
-  "2124265178267005017": "GLM 5.3 和 DeepSeek V4.1 Flash 在 OpenCode 里现在便宜 60%"
+  "2124265178267005017": "GLM 5.3 和 DeepSeek V4.1 Flash 在 OpenCode 里现在便宜 60%",
+  "2124866397121757196": "开干吧",
+  "2124850622331810290": "NSH 的野心是做一套高性能原生框架，覆盖所有平台。\n\n原生体验、高性能、低资源占用、开发者效率、跨平台支持，以及构建专业应用所需的组件。\n\nNSH：我们想要的就是",
+  "2124806474492723244": "Liquid Glass 现在构建在 @uisdk 之上。\n\n键盘、焦点、表单和 ARIA 都来自 UI SDK。玻璃质感是一个 WebGL2 shader。开源，MIT。\n\n感谢 @shadcn 和 @vercel 的 UI SDK。\n\n演示：https://liquid-glass-interface.pages.dev\nGitHub：https://github.com/bilalgursen/liquid-glass",
+  "2124523916819648945": "今天我们发布 LingSante-3.1-flash，一个开放权重的 MoE 模型：总参 560B，每 token 激活 25B。它把多样的医疗能力统一起来，同时保留通用能力，包括复杂的医疗推理、长程工作流执行，以及",
+  "2124791062065816009": "用 nshm，你几乎整个 NSH 应用都能用 TSX 写——只有真需要原生性能时才下沉到 Rust。\n\nnshm 让你把 Rust 代码打包成模块，直接从 TSX 导入。Rust 在各平台原生运行，而你的 UI、状态和页面保持",
+  "2124575437758361956": "Andarium 1.1 发布！加了 AOT，性能显著提升、发热降低、应用启动时间砍掉 35%。还加了 iOS 26 支持、120Hz ProMotion、内置 Magisk、iOS 快捷指令、伪造短信等等！\n\n下载 IPA：https://github.com/imxieyi/Kernarium/releases/tag/andarium-1.1",
+  "2124717898203849052": "2026 年的软件工程师：在编排 Claude、Codex、Cursor、Antigravity 这些 agent。",
+  "2124731584490111224": "我用 GLM-5.4 有一段时间了，可以很确定地说，它是现在能用的最好的开放模型。\n\n它在 KingBench 4 上排第 7，是开放模型里的最好名次。\n\n据我观察，这个模型是认真做的，不太针对榜单做特化"
 }

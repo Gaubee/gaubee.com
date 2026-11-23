@@ -114,6 +114,32 @@ function main(): number {
 
   console.log(`written ${OUT_DIR}：${written.join(" / ")}`);
 
+  // 4) taxonomy 分类：把策展地图投影成「分类 → 仓库清单」，
+  // 供 star-browse 在浏览器里按分类浏览（只含仓库名与类目，不含任何评注）
+  const taxoPath = path.join(DATA, "taxonomy.md");
+  if (existsSync(taxoPath)) {
+    const lines = readFileSync(taxoPath, "utf8").split("\n");
+    const sections: Array<{ section: string; repos: string[] }> = [];
+    let cur: { section: string; repos: string[] } | null = null;
+    for (const line of lines) {
+      const h = line.match(/^###\s+(.+?)（/);
+      if (h) {
+        if (cur && cur.repos.length) sections.push(cur);
+        cur = { section: h[1]!, repos: [] };
+        continue;
+      }
+      const m = line.match(/^- \[([\w.-]+\/[\w.-]+)\]\(https:\/\/github\.com\//);
+      if (m && cur) cur.repos.push(m[1]!);
+    }
+    if (cur && cur.repos.length) sections.push(cur);
+    writeFileSync(
+      path.join(OUT_DIR, "taxonomy.json"),
+      `${JSON.stringify({ count: sections.length, sections })}\n`,
+      "utf8",
+    );
+    written.push(`taxonomy ${sections.length} 类`);
+  }
+
   // 隐私自检
   for (const f of ["stars.json", "deps.json", "x.json"]) {
     const p = path.join(OUT_DIR, f);

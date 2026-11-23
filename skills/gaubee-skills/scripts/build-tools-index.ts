@@ -46,6 +46,8 @@ const WEBAPP_META: Record<string, { dataNeeds: string[]; dataFile?: string }> = 
   "deps-why": { dataNeeds: ["deps"], dataFile: "/static/tools/data/deps.json" },
   "deps-digest": { dataNeeds: ["deps"], dataFile: "/static/tools/data/deps.json" },
   "llm-mem-fit": { dataNeeds: ["none"] },
+  "star-browse": { dataNeeds: ["stars"], dataFile: "/tools/data/taxonomy.json" },
+  "tech-adoption": { dataNeeds: ["graph"] },
 };
 
 function parseRegistry(): Array<{ name: string; summary: string; form: string; date: string }> {
