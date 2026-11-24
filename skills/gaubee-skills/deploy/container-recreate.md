@@ -1,66 +1,82 @@
-# 容器重建备忘录（改完 gaubeeos 的 docker run 参数必看）
+# gaubeeos 部署：compose 化与三个事故的完整根因
 
-## 为什么需要这份备忘
+## 现状（2026-11-24 起）
 
-`gaubeeos` 不是 compose 起的，是 `docker run` 直接跑的。任何一次手动重建
-（`docker rm` + `docker run`）都要把下面这些参数**原样带齐**，漏一个就会出现
-「站点更新了但内容没变」这种极难排查的现象。
-
-## 必须带齐的参数
+`gaubeeos` 由 **compose** 管理（`/etc/edge/gaubeeos/docker-compose.yml`），
+自动更新由 **cron + `auto-update.sh`** 负责，**watchtower 已停用并禁止自启**。
 
 ```sh
-docker run -d --name gaubeeos --restart unless-stopped \
-  -p 127.0.0.1:17080:8080 \
-  -v /etc/edge/gaubeeos/config.toml:/config.toml:ro \
-  -v /opt/gaubee/media-cache:/media-cache \
-  --label com.centurylinklabs.watchtower=true \
-  --label com.centurylinklabs.watchtower.enable=true \
-  --env-file /etc/gaubeeos.env \
-  ghcr.io/gaubee/gaubee.com:latest
+# 重建（唯一入口）
+cd /etc/edge/gaubeeos && sudo docker compose up -d
+# 手动触发一次更新
+sudo /etc/edge/gaubeeos/auto-update.sh
+# 自检
+docker inspect gaubeeos --format 'revision={{index .Config.Labels "org.opencontainers.image.revision"}}'
+docker inspect gaubeeos --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^CDN_GITHUB_TOKEN=//p' | awk '{print length}'
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:17080/
 ```
 
-## 三个已经踩过的坑
+## 事故一：watchtower 用「新建容器替换」的方式升级，与固定端口冲突
 
-### 坑 1：漏了 watchtower 标签 → 自动更新彻底失效（2026-11-24）
+**这是最根本的问题，之前一直没看出来。**
 
-watchtower 用 `--label-enable` 启动，**只监控带 `com.centurylinklabs.watchtower=true`
-标签的容器**。重建时漏掉标签的后果：
+watchtower 的升级机制是：发现新镜像 → **新建一个容器** → 删掉旧的。
+但 `gaubeeos` 绑定 `127.0.0.1:17080`，旧容器还占着端口时，新容器启动必然失败：
 
-- watchtower 日志显示 `Scanned=0`（不是 `Scanned=1 Updated=0`）
-- 之后 CI 每次成功、容器也健康，但站点永远停在旧版本
-- 排查时容易误判成「CI 没推镜像」或「watchtower 坏了」，实际只是容器不在监控名单里
+```
+Error response from daemon: driver failed programming external
+connectivity: Bind for 127.0.0.1:17080 failed: port is already allocated
+```
 
-**判据**：`docker logs watchtower | grep "Scanned="`。`Scanned=1 Updated=0` 是正常的
-（镜像没变）；`Scanned=0` 就是标签丢了。
+后果是**每 5 分钟留下一个 `Created` 状态的僵尸容器**。2026-11-24 排查时发现
+**56 个僵尸**，全部从 22:56 起累积。同时 watchtower 日志是 `Failed=1 Scanned=1 Updated=0`，
+看起来像「什么都没发生」。
 
-### 坑 2：手动 `docker pull` 过新镜像，watchtower 反而不重建
+**判据**：`docker ps -a --filter ancestor=ghcr.io/gaubee/gaubee.com:latest --format '{{.Names}} {{.Status}}'`
+出现一堆 `Created` 就是这个问题。
 
-如果 CI 推了新镜像、又有人手动 `docker pull` 到本地，watchtower 下一次扫描会发现
-本地 digest 已等于远端的，于是 `Updated=0`——但**容器仍在跑旧镜像**（pull 只更新了
-本地镜像层，没有重建容器）。
+**修法**：改用 `docker compose pull && docker compose up -d`——compose 会原地替换容器，
+不会出现两个容器抢同一端口。watchtower 已 `docker update --restart=no` + 停用。
 
-**处置**：`docker stop/rm` 后按上面参数重建，然后核对
-`docker inspect gaubeeos --format "{{index .Config.Labels \"org.opencontainers.image.revision\"}}"`，
-它应该等于最新 commit 的前 40 位。
+## 事故二：重建时漏 watchtower 标签（已被事故一的修法消解）
 
-### 坑 3：从旧容器的 env 里抄 token → 抄成空串（2026-11-24）
+watchtower 以 `--label-enable` 启动，只监控带 `com.centurylinklabs.watchtower.enable=true`
+的容器。手动重建漏了标签 → 日志 `Scanned=0`（不是 `Scanned=1`）→ 永远不更新。
 
-重建时用 `docker inspect <旧容器> --format ... CDN_GITHUB_TOKEN` 取值，但**旧容器若已被
-`docker rm`，就什么都取不到**，`-e CDN_GITHUB_TOKEN=""` 会悄悄把 token 清空。
-后果不立即可见：manifest 靠公开指针仍能加载，但 release 回源与 token 探针会失败。
+现在 compose 文件里写死了标签，且已不用 watchtower，此坑不再适用；
+但**保留这条记录**：如果将来重新启用 watchtower，必须先确认标签在位。
 
-**正确做法**：token 与端口都在 `/etc/gaubeeos.env`，直接用 `--env-file` 引用，
-既不从旧容器抄、也不写进命令行（避免进 shell 历史）。
+## 事故三：从已删容器抄 token 抄成空串
 
-## 重建后的三步验证
+`docker inspect <旧容器>` 取 token，但旧容器已被 `rm`，取到空串，
+`-e CDN_GITHUB_TOKEN=""` 把 token 清空。症状**极隐蔽**：manifest 靠公开指针仍加载成功
+（日志显示 gen 正常），但 token 探针 401、release 回源失败。
 
-1. `docker inspect gaubeeos` 的 `org.opencontainers.image.revision` == 最新 commit
-2. `curl https://gaubee.com/tools/index.json` 的 `count` 与本地 `static/tools/index.json` 一致
-3. `docker logs watchtower | grep Scanned=` 必须是 `Scanned=1`
-4. `docker inspect gaubeeos` 的 `CDN_GITHUB_TOKEN` 长度必须 > 0（93 左右），
-   再跑 `manifest-lag-watch` 看 token 探针是否 200
+**修法**：token 与端口都在 `/etc/gaubeeos.env`，compose 用 `env_file` 引用，
+既不从旧容器抄、也不进命令行。
 
-## 更省事的做法
+## 事故四：`/app/tools` 返回 200 但打不开（应用没被安装）
 
-把启动参数写成 `/etc/edge/gaubeeos/run.sh`（或用 compose 文件），重建时直接执行它，
-不再靠记忆拼参数。这一步还没做——下次重建前值得先补上。
+完全不是部署问题，是客户端逻辑：
+
+`AppManager.init()` 只对**首次访问**（localStorage 为空）安装 `DEFAULT_APP_IDS`。
+老用户的 localStorage 里没有 `tools`，于是：
+- `/app/tools` 走 SPA fallback 返回 200（看起来"上线了"）
+- 但应用根本没安装 → 桌面看不到、路由也进不去
+
+`skill-graph` 当年踩过同一个坑。修法是在 `runDefaultAppMigrations` 加一条
+`{ id: "tools", tag: "add-tools@2026-11-24" }`，老用户首次访问后一次性补装。
+
+**判据**：`curl /app/tools` 返回 4556B（SPA 壳）+ 桌面看不到图标 = 应用未安装，
+不是部署问题。代码注释里记录了同一坑（`AppManager.svelte.ts:311`）。
+
+## 排查这些问题时最容易走的弯路
+
+我这次走过两条：
+
+1. **把「容器在跑但没更新」误判成「容器没在跑」**。`docker ps --filter ancestor=...`
+   在某些时刻返回空，但实际有容器在另一个名字下运行。要用
+   `docker ps -a --format '{{.Names}} {{.Status}} {{.Ports}}' | grep 17080`
+   按端口反查。
+2. **把「SPA 返回 200」当成「页面可用」**。所有 `/app/*` 都返回同样的 4563B 壳，
+   必须用浏览器实际渲染才知道应用有没有装上。
