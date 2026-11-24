@@ -173,6 +173,40 @@ secret、零入站端口、零面板暴露；CI 推完 ghcr 后至多 5 分钟�
 - **回滚**：`settings.json` 里 `proxy` 改回 `proxyCustom` 的值（保留未删）后重启容器；
   备份文件 `settings.json.bak-before-direct-*`。`aiweb-clash` 容器暂不删，观察后再决定。
 
+### magpie 上 OpenDesign 走原生 Anthropic，不再转换（2026-11-13 落地）
+
+背景：OpenDesign 客户端说 Anthropic Messages，而 `opendesign` 插件把模型默认声明成
+`@ai-sdk/openai-compatible`，magpie 于是每个请求都做 Anthropic→Chat 再转回来。
+插件自己的注释（`plugins/node_modules/@magpie-community/opencode-opendesign-auth/index.mjs`）
+写明：**amr-link 对每个模型三个协议都支持**，默认 wire 只是按「思考质量」测出来的偏好。
+
+- **做法：改 magpie 的按模型设置，不动代码、不动插件。**
+  UI 路径：Providers → Open Design → 模型行 → 「API this model is asked on」→ Anthropic。
+  落盘在 `config-b/magpie/settings.json` 的 `modelAPIs`：
+  ```json
+  "opendesign/deepseek-v4.1-flash": "anthropic",
+  "opendesign-plugin/deepseek-v4.1-flash": "anthropic",
+  "opendesign/deepseek-v4.1-flash-eco": "anthropic",
+  "opendesign-plugin/deepseek-v4.1-flash-eco": "anthropic"
+  ```
+  两个 provider id 都要写：插件 provider 的 runtime id 会在 `opendesign` 与
+  `opendesign-plugin` 之间切换（取决于是否与自定义 provider 撞 id）。
+  等价 API：`POST /api/provider/save`，body 带 `modelPrefs:{<model>:{api:"anthropic"}}`，
+  合法值是 `chat|responses|anthropic|gemini|decide`（传 npm 包名会被 400 拒）。
+- **禁止直接改 `plugin-providers.json`**：它在每次启动时由插件重新生成（实测重启后 mtime 更新）。
+- **验证口径**：magpie 请求表的 `ep` 字段。转换时是
+  `/v1/messages → /v1/chat/completions`，原生时只有 `/v1/messages`（无箭头）。
+- **量化**（同模型 deepseek-v4.1-flash、同 406KB 载荷、`cpu.stat` 计费、ABBA 交替 3 轮）：
+  chat wire 0.574s CPU/请求 → anthropic wire 0.388s，**省约 32%**；
+  TTFT 两者都是 3.05s——**首帧由上游决定，转换不是瓶颈**。
+- **别把 30s+ 的慢请求归因于转换**：同一路径在 15:12 也跑出 3.4s 首帧，转换开/关都出现过。
+- 上游 Anthropic 端点：`https://amr-link.open-design.ai/v1/messages`，
+  `x-api-key` 与 `Authorization: Bearer` 两种头部都可用。
+- **其余模型保持插件默认 wire**：`glm-5.3-flash` 只在 anthropic 上出思考、
+  `deepseek-v4-pro` / `claude-haiku-5.5` 在 Responses 上思考更久。
+- **回滚**：删掉上述 `modelAPIs` 四行（或 UI 里把模型 API 改回 Chat）后
+  `docker restart magpie-b`。
+
 ### 文件结构
 
 ```
