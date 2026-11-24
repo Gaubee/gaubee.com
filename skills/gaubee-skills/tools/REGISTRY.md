@@ -32,3 +32,4 @@
 > 清单见 `tools/INTERNAL.md`；形态定义见 `openspec/changes/tool-body-economy`。
 | 2026-11-24 | star-browse | tools/2026-11-24-star-browse/ | 按策展分类浏览收藏：16 个分类 184 个仓库，支持关键词按描述与仓库名过滤（webapp，已在 /app/tools） | proposed | webapp |  |
 | 2026-11-24 | tech-adoption | tools/2026-11-24-tech-adoption/ | 技术采用时间线：查某技术何时首见、用在哪些项目，也能反查项目技术栈（webapp，读站点公开图谱） | proposed | webapp |  |
+| 2026-11-24 | dlx | tools-go/dlx/ | 跨站点视频/音频下载器：Go 编排 + yt-dlp 引擎，补上批量并发、失败归类、归档清单（2.6MB 单二进制；纯 Go 重写不现实，kkdai/youtube 只支持 YouTube） | proposed | self-hosted |  |
