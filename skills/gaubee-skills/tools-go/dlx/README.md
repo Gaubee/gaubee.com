@@ -43,6 +43,13 @@ $ ./dlx doctor
 dlx v0.1.0
   ✓ yt-dlp: /opt/homebrew/bin/yt-dlp (v2026.07.04)
   ✓ ffmpeg（音视频合并需要）
+
+$ ./dlx probe "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+ID  EXT   RESOLUTION FPS CH |   FILESIZE    TBR PROTO | VCODEC           VBR ACODEC      ABR ASR MORE INFO
+139 m4a   audio only      2 |    1.24MiB    49k https | audio only           mp4a.40.5   49k 22k [en] low, m4a_dash
+140 m4a   audio only      2 |    3.29MiB   130k https | audio only           mp4a.40.2  130k 44k [en] medium, m4a_dash
+160 mp4   256x144     25    |    1.96MiB    77k https | avc1.4D400C      77k video only          144p, mp4_dash
+278 webm  256x144     25    |    1.47MiB    58k https | vp9              58k video only          144p, webm_dash
 ```
 
 失败归类的判据（按 yt-dlp 的 stderr 文本）：
@@ -59,3 +66,22 @@ dlx v0.1.0
 
 **self-hosted**：需要本地 ffmpeg 与网络出口，不能在浏览器里跑。
 仓库命名 `gaubee-tool-dlx`；WebApp 详情页给部署说明。
+
+## 自托管部署
+
+这个工具需要本地 yt-dlp 与网络出口，**不在 gaubee.com 网页里运行**。
+
+| 项 | 要求 |
+| --- | --- |
+| 依赖 | yt-dlp（必需）· ffmpeg（分轨合并必需）· Go 1.22+（自行编译时） |
+| 环境变量 | 无（需登录的站点用 `--cookies-from-browser`） |
+| 需要的数据 | 无（输出与清单写在你指定的目录） |
+
+```sh
+git clone https://github.com/Gaubee/gaubee-tool-dlx
+cd gaubee-tool-dlx
+CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o dlx .
+./dlx doctor
+```
+
+仓库命名约定：`gaubee-tool-<slug>`（见 `openspec/changes/tool-body-economy`）。
