@@ -3315,5 +3315,19 @@
   "2124791062065816009": "用 nshm，你几乎整个 NSH 应用都能用 TSX 写——只有真需要原生性能时才下沉到 Rust。\n\nnshm 让你把 Rust 代码打包成模块，直接从 TSX 导入。Rust 在各平台原生运行，而你的 UI、状态和页面保持",
   "2124575437758361956": "Andarium 1.1 发布！加了 AOT，性能显著提升、发热降低、应用启动时间砍掉 35%。还加了 iOS 26 支持、120Hz ProMotion、内置 Magisk、iOS 快捷指令、伪造短信等等！\n\n下载 IPA：https://github.com/imxieyi/Kernarium/releases/tag/andarium-1.1",
   "2124717898203849052": "2026 年的软件工程师：在编排 Claude、Codex、Cursor、Antigravity 这些 agent。",
-  "2124731584490111224": "我用 GLM-5.4 有一段时间了，可以很确定地说，它是现在能用的最好的开放模型。\n\n它在 KingBench 4 上排第 7，是开放模型里的最好名次。\n\n据我观察，这个模型是认真做的，不太针对榜单做特化"
+  "2124731584490111224": "我用 GLM-5.4 有一段时间了，可以很确定地说，它是现在能用的最好的开放模型。\n\n它在 KingBench 4 上排第 7，是开放模型里的最好名次。\n\n据我观察，这个模型是认真做的，不太针对榜单做特化",
+  "2124998521179054551": "agent-browser 现在支持 @ladybirdbrowser\n\nagent-browser -p ladybird\n\nv0.44.0 起可用",
+  "2125266115874144473": "今天我们开源 OCRia-1 的权重——这是我们面向文档 OCR 的旗舰 4B VLM 🔥\n\n这是两天内第二次开放权重发布（昨天刚发布 OCRia-nano-1！！）。\n\n在多个基准上，OCRia-1 处于相对其他 4B 模型的精度-成本帕累托曲线上",
+  "2125273087960887731": "有人试过吗？",
+  "2125221634101723255": "介绍 Panelo UI\n\n构建 AI agent 真正能操作的仪表盘。\n\n> 基于 @uisdk\n> 零配置，一条命令完成设置。\n> 兼容 @shadcn /ui（直接复制粘贴）\n> 30+ 组件与模板即将推出\n> 组件免费。MIT 许可。开源。\n\nhttps://paneloui.com",
+  "2125206548905390523": "NSH 现在有 shadcn 风格的组件库了 🎉\n\nshadcn-nsh：给 Native Shell 的复制粘贴式 UI，构建在 nsh/base 上。没有包依赖——文件归你。全平台支持 + 原生主题（Apple、Material、WinUI……）。\n\nhttps://nsh.dev\nhttps://shadcn-nsh.aning.dev/",
+  "2125177755943960580": "我们开源了一个 3B 激活的翻译模型，击败了算力超过它 30 倍的模型。Hy MT3 提供 1.8B、7B 和 30B-A3B 三种规格，Apache 2.0 许可。\n\n我们持续根据社区反馈打磨模型，覆盖语言从 Hy MT2 的 38 种扩展到 Hy MT3 的 102 种。在",
+  "2124891223597240338": "介绍 Ling-3.2-air：一个开放权重模型，与 Ling-3.0-flash-VL 共享原生多模态架构。\n总参数 124B，激活 5.5B。工作流自动化与专业文档推理更强。AutomationBench-AA 从 15.7% 提升到 61%。\n完整基准结果见下。",
+  "2124935489459261726": "是的。我们正在为 @angular 做 UI SDK，很快就来。\n\nhttps://github.com/vercel-labs/ui",
+  "2125170622049485093": "🚀 Hy MT3 来了——第三代开源翻译模型。\n\n更准确、更完整，也更擅长遵循用户指令。语言覆盖从 38 种扩展到 102 种。\n\n针对游戏本地化（与《王者荣耀》合作）和图像/OCR 翻译做了优化。\n\n模型开源",
+  "2125112289804063211": "OpenCode Go 上刚出现一个隐身模型：HungerG Free 👀\n\n首次测试对比 DeepSeek V4.1 Flash，同一提示词：麦田里的联合收割机，Three.js 🌾\n\nHungerG Free：免费 · 12 分 47 秒（自动档）\nDeepSeek V4.1 Flash：$0.04 · 9 分 41 秒（high 档）\n\nDeepSeek 更快，但",
+  "2124867895062888808": "GPUI Kit v0.11.0 发布了！\n\n这个版本给 Editor、Markdown、Diff 和文本输入带来一系列改进：\n\n- Editor：大型与非 ASCII 文档的软换行更快，行号样式可定制，代码折叠可控。\n- Markdown：换行更好，",
+  "2124973300787159388": "scriptc 现在可以编译：\n\n→ TypeScript（.ts、.tsx、.mts、.cts）\n→ JavaScript（ESM、CommonJS、压缩）\n→ 带 JSDoc 类型的 JavaScript\n→ JSX 与 TSX\n→ 大多数 npm 包，包括 React 19\n→ esbuild bundle\n→ WebAssembly",
+  "2124880084506910810": "我整理了 Awesome UI SDK：一份面向 Vercel UI SDK 的精选目录，收录库、工具、指南与演示。\n\n如果你用 UI SDK 做过东西，我很想看看。\n\nhttps://awesome-ui-sdk.dev/",
+  "2117575593231253627": "在 RunsOn 的对比里，Avrea 是最快的 GitHub Actions runner：比 GitHub 快 163%，比 Blacksmith 快 16%。\n\n为了让 Avrea 成为最快的 runner，团队付出了很多。为他们骄傲。\n\n如果你喜欢快 CI，去试试 Avrea。\n\nhttps://avrea.com/blog/avrea-runson-build-benchmark"
 }
