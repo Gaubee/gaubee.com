@@ -1,0 +1,33 @@
+# gaubeeos 容器（compose 管理）
+#
+# 为什么改成 compose：之前是 docker run 手工起，每次重建都要靠人记得带齐
+# 端口/挂载/watchtower 标签/env 文件四类参数。两次部署事故都源于漏参数：
+#   1. 漏 watchtower 标签 → 容器掉出监控名单（日志 Scanned=0），站点永远停旧版
+#   2. 从已删的旧容器抄 token → 抄成空串，release 回源与 token 探针失败
+# compose 把这些写成声明式，`docker compose up -d` 重建不会漏。
+#
+# 用法（在 /etc/edge/gaubeeos/）：
+#   docker compose up -d          # 拉镜像 + 重建
+#   docker compose logs -f        # 看日志
+#   docker compose config         # 校验配置
+
+services:
+  gaubeeos:
+    image: ghcr.io/gaubee/gaubee.com:latest
+    container_name: gaubeeos
+    restart: unless-stopped
+    ports:
+      # 只绑回环：对外由宿主机的 openresty 终结 TLS 后反代
+      - "127.0.0.1:17080:8080"
+    volumes:
+      - /etc/edge/gaubeeos/config.toml:/config.toml:ro
+      - /opt/gaubee/media-cache:/media-cache
+    env_file:
+      # token 与 PORT/ADMIN_PORT 都在这里，不从旧容器 env 抄
+      - /etc/gaubeeos.env
+    labels:
+      # watchtower 以 --label-enable 启动，只监控带此标签的容器。
+      # 漏了它 → 日志 Scanned=0，自动更新彻底失效。
+      com.centurylinklabs.watchtower.enable: "true"
+      # 兼容旧写法（有些 watchtower 版本读 key 而非 enable）
+      com.centurylinklabs.watchtower: "true"
