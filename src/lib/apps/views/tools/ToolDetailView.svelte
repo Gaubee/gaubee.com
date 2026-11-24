@@ -19,6 +19,8 @@
     searchStars,
     searchX,
     starTimeline,
+    starXCross,
+    topicDrift,
     type DepRepo,
     type StarRepo,
     type ToolMeta,
@@ -52,6 +54,23 @@
 
   function computeResults(): Tabellike[] {
     const q = query.trim();
+    if (toolId === "star-x-cross") {
+      const cross = starXCross(stars, xitems, q);
+      return cross.hits.map((h) => ({
+        a: h.repo.name,
+        b: `${h.repo.desc.slice(0, 80)} · ${h.sample.replace(/\s+/g, " ").slice(0, 70)}`,
+        c: `${h.count} 条 · ${h.latest} · ${h.authors.slice(0, 2).map((a) => `@${a}`).join("、")}`,
+      }));
+    }
+    if (toolId === "stars-drift") {
+      const d = topicDrift(stars, 30);
+      const list = q ? d.topics.filter((t) => t.topic.includes(q.toLowerCase())) : d.topics;
+      return list.map((t) => ({
+        a: t.topic,
+        b: `近 30 天 ${t.recent} · 前 30 天 ${t.prior}`,
+        c: `${t.delta >= 0 ? "+" : ""}${t.delta}`,
+      }));
+    }
     if (!q) return [];
     if (["stars-search", "star-at", "star-readme", "stale-check"].includes(toolId)) {
       return searchStars(stars, q, { archived: toolId === "stale-check" ? true : null })
@@ -72,6 +91,8 @@
   }
 
   const timeline = $derived(toolId === "star-timeline" ? starTimeline(stars, 120) : []);
+  const cross = $derived(toolId === "star-x-cross" ? starXCross(stars, xitems) : null);
+  const drift = $derived(toolId === "stars-drift" ? topicDrift(stars, 30) : null);
 
   onMount(async () => {
     const idx = await loadIndex();
@@ -98,6 +119,8 @@
     "x-top-authors",
     "star-browse",
     "tech-adoption",
+    "star-x-cross",
+    "stars-drift",
   ]);
   const isRunnable = $derived(runnable.includes(toolId));
 </script>
@@ -126,6 +149,46 @@
               <li><span>{t.date}</span><span>+{t.added}</span><span>累计 {t.total}</span></li>
             {/each}
           </ul>
+        {:else if toolId === "star-x-cross"}
+          {#if query.trim()}
+            <p class="count">命中 {results.length} 条</p>
+            <ul class="results">
+              {#each results as r (r.a)}
+                <li><span class="a">{r.a}</span><span class="b">{r.b}</span>{#if r.c}<span class="c">{r.c}</span>{/if}</li>
+              {/each}
+            </ul>
+          {:else if cross}
+            <p class="muted">收藏 {cross.stars} · X {cross.posts} 条 · 交叉命中 {cross.hitCount} 个仓库 / {cross.mentionCount} 条动态</p>
+            <ul class="results">
+              {#each cross.hits.slice(0, 12) as h (h.repo.name)}
+                <li>
+                  <span class="a">{h.repo.name} <small>★{h.repo.stars} {h.repo.lang}</small></span>
+                  <span class="b">{h.repo.desc.slice(0, 80)} · {h.sample.replace(/\s+/g, " ").slice(0, 90)}</span>
+                  <span class="c">{h.count} 条 · {h.latest} · {h.authors.slice(0, 2).map((a) => `@${a}`).join("、")}</span>
+                </li>
+              {/each}
+            </ul>
+            <h2>动态里出现、尚未收藏（{cross.candidates.length}）</h2>
+            <ul class="results">
+              {#each cross.candidates.slice(0, 10) as c (c.repo)}
+                <li>
+                  <span class="a">{c.repo}</span>
+                  <span class="b">{c.sample.replace(/\s+/g, " ").slice(0, 90)}</span>
+                  <span class="c">{c.count} 条 · {c.latest} · {c.authors.slice(0, 2).map((a) => `@${a}`).join("、")}</span>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        {:else if toolId === "stars-drift"}
+          {#if drift}
+            <p class="muted">近 {drift.days} 天 {drift.window} 个新星标（前一期 {drift.prev}）；主题按增量排序</p>
+            <ul class="results">
+              {#each (query.trim() ? results : drift.topics.map((t) => ({ a: t.topic, b: `近 30 天 ${t.recent} · 前 30 天 ${t.prior}`, c: `${t.delta >= 0 ? "+" : ""}${t.delta}` }))) as r (r.a)}
+                <li><span class="a">{r.a}</span><span class="b">{r.b}</span>{#if r.c}<span class="c">{r.c}</span>{/if}</li>
+              {/each}
+            </ul>
+            <p class="muted">语言（近 / 前）：{drift.languages.map((l) => `${l.lang} ${l.recent}/${l.prior}`).join("、")}</p>
+          {/if}
         {:else if query.trim()}
           <p class="count">命中 {results.length} 条{results.length >= 20 ? "（已截断）" : ""}</p>
           <ul class="results">

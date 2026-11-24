@@ -48,6 +48,7 @@ const WEBAPP_META: Record<string, { dataNeeds: string[]; dataFile?: string }> = 
   "llm-mem-fit": { dataNeeds: ["none"] },
   "star-browse": { dataNeeds: ["stars"], dataFile: "/tools/data/taxonomy.json" },
   "tech-adoption": { dataNeeds: ["graph"] },
+  "star-x-cross": { dataNeeds: ["stars", "x"], dataFile: "/static/tools/data/x.json" },
 };
 
 function parseRegistry(): Array<{ name: string; summary: string; form: string; date: string }> {

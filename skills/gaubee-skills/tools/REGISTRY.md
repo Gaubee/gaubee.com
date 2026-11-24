@@ -17,7 +17,7 @@
 | 2026-10-20 | x-posters-backfill | tools/2026-10-20-x-posters-backfill/ | 视频 poster 缺口审计+回灌：全库 <video> 覆盖对账（首跑 1202 缺 78）+staging 副本 ffmpeg 抽首帧 + x.json posterLocal 接线 + 重渲染（首版只写文件漏接线被审计判 30 孤儿，补课后覆盖 1124→1157） | approved | self-hosted |          |
 | 2026-10-20 | video-retro-hd | tools/2026-10-20-video-retro-hd/ | 存量低清视频追溯升级：重拉 1080p/720p 源→无损切 HLS 分片→改键→重渲染；--until 给 cron 让路、--no-render/--render-pending 让页面引用等媒体发布（首跑 47 分钟视频 360p→720p 472 段 235MB；候选 332） | approved | self-hosted |          |
 | 2026-10-24 | x-thread-backfill | tools/2026-10-24-x-thread-backfill/ | X 线程兜底工具化：扫描疑似缺链（🧵/n/m 标记无 thread 字段）+ ego-browser 抓同作者全链原子写回（首跑 36 条疑似缺链；DeepSeek 1/6 线程实抓 6 段收尾对齐） | approved | self-hosted |          |
-| 2026-10-25 | stars-drift | tools/2026-10-25-stars-drift/ | 星标兴趣漂移月览：catalog 分类 × starred_at 双窗口聚合 + 主力语言（首跑：近 30 天 90 星 vs 前 54，AI Agent 类 +21 近两倍漂移） | approved | webapp |          |
+| 2026-10-25 | stars-drift | tools/2026-10-25-stars-drift/ | 星标兴趣漂移月览：catalog 分类 × starred_at 双窗口聚合 + 主力语言（首跑：近 30 天 90 星 vs 前 54，AI Agent 类 +21 近两倍漂移） | approved | webapp | 2026-11-25 升级：加主题/语言双窗口漂移与 --json，接入 /app/tools |
 | 2026-10-25 | vault-verify | tools/2026-10-25-vault-verify/ | vault.enc.sqlite 只读校验：逐行 GCM 解密 + 行内哈希 + --workspace 双向对账（首跑 171 行全绿，抓到 taxonomy/profile/feedback-log 3 条已改未回灌） | approved | self-hosted |          |
 | 2026-10-26 | x-top-authors | tools/2026-10-26-x-top-authors/ | X 点赞作者榜：x.json liked 按作者聚合双窗口计数（首跑：30 天 228 条赞 top10 占 38，@bkdgiffug 7 条居首） | approved | webapp |          |
 | 2026-10-26 | vault-drift-sync | tools/2026-10-26-vault-drift-sync/ | vault 漂移回灌（vault-verify 姊妹动作）：agent 脚本直写绕过加密镜像的分叉一键补齐，vaultPut 语义幂等（首跑 dry 3 → 回灌 3 → 复核归零，实证根因为 python 直写 taxonomy） | approved | self-hosted |          |
@@ -33,3 +33,4 @@
 | 2026-11-24 | star-browse | tools/2026-11-24-star-browse/ | 按策展分类浏览收藏：16 个分类 184 个仓库，支持关键词按描述与仓库名过滤（webapp，已在 /app/tools） | proposed | webapp |  |
 | 2026-11-24 | tech-adoption | tools/2026-11-24-tech-adoption/ | 技术采用时间线：查某技术何时首见、用在哪些项目，也能反查项目技术栈（webapp，读站点公开图谱） | proposed | webapp |  |
 | 2026-11-24 | dlx | tools-go/dlx/ | 跨站点视频/音频下载器：Go 编排 + yt-dlp 引擎，补上批量并发、失败归类、归档清单（2.6MB 单二进制；纯 Go 重写不现实，kkdai/youtube 只支持 YouTube） | proposed | self-hosted |  |
+| 2026-11-25 | star-x-cross | tools/2026-11-25-star-x-cross/ | 收藏 × X 动态交叉命中：X 里提过的收藏仓库（条数/作者/日期）+ 提到但尚未收藏的 GitHub 候选（首跑 78 仓 / 137 条动态，候选 172 个） | proposed | webapp |  |

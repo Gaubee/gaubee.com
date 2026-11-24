@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-23T22:36:43.207Z",
-  "count": 23,
+  "generatedAt": "2026-11-24T22:37:52.064Z",
+  "count": 25,
   "tools": [
     {
       "id": "deps-digest",
@@ -109,6 +109,19 @@
       "dataFile": "/static/tools/data/stars.json"
     },
     {
+      "id": "star-x-cross",
+      "name": "star-x-cross",
+      "summary": "收藏 × X 动态交叉命中：X 里提过的收藏仓库（条数/作者/日期）+ 提到但尚未收藏的 GitHub 候选（首跑 78 仓 / 137 条动态，候选 172 个）",
+      "form": "webapp",
+      "version": "0.1",
+      "updatedAt": "2026-11-25",
+      "dataNeeds": [
+        "stars",
+        "x"
+      ],
+      "dataFile": "/static/tools/data/x.json"
+    },
+    {
       "id": "stars-drift",
       "name": "stars-drift",
       "summary": "星标兴趣漂移月览：catalog 分类 × starred_at 双窗口聚合 + 主力语言（首跑：近 30 天 90 星 vs 前 54，AI Agent 类 +21 近两倍漂移）",
@@ -176,6 +189,16 @@
       "updatedAt": "2026-10-20",
       "dataNeeds": [],
       "repo": "gaubee-tool-auth-server-deploy"
+    },
+    {
+      "id": "dlx",
+      "name": "dlx",
+      "summary": "跨站点视频/音频下载器：Go 编排 + yt-dlp 引擎，补上批量并发、失败归类、归档清单（2.6MB 单二进制；纯 Go 重写不现实，kkdai/youtube 只支持 YouTube）",
+      "form": "self-hosted",
+      "version": "0.1",
+      "updatedAt": "2026-11-24",
+      "dataNeeds": [],
+      "repo": "gaubee-tool-dlx"
     },
     {
       "id": "remux-probe",
