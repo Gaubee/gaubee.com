@@ -31,12 +31,14 @@ interface PersistedDesktopLayout {
 }
 
 /** 当前 schema 版本。升级时递增，配合 MIGRATIONS 做一次性数据迁移。 */
-const CURRENT_VERSION = 3;
+const CURRENT_VERSION = 4;
 
 /**
  * 版本迁移：把"曾经默认隐藏、现已晋升为可见"的应用补充进持久化列表。
  * - v1→v2：github 从 bottom 区晋升为 main 区主屏应用（2026-07-26），纳入桌面网格。
  * - v2→v3：skill-graph 系统应用上线（2026-10-04），老用户桌面补进网格。
+ * - v3→v4：tools 工具集应用上线（2026-11-24）。它虽是 default 类，但**新装应用默认隐藏**，
+ *   老用户看不到入口——所以这里显式补进桌面网格（用户可自行隐藏）。
  */
 function migrateLayout(persisted: PersistedDesktopLayout): PersistedDesktopLayout {
   const v = persisted.version ?? 1;
@@ -47,6 +49,9 @@ function migrateLayout(persisted: PersistedDesktopLayout): PersistedDesktopLayou
   }
   if (v < 3 && !apps.includes("skill-graph")) {
     apps.push("skill-graph");
+  }
+  if (v < 4 && !apps.includes("tools")) {
+    apps.push("tools");
   }
   return { desktopApps: apps, updatedAt: persisted.updatedAt, version: CURRENT_VERSION };
 }
