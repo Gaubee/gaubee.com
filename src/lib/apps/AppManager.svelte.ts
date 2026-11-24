@@ -319,6 +319,9 @@ export class AppManager {
     if (typeof localStorage === "undefined") return false;
     const migrations: ReadonlyArray<{ id: string; tag: string }> = [
       { id: "json-viewer", tag: "add-json-viewer@2026-10-06" },
+      // 工具集（/app/tools）：工坊产出的 WebApp 出口。老用户的 localStorage 里没有它，
+      // 不加这条迁移就永远看不到（skill-graph 当年踩过同一个坑）。
+      { id: "tools", tag: "add-tools@2026-11-24" },
     ];
     let done: string[] = [];
     try {

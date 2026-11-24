@@ -30,6 +30,8 @@ function freshManager(): AppManager {
   const manager = new AppManager();
   manager.register(makeEntry("github"));
   manager.register(makeEntry("json-viewer"));
+  // tools 也是 DEFAULT_APP_IDS 的一员，缺它会让迁移测试误判成「没补装」
+  manager.register(makeEntry("tools"));
   return manager;
 }
 
@@ -80,5 +82,28 @@ describe("默认应用增量迁移（json-viewer 补装）", () => {
     const manager = freshManager();
     manager.init();
     expect(manager.isInstalled("json-viewer")).toBe(false);
+  });
+});
+
+describe("工具集应用迁移（tools 补装）", () => {
+  /** tools 也是 DEFAULT_APP_IDS 的一员；老用户必须靠迁移才会装上。 */
+  it("老用户（只装过 github、迁移标记只有 json-viewer）init 后补装 tools", () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(["github"]));
+    localStorage.setItem(MIGRATIONS_KEY, JSON.stringify(["add-json-viewer@2026-10-06"]));
+    const manager = freshManager();
+    manager.init();
+    expect(manager.isInstalled("tools")).toBe(true);
+    expect(JSON.parse(localStorage.getItem(MIGRATIONS_KEY) ?? "[]")).toContain("add-tools@2026-11-24");
+  });
+
+  it("tools 迁移只跑一次：用户卸载后不再补装", () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(["github"]));
+    localStorage.setItem(MIGRATIONS_KEY, JSON.stringify(["add-json-viewer@2026-10-06"]));
+    freshManager().init();
+    const after = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]") as string[];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(after.filter((id) => id !== "tools")));
+    const manager2 = freshManager();
+    manager2.init();
+    expect(manager2.isInstalled("tools")).toBe(false);
   });
 });
