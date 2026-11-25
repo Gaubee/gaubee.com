@@ -1,6 +1,6 @@
 # search-server 部署手册（zvec 语义搜索）
 
-> 状态：Phase 1 MVP 物料。**本文件不代表已部署**；生产变更需单独评审。
+> 状态：Phase 1 已于 2026-11-25 部署（17082 + openresty `/api/search`）；后续变更仍需评审。
 > 引擎：alibaba/zvec 0.8.1（进程内向量库，Apache-2.0）+ intfloat/multilingual-e5-small
 > ONNX（MIT）+ ONNX Runtime（MIT，经 `ort` 构建期下载）。
 
@@ -77,8 +77,13 @@ Dockerfile 使用多阶段构建，构建上下文必须是**仓库根目录**�
 
 ```bash
 cd /path/to/gaubee.com
-docker build -f search-server/Dockerfile -t gaubee/search-server:zvec-0.8.1 .
+docker build -f search-server/Dockerfile -t gaubee-search:local .
 ```
+
+> **镜像拉取通道（2026-11-25 实测）**：生产服务器直连 `ghcr.io` 的 blob 域名
+> （`pkg-containers.githubusercontent.com`）会 TLS 超时，但 `ghcr.nju.edu.cn`
+> 镜像可正常拉取且 digest 与 ghcr.io 一致。因此 compose 使用
+> `ghcr.nju.edu.cn/gaubee/gaubee-search:latest`；CI 仍推 ghcr.io。
 
 `search-server/Dockerfile.dockerignore` 只放行 crate 源码与 `src/content/{articles,events}`，
 不会把 node_modules/static 大目录送进构建上下文。
@@ -99,7 +104,7 @@ docker build -f search-server/Dockerfile -t gaubee/search-server:zvec-0.8.1 .
 ```yaml
 services:
   search-server:
-    image: docker.io/gaubee/search-server:zvec-0.8.1
+    image: ghcr.nju.edu.cn/gaubee/gaubee-search:latest
     # 或本地构建：
     # build:
     #   context: ..
