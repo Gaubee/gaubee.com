@@ -1,31 +1,25 @@
-//! 全量索引构建：内容 → chunk → embedding → zvec。
+//! 全量索引构建：内容 → chunk → magpie embedding → SQLite。
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::{bail, Context, Result};
 use sha2::{Digest, Sha256};
-use tokenizers::Tokenizer;
 
-use crate::chunk::{
-    chunk_document, content_hash, MAX_CHUNKS_PER_DOC, OVERLAP_TOKENS, WINDOW_TOKENS,
-};
+use crate::chunk::{chunk_text, embedding_input, MAX_CHUNKS_PER_DOC, OVERLAP_CHARS, WINDOW_CHARS};
 use crate::content::{load_content, SourceDocument};
-use crate::embed::Embedder;
-use crate::manifest::{
-    collection_path, directory_size, now_rfc3339, write_manifest, IndexManifest,
-};
+use crate::embed::{EmbeddingClient, EmbeddingConfig};
+use crate::manifest::{now_rfc3339, IndexManifest, FORMAT_VERSION};
 use crate::search::encode_tags;
-use crate::store::{ChunkDocument, ZvecStore, EMBEDDING_DIM};
+use crate::store::{document_hash, tokenize_for_index, write_index, ChunkRecord};
 
 pub struct BuildOptions {
     pub content_root: PathBuf,
-    pub index_root: PathBuf,
-    pub model_dir: PathBuf,
-    pub threads: usize,
+    pub index_path: PathBuf,
+    pub embedding: EmbeddingConfig,
 }
 
+#[derive(Debug)]
 pub struct BuildReport {
     pub documents: usize,
     pub chunks: usize,
@@ -34,8 +28,14 @@ pub struct BuildReport {
     pub manifest: IndexManifest,
 }
 
+pub struct CheckReport {
+    pub documents: usize,
+    pub content_hash: String,
+    pub index_content_hash: Option<String>,
+    pub matches: bool,
+}
+
 struct PendingChunk {
-    id: String,
     parent_id: String,
     app_id: String,
     title: String,
@@ -45,22 +45,14 @@ struct PendingChunk {
     content_hash: String,
     href: String,
     text: String,
+    text_tokens: String,
+    embed_input: String,
     embedding: Vec<f32>,
 }
 
-/// 全量重建索引（先删除旧 collection，再写入新数据）。
+/// 全量重建索引（先写临时文件再原子替换，失败不破坏旧索引）。
 pub fn build_index(options: &BuildOptions) -> Result<BuildReport> {
     let started = Instant::now();
-    let tokenizer_path = options.model_dir.join("tokenizer.json");
-    let model_path = options.model_dir.join("model.onnx");
-    if !tokenizer_path.is_file() || !model_path.is_file() {
-        bail!(
-            "模型文件缺失：{} / {}（先运行 search-server/scripts/fetch-model.sh）",
-            tokenizer_path.display(),
-            model_path.display()
-        );
-    }
-
     let documents = load_content(&options.content_root)?;
     if documents.is_empty() {
         bail!(
@@ -69,21 +61,20 @@ pub fn build_index(options: &BuildOptions) -> Result<BuildReport> {
         );
     }
     tracing::info!(documents = documents.len(), "内容读取完成");
-
-    let tokenizer = Tokenizer::from_file(&tokenizer_path)
-        .map_err(|error| anyhow::anyhow!("加载 tokenizer 失败：{error}"))?;
+    let fingerprint = content_fingerprint(&documents);
 
     let mut pending = Vec::new();
     let mut apps: BTreeMap<String, usize> = BTreeMap::new();
-    let mut parent_hashes: Vec<(String, String)> = Vec::new();
-
     for document in &documents {
-        let hash = document_hash(document);
-        parent_hashes.push((document.parent_id.clone(), hash.clone()));
+        let hash = document_hash(
+            &document.title,
+            &document.tags,
+            document.date,
+            &document.text,
+        );
         *apps.entry(document.app_id.clone()).or_default() += 1;
-        for chunk in chunk_document(&tokenizer, document) {
+        for chunk in chunk_text(&document.text) {
             pending.push(PendingChunk {
-                id: format!("{}#{}", document.parent_id, chunk.index),
                 parent_id: document.parent_id.clone(),
                 app_id: document.app_id.clone(),
                 title: document.title.clone(),
@@ -92,124 +83,94 @@ pub fn build_index(options: &BuildOptions) -> Result<BuildReport> {
                 chunk_index: chunk.index as i32,
                 content_hash: hash.clone(),
                 href: document.href.clone(),
+                text_tokens: tokenize_for_index(&format!("{} {}", document.title, chunk.text)),
+                embed_input: embedding_input(&document.title, &chunk.text),
                 text: chunk.text,
                 embedding: Vec::new(),
             });
         }
     }
+    if pending.is_empty() {
+        bail!("内容切分后没有可索引的 chunk");
+    }
     tracing::info!(
         chunks = pending.len(),
+        window_chars = WINDOW_CHARS,
+        overlap_chars = OVERLAP_CHARS,
         max_chunks_per_doc = MAX_CHUNKS_PER_DOC,
-        "chunk 切分完成"
+        "chunk 切分与分词完成"
     );
 
-    let embedder = Embedder::load(&model_path, &tokenizer_path, options.threads)?;
+    let client = EmbeddingClient::new(&options.embedding).context("初始化 embedding 客户端失败")?;
     tracing::info!(
-        threads = options.threads,
-        dim = EMBEDDING_DIM,
-        "E5 模型加载完成"
+        model = %options.embedding.model,
+        batch_size = options.embedding.batch_size,
+        concurrency = options.embedding.concurrency,
+        "开始请求 magpie embedding"
     );
-
-    // 分批 embedding（控制内存峰值，同时给进度）。
-    const EMBED_BATCH: usize = 64;
-    let total_chunks = pending.len();
-    let mut embedded = 0usize;
-    for batch in pending.chunks_mut(EMBED_BATCH) {
-        let passages = batch
-            .iter()
-            .map(|chunk| chunk.text.clone())
-            .collect::<Vec<_>>();
-        let vectors = embedder.embed_passages(&passages)?;
-        if vectors.len() != batch.len() {
-            bail!(
-                "embedding 数量不匹配：期望 {}，实际 {}",
-                batch.len(),
-                vectors.len()
-            );
-        }
-        for (chunk, vector) in batch.iter_mut().zip(vectors) {
-            if vector.len() != EMBEDDING_DIM {
-                bail!("embedding 维度错误：{}", vector.len());
-            }
-            chunk.embedding = vector;
-        }
-        embedded += batch.len();
-        if embedded % 512 < EMBED_BATCH || embedded == total_chunks {
-            tracing::info!(embedded, total = total_chunks, "embedding 进度");
-        }
-    }
-
-    // embedding 全部成功后才删除旧索引，避免中途失败丢可用索引。
-    if options.index_root.exists() {
-        fs::remove_dir_all(&options.index_root)
-            .with_context(|| format!("删除旧索引失败：{}", options.index_root.display()))?;
-    }
-    fs::create_dir_all(&options.index_root)?;
-    let collection = collection_path(&options.index_root);
-
-    let store = ZvecStore::create(&collection)?;
-    let mut written = 0usize;
-    for batch in pending.chunks(500) {
-        let docs = batch
-            .iter()
-            .map(|chunk| ChunkDocument {
-                id: chunk.id.clone(),
-                parent_id: &chunk.parent_id,
-                app_id: &chunk.app_id,
-                title: &chunk.title,
-                tags: &chunk.tags,
-                date: chunk.date,
-                chunk_index: chunk.chunk_index,
-                content_hash: &chunk.content_hash,
-                href: &chunk.href,
-                text: &chunk.text,
-                embedding: &chunk.embedding,
-            })
-            .collect::<Vec<_>>();
-        store.insert(&docs)?;
-        written += docs.len();
-        tracing::info!(written, total = pending.len(), "写入进度");
-    }
-
-    store.optimize()?;
-    store.flush()?;
-    let doc_count = store.doc_count()?;
-    drop(store);
-
-    if doc_count as usize != pending.len() {
+    let inputs = pending
+        .iter()
+        .map(|chunk| chunk.embed_input.clone())
+        .collect::<Vec<_>>();
+    let vectors = client.embed_all(&inputs)?;
+    if vectors.len() != pending.len() {
         bail!(
-            "写入数量校验失败：zvec doc_count={doc_count}，期望 {}",
-            pending.len()
+            "embedding 数量不匹配：期望 {}，实际 {}",
+            pending.len(),
+            vectors.len()
         );
     }
-
-    parent_hashes.sort();
-    let mut hasher = Sha256::new();
-    for (parent, hash) in &parent_hashes {
-        hasher.update(parent.as_bytes());
-        hasher.update(b"\0");
-        hasher.update(hash.as_bytes());
-        hasher.update(b"\n");
+    let embed_dim = vectors.first().map(Vec::len).unwrap_or(0);
+    if embed_dim == 0 {
+        bail!("embedding 维度为 0");
     }
-    let index_hash = hex::encode(hasher.finalize());
+    for (chunk, vector) in pending.iter_mut().zip(vectors) {
+        if vector.len() != embed_dim {
+            bail!("embedding 维度错误：{} != {embed_dim}", vector.len());
+        }
+        chunk.embedding = vector;
+    }
+    tracing::info!(
+        embedded = pending.len(),
+        dim = embed_dim,
+        elapsed_ms = started.elapsed().as_millis(),
+        "embedding 完成"
+    );
 
     let manifest = IndexManifest {
-        version: 1,
+        version: FORMAT_VERSION,
         built_at: now_rfc3339(),
-        content_hash: index_hash,
+        content_hash: fingerprint,
         documents: documents.len(),
         chunks: pending.len(),
         apps,
-        model: "intfloat/multilingual-e5-small@614241f".to_string(),
-        zvec_version: crate::store::sdk_version(),
-        embed_dim: EMBEDDING_DIM,
-        chunk_window: WINDOW_TOKENS,
-        chunk_overlap: OVERLAP_TOKENS,
+        model: options.embedding.model.clone(),
+        embed_dim,
+        chunk_window_chars: WINDOW_CHARS,
+        chunk_overlap_chars: OVERLAP_CHARS,
         max_chunks_per_doc: MAX_CHUNKS_PER_DOC,
     };
-    write_manifest(&options.index_root, &manifest)?;
 
-    let index_bytes = directory_size(&collection);
+    let records = pending
+        .iter()
+        .map(|chunk| ChunkRecord {
+            parent_id: &chunk.parent_id,
+            app_id: &chunk.app_id,
+            title: &chunk.title,
+            tags: &chunk.tags,
+            date: chunk.date,
+            chunk_index: chunk.chunk_index,
+            content_hash: &chunk.content_hash,
+            href: &chunk.href,
+            text: &chunk.text,
+            text_tokens: &chunk.text_tokens,
+            embedding: &chunk.embedding,
+        })
+        .collect::<Vec<_>>();
+
+    let index_bytes = write_index(&options.index_path, &records, &manifest)
+        .with_context(|| format!("写入索引失败：{}", options.index_path.display()))?;
+
     Ok(BuildReport {
         documents: documents.len(),
         chunks: pending.len(),
@@ -219,26 +180,176 @@ pub fn build_index(options: &BuildOptions) -> Result<BuildReport> {
     })
 }
 
-/// parent 级内容指纹：标题/标签/日期/正文任一变化都会改变。
-pub fn document_hash(document: &SourceDocument) -> String {
+/// 检查索引是否存在且内容指纹一致（容器 entrypoint 用）。
+pub fn check_index(content_root: &Path, index_path: &Path) -> Result<CheckReport> {
+    let documents = load_content(content_root)?;
+    if documents.is_empty() {
+        bail!("内容目录为空：{}", content_root.display());
+    }
+    let fingerprint = content_fingerprint(&documents);
+    let index_content_hash = crate::store::read_content_hash(index_path)?;
+    let matches = index_content_hash.as_deref() == Some(fingerprint.as_str());
+    Ok(CheckReport {
+        documents: documents.len(),
+        content_hash: fingerprint,
+        index_content_hash,
+        matches,
+    })
+}
+
+/// 内容级指纹：按 parentId 排序后对每篇文档 hash 做 sha256。
+pub fn content_fingerprint(documents: &[SourceDocument]) -> String {
+    let mut hashes = documents
+        .iter()
+        .map(|document| {
+            (
+                document.parent_id.as_str(),
+                document_hash(
+                    &document.title,
+                    &document.tags,
+                    document.date,
+                    &document.text,
+                ),
+            )
+        })
+        .collect::<Vec<_>>();
+    hashes.sort();
     let mut hasher = Sha256::new();
-    hasher.update(document.title.as_bytes());
-    hasher.update(b"\0");
-    hasher.update(document.tags.join(",").as_bytes());
-    hasher.update(b"\0");
-    hasher.update(document.date.to_string().as_bytes());
-    hasher.update(b"\0");
-    hasher.update(content_hash(&document.text).as_bytes());
+    for (parent, hash) in &hashes {
+        hasher.update(parent.as_bytes());
+        hasher.update(b"\0");
+        hasher.update(hash.as_bytes());
+        hasher.update(b"\n");
+    }
     hex::encode(hasher.finalize())
 }
 
-/// 索引目录是否存在（供 serve 启动检查）。
-pub fn ensure_index_root(index_root: &Path) -> Result<()> {
-    if !collection_path(index_root).is_dir() {
-        bail!(
-            "索引不存在：{}（先运行 search-server build）",
-            collection_path(index_root).display()
-        );
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::search::ValidatedFilters;
+    use crate::store::{LoadedIndex, SearchMode};
+    use crate::test_support::{MockEmbeddingServer, MockMode};
+
+    fn write_fixture(root: &Path) {
+        std::fs::create_dir_all(root.join("events")).unwrap();
+        std::fs::create_dir_all(root.join("articles")).unwrap();
+        std::fs::write(
+            root.join("events/0001.rust-async.md"),
+            "---\ntitle: Rust 异步运行时\ndate: 2024-03-01\ntags:\n  - rust\n  - async\n---\n\nRust 异步运行时 tokio 与并发调度。\n",
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("articles/0002.vector-db.md"),
+            "---\ntitle: 向量数据库\ndate: 2024-02-01\ntags:\n  - database\n---\n\n向量数据库 semantic search 与 embedding 检索。\n",
+        )
+        .unwrap();
     }
-    Ok(())
+
+    fn config(url: String) -> EmbeddingConfig {
+        EmbeddingConfig {
+            base_url: url,
+            api_key: "test-key".to_string(),
+            model: "mock-embed".to_string(),
+            timeout: std::time::Duration::from_secs(5),
+            batch_size: 2,
+            concurrency: 2,
+            max_retries: 1,
+        }
+    }
+
+    #[test]
+    fn builds_index_with_mock_embeddings_and_searches() {
+        let server = MockEmbeddingServer::start(MockMode::Success { dim: 8 }, 0);
+        let directory = tempfile::tempdir().unwrap();
+        let content = directory.path().join("content");
+        write_fixture(&content);
+        let index_path = directory.path().join("index.sqlite");
+
+        let report = build_index(&BuildOptions {
+            content_root: content.clone(),
+            index_path: index_path.clone(),
+            embedding: config(server.url()),
+        })
+        .expect("build");
+        assert_eq!(report.documents, 2);
+        assert_eq!(report.chunks, 2);
+        assert!(report.index_bytes > 0);
+        assert!(index_path.is_file());
+
+        let index = LoadedIndex::open(&index_path).expect("open");
+        assert_eq!(index.dim(), 8);
+        let filters = ValidatedFilters::default();
+
+        let hits = index
+            .search(SearchMode::Fts, None, "异步", &filters, 5)
+            .expect("fts");
+        assert_eq!(hits[0].parent_id, "src/content/events/0001.rust-async.md");
+
+        let client = EmbeddingClient::new(&config(server.url())).unwrap();
+        let query = client.embed_query("rust 异步", 8).unwrap();
+        let hits = index
+            .search(SearchMode::Vector, Some(&query), "rust 异步", &filters, 5)
+            .expect("vector");
+        assert_eq!(hits[0].parent_id, "src/content/events/0001.rust-async.md");
+
+        let hits = index
+            .search(SearchMode::Hybrid, Some(&query), "semantic", &filters, 5)
+            .expect("hybrid");
+        assert!(!hits.is_empty());
+
+        let check = check_index(&content, &index_path).expect("check");
+        assert!(check.matches);
+
+        // 内容变化后指纹不匹配。
+        std::fs::write(
+            content.join("events/0001.rust-async.md"),
+            "---\ntitle: Rust 异步运行时\ndate: 2024-03-01\ntags:\n  - rust\n---\n\n内容已变化。\n",
+        )
+        .unwrap();
+        let check = check_index(&content, &index_path).expect("check changed");
+        assert!(!check.matches);
+    }
+
+    #[test]
+    fn failed_embedding_keeps_old_index() {
+        let good = MockEmbeddingServer::start(MockMode::Success { dim: 8 }, 0);
+        let directory = tempfile::tempdir().unwrap();
+        let content = directory.path().join("content");
+        write_fixture(&content);
+        let index_path = directory.path().join("index.sqlite");
+        build_index(&BuildOptions {
+            content_root: content.clone(),
+            index_path: index_path.clone(),
+            embedding: config(good.url()),
+        })
+        .expect("initial build");
+        let original = std::fs::read(&index_path).unwrap();
+
+        let bad = MockEmbeddingServer::start(MockMode::Fail { status: 503 }, 0);
+        let error = build_index(&BuildOptions {
+            content_root: content,
+            index_path: index_path.clone(),
+            embedding: config(bad.url()),
+        })
+        .unwrap_err();
+        assert!(error.to_string().contains("503"));
+        assert_eq!(std::fs::read(&index_path).unwrap(), original);
+        assert!(LoadedIndex::open(&index_path).is_ok());
+    }
+
+    #[test]
+    fn fingerprint_changes_with_title_or_body() {
+        let directory = tempfile::tempdir().unwrap();
+        let content = directory.path().join("content");
+        write_fixture(&content);
+        let documents = load_content(&content).unwrap();
+        let first = content_fingerprint(&documents);
+        let mut changed_title = documents.clone();
+        changed_title[0].title.push('!');
+        assert_ne!(first, content_fingerprint(&changed_title));
+        let mut changed_body = documents.clone();
+        changed_body[0].text.push('!');
+        assert_ne!(first, content_fingerprint(&changed_body));
+    }
 }

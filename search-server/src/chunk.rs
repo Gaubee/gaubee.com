@@ -1,25 +1,25 @@
-//! Token 窗口切分与内容哈希。
+//! 字符窗口切分与内容哈希。
 //!
-//! 默认 400 token 窗口 / 80 overlap；单篇最多 40 个 chunk。超过 40 个窗口时
-//! 不再丢弃尾部，而是在 [0, len-window] 上等距取样 40 个窗口覆盖全文。
+//! 不再依赖本地 tokenizer：按 Unicode 字符窗口切分（默认 1600 字符 / 200
+//! overlap，单篇最多 8 个 chunk）。超过 8 个窗口时不再丢弃尾部，而是在
+//! [0, len-window] 上等距取样，保留首尾覆盖。1600 字符约对应 600–800 个
+//! 中英混合 token，远低于 text-embedding-3-small 的 8191 token 上限。
 use sha2::{Digest, Sha256};
-use tokenizers::Tokenizer;
 
-use crate::content::SourceDocument;
-
-pub const WINDOW_TOKENS: usize = 400;
-pub const OVERLAP_TOKENS: usize = 80;
-pub const MAX_CHUNKS_PER_DOC: usize = 40;
+pub const WINDOW_CHARS: usize = 1600;
+pub const OVERLAP_CHARS: usize = 200;
+pub const MAX_CHUNKS_PER_DOC: usize = 8;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Chunk {
     pub index: usize,
     pub text: String,
-    pub token_start: usize,
-    pub token_end: usize,
+    /// 以字符计（不是 token），用于调试与增量比对。
+    pub char_start: usize,
+    pub char_end: usize,
 }
 
-/// 计算窗口起始 token 下标。
+/// 计算窗口起始字符下标。
 pub fn window_starts(len: usize, window: usize, overlap: usize, max_chunks: usize) -> Vec<usize> {
     assert!(window > 0, "window 必须为正");
     assert!(overlap < window, "overlap 必须小于 window");
@@ -60,62 +60,54 @@ pub fn window_starts(len: usize, window: usize, overlap: usize, max_chunks: usiz
     sampled
 }
 
-/// 对全文（清洗后正文）计算 sha256，作为 parent 级内容指纹。
+/// 对清洗后的正文计算 sha256，作为 parent 级内容指纹。
 pub fn content_hash(text: &str) -> String {
     let digest = Sha256::digest(text.as_bytes());
     hex::encode(digest)
 }
 
-/// 用 E5 tokenizer 切 chunk；tokenizer 失败时退化为单 chunk。
-pub fn chunk_document(tokenizer: &Tokenizer, document: &SourceDocument) -> Vec<Chunk> {
-    let encoding = tokenizer.encode(document.text.as_str(), false);
-    let Ok(encoding) = encoding else {
-        return vec![Chunk {
-            index: 0,
-            text: document.text.clone(),
-            token_start: 0,
-            token_end: 0,
-        }];
-    };
-    let ids = encoding.get_ids();
-    let starts = window_starts(ids.len(), WINDOW_TOKENS, OVERLAP_TOKENS, MAX_CHUNKS_PER_DOC);
+/// 按字符窗口切 chunk；空文本返回空 Vec。
+pub fn chunk_text(text: &str) -> Vec<Chunk> {
+    let offsets = char_offsets(text);
+    let total = offsets.len() - 1;
+    let starts = window_starts(total, WINDOW_CHARS, OVERLAP_CHARS, MAX_CHUNKS_PER_DOC);
     let mut chunks = Vec::with_capacity(starts.len());
 
     for (index, start) in starts.into_iter().enumerate() {
-        let end = (start + WINDOW_TOKENS).min(ids.len());
-        let text = tokenizer
-            .decode(&ids[start..end], true)
-            .map(|text| text.trim().to_string())
-            .unwrap_or_default();
-        if text.is_empty() {
+        let end = (start + WINDOW_CHARS).min(total);
+        let slice = &text[offsets[start]..offsets[end]];
+        let trimmed = slice.trim();
+        if trimmed.is_empty() {
             continue;
         }
         chunks.push(Chunk {
             index,
-            text,
-            token_start: start,
-            token_end: end,
+            text: trimmed.to_string(),
+            char_start: start,
+            char_end: end,
         });
     }
 
-    if chunks.is_empty() {
-        chunks.push(Chunk {
-            index: 0,
-            text: document.text.clone(),
-            token_start: 0,
-            token_end: ids.len(),
-        });
-    }
     chunks
 }
 
-/// E5（sentence-transformers）官方要求的前缀。
-pub fn passage_text(text: &str) -> String {
-    format!("passage: {text}")
+/// 返回每个字符的字节起点，末尾追加 text.len()（含 len+1 个元素）。
+fn char_offsets(text: &str) -> Vec<usize> {
+    let mut offsets = text
+        .char_indices()
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    offsets.push(text.len());
+    offsets
 }
 
-pub fn query_text(text: &str) -> String {
-    format!("query: {text}")
+/// 送 embedding 的文本：标题 + 正文，提升短查询与标题词的语义匹配。
+pub fn embedding_input(title: &str, text: &str) -> String {
+    if title.is_empty() {
+        text.to_string()
+    } else {
+        format!("{title}\n{text}")
+    }
 }
 
 #[cfg(test)]
@@ -124,32 +116,32 @@ mod tests {
 
     #[test]
     fn short_document_single_window() {
-        assert_eq!(window_starts(100, 400, 80, 40), vec![0]);
-        assert_eq!(window_starts(400, 400, 80, 40), vec![0]);
-        assert!(window_starts(0, 400, 80, 40).is_empty());
+        assert_eq!(window_starts(100, 1600, 200, 8), vec![0]);
+        assert_eq!(window_starts(1600, 1600, 200, 8), vec![0]);
+        assert!(window_starts(0, 1600, 200, 8).is_empty());
     }
 
     #[test]
-    fn normal_windows_follow_400_80() {
-        // 1000 tokens：0..400、320..720、600..1000。
-        assert_eq!(window_starts(1000, 400, 80, 40), vec![0, 320, 600]);
-        assert_eq!(window_starts(500, 400, 80, 40), vec![0, 100]);
+    fn normal_windows_follow_1600_200() {
+        // 4000 字符：0..1600、1400..3000、2400..4000。
+        assert_eq!(window_starts(4000, 1600, 200, 8), vec![0, 1400, 2400]);
+        assert_eq!(window_starts(2000, 1600, 200, 8), vec![0, 400]);
     }
 
     #[test]
-    fn caps_long_documents_at_40_and_keeps_tail() {
-        let starts = window_starts(60_000, 400, 80, 40);
-        assert_eq!(starts.len(), 40);
+    fn caps_long_documents_and_keeps_tail() {
+        let starts = window_starts(60_000, 1600, 200, 8);
+        assert_eq!(starts.len(), 8);
         assert_eq!(starts.first().copied(), Some(0));
-        assert_eq!(starts.last().copied(), Some(60_000 - 400));
+        assert_eq!(starts.last().copied(), Some(60_000 - 1600));
         assert!(starts.windows(2).all(|pair| pair[0] < pair[1]));
     }
 
     #[test]
     fn window_end_never_exceeds_len() {
-        for len in [401usize, 720, 721, 1040, 12_345] {
-            for start in window_starts(len, 400, 80, 40) {
-                assert!(start + 400 <= len);
+        for len in [1601usize, 3000, 3001, 4400, 52_345] {
+            for start in window_starts(len, 1600, 200, 8) {
+                assert!(start + 1600 <= len);
             }
         }
     }
@@ -165,8 +157,28 @@ mod tests {
     }
 
     #[test]
-    fn e5_prefixes() {
-        assert_eq!(passage_text("x"), "passage: x");
-        assert_eq!(query_text("y"), "query: y");
+    fn chunk_text_respects_utf8_boundaries() {
+        let text = "中文😀abc".repeat(1000); // 每个重复 8 个字符
+        let chunks = chunk_text(&text);
+        assert!(!chunks.is_empty());
+        for chunk in &chunks {
+            assert!(!chunk.text.is_empty());
+            assert!(chunk.char_end - chunk.char_start <= WINDOW_CHARS);
+        }
+        assert_eq!(chunks[0].char_start, 0);
+    }
+
+    #[test]
+    fn chunk_text_short_and_empty() {
+        assert!(chunk_text("").is_empty());
+        let chunks = chunk_text("只有一句话");
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].text, "只有一句话");
+    }
+
+    #[test]
+    fn embedding_input_prefixes_title() {
+        assert_eq!(embedding_input("标题", "正文"), "标题\n正文");
+        assert_eq!(embedding_input("", "正文"), "正文");
     }
 }

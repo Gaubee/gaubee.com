@@ -2,8 +2,7 @@
 **
 !search-server/Cargo.toml
 !search-server/Cargo.lock
-!search-server/build.rs
 !search-server/src/**
-!search-server/scripts/**
+!search-server/entrypoint.sh
 !src/content/articles/**
 !src/content/events/**

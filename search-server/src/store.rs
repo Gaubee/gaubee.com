@@ -1,42 +1,64 @@
-//! zvec collection 的安全封装：建库、写入、混合检索、统计。
+//! SQLite 单文件索引：docs + FTS5 + vectors，纯 Rust 查询路径。
 //!
-//! 关键语义（与官方 Python 绑定一致）：
-//! - COSINE 检索返回的是距离（越小越相似），相似度 = 1 - score；
-//! - 混合检索使用多子查询 + RRF（rank_constant 默认 60）；
-//! - FTS 使用 jieba tokenizer，默认 OR 连接词项。
-use std::ffi::{c_void, CStr, CString};
-use std::path::Path;
-use std::ptr;
-use std::sync::OnceLock;
+//! 布局：
+//! - `docs`：chunk 级元数据与正文（text 给摘要，text_tokens 给 FTS5）；
+//! - `docs_fts`：FTS5 外部内容表，中文由 jieba-rs 预分词后写入；
+//! - `vectors`：doc_id + f32 LE embedding BLOB；
+//! - `meta`：格式版本与 `IndexManifest` JSON。
+//!
+//! 启动时把全部向量加载为连续 `Vec<f32>`，查询用暴力余弦扫描；几万 chunk
+//! 以内都是毫秒级，不需要 HNSW/ANN 运行时。
+use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::{LazyLock, Mutex};
 
 use anyhow::{bail, Context, Result};
+use jieba_rs::Jieba;
+use rusqlite::types::Value;
+use rusqlite::{params, params_from_iter, Connection, OpenFlags, OptionalExtension};
+use sha2::{Digest, Sha256};
 
-use crate::zvec_ffi::{self as ffi, cstring, field_ptrs};
+use crate::manifest::IndexManifest;
+use crate::search::{rrf_score, ValidatedFilters};
 
-pub const EMBEDDING_DIM: usize = 384;
-pub const COLLECTION_NAME: &str = "gaubee_search";
+static JIEBA: LazyLock<Jieba> = LazyLock::new(Jieba::new);
 
-pub const FIELD_PARENT_ID: &str = "parentId";
-pub const FIELD_APP_ID: &str = "appId";
-pub const FIELD_TITLE: &str = "title";
-pub const FIELD_TAGS: &str = "tags";
-pub const FIELD_DATE: &str = "date";
-pub const FIELD_CHUNK_INDEX: &str = "chunkIndex";
-pub const FIELD_CONTENT_HASH: &str = "contentHash";
-pub const FIELD_HREF: &str = "href";
-pub const FIELD_TEXT: &str = "text";
-pub const FIELD_EMBEDDING: &str = "embedding";
+const SCHEMA: &str = r#"
+CREATE TABLE meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 
-/// 查询返回需要的标量字段。
-pub const OUTPUT_FIELDS: &[&str] = &[
-    FIELD_PARENT_ID,
-    FIELD_APP_ID,
-    FIELD_TITLE,
-    FIELD_DATE,
-    FIELD_CHUNK_INDEX,
-    FIELD_HREF,
-    FIELD_TEXT,
-];
+CREATE TABLE docs (
+    id           INTEGER PRIMARY KEY,
+    parent_id    TEXT NOT NULL,
+    app_id       TEXT NOT NULL,
+    title        TEXT NOT NULL,
+    tags         TEXT NOT NULL,
+    date         INTEGER NOT NULL,
+    href         TEXT NOT NULL,
+    chunk_index  INTEGER NOT NULL,
+    text         TEXT NOT NULL,
+    text_tokens  TEXT NOT NULL,
+    content_hash TEXT NOT NULL
+);
+
+CREATE INDEX idx_docs_parent ON docs(parent_id);
+CREATE INDEX idx_docs_app_date ON docs(app_id, date);
+
+CREATE VIRTUAL TABLE docs_fts USING fts5(
+    text_tokens,
+    content='docs',
+    content_rowid='id',
+    tokenize='unicode61'
+);
+
+CREATE TABLE vectors (
+    doc_id    INTEGER PRIMARY KEY,
+    embedding BLOB NOT NULL
+);
+"#;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SearchMode {
@@ -56,10 +78,9 @@ impl SearchMode {
     }
 }
 
-/// 单条待写入 chunk。
+/// 一条待写入的 chunk。
 #[derive(Debug, Clone)]
-pub struct ChunkDocument<'a> {
-    pub id: String,
+pub struct ChunkRecord<'a> {
     pub parent_id: &'a str,
     pub app_id: &'a str,
     pub title: &'a str,
@@ -69,12 +90,28 @@ pub struct ChunkDocument<'a> {
     pub content_hash: &'a str,
     pub href: &'a str,
     pub text: &'a str,
+    pub text_tokens: &'a str,
     pub embedding: &'a [f32],
+}
+
+/// 内存中的 chunk 元数据（摘要/过滤用）。
+#[derive(Debug, Clone)]
+pub struct ChunkMeta {
+    pub doc_id: i64,
+    pub parent_id: String,
+    pub app_id: String,
+    pub title: String,
+    pub tags: String,
+    pub date: i64,
+    pub chunk_index: i32,
+    pub href: String,
+    pub text: String,
 }
 
 /// 一条检索命中（chunk 粒度）。
 #[derive(Debug, Clone)]
 pub struct Hit {
+    pub doc_id: i64,
     pub parent_id: String,
     pub app_id: String,
     pub title: String,
@@ -85,921 +122,560 @@ pub struct Hit {
     pub score: f32,
 }
 
-/// 进程内 zvec 初始化（只执行一次）。
-fn ensure_initialized() -> Result<()> {
-    static INIT: OnceLock<Result<(), String>> = OnceLock::new();
-    let result = INIT.get_or_init(|| unsafe {
-        let config = ffi::zvec_config_data_create();
-        if config.is_null() {
-            return Err("zvec_config_data_create 返回 NULL".to_string());
+/// 写入索引文件（先写临时文件，成功后原子重命名，失败不破坏旧索引）。
+pub fn write_index(
+    path: &Path,
+    records: &[ChunkRecord<'_>],
+    manifest: &IndexManifest,
+) -> Result<u64> {
+    if records.is_empty() {
+        bail!("拒绝写入空索引");
+    }
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    fs::create_dir_all(parent)
+        .with_context(|| format!("创建索引目录失败：{}", parent.display()))?;
+    let temp = temp_path(path);
+    let _ = fs::remove_file(&temp);
+
+    let outcome = write_index_inner(&temp, records, manifest);
+    match outcome {
+        Ok(bytes) => {
+            fs::rename(&temp, path).with_context(|| {
+                format!("原子替换索引失败：{} -> {}", temp.display(), path.display())
+            })?;
+            Ok(bytes)
         }
-        if let Err(error) = check(ffi::zvec_config_data_set_memory_limit(
-            config,
-            1024 * 1024 * 1024,
-        )) {
-            ffi::zvec_config_data_destroy(config);
-            return Err(error.to_string());
+        Err(error) => {
+            let _ = fs::remove_file(&temp);
+            Err(error)
         }
-        let code = ffi::zvec_initialize(config);
-        ffi::zvec_config_data_destroy(config);
-        if let Err(error) = check(code) {
-            return Err(error.to_string());
-        }
-        Ok(())
-    });
-    match result {
-        Ok(()) => Ok(()),
-        Err(message) => bail!("zvec 初始化失败：{message}"),
     }
 }
 
-fn check(code: ffi::zvec_error_code_t) -> Result<()> {
-    if code == ffi::ZVEC_OK {
-        return Ok(());
-    }
-    bail!("zvec 错误码 {code}：{}", ffi::take_last_error())
+fn temp_path(path: &Path) -> PathBuf {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("index.sqlite");
+    path.with_file_name(format!(".{file_name}.tmp-{}", std::process::id()))
 }
 
-/// 官方 SDK 版本（诊断用）。
-pub fn sdk_version() -> String {
-    unsafe {
-        let pointer = ffi::zvec_get_version();
-        if pointer.is_null() {
-            return "unknown".to_string();
+fn write_index_inner(
+    path: &Path,
+    records: &[ChunkRecord<'_>],
+    manifest: &IndexManifest,
+) -> Result<u64> {
+    let mut connection = Connection::open(path)
+        .with_context(|| format!("创建 SQLite 索引失败：{}", path.display()))?;
+    connection.execute_batch(
+        "PRAGMA journal_mode=DELETE;
+         PRAGMA synchronous=OFF;
+         PRAGMA temp_store=MEMORY;
+         PRAGMA cache_size=-65536;",
+    )?;
+    connection
+        .execute_batch(SCHEMA)
+        .context("创建索引表结构失败")?;
+
+    {
+        let transaction = connection.transaction()?;
+        {
+            let mut insert_doc = transaction.prepare(
+                "INSERT INTO docs (
+                    parent_id, app_id, title, tags, date, href,
+                    chunk_index, text, text_tokens, content_hash
+                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            )?;
+            let mut insert_fts =
+                transaction.prepare("INSERT INTO docs_fts(rowid, text_tokens) VALUES (?, ?)")?;
+            let mut insert_vector =
+                transaction.prepare("INSERT INTO vectors(doc_id, embedding) VALUES (?, ?)")?;
+
+            for record in records {
+                insert_doc.execute(params![
+                    record.parent_id,
+                    record.app_id,
+                    record.title,
+                    record.tags,
+                    record.date,
+                    record.href,
+                    record.chunk_index,
+                    record.text,
+                    record.text_tokens,
+                    record.content_hash,
+                ])?;
+                let doc_id = transaction.last_insert_rowid();
+                insert_fts.execute(params![doc_id, record.text_tokens])?;
+                insert_vector.execute(params![doc_id, encode_vector(record.embedding)])?;
+            }
         }
-        CStr::from_ptr(pointer).to_string_lossy().into_owned()
-    }
-}
-
-pub struct ZvecStore {
-    collection: *mut ffi::zvec_collection_t,
-}
-
-// zvec collection 句柄支持并发读；写入只在构建阶段单线程执行。
-unsafe impl Send for ZvecStore {}
-unsafe impl Sync for ZvecStore {}
-
-impl ZvecStore {
-    /// 新建并打开 collection；调用方负责先清空目标目录。
-    pub fn create(path: &Path) -> Result<Self> {
-        ensure_initialized()?;
-        let path_c = cstring(&path.to_string_lossy())?;
-        let schema = build_schema()?;
-        let options = CollectionOptions::new(false)?;
-        let mut collection: *mut ffi::zvec_collection_t = ptr::null_mut();
-        let code = unsafe {
-            ffi::zvec_collection_create_and_open(
-                path_c.as_ptr(),
-                schema.0,
-                options.0,
-                &mut collection,
-            )
-        };
-        drop(options);
-        drop(schema);
-        check(code).with_context(|| format!("创建 zvec collection 失败：{}", path.display()))?;
-        if collection.is_null() {
-            bail!("zvec_collection_create_and_open 返回空句柄");
-        }
-        Ok(Self { collection })
+        transaction.commit()?;
     }
 
-    /// 打开已有 collection（读写；索引构建/增量更新用）。
+    connection.execute_batch("INSERT INTO docs_fts(docs_fts) VALUES('optimize');")?;
+    connection.execute_batch("PRAGMA optimize; ANALYZE;")?;
+    connection.execute(
+        "INSERT INTO meta(key, value) VALUES ('formatVersion', ?1)",
+        [crate::manifest::FORMAT_VERSION.to_string()],
+    )?;
+    connection.execute(
+        "INSERT INTO meta(key, value) VALUES ('manifest', ?1)",
+        [serde_json::to_string(manifest)?],
+    )?;
+    connection.execute_batch("VACUUM;")?;
+
+    let count: i64 = connection.query_row("SELECT COUNT(*) FROM docs", [], |row| row.get(0))?;
+    if count as usize != records.len() {
+        bail!("索引写入数量校验失败：{count} != {}", records.len());
+    }
+    drop(connection);
+    Ok(fs::metadata(path)?.len())
+}
+
+fn encode_vector(vector: &[f32]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(vector.len() * 4);
+    for value in vector {
+        bytes.extend_from_slice(&value.to_le_bytes());
+    }
+    bytes
+}
+
+fn decode_vector(blob: &[u8]) -> Result<Vec<f32>> {
+    if !blob.len().is_multiple_of(4) {
+        bail!("embedding BLOB 长度非法：{}", blob.len());
+    }
+    Ok(blob
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|chunk| f32::from_le_bytes(*chunk))
+        .collect())
+}
+
+pub struct LoadedIndex {
+    connection: Mutex<Connection>,
+    chunks: Vec<ChunkMeta>,
+    vectors: Vec<f32>,
+    dim: usize,
+    manifest: IndexManifest,
+    path: PathBuf,
+}
+
+impl LoadedIndex {
     pub fn open(path: &Path) -> Result<Self> {
-        Self::open_inner(path, false)
-    }
+        let connection = Connection::open_with_flags(
+            path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .with_context(|| format!("打开索引失败：{}", path.display()))?;
+        connection.busy_timeout(std::time::Duration::from_millis(2_000))?;
 
-    /// 只读打开（serve 用；索引可挂载为只读卷，无需写锁文件）。
-    pub fn open_read_only(path: &Path) -> Result<Self> {
-        Self::open_inner(path, true)
-    }
-
-    fn open_inner(path: &Path, read_only: bool) -> Result<Self> {
-        ensure_initialized()?;
-        let path_c = cstring(&path.to_string_lossy())?;
-        let options = CollectionOptions::new(read_only)?;
-        let mut collection: *mut ffi::zvec_collection_t = ptr::null_mut();
-        let code =
-            unsafe { ffi::zvec_collection_open(path_c.as_ptr(), options.0, &mut collection) };
-        drop(options);
-        check(code).with_context(|| format!("打开 zvec collection 失败：{}", path.display()))?;
-        if collection.is_null() {
-            bail!("zvec_collection_open 返回空句柄");
+        let manifest_json: Option<String> = connection
+            .query_row("SELECT value FROM meta WHERE key = 'manifest'", [], |row| {
+                row.get(0)
+            })
+            .optional()?;
+        let manifest_json = manifest_json.context("索引缺少 manifest 元数据（版本过旧？）")?;
+        let manifest: IndexManifest =
+            serde_json::from_str(&manifest_json).context("解析索引 manifest 失败")?;
+        if manifest.version != crate::manifest::FORMAT_VERSION {
+            bail!(
+                "索引格式版本不支持：{}（期望 {}），请重建",
+                manifest.version,
+                crate::manifest::FORMAT_VERSION
+            );
         }
-        Ok(Self { collection })
-    }
-
-    /// 批量写入（insert）。每批 500 条。
-    pub fn insert(&self, documents: &[ChunkDocument<'_>]) -> Result<()> {
-        self.write_batch(documents, false)
-    }
-
-    /// 批量 upsert（增量更新用）。
-    #[allow(dead_code)]
-    pub fn upsert(&self, documents: &[ChunkDocument<'_>]) -> Result<()> {
-        self.write_batch(documents, true)
-    }
-
-    fn write_batch(&self, documents: &[ChunkDocument<'_>], upsert: bool) -> Result<()> {
-        for batch in documents.chunks(500) {
-            self.write_chunk_batch(batch, upsert)?;
+        if manifest.embed_dim == 0 {
+            bail!("索引 embedDim 非法：0");
         }
-        Ok(())
-    }
 
-    fn write_chunk_batch(&self, batch: &[ChunkDocument<'_>], upsert: bool) -> Result<()> {
-        let mut raw_docs: Vec<*const ffi::zvec_doc_t> = Vec::with_capacity(batch.len());
-        // 保证 CString / C 字符串生命周期覆盖 insert 调用。
-        let mut keep_alive: Vec<Vec<CString>> = Vec::with_capacity(batch.len());
-
-        for document in batch {
-            let strings = [
-                document.id.as_str(),
-                document.parent_id,
-                document.app_id,
-                document.title,
-                document.tags,
-                document.content_hash,
-                document.href,
-                document.text,
-            ]
-            .into_iter()
-            .map(cstring)
-            .collect::<Result<Vec<_>>>()?;
-
-            let doc = unsafe { ffi::zvec_doc_create() };
-            if doc.is_null() {
-                bail!("zvec_doc_create 返回 NULL");
+        let mut statement = connection.prepare(
+            "SELECT d.id, d.parent_id, d.app_id, d.title, d.tags, d.date,
+                    d.chunk_index, d.href, d.text, v.embedding
+             FROM docs d JOIN vectors v ON v.doc_id = d.id
+             ORDER BY d.id",
+        )?;
+        let mut rows = statement.query([])?;
+        let dim = manifest.embed_dim;
+        let mut chunks = Vec::new();
+        let mut vectors = Vec::new();
+        while let Some(row) = rows.next()? {
+            let blob: Vec<u8> = row.get(9)?;
+            if blob.len() != dim * 4 {
+                bail!(
+                    "向量维度不匹配：期望 {dim} 维（{} 字节），实际 {} 字节",
+                    dim * 4,
+                    blob.len()
+                );
             }
-
-            unsafe {
-                ffi::zvec_doc_set_pk(doc, strings[0].as_ptr());
-                add_string(doc, FIELD_PARENT_ID, &strings[1])?;
-                add_string(doc, FIELD_APP_ID, &strings[2])?;
-                add_string(doc, FIELD_TITLE, &strings[3])?;
-                add_string(doc, FIELD_TAGS, &strings[4])?;
-                add_string(doc, FIELD_CONTENT_HASH, &strings[5])?;
-                add_string(doc, FIELD_HREF, &strings[6])?;
-                add_string(doc, FIELD_TEXT, &strings[7])?;
-                add_basic(
-                    doc,
-                    FIELD_DATE,
-                    ffi::ZVEC_DATA_TYPE_INT64,
-                    &document.date as *const i64 as *const c_void,
-                    std::mem::size_of::<i64>(),
-                )?;
-                add_basic(
-                    doc,
-                    FIELD_CHUNK_INDEX,
-                    ffi::ZVEC_DATA_TYPE_INT32,
-                    &document.chunk_index as *const i32 as *const c_void,
-                    std::mem::size_of::<i32>(),
-                )?;
-                add_basic(
-                    doc,
-                    FIELD_EMBEDDING,
-                    ffi::ZVEC_DATA_TYPE_VECTOR_FP32,
-                    document.embedding.as_ptr() as *const c_void,
-                    std::mem::size_of_val(document.embedding),
-                )?;
-            }
-
-            raw_docs.push(doc);
-            keep_alive.push(strings);
+            vectors.extend(decode_vector(&blob)?);
+            chunks.push(ChunkMeta {
+                doc_id: row.get(0)?,
+                parent_id: row.get(1)?,
+                app_id: row.get(2)?,
+                title: row.get(3)?,
+                tags: row.get(4)?,
+                date: row.get(5)?,
+                chunk_index: row.get(6)?,
+                href: row.get(7)?,
+                text: row.get(8)?,
+            });
         }
-
-        let mut success = 0usize;
-        let mut errors = 0usize;
-        let code = unsafe {
-            let docs_ptr = raw_docs.as_ptr();
-            if upsert {
-                ffi::zvec_collection_upsert(
-                    self.collection,
-                    docs_ptr,
-                    raw_docs.len(),
-                    &mut success,
-                    &mut errors,
-                )
-            } else {
-                ffi::zvec_collection_insert(
-                    self.collection,
-                    docs_ptr,
-                    raw_docs.len(),
-                    &mut success,
-                    &mut errors,
-                )
-            }
-        };
-
-        for doc in &raw_docs {
-            unsafe { ffi::zvec_doc_destroy(*doc as *mut _) };
+        if chunks.is_empty() {
+            bail!("索引为空：{}", path.display());
         }
-        drop(keep_alive);
-
-        check(code)?;
-        if errors > 0 {
-            bail!("zvec 写入部分失败：成功 {success}，失败 {errors}");
+        if vectors.len() != chunks.len() * dim {
+            bail!("向量总数与 chunk 数不匹配");
         }
-        Ok(())
+        drop(rows);
+        drop(statement);
+        Ok(Self {
+            connection: Mutex::new(connection),
+            chunks,
+            vectors,
+            dim,
+            manifest,
+            path: path.to_path_buf(),
+        })
     }
 
-    /// 按主键删除。
-    #[allow(dead_code)]
-    pub fn delete_pks(&self, pks: &[String]) -> Result<usize> {
-        if pks.is_empty() {
-            return Ok(0);
-        }
-        let cstrings = pks
+    pub fn manifest(&self) -> &IndexManifest {
+        &self.manifest
+    }
+
+    pub fn dim(&self) -> usize {
+        self.dim
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn chunk_count(&self) -> usize {
+        self.chunks.len()
+    }
+
+    pub fn document_count(&self) -> usize {
+        self.chunks
             .iter()
-            .map(|pk| cstring(pk))
-            .collect::<Result<Vec<_>>>()?;
-        let pointers = cstrings.iter().map(|pk| pk.as_ptr()).collect::<Vec<_>>();
-        let mut success = 0usize;
-        let mut errors = 0usize;
-        let code = unsafe {
-            ffi::zvec_collection_delete(
-                self.collection,
-                pointers.as_ptr(),
-                pointers.len(),
-                &mut success,
-                &mut errors,
-            )
-        };
-        check(code)?;
-        if errors > 0 {
-            bail!("zvec 删除部分失败：成功 {success}，失败 {errors}");
-        }
-        Ok(success)
+            .map(|chunk| chunk.parent_id.as_str())
+            .collect::<HashSet<_>>()
+            .len()
     }
 
-    /// 按过滤表达式删除（整篇 upsert 前清理旧 chunk 用）。
-    #[allow(dead_code)]
-    pub fn delete_by_filter(&self, filter: &str) -> Result<()> {
-        let filter = cstring(filter)?;
-        let code =
-            unsafe { ffi::zvec_collection_delete_by_filter(self.collection, filter.as_ptr()) };
-        check(code)
-    }
-
-    pub fn flush(&self) -> Result<()> {
-        check(unsafe { ffi::zvec_collection_flush(self.collection) })
-    }
-
-    pub fn optimize(&self) -> Result<()> {
-        check(unsafe { ffi::zvec_collection_optimize(self.collection) })
-    }
-
-    pub fn doc_count(&self) -> Result<u64> {
-        let mut stats: *mut ffi::zvec_collection_stats_t = ptr::null_mut();
-        let code = unsafe { ffi::zvec_collection_get_stats(self.collection, &mut stats) };
-        check(code)?;
-        if stats.is_null() {
-            return Ok(0);
-        }
-        let count = unsafe { ffi::zvec_collection_stats_get_doc_count(stats) };
-        unsafe { ffi::zvec_collection_stats_destroy(stats) };
-        Ok(count)
-    }
-
-    /// 执行检索（vector / fts / hybrid）。
     pub fn search(
         &self,
         mode: SearchMode,
         embedding: Option<&[f32]>,
         query: &str,
-        filter: Option<&str>,
+        filters: &ValidatedFilters,
         topk: usize,
     ) -> Result<Vec<Hit>> {
-        let topk = topk.clamp(1, 1000) as i32;
-        let filter_c = filter.map(cstring).transpose()?;
-        let filter_ptr = filter_c
-            .as_ref()
-            .map(|value| value.as_ptr())
-            .unwrap_or(ptr::null());
-
-        let output_fields = OUTPUT_FIELDS
-            .iter()
-            .map(|field| cstring(field))
-            .collect::<Result<Vec<_>>>()?;
-        let output_ptrs = field_ptrs(&output_fields);
-
-        let mut results: *mut *mut ffi::zvec_doc_t = ptr::null_mut();
-        let mut count = 0usize;
-
-        let code = unsafe {
-            match mode {
-                SearchMode::Hybrid => {
-                    let embedding = embedding.context("hybrid 检索缺少 query embedding")?;
-                    let multi = ffi::zvec_multi_query_create();
-                    if multi.is_null() {
-                        bail!("zvec_multi_query_create 返回 NULL");
-                    }
-                    let outcome = (|| -> Result<()> {
-                        check(ffi::zvec_multi_query_set_topk(multi, topk))?;
-                        if !filter_ptr.is_null() {
-                            check(ffi::zvec_multi_query_set_filter(multi, filter_ptr))?;
-                        }
-                        check(ffi::zvec_multi_query_set_include_vector(multi, false))?;
-                        check(ffi::zvec_multi_query_set_output_fields(
-                            multi,
-                            output_ptrs.as_ptr(),
-                            output_ptrs.len(),
-                        ))?;
-                        check(ffi::zvec_multi_query_set_rerank_rrf(multi, 60))?;
-
-                        let vector_sub = build_vector_sub_query(embedding, topk)?;
-                        let fts_sub = build_fts_sub_query(query, topk)?;
-                        check(ffi::zvec_multi_query_add_sub_query(multi, vector_sub.0))?;
-                        check(ffi::zvec_multi_query_add_sub_query(multi, fts_sub.0))?;
-                        drop(vector_sub);
-                        drop(fts_sub);
-
-                        check(ffi::zvec_collection_multi_query(
-                            self.collection,
-                            multi,
-                            &mut results,
-                            &mut count,
-                        ))
-                    })();
-                    ffi::zvec_multi_query_destroy(multi);
-                    outcome?;
-                    ffi::ZVEC_OK
-                }
-                SearchMode::Vector => {
-                    let embedding = embedding.context("vector 检索缺少 query embedding")?;
-                    let query_handle = ffi::zvec_vector_query_create();
-                    if query_handle.is_null() {
-                        bail!("zvec_vector_query_create 返回 NULL");
-                    }
-                    let outcome = (|| -> Result<()> {
-                        let field = cstring(FIELD_EMBEDDING)?;
-                        check(ffi::zvec_vector_query_set_field_name(
-                            query_handle,
-                            field.as_ptr(),
-                        ))?;
-                        check(ffi::zvec_vector_query_set_query_vector(
-                            query_handle,
-                            embedding.as_ptr() as *const c_void,
-                            std::mem::size_of_val(embedding),
-                        ))?;
-                        check(ffi::zvec_vector_query_set_topk(query_handle, topk))?;
-                        if !filter_ptr.is_null() {
-                            check(ffi::zvec_vector_query_set_filter(query_handle, filter_ptr))?;
-                        }
-                        check(ffi::zvec_vector_query_set_include_vector(
-                            query_handle,
-                            false,
-                        ))?;
-                        check(ffi::zvec_vector_query_set_include_doc_id(
-                            query_handle,
-                            true,
-                        ))?;
-                        check(ffi::zvec_vector_query_set_output_fields(
-                            query_handle,
-                            output_ptrs.as_ptr(),
-                            output_ptrs.len(),
-                        ))?;
-                        let flat = ffi::zvec_query_params_flat_create(false, 10.0);
-                        if flat.is_null() {
-                            bail!("zvec_query_params_flat_create 返回 NULL");
-                        }
-                        // set_query_params 转移所有权，成功后不能 destroy。
-                        if let Err(error) = check(ffi::zvec_vector_query_set_query_params(
-                            query_handle,
-                            flat as *mut c_void,
-                        )) {
-                            ffi::zvec_query_params_flat_destroy(flat);
-                            return Err(error);
-                        }
-                        check(ffi::zvec_collection_query(
-                            self.collection,
-                            query_handle,
-                            &mut results,
-                            &mut count,
-                        ))
-                    })();
-                    ffi::zvec_vector_query_destroy(query_handle);
-                    outcome?;
-                    ffi::ZVEC_OK
-                }
-                SearchMode::Fts => {
-                    let query_handle = ffi::zvec_vector_query_create();
-                    if query_handle.is_null() {
-                        bail!("zvec_vector_query_create 返回 NULL");
-                    }
-                    let outcome = (|| -> Result<()> {
-                        let field = cstring(FIELD_TEXT)?;
-                        check(ffi::zvec_vector_query_set_field_name(
-                            query_handle,
-                            field.as_ptr(),
-                        ))?;
-                        check(ffi::zvec_vector_query_set_topk(query_handle, topk))?;
-                        if !filter_ptr.is_null() {
-                            check(ffi::zvec_vector_query_set_filter(query_handle, filter_ptr))?;
-                        }
-                        check(ffi::zvec_vector_query_set_include_vector(
-                            query_handle,
-                            false,
-                        ))?;
-                        check(ffi::zvec_vector_query_set_output_fields(
-                            query_handle,
-                            output_ptrs.as_ptr(),
-                            output_ptrs.len(),
-                        ))?;
-                        let fts = build_fts_payload(query)?;
-                        check(ffi::zvec_vector_query_set_fts(query_handle, fts.0))?;
-                        drop(fts);
-                        let fts_params = ffi::zvec_query_params_fts_create(cstr(b"OR")?.as_ptr());
-                        if fts_params.is_null() {
-                            bail!("zvec_query_params_fts_create 返回 NULL");
-                        }
-                        check(ffi::zvec_vector_query_set_fts_params(
-                            query_handle,
-                            fts_params,
-                        ))?;
-                        check(ffi::zvec_collection_query(
-                            self.collection,
-                            query_handle,
-                            &mut results,
-                            &mut count,
-                        ))
-                    })();
-                    ffi::zvec_vector_query_destroy(query_handle);
-                    outcome?;
-                    ffi::ZVEC_OK
-                }
+        let topk = topk.clamp(1, 1_000);
+        match mode {
+            SearchMode::Fts => self.fts_search(query, filters, topk),
+            SearchMode::Vector => {
+                let embedding = embedding.context("vector 检索缺少 query embedding")?;
+                self.vector_search(embedding, filters, topk)
             }
+            SearchMode::Hybrid => {
+                let embedding = embedding.context("hybrid 检索缺少 query embedding")?;
+                self.hybrid_search(embedding, query, filters, topk)
+            }
+        }
+    }
+
+    fn fts_search(&self, query: &str, filters: &ValidatedFilters, topk: usize) -> Result<Vec<Hit>> {
+        let Some(expression) = fts_match_expression(query) else {
+            return Ok(Vec::new());
         };
 
-        check(code)?;
-        if results.is_null() || count == 0 {
-            return Ok(Vec::new());
-        }
+        let mut sql = String::from(
+            "SELECT d.id, d.parent_id, d.app_id, d.title, d.date,
+                    d.chunk_index, d.href, d.text, -bm25(docs_fts) AS score
+             FROM docs_fts JOIN docs d ON d.id = docs_fts.rowid
+             WHERE docs_fts MATCH ?",
+        );
+        let mut values: Vec<Value> = vec![Value::Text(expression)];
 
-        let mut hits = Vec::with_capacity(count);
-        for index in 0..count {
-            let doc = unsafe { *results.add(index) };
-            if doc.is_null() {
-                continue;
-            }
-            let hit = unsafe { hit_from_doc(doc) };
-            if let Some(hit) = hit {
-                hits.push(hit);
+        if !filters.apps.is_empty() {
+            sql.push_str(&in_clause(" AND d.app_id IN (", filters.apps.len()));
+            for app in &filters.apps {
+                values.push(Value::Text(app.clone()));
             }
         }
-        unsafe { ffi::zvec_docs_free(results, count) };
+        if !filters.exclude_apps.is_empty() {
+            sql.push_str(&in_clause(
+                " AND d.app_id NOT IN (",
+                filters.exclude_apps.len(),
+            ));
+            for app in &filters.exclude_apps {
+                values.push(Value::Text(app.clone()));
+            }
+        }
+        for tag in &filters.tags {
+            sql.push_str(" AND instr(d.tags, ?) > 0");
+            values.push(Value::Text(tag.clone()));
+        }
+        if let Some(date) = filters.date_from {
+            sql.push_str(" AND d.date >= ?");
+            values.push(Value::Integer(date));
+        }
+        if let Some(date) = filters.date_to {
+            sql.push_str(" AND d.date <= ?");
+            values.push(Value::Integer(date));
+        }
+        sql.push_str(" ORDER BY bm25(docs_fts) ASC LIMIT ?");
+        values.push(Value::Integer(topk as i64));
+
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| anyhow::anyhow!("索引连接锁中毒"))?;
+        let mut statement = connection.prepare(&sql)?;
+        let mut rows = statement.query(params_from_iter(values.iter()))?;
+        let mut hits = Vec::new();
+        while let Some(row) = rows.next()? {
+            let score: f64 = row.get(8)?;
+            hits.push(Hit {
+                doc_id: row.get(0)?,
+                parent_id: row.get(1)?,
+                app_id: row.get(2)?,
+                title: row.get(3)?,
+                date: row.get(4)?,
+                chunk_index: row.get(5)?,
+                href: row.get(6)?,
+                text: row.get(7)?,
+                score: score.max(0.0) as f32,
+            });
+        }
         Ok(hits)
     }
-}
 
-impl Drop for ZvecStore {
-    fn drop(&mut self) {
-        if !self.collection.is_null() {
-            unsafe {
-                // 注意：不能用 zvec_collection_destroy——它调用 Collection::destroy()
-                // 删除磁盘数据；close 只释放句柄。数据已显式 flush。
-                let _ = ffi::zvec_collection_close(self.collection);
+    fn vector_search(
+        &self,
+        embedding: &[f32],
+        filters: &ValidatedFilters,
+        topk: usize,
+    ) -> Result<Vec<Hit>> {
+        if embedding.len() != self.dim {
+            bail!(
+                "query embedding 维度不匹配：期望 {}，实际 {}",
+                self.dim,
+                embedding.len()
+            );
+        }
+        let norm = embedding
+            .iter()
+            .map(|value| value * value)
+            .sum::<f32>()
+            .sqrt();
+        if norm <= 1e-12 {
+            return Ok(Vec::new());
+        }
+        let scale = 1.0 / norm;
+
+        let mut candidates: Vec<(f32, usize)> = Vec::new();
+        for (index, chunk) in self.chunks.iter().enumerate() {
+            if !filters.matches(&chunk.app_id, &chunk.tags, chunk.date) {
+                continue;
             }
-            self.collection = ptr::null_mut();
+            let base = index * self.dim;
+            let slice = &self.vectors[base..base + self.dim];
+            let similarity = dot(slice, embedding) * scale;
+            if similarity.is_finite() {
+                candidates.push((similarity, index));
+            }
         }
+        candidates.sort_by(|left, right| {
+            right
+                .0
+                .partial_cmp(&left.0)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| left.1.cmp(&right.1))
+        });
+        candidates.truncate(topk);
+        Ok(candidates
+            .into_iter()
+            .map(|(score, index)| hit_from_meta(&self.chunks[index], score))
+            .collect())
+    }
+
+    fn hybrid_search(
+        &self,
+        embedding: &[f32],
+        query: &str,
+        filters: &ValidatedFilters,
+        topk: usize,
+    ) -> Result<Vec<Hit>> {
+        let fts_hits = self.fts_search(query, filters, topk)?;
+        let vector_hits = self.vector_search(embedding, filters, topk)?;
+
+        let mut merged: HashMap<i64, (Hit, f32)> = HashMap::new();
+        for (rank, hit) in fts_hits.into_iter().enumerate() {
+            let score = rrf_score(rank);
+            merged.entry(hit.doc_id).or_insert((hit, 0.0)).1 += score;
+        }
+        for (rank, hit) in vector_hits.into_iter().enumerate() {
+            let score = rrf_score(rank);
+            merged.entry(hit.doc_id).or_insert((hit, 0.0)).1 += score;
+        }
+
+        let mut hits = merged.into_values().collect::<Vec<_>>();
+        hits.sort_by(|left, right| {
+            right
+                .1
+                .partial_cmp(&left.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| right.0.date.cmp(&left.0.date))
+                .then_with(|| left.0.chunk_index.cmp(&right.0.chunk_index))
+                .then_with(|| left.0.parent_id.cmp(&right.0.parent_id))
+        });
+        Ok(hits
+            .into_iter()
+            .map(|(mut hit, score)| {
+                hit.score = score;
+                hit
+            })
+            .collect())
     }
 }
 
-struct CollectionOptions(*mut ffi::zvec_collection_options_t);
+fn in_clause(prefix: &str, count: usize) -> String {
+    let placeholders = std::iter::repeat_n("?", count)
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("{prefix}{placeholders})")
+}
 
-impl CollectionOptions {
-    fn new(read_only: bool) -> Result<Self> {
-        let options = unsafe { ffi::zvec_collection_options_create() };
-        if options.is_null() {
-            bail!("zvec_collection_options_create 返回 NULL");
-        }
-        let options = Self(options);
-        check(unsafe { ffi::zvec_collection_options_set_enable_mmap(options.0, true) })?;
-        if read_only {
-            check(unsafe { ffi::zvec_collection_options_set_read_only(options.0, true) })?;
-        }
-        Ok(options)
+fn dot(left: &[f32], right: &[f32]) -> f32 {
+    left.iter()
+        .zip(right.iter())
+        .map(|(left, right)| left * right)
+        .sum()
+}
+
+fn hit_from_meta(meta: &ChunkMeta, score: f32) -> Hit {
+    Hit {
+        doc_id: meta.doc_id,
+        parent_id: meta.parent_id.clone(),
+        app_id: meta.app_id.clone(),
+        title: meta.title.clone(),
+        date: meta.date,
+        chunk_index: meta.chunk_index,
+        href: meta.href.clone(),
+        text: meta.text.clone(),
+        score,
     }
 }
 
-impl Drop for CollectionOptions {
-    fn drop(&mut self) {
-        if !self.0.is_null() {
-            unsafe { ffi::zvec_collection_options_destroy(self.0) };
-        }
+/// 读取索引内容指纹（serve/entrypoint 检查索引是否过期）。
+pub fn read_content_hash(path: &Path) -> Result<Option<String>> {
+    if !path.is_file() {
+        return Ok(None);
     }
-}
-
-struct Schema(*mut ffi::zvec_collection_schema_t);
-
-impl Drop for Schema {
-    fn drop(&mut self) {
-        if !self.0.is_null() {
-            unsafe { ffi::zvec_collection_schema_destroy(self.0) };
-        }
-    }
-}
-
-fn build_schema() -> Result<Schema> {
-    ensure_initialized()?;
-    let schema = unsafe { ffi::zvec_collection_schema_create(cstring(COLLECTION_NAME)?.as_ptr()) };
-    if schema.is_null() {
-        bail!("zvec_collection_schema_create 返回 NULL");
-    }
-    let schema = Schema(schema);
-
-    // 标量：parentId/appId 倒排；date 倒排 + range；tags 倒排（LIKE 过滤）。
-    add_field(
-        schema.0,
-        FIELD_PARENT_ID,
-        ffi::ZVEC_DATA_TYPE_STRING,
-        0,
-        Some(IndexSpec::Invert {
-            range: false,
-            wildcard: false,
-        }),
-    )?;
-    add_field(
-        schema.0,
-        FIELD_APP_ID,
-        ffi::ZVEC_DATA_TYPE_STRING,
-        0,
-        Some(IndexSpec::Invert {
-            range: false,
-            wildcard: false,
-        }),
-    )?;
-    add_field(schema.0, FIELD_TITLE, ffi::ZVEC_DATA_TYPE_STRING, 0, None)?;
-    add_field(
-        schema.0,
-        FIELD_TAGS,
-        ffi::ZVEC_DATA_TYPE_STRING,
-        0,
-        Some(IndexSpec::Invert {
-            range: false,
-            wildcard: true,
-        }),
-    )?;
-    add_field(
-        schema.0,
-        FIELD_DATE,
-        ffi::ZVEC_DATA_TYPE_INT64,
-        0,
-        Some(IndexSpec::Invert {
-            range: true,
-            wildcard: false,
-        }),
-    )?;
-    add_field(
-        schema.0,
-        FIELD_CHUNK_INDEX,
-        ffi::ZVEC_DATA_TYPE_INT32,
-        0,
-        None,
-    )?;
-    add_field(
-        schema.0,
-        FIELD_CONTENT_HASH,
-        ffi::ZVEC_DATA_TYPE_STRING,
-        0,
-        None,
-    )?;
-    add_field(schema.0, FIELD_HREF, ffi::ZVEC_DATA_TYPE_STRING, 0, None)?;
-
-    // FTS：jieba（中英混排），默认 OR 由查询参数控制。
-    let fts_params = unsafe { ffi::zvec_index_params_create(ffi::ZVEC_INDEX_TYPE_FTS) };
-    if fts_params.is_null() {
-        bail!("zvec_index_params_create(FTS) 返回 NULL");
-    }
-    let tokenizer = cstring("jieba")?;
-    let fts_code = unsafe {
-        ffi::zvec_index_params_set_fts_params(
-            fts_params,
-            tokenizer.as_ptr(),
-            ptr::null(),
-            ptr::null(),
-        )
+    let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .with_context(|| format!("打开索引失败：{}", path.display()))?;
+    let manifest_json: Option<String> = connection
+        .query_row("SELECT value FROM meta WHERE key = 'manifest'", [], |row| {
+            row.get(0)
+        })
+        .optional()?;
+    let Some(json) = manifest_json else {
+        return Ok(None);
     };
-    let fts_result = check(fts_code);
-    if let Err(error) = fts_result {
-        unsafe { ffi::zvec_index_params_destroy(fts_params) };
-        return Err(error);
-    }
-    let field_result = add_field_with_params(
-        schema.0,
-        FIELD_TEXT,
-        ffi::ZVEC_DATA_TYPE_STRING,
-        0,
-        fts_params,
-    );
-    unsafe { ffi::zvec_index_params_destroy(fts_params) };
-    field_result?;
-
-    // dense：Flat + COSINE。
-    // 2026-11-25 Linux 实证：HNSW 索引在 multi-query/RRF 下会报
-    // "Reference index must be Flat or IVF"（macOS 未复现）；Flat 满足该约束，
-    // 2903 chunks 的暴力检索延迟仍在毫秒级。
-    let vector_params = unsafe { ffi::zvec_index_params_create(ffi::ZVEC_INDEX_TYPE_FLAT) };
-    if vector_params.is_null() {
-        bail!("zvec_index_params_create(FLAT) 返回 NULL");
-    }
-    let vector_result = (|| -> Result<()> {
-        check(unsafe {
-            ffi::zvec_index_params_set_metric_type(vector_params, ffi::ZVEC_METRIC_TYPE_COSINE)
-        })?;
-        add_field_with_params(
-            schema.0,
-            FIELD_EMBEDDING,
-            ffi::ZVEC_DATA_TYPE_VECTOR_FP32,
-            EMBEDDING_DIM as u32,
-            vector_params,
-        )
-    })();
-    unsafe { ffi::zvec_index_params_destroy(vector_params) };
-    vector_result?;
-
-    Ok(schema)
+    let manifest: IndexManifest = serde_json::from_str(&json).context("解析索引 manifest 失败")?;
+    Ok(Some(manifest.content_hash))
 }
 
-enum IndexSpec {
-    Invert { range: bool, wildcard: bool },
+/// jieba 预分词：保留含字母/数字/汉字的 token，丢弃纯标点与空白。
+pub fn fts_tokens(text: &str) -> Vec<String> {
+    JIEBA
+        .cut(text, true)
+        .into_iter()
+        .map(str::trim)
+        .filter(|token| {
+            !token.is_empty() && token.chars().any(|character| character.is_alphanumeric())
+        })
+        .map(ToOwned::to_owned)
+        .collect()
 }
 
-fn add_field(
-    schema: *mut ffi::zvec_collection_schema_t,
-    name: &str,
-    data_type: ffi::zvec_data_type_t,
-    dimension: u32,
-    index: Option<IndexSpec>,
-) -> Result<()> {
-    match index {
-        None => add_field_with_params(schema, name, data_type, dimension, ptr::null_mut()),
-        Some(IndexSpec::Invert { range, wildcard }) => {
-            let params = unsafe { ffi::zvec_index_params_create(ffi::ZVEC_INDEX_TYPE_INVERT) };
-            if params.is_null() {
-                bail!("zvec_index_params_create(INVERT) 返回 NULL");
-            }
-            let result = (|| -> Result<()> {
-                check(unsafe {
-                    ffi::zvec_index_params_set_invert_params(params, range, wildcard)
-                })?;
-                add_field_with_params(schema, name, data_type, dimension, params)
-            })();
-            unsafe { ffi::zvec_index_params_destroy(params) };
-            result
-        }
-    }
+pub fn tokenize_for_index(text: &str) -> String {
+    fts_tokens(text).join(" ")
 }
 
-fn add_field_with_params(
-    schema: *mut ffi::zvec_collection_schema_t,
-    name: &str,
-    data_type: ffi::zvec_data_type_t,
-    dimension: u32,
-    index_params: *mut ffi::zvec_index_params_t,
-) -> Result<()> {
-    let name_c = cstring(name)?;
-    let field =
-        unsafe { ffi::zvec_field_schema_create(name_c.as_ptr(), data_type, false, dimension) };
-    if field.is_null() {
-        bail!("zvec_field_schema_create({name}) 返回 NULL");
-    }
-    let result = (|| -> Result<()> {
-        if !index_params.is_null() {
-            check(unsafe { ffi::zvec_field_schema_set_index_params(field, index_params) })?;
-        }
-        check(unsafe { ffi::zvec_collection_schema_add_field(schema, field) })
-            .with_context(|| format!("添加字段 {name} 失败"))
-    })();
-    unsafe { ffi::zvec_field_schema_destroy(field) };
-    result
+/// 预热 jieba 词典（约 44 MB 常驻），避免首个查询承担加载延迟。
+pub fn warmup() {
+    let _ = fts_tokens("预热 warmup");
 }
 
-struct VectorSubQuery(*mut ffi::zvec_sub_query_t);
-
-impl Drop for VectorSubQuery {
-    fn drop(&mut self) {
-        if !self.0.is_null() {
-            unsafe { ffi::zvec_sub_query_destroy(self.0) };
-        }
+/// 构造 FTS5 MATCH 表达式：每个 token 加双引号，OR 连接；空结果返回 None。
+pub fn fts_match_expression(query: &str) -> Option<String> {
+    let tokens = fts_tokens(query);
+    if tokens.is_empty() {
+        return None;
     }
-}
-
-struct FtsSubQuery(*mut ffi::zvec_sub_query_t);
-
-impl Drop for FtsSubQuery {
-    fn drop(&mut self) {
-        if !self.0.is_null() {
-            unsafe { ffi::zvec_sub_query_destroy(self.0) };
-        }
-    }
-}
-
-fn build_vector_sub_query(embedding: &[f32], topk: i32) -> Result<VectorSubQuery> {
-    let sub = unsafe { ffi::zvec_sub_query_create() };
-    if sub.is_null() {
-        bail!("zvec_sub_query_create 返回 NULL");
-    }
-    let sub = VectorSubQuery(sub);
-    let field = cstring(FIELD_EMBEDDING)?;
-    check(unsafe { ffi::zvec_sub_query_set_field_name(sub.0, field.as_ptr()) })?;
-    check(unsafe {
-        ffi::zvec_sub_query_set_query_vector(
-            sub.0,
-            embedding.as_ptr() as *const c_void,
-            std::mem::size_of_val(embedding),
-        )
-    })?;
-    check(unsafe { ffi::zvec_sub_query_set_num_candidates(sub.0, topk) })?;
-    let flat = unsafe { ffi::zvec_query_params_flat_create(false, 10.0) };
-    if flat.is_null() {
-        bail!("zvec_query_params_flat_create 返回 NULL");
-    }
-    // 所有权转移给 sub-query。
-    if let Err(error) = check(unsafe { ffi::zvec_sub_query_set_flat_params(sub.0, flat) }) {
-        unsafe { ffi::zvec_query_params_flat_destroy(flat) };
-        return Err(error);
-    }
-    Ok(sub)
-}
-
-fn build_fts_sub_query(query: &str, topk: i32) -> Result<FtsSubQuery> {
-    let sub = unsafe { ffi::zvec_sub_query_create() };
-    if sub.is_null() {
-        bail!("zvec_sub_query_create 返回 NULL");
-    }
-    let sub = FtsSubQuery(sub);
-    let field = cstring(FIELD_TEXT)?;
-    check(unsafe { ffi::zvec_sub_query_set_field_name(sub.0, field.as_ptr()) })?;
-    check(unsafe { ffi::zvec_sub_query_set_num_candidates(sub.0, topk) })?;
-    let fts = build_fts_payload(query)?;
-    check(unsafe { ffi::zvec_sub_query_set_fts(sub.0, fts.0) })?;
-    drop(fts);
-    let params = unsafe { ffi::zvec_query_params_fts_create(cstr(b"OR")?.as_ptr()) };
-    if params.is_null() {
-        bail!("zvec_query_params_fts_create 返回 NULL");
-    }
-    // 所有权转移给 sub-query。
-    check(unsafe { ffi::zvec_sub_query_set_fts_params(sub.0, params) })?;
-    Ok(sub)
-}
-
-struct Fts(*mut ffi::zvec_fts_t);
-
-impl Drop for Fts {
-    fn drop(&mut self) {
-        if !self.0.is_null() {
-            unsafe { ffi::zvec_fts_destroy(self.0) };
-        }
-    }
-}
-
-fn build_fts_payload(query: &str) -> Result<Fts> {
-    let fts = unsafe { ffi::zvec_fts_create() };
-    if fts.is_null() {
-        bail!("zvec_fts_create 返回 NULL");
-    }
-    let fts = Fts(fts);
-    let query = cstring(query)?;
-    check(unsafe { ffi::zvec_fts_set_match_string(fts.0, query.as_ptr()) })?;
-    Ok(fts)
-}
-
-fn cstr(value: &[u8]) -> Result<std::ffi::CString> {
-    std::ffi::CString::new(value).map_err(|_| anyhow::anyhow!("C 字符串包含 NUL"))
-}
-
-unsafe fn add_string(doc: *mut ffi::zvec_doc_t, field: &str, value: &CString) -> Result<()> {
-    add_basic(
-        doc,
-        field,
-        ffi::ZVEC_DATA_TYPE_STRING,
-        value.as_ptr() as *const c_void,
-        value.as_bytes().len(),
+    Some(
+        tokens
+            .iter()
+            .map(|token| format!("\"{}\"", token.replace('"', "\"\"")))
+            .collect::<Vec<_>>()
+            .join(" OR "),
     )
 }
 
-unsafe fn add_basic(
-    doc: *mut ffi::zvec_doc_t,
-    field: &str,
-    data_type: ffi::zvec_data_type_t,
-    value: *const c_void,
-    size: usize,
-) -> Result<()> {
-    let field_c = cstring(field)?;
-    check(ffi::zvec_doc_add_field_by_value(
-        doc,
-        field_c.as_ptr(),
-        data_type,
-        value,
-        size,
-    ))
-}
-
-unsafe fn hit_from_doc(doc: *const ffi::zvec_doc_t) -> Option<Hit> {
-    let parent_id = field_string(doc, FIELD_PARENT_ID)?;
-    let app_id = field_string(doc, FIELD_APP_ID)?;
-    let title = field_string(doc, FIELD_TITLE).unwrap_or_default();
-    let href = field_string(doc, FIELD_HREF).unwrap_or_default();
-    let text = field_string(doc, FIELD_TEXT).unwrap_or_default();
-    let date = field_i64(doc, FIELD_DATE).unwrap_or(0);
-    let chunk_index = field_i32(doc, FIELD_CHUNK_INDEX).unwrap_or(0);
-    Some(Hit {
-        parent_id,
-        app_id,
-        title,
-        date,
-        chunk_index,
-        href,
-        text,
-        score: ffi::zvec_doc_get_score(doc),
-    })
-}
-
-unsafe fn field_string(doc: *const ffi::zvec_doc_t, field: &str) -> Option<String> {
-    let field_c = cstring(field).ok()?;
-    let mut value: *const c_void = ptr::null();
-    let mut size = 0usize;
-    let code = ffi::zvec_doc_get_field_value_pointer(
-        doc,
-        field_c.as_ptr(),
-        ffi::ZVEC_DATA_TYPE_STRING,
-        &mut value,
-        &mut size,
-    );
-    if code != ffi::ZVEC_OK || value.is_null() {
-        return None;
-    }
-    let text = CStr::from_ptr(value as *const std::os::raw::c_char)
-        .to_string_lossy()
-        .into_owned();
-    Some(text)
-}
-
-unsafe fn field_i64(doc: *const ffi::zvec_doc_t, field: &str) -> Option<i64> {
-    let field_c = cstring(field).ok()?;
-    let mut value: i64 = 0;
-    let code = ffi::zvec_doc_get_field_value_basic(
-        doc,
-        field_c.as_ptr(),
-        ffi::ZVEC_DATA_TYPE_INT64,
-        &mut value as *mut i64 as *mut c_void,
-        std::mem::size_of::<i64>(),
-    );
-    (code == ffi::ZVEC_OK).then_some(value)
-}
-
-unsafe fn field_i32(doc: *const ffi::zvec_doc_t, field: &str) -> Option<i32> {
-    let field_c = cstring(field).ok()?;
-    let mut value: i32 = 0;
-    let code = ffi::zvec_doc_get_field_value_basic(
-        doc,
-        field_c.as_ptr(),
-        ffi::ZVEC_DATA_TYPE_INT32,
-        &mut value as *mut i32 as *mut c_void,
-        std::mem::size_of::<i32>(),
-    );
-    (code == ffi::ZVEC_OK).then_some(value)
-}
-
-/// 校验 embedding 维度，写入/查询前调用。
-#[allow(dead_code)]
-pub fn validate_embedding(embedding: &[f32]) -> Result<()> {
-    if embedding.len() != EMBEDDING_DIM {
-        bail!(
-            "embedding 维度错误：期望 {}，实际 {}",
-            EMBEDDING_DIM,
-            embedding.len()
-        );
-    }
-    Ok(())
+/// parent 级内容指纹：标题/标签/日期/正文任一变化都会改变。
+pub fn document_hash(title: &str, tags: &[String], date: i64, text: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(title.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(tags.join(",").as_bytes());
+    hasher.update(b"\0");
+    hasher.update(date.to_string().as_bytes());
+    hasher.update(b"\0");
+    hasher.update(crate::chunk::content_hash(text).as_bytes());
+    hex::encode(hasher.finalize())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::manifest::{IndexManifest, FORMAT_VERSION};
 
-    fn embedding(seed: usize, primary: usize) -> Vec<f32> {
-        let mut vector = vec![0.0f32; EMBEDDING_DIM];
-        vector[primary % EMBEDDING_DIM] = 1.0;
-        vector[(seed + 7) % EMBEDDING_DIM] = 0.05;
+    fn manifest(dim: usize) -> IndexManifest {
+        IndexManifest {
+            version: FORMAT_VERSION,
+            built_at: "2026-01-01T00:00:00.000Z".to_string(),
+            content_hash: "test-hash".to_string(),
+            documents: 2,
+            chunks: 2,
+            apps: Default::default(),
+            model: "mock".to_string(),
+            embed_dim: dim,
+            chunk_window_chars: crate::chunk::WINDOW_CHARS,
+            chunk_overlap_chars: crate::chunk::OVERLAP_CHARS,
+            max_chunks_per_doc: crate::chunk::MAX_CHUNKS_PER_DOC,
+        }
+    }
+
+    fn vector(values: [f32; 3]) -> Vec<f32> {
+        let mut vector = values.to_vec();
         crate::embed::l2_normalize(&mut vector);
         vector
     }
 
-    #[test]
-    fn zvec_roundtrip_vector_fts_hybrid_and_filter() {
-        let directory = tempfile::tempdir().expect("临时目录");
-        let collection = directory.path().join("collection");
-        let store = ZvecStore::create(&collection).expect("创建 collection");
-
-        let vector_a = embedding(1, 0);
-        let vector_b = embedding(2, 1);
-        let text_a = "rust async runtime tokio concurrency";
-        let text_b = "vector database hnsw semantic search";
-        let docs = [
-            ChunkDocument {
-                id: "a#0".to_string(),
+    fn build_temp() -> (tempfile::TempDir, PathBuf) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("index.sqlite");
+        let vector_a = vector([1.0, 0.0, 0.0]);
+        let vector_b = vector([0.0, 1.0, 0.0]);
+        // tokenize_for_index 返回临时 String，record() 里借用会悬垂；
+        // 这里显式持有 token 字符串。
+        let tokens_a = tokenize_for_index("Rust 异步运行时 tokio");
+        let tokens_b = tokenize_for_index("向量数据库 hnsw semantic search");
+        let records = [
+            ChunkRecord {
                 parent_id: "parent-a",
                 app_id: "event",
                 title: "Rust 异步运行时",
@@ -1008,11 +684,11 @@ mod tests {
                 chunk_index: 0,
                 content_hash: "hash-a",
                 href: "/article/events/a",
-                text: text_a,
+                text: "Rust 异步运行时 tokio concurrency",
+                text_tokens: &tokens_a,
                 embedding: &vector_a,
             },
-            ChunkDocument {
-                id: "b#0".to_string(),
+            ChunkRecord {
                 parent_id: "parent-b",
                 app_id: "articles",
                 title: "向量数据库",
@@ -1021,89 +697,129 @@ mod tests {
                 chunk_index: 0,
                 content_hash: "hash-b",
                 href: "/article/articles/b",
-                text: text_b,
+                text: "vector database hnsw semantic search",
+                text_tokens: &tokens_b,
                 embedding: &vector_b,
             },
         ];
-        store.insert(&docs).expect("写入");
-        store.optimize().expect("optimize");
-        store.flush().expect("flush");
-        assert_eq!(store.doc_count().expect("统计"), 2);
+        write_index(&path, &records, &manifest(3)).expect("write index");
+        (dir, path)
+    }
 
-        let hits = store
-            .search(SearchMode::Vector, Some(&vector_a), "unused", None, 5)
-            .expect("向量检索");
-        assert!(!hits.is_empty());
-        assert_eq!(hits[0].parent_id, "parent-a");
-        assert!(
-            hits[0].score < 0.01,
-            "COSINE 距离应接近 0：{}",
-            hits[0].score
+    #[test]
+    fn fts_chinese_and_english_tokens() {
+        let tokens = fts_tokens("Rust 异步运行时 tokio，C++ 与 C#");
+        assert!(tokens.iter().any(|token| token == "Rust"));
+        assert!(tokens
+            .iter()
+            .any(|token| token == "异步" || token == "异步运行时"));
+        assert!(tokens.iter().any(|token| token == "tokio"));
+        assert!(tokens
+            .iter()
+            .any(|token| token.starts_with('C') && token.len() <= 3));
+        assert!(fts_match_expression("什麼都不匹配").is_some());
+        assert!(fts_match_expression("!!! ...").is_none());
+    }
+
+    #[test]
+    fn fts_match_expression_quotes_tokens() {
+        assert_eq!(
+            fts_match_expression("rust tokio"),
+            Some("\"rust\" OR \"tokio\"".to_string())
         );
-        assert_eq!(hits[0].title, "Rust 异步运行时");
-        assert_eq!(hits[0].href, "/article/events/a");
+    }
 
-        let hits = store
-            .search(SearchMode::Fts, None, "rust", None, 5)
-            .expect("FTS 检索");
-        assert!(!hits.is_empty());
+    #[test]
+    fn roundtrip_vector_fts_hybrid_and_filter() {
+        let (_dir, path) = build_temp();
+        let index = LoadedIndex::open(&path).expect("open");
+        assert_eq!(index.dim(), 3);
+        assert_eq!(index.chunk_count(), 2);
+        assert_eq!(index.document_count(), 2);
+        assert_eq!(
+            read_content_hash(&path).unwrap().as_deref(),
+            Some("test-hash")
+        );
+
+        let query = vector([1.0, 0.0, 0.0]);
+        let filters = ValidatedFilters::default();
+
+        let hits = index
+            .search(SearchMode::Vector, Some(&query), "unused", &filters, 5)
+            .expect("vector");
         assert_eq!(hits[0].parent_id, "parent-a");
+        assert!((hits[0].score - 1.0).abs() < 1e-5);
 
-        let hits = store
-            .search(SearchMode::Hybrid, Some(&vector_b), "hnsw", None, 5)
-            .expect("混合检索");
-        assert!(!hits.is_empty());
-        assert_eq!(hits[0].parent_id, "parent-b");
+        let hits = index
+            .search(SearchMode::Fts, None, "异步", &filters, 5)
+            .expect("fts");
+        assert_eq!(hits[0].parent_id, "parent-a");
         assert!(hits[0].score > 0.0);
 
-        let hits = store
-            .search(
-                SearchMode::Vector,
-                Some(&vector_a),
-                "unused",
-                Some("appId = 'articles'"),
-                5,
-            )
-            .expect("过滤检索");
+        let hits = index
+            .search(SearchMode::Fts, None, "semantic", &filters, 5)
+            .expect("fts-en");
+        assert_eq!(hits[0].parent_id, "parent-b");
+
+        let hits = index
+            .search(SearchMode::Hybrid, Some(&query), "semantic", &filters, 5)
+            .expect("hybrid");
+        // parent-b 同时命中 FTS rank0 与向量 rank1，RRF 分应高于只命中单路的 parent-a。
+        assert_eq!(hits[0].parent_id, "parent-b");
+        assert!(hits.iter().any(|hit| hit.parent_id == "parent-a"));
+
+        let mut app_filter = ValidatedFilters::default();
+        app_filter.apps.insert("articles".to_string());
+        let hits = index
+            .search(SearchMode::Vector, Some(&query), "unused", &app_filter, 5)
+            .expect("app filter");
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].parent_id, "parent-b");
 
-        let hits = store
-            .search(
-                SearchMode::Vector,
-                Some(&vector_a),
-                "unused",
-                Some("tags LIKE '% rust %'"),
-                5,
-            )
-            .expect("标签过滤");
+        let mut tag_filter = ValidatedFilters::default();
+        tag_filter.tags.push(" rust ".to_string());
+        let hits = index
+            .search(SearchMode::Vector, Some(&query), "unused", &tag_filter, 5)
+            .expect("tag filter");
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].parent_id, "parent-a");
 
-        store
-            .delete_by_filter("appId = 'articles'")
-            .expect("按过滤删除");
-        store.flush().expect("flush");
-        assert_eq!(store.doc_count().expect("统计"), 1);
+        let date_filter = ValidatedFilters {
+            date_from: Some(1_650_000_000_000),
+            ..Default::default()
+        };
+        let hits = index
+            .search(SearchMode::Fts, None, "semantic", &date_filter, 5)
+            .expect("date filter");
+        assert!(hits.is_empty());
+    }
 
-        // close（而非 destroy）后数据必须仍在磁盘，可重新打开。
-        drop(store);
-        let reopened = ZvecStore::open(&collection).expect("重新打开 collection");
-        assert_eq!(reopened.doc_count().expect("重开统计"), 1);
-        drop(reopened);
+    #[test]
+    fn empty_special_query_returns_no_fts_hits() {
+        let (_dir, path) = build_temp();
+        let index = LoadedIndex::open(&path).expect("open");
+        let filters = ValidatedFilters::default();
+        assert!(index
+            .search(SearchMode::Fts, None, "!!! ...", &filters, 5)
+            .unwrap()
+            .is_empty());
+        assert!(index
+            .search(SearchMode::Fts, None, "", &filters, 5)
+            .unwrap()
+            .is_empty());
+        assert!(index
+            .search(SearchMode::Fts, None, "\"", &filters, 5)
+            .unwrap()
+            .is_empty());
+    }
 
-        // serve 使用的只读打开（索引可挂载为只读卷）。
-        let read_only = ZvecStore::open_read_only(&collection).expect("只读打开 collection");
-        assert_eq!(read_only.doc_count().expect("只读统计"), 1);
-        let hits = read_only
-            .search(
-                SearchMode::Vector,
-                Some(&embedding(1, 0)),
-                "unused",
-                None,
-                5,
-            )
-            .expect("只读检索");
-        assert_eq!(hits[0].parent_id, "parent-a");
+    #[test]
+    fn rejects_missing_or_corrupt_index() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(LoadedIndex::open(&dir.path().join("missing.sqlite")).is_err());
+        assert_eq!(
+            read_content_hash(&dir.path().join("missing.sqlite")).unwrap(),
+            None
+        );
     }
 }

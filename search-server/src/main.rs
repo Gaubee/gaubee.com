@@ -1,8 +1,9 @@
-//! gaubee.com 语义搜索服务（zvec + E5-small ONNX）。
+//! gaubee.com 语义搜索服务（SQLite FTS5 + magpie remote embedding）。
 //!
 //! 用法：
-//!   cargo run --release -- build     # 全量重建索引到 ./index
-//!   cargo run --release -- serve     # 监听 127.0.0.1:17081
+//!   cargo run --release -- build     # 全量重建 ./index.sqlite
+//!   cargo run --release -- serve     # 监听 127.0.0.1:17082
+//!   cargo run --release -- check     # 校验索引是否存在且内容指纹一致
 mod api;
 mod chunk;
 mod content;
@@ -11,27 +12,27 @@ mod indexer;
 mod manifest;
 mod search;
 mod store;
-mod zvec_ffi;
+#[cfg(test)]
+mod test_support;
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
-use crate::api::{router, AppState};
-use crate::embed::Embedder;
-use crate::indexer::{build_index, ensure_index_root, BuildOptions};
-use crate::manifest::{collection_path, read_manifest};
-use crate::store::ZvecStore;
+use crate::api::{router, AppState, ENGINE};
+use crate::embed::{EmbeddingClient, EmbeddingConfig, DEFAULT_BASE_URL, DEFAULT_MODEL};
+use crate::indexer::{build_index, check_index, BuildOptions};
+use crate::store::LoadedIndex;
 
 #[derive(Parser)]
 #[command(
     name = "search-server",
     version,
-    about = "gaubee.com zvec 语义搜索服务"
+    about = "gaubee.com SQLite FTS5 + 远程 embedding 搜索服务"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -44,45 +45,92 @@ enum Command {
     Build(BuildArgs),
     /// 启动 HTTP 服务。
     Serve(ServeArgs),
+    /// 校验索引是否存在且内容指纹一致（entrypoint 用）。
+    Check(CheckArgs),
 }
 
-#[derive(clap::Args)]
+#[derive(Args, Clone)]
+struct MagpieArgs {
+    /// magpie 网关基础地址（可带 /v1 或完整 /v1/embeddings）。
+    #[arg(long, default_value = DEFAULT_BASE_URL, env = "MAGPIE_URL")]
+    magpie_url: String,
+    /// magpie caller key；只从环境变量/命令行注入，不落盘、不打印。
+    #[arg(long, env = "MAGPIE_API_KEY", hide_env_values = true)]
+    magpie_api_key: Option<String>,
+    /// embedding 模型名。
+    #[arg(long, default_value = DEFAULT_MODEL, env = "MAGPIE_EMBED_MODEL")]
+    magpie_embed_model: String,
+}
+
+impl MagpieArgs {
+    fn config(
+        &self,
+        timeout_ms: u64,
+        batch_size: usize,
+        concurrency: usize,
+        retries: u32,
+    ) -> EmbeddingConfig {
+        EmbeddingConfig {
+            base_url: self.magpie_url.clone(),
+            api_key: self.magpie_api_key.clone().unwrap_or_default(),
+            model: self.magpie_embed_model.clone(),
+            timeout: Duration::from_millis(timeout_ms),
+            batch_size,
+            concurrency,
+            max_retries: retries,
+        }
+    }
+}
+
+#[derive(Args)]
 struct BuildArgs {
     /// 内容根目录（含 articles/events 子目录）。
     #[arg(long, default_value = "../src/content", env = "CONTENT_DIR")]
     content: PathBuf,
-    /// 索引输出根目录（collection/ + manifest.json）。
-    #[arg(long, default_value = "./index", env = "INDEX_DIR")]
+    /// 索引输出文件。
+    #[arg(long, default_value = "./index.sqlite", env = "INDEX_FILE")]
     index: PathBuf,
-    /// E5 模型目录（model.onnx + tokenizer.json）。
-    #[arg(
-        long,
-        default_value = "./.cache/models/multilingual-e5-small",
-        env = "MODEL_DIR"
-    )]
-    model_dir: PathBuf,
-    /// ONNX 推理线程数。
-    #[arg(long, default_value_t = 4, env = "SEARCH_THREADS")]
-    threads: usize,
+    #[command(flatten)]
+    magpie: MagpieArgs,
+    /// 每请求 embedding 条数（实测 magpie 接受 256，默认 64）。
+    #[arg(long, default_value_t = 64, env = "EMBED_BATCH_SIZE")]
+    embed_batch_size: usize,
+    /// 并发 embedding 请求数（默认 4）。
+    #[arg(long, default_value_t = 4, env = "EMBED_CONCURRENCY")]
+    embed_concurrency: usize,
+    /// 构建期单请求超时（毫秒）。
+    #[arg(long, default_value_t = 120_000, env = "MAGPIE_BUILD_TIMEOUT_MS")]
+    timeout_ms: u64,
+    /// 429/5xx/超时重试次数。
+    #[arg(long, default_value_t = 5, env = "MAGPIE_MAX_RETRIES")]
+    max_retries: u32,
 }
 
-#[derive(clap::Args)]
+#[derive(Args)]
 struct ServeArgs {
-    #[arg(long, default_value = "./index", env = "INDEX_DIR")]
+    #[arg(long, default_value = "./index.sqlite", env = "INDEX_FILE")]
     index: PathBuf,
-    #[arg(
-        long,
-        default_value = "./.cache/models/multilingual-e5-small",
-        env = "MODEL_DIR"
-    )]
-    model_dir: PathBuf,
-    #[arg(long, default_value = "127.0.0.1:17081", env = "SEARCH_BIND")]
+    #[arg(long, default_value = "127.0.0.1:17082", env = "SEARCH_BIND")]
     bind: String,
-    #[arg(long, default_value_t = 4, env = "SEARCH_THREADS")]
-    threads: usize,
+    #[command(flatten)]
+    magpie: MagpieArgs,
+    /// 查询 embedding 超时（毫秒）；超时自动降级 FTS-only。
+    #[arg(long, default_value_t = 2_000, env = "MAGPIE_TIMEOUT_MS")]
+    timeout_ms: u64,
+    /// 查询 embedding 重试次数；默认 0，超时立即降级，避免放大客户端超时。
+    #[arg(long, default_value_t = 0, env = "MAGPIE_QUERY_RETRIES")]
+    max_retries: u32,
 }
 
-fn main() -> Result<()> {
+#[derive(Args)]
+struct CheckArgs {
+    #[arg(long, default_value = "../src/content", env = "CONTENT_DIR")]
+    content: PathBuf,
+    #[arg(long, default_value = "./index.sqlite", env = "INDEX_FILE")]
+    index: PathBuf,
+}
+
+fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
@@ -91,24 +139,38 @@ fn main() -> Result<()> {
         .init();
 
     let cli = Cli::parse();
-    match cli.command {
+    let result = match cli.command {
         Command::Build(args) => run_build(args),
+        Command::Check(args) => run_check(args),
         Command::Serve(args) => {
             let runtime = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
-                .context("创建 tokio runtime 失败")?;
-            runtime.block_on(run_serve(args))
+                .context("创建 tokio runtime 失败");
+            match runtime {
+                Ok(runtime) => runtime.block_on(run_serve(args)),
+                Err(error) => Err(error),
+            }
         }
+    };
+    if let Err(error) = result {
+        tracing::error!("{error:#}");
+        eprintln!("search-server 失败：{error:#}");
+        std::process::exit(1);
     }
 }
 
 fn run_build(args: BuildArgs) -> Result<()> {
+    let embedding = args.magpie.config(
+        args.timeout_ms,
+        args.embed_batch_size,
+        args.embed_concurrency,
+        args.max_retries,
+    );
     let report = build_index(&BuildOptions {
         content_root: args.content,
-        index_root: args.index.clone(),
-        model_dir: args.model_dir,
-        threads: args.threads,
+        index_path: args.index.clone(),
+        embedding,
     })?;
     println!(
         "索引构建完成：{} 篇文档 / {} chunks，耗时 {:.1}s，索引 {:.1} MiB",
@@ -117,48 +179,65 @@ fn run_build(args: BuildArgs) -> Result<()> {
         report.duration_ms as f64 / 1000.0,
         report.index_bytes as f64 / (1024.0 * 1024.0),
     );
-    println!("collection: {}", collection_path(&args.index).display());
+    println!("index:    {}", args.index.display());
     println!(
-        "manifest:   {}",
-        manifest::manifest_path(&args.index).display()
-    );
-    println!(
-        "stats:      {}",
+        "manifest: {}",
         serde_json::to_string(&report.manifest).unwrap_or_default()
     );
     Ok(())
 }
 
-async fn run_serve(args: ServeArgs) -> Result<()> {
-    ensure_index_root(&args.index)?;
-    let started = Instant::now();
-    let collection = collection_path(&args.index);
-    // 优先只读（索引可挂载为只读卷）；若索引有未完成 WAL 则回退读写打开。
-    let store = match ZvecStore::open_read_only(&collection) {
-        Ok(store) => store,
-        Err(error) => {
-            tracing::warn!(%error, "只读打开失败，回退读写模式");
-            ZvecStore::open(&collection)?
-        }
-    };
-    let docs = store.doc_count()?;
-    let manifest = read_manifest(&args.index)?;
-    let embedder = Embedder::load(
-        &args.model_dir.join("model.onnx"),
-        &args.model_dir.join("tokenizer.json"),
-        args.threads,
-    )?;
-
-    // 预热：加载 HNSW / FTS 段并跑一次 query embedding。
-    if let Err(error) = embedder.embed_query("warmup") {
-        tracing::warn!(%error, "查询 embedding 预热失败");
+fn run_check(args: CheckArgs) -> Result<()> {
+    let report = check_index(&args.content, &args.index)?;
+    println!("documents:   {}", report.documents);
+    println!("contentHash: {}", report.content_hash);
+    println!(
+        "indexHash:   {}",
+        report.index_content_hash.as_deref().unwrap_or("<缺失>")
+    );
+    if !report.matches {
+        anyhow::bail!(
+            "索引缺失或内容指纹不一致：{}（需要重建）",
+            args.index.display()
+        );
     }
+    println!("status:      up-to-date");
+    Ok(())
+}
 
+async fn run_serve(args: ServeArgs) -> Result<()> {
+    let started = Instant::now();
+    let index = LoadedIndex::open(&args.index)?;
+    let manifest = index.manifest().clone();
+    store::warmup();
+
+    let embedder = if args
+        .magpie
+        .magpie_api_key
+        .as_deref()
+        .map(str::trim)
+        .is_some_and(|key| !key.is_empty())
+    {
+        let config = args.magpie.config(args.timeout_ms, 64, 1, args.max_retries);
+        match EmbeddingClient::new(&config) {
+            Ok(client) => Some(client),
+            Err(error) => {
+                tracing::warn!(%error, "embedding 客户端初始化失败，服务以 FTS-only 运行");
+                None
+            }
+        }
+    } else {
+        tracing::warn!("MAGPIE_API_KEY 未配置，服务以 FTS-only 运行（响应 degraded=true）");
+        None
+    };
+
+    let embed_model = embedder
+        .as_ref()
+        .map(|client| client.model().to_string())
+        .unwrap_or_else(|| "none".to_string());
     let state = Arc::new(AppState {
-        store,
+        index,
         embedder,
-        index_root: args.index.clone(),
-        manifest: manifest.clone(),
         started,
     });
 
@@ -167,19 +246,20 @@ async fn run_serve(args: ServeArgs) -> Result<()> {
         .with_context(|| format!("监听 {} 失败", args.bind))?;
     tracing::info!(
         bind = %args.bind,
-        docs,
-        zvec = %crate::store::sdk_version(),
+        engine = ENGINE,
+        docs = state.index.chunk_count(),
+        documents = manifest.documents,
+        embed_model = %embed_model,
+        embed_dim = state.index.dim(),
+        query_timeout_ms = args.timeout_ms,
         "search-server 已启动"
     );
-    if let Some(manifest) = &manifest {
-        tracing::info!(
-            built_at = %manifest.built_at_rfc3339(),
-            documents = manifest.documents,
-            chunks = manifest.chunks,
-            index = %args.index.display(),
-            "索引已加载"
-        );
-    }
+    tracing::info!(
+        built_at = %manifest.built_at_rfc3339(),
+        content_hash = %manifest.content_hash,
+        index = %args.index.display(),
+        "索引已加载"
+    );
 
     axum::serve(listener, router(state))
         .with_graceful_shutdown(shutdown_signal())
