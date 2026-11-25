@@ -1,8 +1,16 @@
-//! magpie 网关 embedding 客户端（OpenAI 兼容 `/v1/embeddings`）。
+//! embedding 客户端（OpenAI 兼容 `/v1/embeddings`）。
+//!
+//! 同一个客户端同时支持两种后端，二者协议一致：
+//! - 远程网关（magpie 等），需要 API key；
+//! - 本地 llama.cpp `llama-server`（GGUF 量化模型），loopback 且通常无 key。
 //!
 //! 设计要点：
 //! - 只通过环境变量/CLI 注入 key，任何日志与错误信息都不包含 key；
-//! - 批量请求默认 64 条、4 路并发，429/5xx/超时按指数退避重试；
+//! - 模型质量强依赖**任务前缀**：EmbeddingGemma 2 要 `task: search result |
+//!   query:` / `title: ... | text: ...`，bge-zh 要查询指令前缀。前缀由
+//!   `PromptProfile` 统一生成，build 与 serve 必须用同一 profile，否则向量
+//!   空间不可比（profile 会写进索引 manifest 供 check 校验）；
+//! - 批量请求默认 48 条、4 路并发，429/5xx/超时按指数退避重试；
 //! - 响应按 `index` 排序，逐个校验维度并做 L2 归一化（存储与查询都归一化，
 //!   检索时用点积即余弦相似度）；
 //! - serve 侧超时默认 2s，失败由调用方降级到 FTS-only。
@@ -15,18 +23,77 @@ use anyhow::{bail, Context, Result};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 
-pub const DEFAULT_BASE_URL: &str = "https://magpie.aiweb.xin";
-/// mistral-embed 在本机/服务器网关的 p50 明显低于 text-embedding-3-small，
-/// 且 1024 维索引更小；默认模型与索引维度由 build 时实际返回自动落盘。
-pub const DEFAULT_MODEL: &str = "mistral-embed";
+/// 本地 llama.cpp 默认端口（build/serve 都指向这里）。
+pub const DEFAULT_BASE_URL: &str = "http://127.0.0.1:18081";
+/// EmbeddingGemma 2 文本核心（270M 参数，768 维，8K 上下文）。
+pub const DEFAULT_MODEL: &str = "embeddinggemma-2";
 /// 查询 embedding 进程内 LRU 容量（key = 模型 + 查询文本）。
 pub const QUERY_CACHE_CAPACITY: usize = 256;
+
+/// 任务前缀模板。前缀直接决定检索质量，且必须与建索引时一致。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum PromptProfile {
+    /// 不加任何前缀（mistral-embed 等通用模型）。
+    None,
+    /// EmbeddingGemma 2：查询 `task: search result | query: ...`，
+    /// 文档 `title: {title} | text: {content}`。
+    #[default]
+    EmbeddingGemma2,
+    /// bge-small-zh-v1.5：查询加中文检索指令，文档不加前缀。
+    BgeZh,
+}
+
+impl PromptProfile {
+    pub fn parse(value: &str) -> Result<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "" | "gemma2" | "embeddinggemma2" | "embeddinggemma-2" => Ok(Self::EmbeddingGemma2),
+            "none" | "plain" => Ok(Self::None),
+            "bge" | "bge-zh" | "bge-zh-v1.5" => Ok(Self::BgeZh),
+            other => bail!("不支持的 EMBED_PROMPTS：{other}（可用 gemma2/none/bge-zh）"),
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::EmbeddingGemma2 => "gemma2",
+            Self::BgeZh => "bge-zh",
+        }
+    }
+
+    /// 查询侧输入。
+    pub fn query(&self, query: &str) -> String {
+        match self {
+            Self::None => query.to_string(),
+            Self::EmbeddingGemma2 => format!("task: search result | query: {query}"),
+            Self::BgeZh => format!("为这个句子生成表示以用于检索相关文章：{query}"),
+        }
+    }
+
+    /// 文档侧输入；`title` 为空时 gemma2 按官方要求写 `title: none`。
+    pub fn document(&self, title: &str, text: &str) -> String {
+        match self {
+            Self::None => text.to_string(),
+            Self::EmbeddingGemma2 => {
+                let title = if title.trim().is_empty() {
+                    "none"
+                } else {
+                    title.trim()
+                };
+                format!("title: {title} | text: {text}")
+            }
+            Self::BgeZh => text.to_string(),
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct EmbeddingConfig {
     pub base_url: String,
     pub api_key: String,
     pub model: String,
+    pub prompts: PromptProfile,
     pub timeout: Duration,
     pub batch_size: usize,
     pub concurrency: usize,
@@ -39,6 +106,7 @@ impl Default for EmbeddingConfig {
             base_url: DEFAULT_BASE_URL.to_string(),
             api_key: String::new(),
             model: DEFAULT_MODEL.to_string(),
+            prompts: PromptProfile::default(),
             timeout: Duration::from_millis(2_000),
             batch_size: 48,
             concurrency: 4,
@@ -125,7 +193,11 @@ pub struct EmbeddingClient {
     client: Client,
     endpoint: String,
     api_key: String,
+    /// 请求里发的模型名（网关/llama-server 认的值）。
     model: String,
+    /// 模型 + 前缀模板 = 向量空间身份，写进索引 manifest 参与一致性校验。
+    identity: String,
+    prompts: PromptProfile,
     batch_size: usize,
     concurrency: usize,
     max_retries: u32,
@@ -152,11 +224,13 @@ struct EmbeddingItem {
 
 impl EmbeddingClient {
     pub fn new(config: &EmbeddingConfig) -> Result<Self> {
-        if config.api_key.trim().is_empty() {
-            bail!("MAGPIE_API_KEY 为空");
-        }
         if config.model.trim().is_empty() {
-            bail!("MAGPIE_EMBED_MODEL 为空");
+            bail!("EMBED_MODEL 为空");
+        }
+        let local = is_local_endpoint(&config.base_url);
+        if !local && config.api_key.trim().is_empty() {
+            // 远程网关需要 key；本地 llama.cpp loopback 通常无鉴权。
+            bail!("远程 embedding 网关需要 key（EMBED_API_KEY 为空）");
         }
         let builder = Client::builder()
             .timeout(config.timeout)
@@ -170,6 +244,8 @@ impl EmbeddingClient {
             endpoint: endpoint_for(&config.base_url),
             api_key: config.api_key.clone(),
             model: config.model.clone(),
+            identity: model_identity(&config.model, config.prompts),
+            prompts: config.prompts,
             batch_size: config.batch_size.max(1),
             concurrency: config.concurrency.max(1),
             max_retries: config.max_retries,
@@ -177,15 +253,25 @@ impl EmbeddingClient {
         })
     }
 
-    pub fn model(&self) -> &str {
+    /// 向量空间身份（`模型:前缀模板`），与索引 manifest.model 比对。
+    pub fn space(&self) -> &str {
+        &self.identity
+    }
+
+    /// 请求用的原始模型名。
+    pub fn request_model(&self) -> &str {
         &self.model
+    }
+
+    pub fn prompts(&self) -> PromptProfile {
+        self.prompts
     }
 
     /// 查询向量；`expected_dim` 来自索引元数据，不匹配立即报错（调用方降级）。
     ///
-    /// 进程内 LRU 按「模型 + 查询文本」复用；命中时直接返回归一化向量。
+    /// 进程内 LRU 按「向量空间身份 + 查询文本」复用；命中时直接返回归一化向量。
     pub fn embed_query(&self, query: &str, expected_dim: usize) -> Result<Vec<f32>> {
-        let key = format!("{}\u{0}{query}", self.model);
+        let key = format!("{}\u{0}{query}", self.identity);
         if let Ok(mut cache) = self.query_cache.lock() {
             if let Some(vector) = cache.get(&key) {
                 if vector.len() == expected_dim {
@@ -195,7 +281,8 @@ impl EmbeddingClient {
             }
         }
 
-        let mut vectors = self.embed_all(std::slice::from_ref(&query.to_string()))?;
+        let prefixed = self.prompts.query(query);
+        let mut vectors = self.embed_all(std::slice::from_ref(&prefixed))?;
         let vector = vectors.pop().context("query embedding 返回空结果")?;
         if vector.len() != expected_dim {
             bail!(
@@ -214,6 +301,15 @@ impl EmbeddingClient {
             .lock()
             .map(|cache| cache.stats())
             .unwrap_or_default()
+    }
+
+    /// 文档批量 embedding：按前缀模板包装 `(标题, 正文)`，返回顺序与输入一致。
+    pub fn embed_documents(&self, documents: &[(String, String)]) -> Result<Vec<Vec<f32>>> {
+        let texts = documents
+            .iter()
+            .map(|(title, text)| self.prompts.document(title, text))
+            .collect::<Vec<_>>();
+        self.embed_all(&texts)
     }
 
     /// 批量 embedding，返回顺序与输入一致；所有向量已 L2 归一化。
@@ -436,6 +532,29 @@ pub fn endpoint_for(base_url: &str) -> String {
     }
 }
 
+/// 向量空间身份：`模型:前缀模板`。前缀会改变向量分布，必须参与索引一致性校验。
+pub fn model_identity(model: &str, prompts: PromptProfile) -> String {
+    format!("{}:{}", model.trim(), prompts.name())
+}
+
+/// loopback / 私网地址视为本地后端（不要求 key）。
+fn is_local_endpoint(base_url: &str) -> bool {
+    let trimmed = base_url.trim();
+    let host = trimmed
+        .split("://")
+        .nth(1)
+        .unwrap_or(trimmed)
+        .split(['/', ':'])
+        .next()
+        .unwrap_or("");
+    host == "127.0.0.1"
+        || host == "localhost"
+        || host == "::1"
+        || host == "0.0.0.0"
+        || host.starts_with("10.")
+        || host.starts_with("192.168.")
+}
+
 pub fn l2_normalize(vector: &mut [f32]) {
     let norm = vector.iter().map(|value| value * value).sum::<f32>().sqrt();
     if norm > 1e-12 {
@@ -455,6 +574,7 @@ mod tests {
             base_url,
             api_key: "test-key".to_string(),
             model: "mock-embed".to_string(),
+            prompts: PromptProfile::None,
             timeout: Duration::from_millis(timeout_ms),
             batch_size: 4,
             concurrency: 2,
@@ -463,9 +583,68 @@ mod tests {
     }
 
     #[test]
-    fn default_model_is_mistral_embed() {
-        assert_eq!(DEFAULT_MODEL, "mistral-embed");
+    fn default_backend_is_local_embeddinggemma2() {
+        assert_eq!(DEFAULT_BASE_URL, "http://127.0.0.1:18081");
+        assert_eq!(DEFAULT_MODEL, "embeddinggemma-2");
         assert_eq!(QUERY_CACHE_CAPACITY, 256);
+        assert_eq!(PromptProfile::default(), PromptProfile::EmbeddingGemma2);
+    }
+
+    #[test]
+    fn prompt_profiles_match_official_templates() {
+        let gemma = PromptProfile::EmbeddingGemma2;
+        assert_eq!(
+            gemma.query("语义搜索"),
+            "task: search result | query: 语义搜索"
+        );
+        assert_eq!(gemma.document("标题", "正文"), "title: 标题 | text: 正文");
+        assert_eq!(gemma.document("", "正文"), "title: none | text: 正文");
+
+        let bge = PromptProfile::BgeZh;
+        assert_eq!(
+            bge.query("语义搜索"),
+            "为这个句子生成表示以用于检索相关文章：语义搜索"
+        );
+        assert_eq!(bge.document("标题", "正文"), "正文");
+
+        assert_eq!(PromptProfile::None.query("q"), "q");
+        assert_eq!(PromptProfile::None.document("t", "x"), "x");
+    }
+
+    #[test]
+    fn prompt_profile_parsing_and_identity() {
+        assert_eq!(
+            PromptProfile::parse("gemma2").unwrap(),
+            PromptProfile::EmbeddingGemma2
+        );
+        assert_eq!(
+            PromptProfile::parse("bge-zh").unwrap(),
+            PromptProfile::BgeZh
+        );
+        assert_eq!(PromptProfile::parse("none").unwrap(), PromptProfile::None);
+        assert!(PromptProfile::parse("unknown").is_err());
+        assert_eq!(
+            model_identity("embeddinggemma-2", PromptProfile::EmbeddingGemma2),
+            "embeddinggemma-2:gemma2"
+        );
+        assert_ne!(
+            model_identity("bge", PromptProfile::None),
+            model_identity("bge", PromptProfile::BgeZh)
+        );
+    }
+
+    #[test]
+    fn local_endpoints_do_not_require_key() {
+        let mut config = config("http://127.0.0.1:1/v1/embeddings".to_string(), 1_000);
+        config.api_key = String::new();
+        assert!(EmbeddingClient::new(&config).is_ok());
+        assert!(is_local_endpoint("http://localhost:18081"));
+        assert!(is_local_endpoint("http://192.168.1.10:18081"));
+        assert!(!is_local_endpoint("https://magpie.aiweb.xin"));
+
+        let mut remote = config.clone();
+        remote.base_url = "https://magpie.aiweb.xin".to_string();
+        assert!(EmbeddingClient::new(&remote).is_err());
     }
 
     #[test]

@@ -236,7 +236,7 @@ fn health_response(state: &AppState) -> HealthResponse {
     let active_model = state
         .embedder
         .as_ref()
-        .map(|client| client.model().to_string());
+        .map(|client| client.space().to_string());
     let cache = state
         .embedder
         .as_ref()
@@ -346,6 +346,7 @@ mod tests {
             base_url: url,
             api_key: "test-key".to_string(),
             model: "mock-embed".to_string(),
+            prompts: crate::embed::PromptProfile::None,
             timeout: std::time::Duration::from_secs(5),
             batch_size: 2,
             concurrency: 2,
@@ -415,8 +416,8 @@ mod tests {
         );
         let health = health_response(&state);
         assert!(health.vector_enabled);
-        assert_eq!(health.index_model, "mock-embed");
-        assert_eq!(health.active_model.as_deref(), Some("mock-embed"));
+        assert_eq!(health.index_model, "mock-embed:none");
+        assert_eq!(health.active_model.as_deref(), Some("mock-embed:none"));
     }
 
     #[test]
@@ -438,8 +439,8 @@ mod tests {
 
         let health = health_response(&state);
         assert!(!health.vector_enabled);
-        assert_eq!(health.index_model, "mock-embed");
-        assert_eq!(health.active_model.as_deref(), Some("other-embed"));
+        assert_eq!(health.index_model, "mock-embed:none");
+        assert_eq!(health.active_model.as_deref(), Some("other-embed:none"));
         assert_eq!(health.embed_dim, 8);
     }
 

@@ -569,7 +569,8 @@ fn hit_from_meta(meta: &ChunkMeta, score: f32) -> Hit {
     }
 }
 
-/// 读取索引 manifest（check/serve 校验内容与 embedding 模型用）。
+/// 读取索引 manifest（仅测试/诊断用；check 走 `verify_index_integrity` 一次拿全）。
+#[cfg(test)]
 pub fn read_index_manifest(path: &Path) -> Result<Option<IndexManifest>> {
     if !path.is_file() {
         return Ok(None);
@@ -592,6 +593,127 @@ pub fn read_index_manifest(path: &Path) -> Result<Option<IndexManifest>> {
 #[cfg(test)]
 pub fn read_content_hash(path: &Path) -> Result<Option<String>> {
     Ok(read_index_manifest(path)?.map(|manifest| manifest.content_hash))
+}
+
+/// 轻量校验索引：文件存在、SQLite 可打开、格式版本、表结构、行数与向量长度。
+///
+/// 只做只读探测，不读取向量内容，也不走 `LoadedIndex::open` 的全量加载路径；
+/// 供 `check` 子命令在容器 entrypoint 里低成本判断索引是否可用。
+/// 通过时返回 manifest，失败时返回可直接展示的中文原因。
+pub fn verify_index_integrity(path: &Path) -> Result<IndexManifest> {
+    let metadata =
+        fs::metadata(path).with_context(|| format!("索引文件不存在：{}", path.display()))?;
+    if metadata.len() == 0 {
+        bail!("索引文件为空（0 字节）：{}", path.display());
+    }
+    let connection = Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .with_context(|| format!("打开索引失败（文件可能已损坏）：{}", path.display()))?;
+
+    let format_version: Option<String> = connection
+        .query_row(
+            "SELECT value FROM meta WHERE key = 'formatVersion'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .context("读取索引 meta.formatVersion 失败（表结构可能损坏）")?;
+    let format_version = format_version.context("索引缺少 meta.formatVersion（版本过旧？）")?;
+    let parsed = format_version
+        .trim()
+        .parse::<u32>()
+        .with_context(|| format!("索引 meta.formatVersion 非法：{format_version:?}"))?;
+    if parsed != crate::manifest::FORMAT_VERSION {
+        bail!(
+            "索引格式版本不支持：{parsed}（期望 {}），请重建",
+            crate::manifest::FORMAT_VERSION
+        );
+    }
+
+    let manifest_json: Option<String> = connection
+        .query_row("SELECT value FROM meta WHERE key = 'manifest'", [], |row| {
+            row.get(0)
+        })
+        .optional()
+        .context("读取索引 manifest 失败（表结构可能损坏）")?;
+    let manifest_json = manifest_json.context("索引缺少 manifest 元数据（版本过旧？）")?;
+    let manifest: IndexManifest =
+        serde_json::from_str(&manifest_json).context("解析索引 manifest 失败（元数据已损坏）")?;
+    if manifest.version != crate::manifest::FORMAT_VERSION {
+        bail!(
+            "索引 manifest 版本不支持：{}（期望 {}），请重建",
+            manifest.version,
+            crate::manifest::FORMAT_VERSION
+        );
+    }
+    if manifest.embed_dim == 0 {
+        bail!("索引 embedDim 非法：0");
+    }
+
+    for table in ["docs", "vectors"] {
+        let present: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type IN ('table', 'view') AND name = ?1",
+                [table],
+                |row| row.get(0),
+            )
+            .context("读取索引表结构失败（sqlite_master 已损坏）")?;
+        if present == 0 {
+            bail!("索引缺少必需的表：{table}");
+        }
+    }
+
+    let docs: i64 = connection
+        .query_row("SELECT COUNT(*) FROM docs", [], |row| row.get(0))
+        .context("统计 docs 行数失败（表已损坏）")?;
+    let vectors: i64 = connection
+        .query_row("SELECT COUNT(*) FROM vectors", [], |row| row.get(0))
+        .context("统计 vectors 行数失败（表已损坏）")?;
+    if docs == 0 {
+        bail!("索引内容为空：docs 表 0 行");
+    }
+    if docs != vectors {
+        bail!("docs 与 vectors 行数不一致：docs={docs}，vectors={vectors}");
+    }
+    let paired: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM docs JOIN vectors ON vectors.doc_id = docs.id",
+            [],
+            |row| row.get(0),
+        )
+        .context("统计 docs/vectors 对应关系失败（表已损坏）")?;
+    if paired != vectors {
+        bail!("docs 与 vectors 未一一对应：vectors={vectors}，可配对 {paired}");
+    }
+
+    let expected_bytes = i64::try_from(manifest.embed_dim * 4).context("索引 embedDim 过大")?;
+    let mut statement = connection.prepare(
+        "SELECT doc_id, length(embedding) FROM vectors WHERE length(embedding) != ?1 LIMIT 1",
+    )?;
+    let mut rows = statement.query([expected_bytes])?;
+    if let Some(row) = rows.next()? {
+        let doc_id: i64 = row.get(0)?;
+        let actual: i64 = row.get(1)?;
+        bail!(
+            "向量长度与 embedDim 不匹配：doc_id={doc_id} 期望 {expected_bytes} 字节（{} 维），实际 {actual} 字节",
+            manifest.embed_dim
+        );
+    }
+    drop(rows);
+    drop(statement);
+
+    // quick_check 只扫主结构，不逐条解码向量，几万 chunk 仍是毫秒级。
+    let mut statement = connection.prepare("PRAGMA quick_check")?;
+    let mut rows = statement.query([])?;
+    while let Some(row) = rows.next()? {
+        let result: String = row.get(0)?;
+        if !result.eq_ignore_ascii_case("ok") {
+            bail!("索引完整性校验失败（PRAGMA quick_check）：{result}");
+        }
+    }
+    Ok(manifest)
 }
 
 /// jieba 预分词：保留含字母/数字/汉字的 token，丢弃纯标点与空白。
@@ -827,5 +949,80 @@ mod tests {
             read_content_hash(&dir.path().join("missing.sqlite")).unwrap(),
             None
         );
+    }
+
+    #[test]
+    fn integrity_accepts_fresh_index() {
+        let (_dir, path) = build_temp();
+        let manifest = verify_index_integrity(&path).expect("fresh index passes");
+        assert_eq!(manifest.embed_dim, 3);
+        assert_eq!(manifest.version, FORMAT_VERSION);
+    }
+
+    #[test]
+    fn integrity_rejects_unsupported_format_version() {
+        let (_dir, path) = build_temp();
+        let connection = Connection::open(&path).unwrap();
+        connection
+            .execute(
+                "UPDATE meta SET value = '99' WHERE key = 'formatVersion'",
+                [],
+            )
+            .unwrap();
+        drop(connection);
+        let error = verify_index_integrity(&path).unwrap_err();
+        assert!(error.to_string().contains("格式版本不支持"), "{error:#}");
+    }
+
+    #[test]
+    fn integrity_rejects_missing_manifest() {
+        let (_dir, path) = build_temp();
+        let connection = Connection::open(&path).unwrap();
+        connection
+            .execute("DELETE FROM meta WHERE key = 'manifest'", [])
+            .unwrap();
+        drop(connection);
+        let error = verify_index_integrity(&path).unwrap_err();
+        assert!(error.to_string().contains("缺少 manifest"), "{error:#}");
+    }
+
+    #[test]
+    fn integrity_rejects_truncated_vector_blob() {
+        let (_dir, path) = build_temp();
+        let connection = Connection::open(&path).unwrap();
+        // 3 维 f32 应为 12 字节；截成 8 字节模拟写入损坏。
+        connection
+            .execute(
+                "UPDATE vectors SET embedding = zeroblob(8) WHERE doc_id = (SELECT MIN(doc_id) FROM vectors)",
+                [],
+            )
+            .unwrap();
+        drop(connection);
+        let error = verify_index_integrity(&path).unwrap_err();
+        assert!(error.to_string().contains("向量长度"), "{error:#}");
+    }
+
+    #[test]
+    fn integrity_rejects_empty_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("empty.sqlite");
+        std::fs::write(&path, b"").unwrap();
+        let error = verify_index_integrity(&path).unwrap_err();
+        assert!(error.to_string().contains("为空"), "{error:#}");
+    }
+
+    #[test]
+    fn integrity_rejects_vector_row_count_mismatch() {
+        let (_dir, path) = build_temp();
+        let connection = Connection::open(&path).unwrap();
+        connection
+            .execute(
+                "DELETE FROM vectors WHERE doc_id = (SELECT MAX(doc_id) FROM vectors)",
+                [],
+            )
+            .unwrap();
+        drop(connection);
+        let error = verify_index_integrity(&path).unwrap_err();
+        assert!(error.to_string().contains("行数不一致"), "{error:#}");
     }
 }

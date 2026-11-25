@@ -101,15 +101,8 @@ fn char_offsets(text: &str) -> Vec<usize> {
     offsets
 }
 
-/// 送 embedding 的文本：标题 + 正文，提升短查询与标题词的语义匹配。
-pub fn embedding_input(title: &str, text: &str) -> String {
-    if title.is_empty() {
-        text.to_string()
-    } else {
-        format!("{title}\n{text}")
-    }
-}
-
+/// 送 embedding 的文本由 `PromptProfile` 统一生成（见 `embed.rs`），
+/// 这里只负责切分与指纹，不再拼标题。
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -174,11 +167,5 @@ mod tests {
         let chunks = chunk_text("只有一句话");
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].text, "只有一句话");
-    }
-
-    #[test]
-    fn embedding_input_prefixes_title() {
-        assert_eq!(embedding_input("标题", "正文"), "标题\n正文");
-        assert_eq!(embedding_input("", "正文"), "正文");
     }
 }

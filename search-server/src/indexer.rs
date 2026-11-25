@@ -6,7 +6,7 @@ use std::time::Instant;
 use anyhow::{bail, Context, Result};
 use sha2::{Digest, Sha256};
 
-use crate::chunk::{chunk_text, embedding_input, MAX_CHUNKS_PER_DOC, OVERLAP_CHARS, WINDOW_CHARS};
+use crate::chunk::{chunk_text, MAX_CHUNKS_PER_DOC, OVERLAP_CHARS, WINDOW_CHARS};
 use crate::content::{load_content, SourceDocument};
 use crate::embed::{EmbeddingClient, EmbeddingConfig};
 use crate::manifest::{now_rfc3339, IndexManifest, FORMAT_VERSION};
@@ -36,6 +36,9 @@ pub struct CheckReport {
     pub index_model: Option<String>,
     pub content_matches: bool,
     pub model_matches: bool,
+    /// 索引结构与数据完整性（格式版本 / 表 / 行数 / 向量长度 / PRAGMA quick_check）。
+    pub integrity_ok: bool,
+    pub integrity_error: Option<String>,
     pub matches: bool,
 }
 
@@ -50,7 +53,6 @@ struct PendingChunk {
     href: String,
     text: String,
     text_tokens: String,
-    embed_input: String,
     embedding: Vec<f32>,
 }
 
@@ -88,7 +90,6 @@ pub fn build_index(options: &BuildOptions) -> Result<BuildReport> {
                 content_hash: hash.clone(),
                 href: document.href.clone(),
                 text_tokens: tokenize_for_index(&format!("{} {}", document.title, chunk.text)),
-                embed_input: embedding_input(&document.title, &chunk.text),
                 text: chunk.text,
                 embedding: Vec::new(),
             });
@@ -107,16 +108,18 @@ pub fn build_index(options: &BuildOptions) -> Result<BuildReport> {
 
     let client = EmbeddingClient::new(&options.embedding).context("初始化 embedding 客户端失败")?;
     tracing::info!(
-        model = %options.embedding.model,
+        model = %client.request_model(),
+        identity = %client.space(),
+        prompts = client.prompts().name(),
         batch_size = options.embedding.batch_size,
         concurrency = options.embedding.concurrency,
-        "开始请求 magpie embedding"
+        "开始请求 embedding（本地 llama.cpp 或远程网关）"
     );
-    let inputs = pending
+    let documents_for_embedding = pending
         .iter()
-        .map(|chunk| chunk.embed_input.clone())
+        .map(|chunk| (chunk.title.clone(), chunk.text.clone()))
         .collect::<Vec<_>>();
-    let vectors = client.embed_all(&inputs)?;
+    let vectors = client.embed_documents(&documents_for_embedding)?;
     if vectors.len() != pending.len() {
         bail!(
             "embedding 数量不匹配：期望 {}，实际 {}",
@@ -148,7 +151,7 @@ pub fn build_index(options: &BuildOptions) -> Result<BuildReport> {
         documents: documents.len(),
         chunks: pending.len(),
         apps,
-        model: options.embedding.model.clone(),
+        model: client.space().to_string(),
         embed_dim,
         chunk_window_chars: WINDOW_CHARS,
         chunk_overlap_chars: OVERLAP_CHARS,
@@ -184,9 +187,11 @@ pub fn build_index(options: &BuildOptions) -> Result<BuildReport> {
     })
 }
 
-/// 检查索引是否存在、内容指纹与 embedding 模型一致（容器 entrypoint 用）。
+/// 检查索引是否存在、内容指纹、embedding 模型与结构完整性（容器 entrypoint 用）。
 ///
 /// 模型名必须参与判定：不同模型的向量空间不兼容，即使维度相同也不能复用。
+/// 完整性必须参与判定：损坏或版本不匹配的索引如果只过了指纹/模型两道，`serve`
+/// 会在加载时失败，容器随即进入 entrypoint 崩溃循环。
 pub fn check_index(
     content_root: &Path,
     index_path: &Path,
@@ -197,7 +202,14 @@ pub fn check_index(
         bail!("内容目录为空：{}", content_root.display());
     }
     let fingerprint = content_fingerprint(&documents);
-    let manifest = crate::store::read_index_manifest(index_path)?;
+
+    // 完整性探测：失败时不 bail，把原因带回调用方用于区分「该重建」与「已损坏」。
+    let (integrity_ok, integrity_error, manifest) =
+        match crate::store::verify_index_integrity(index_path) {
+            Ok(manifest) => (true, None, Some(manifest)),
+            Err(error) => (false, Some(format!("{error:#}")), None),
+        };
+
     let index_content_hash = manifest
         .as_ref()
         .map(|manifest| manifest.content_hash.clone());
@@ -213,7 +225,9 @@ pub fn check_index(
         index_model,
         content_matches,
         model_matches,
-        matches: content_matches && model_matches,
+        integrity_ok,
+        integrity_error,
+        matches: content_matches && model_matches && integrity_ok,
     })
 }
 
@@ -271,6 +285,7 @@ mod tests {
             base_url: url,
             api_key: "test-key".to_string(),
             model: "mock-embed".to_string(),
+            prompts: crate::embed::PromptProfile::None,
             timeout: std::time::Duration::from_secs(5),
             batch_size: 2,
             concurrency: 2,
@@ -318,18 +333,18 @@ mod tests {
             .expect("hybrid");
         assert!(!hits.is_empty());
 
-        let check = check_index(&content, &index_path, "mock-embed").expect("check");
+        let check = check_index(&content, &index_path, "mock-embed:none").expect("check");
         assert!(check.content_matches);
         assert!(check.model_matches);
         assert!(check.matches);
 
         let check =
-            check_index(&content, &index_path, "another-embed").expect("check model changed");
+            check_index(&content, &index_path, "another-embed:none").expect("check model changed");
         assert!(check.content_matches);
         assert!(!check.model_matches);
         assert!(!check.matches);
-        assert_eq!(check.index_model.as_deref(), Some("mock-embed"));
-        assert_eq!(check.expected_model, "another-embed");
+        assert_eq!(check.index_model.as_deref(), Some("mock-embed:none"));
+        assert_eq!(check.expected_model, "another-embed:none");
 
         // 内容变化后指纹不匹配。
         std::fs::write(
@@ -337,7 +352,7 @@ mod tests {
             "---\ntitle: Rust 异步运行时\ndate: 2024-03-01\ntags:\n  - rust\n---\n\n内容已变化。\n",
         )
         .unwrap();
-        let check = check_index(&content, &index_path, "mock-embed").expect("check changed");
+        let check = check_index(&content, &index_path, "mock-embed:none").expect("check changed");
         assert!(!check.content_matches);
         assert!(check.model_matches);
         assert!(!check.matches);
