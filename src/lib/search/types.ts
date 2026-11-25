@@ -8,9 +8,20 @@ import type { Query } from "minisearch";
 /** 搜索应用已解析的 Lucene 查询。 */
 export interface SearchQuery {
   source: string;
+  /** 去掉 `app:` 等字段限定后的自由文本，供服务端语义检索使用。 */
+  text: string;
   includeAppIds: readonly string[];
   excludeAppIds: readonly string[];
   engineQuery: Query | null;
+  /** 结构化过滤（标签/时间），由搜索视图或扩展入口注入。 */
+  filters?: SearchFilters;
+}
+
+/** 与语义搜索服务对齐的结构化过滤条件（date 为毫秒时间戳）。 */
+export interface SearchFilters {
+  tags?: string[];
+  dateFrom?: number;
+  dateTo?: number;
 }
 
 /** 分发给应用搜索服务的单次任务。 */

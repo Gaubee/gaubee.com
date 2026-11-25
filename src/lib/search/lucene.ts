@@ -221,19 +221,33 @@ function toPlan(node: LuceneNode): QueryPlan {
   };
 }
 
+function collectFreeText(node: LuceneNode, terms: string[]): void {
+  if (node.type === "term") {
+    // app 字段只用于应用筛选，不进入语义查询文本。
+    if (node.field === "app") return;
+    terms.push(node.value);
+    return;
+  }
+  if (node.type === "not") return; // 否定项保留在 engineQuery 中，不参与语义召回。
+  for (const child of node.children) collectFreeText(child, terms);
+}
+
 /** 解析用户输入的 Lucene 表达式，生成可分发的搜索任务。 */
 export function parseLuceneQuery(source: string): SearchQuery {
   const expression = new Parser(tokenize(source.trim())).parse();
   if (!expression) {
-    return { source, includeAppIds: [], excludeAppIds: [], engineQuery: null };
+    return { source, text: "", includeAppIds: [], excludeAppIds: [], engineQuery: null };
   }
 
   const include = new Set<string>();
   const exclude = new Set<string>();
   collectAppFilters(expression, false, include, exclude);
+  const terms: string[] = [];
+  collectFreeText(expression, terms);
 
   return {
     source,
+    text: terms.join(" "),
     includeAppIds: [...include].sort(),
     excludeAppIds: [...exclude].sort(),
     engineQuery: planToQuery(toPlan(expression)),

@@ -2,7 +2,7 @@ import { searchIndexProcessor } from "$lib/content-pipeline/processors/search-in
 import { tagsProcessor } from "$lib/content-pipeline/processors/tags";
 import { eventsSource } from "$lib/content-pipeline/sources/events";
 import { leafRoute } from "$lib/router";
-import { createFileSearchService } from "$lib/search/file-service";
+import { createServerSearchService } from "$lib/search/server-service";
 /**
  * 事件应用（系统内置，不可卸载）。
  *
@@ -61,7 +61,7 @@ export const eventApp: AppEntry = {
       },
     ],
     vfsOwnership: ["src/content/events/"],
-    searchService: () => createFileSearchService({ appId: "event", appName: "事件" }),
+    searchService: () => createServerSearchService({ appId: "event", appName: "事件" }),
     // ★ 声明式内容管道：events 源；处理器与 articles 共享（注册表按 id 去重）
     contentPipeline: {
       source: eventsSource,
@@ -78,6 +78,7 @@ export const eventApp: AppEntry = {
       },
     ],
     description: "浏览事件流",
-    longDescription: "GitHub 日报、X 日报与历史归档按月浏览，数据来自只读静态层。点击进入详情阅读完整内容。",
+    longDescription:
+      "GitHub 日报、X 日报与历史归档按月浏览，数据来自只读静态层。点击进入详情阅读完整内容。",
   },
 };

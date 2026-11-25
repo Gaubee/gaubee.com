@@ -36,6 +36,7 @@ describe("parseLuceneQuery", () => {
 
     expect(query.includeAppIds).toEqual(["articles", "shout"]);
     expect(query.excludeAppIds).toEqual([]);
+    expect(query.text).toBe("Signals proposal");
     expect(query.engineQuery).not.toBeNull();
   });
 
@@ -46,7 +47,15 @@ describe("parseLuceneQuery", () => {
     const results = index.search(query.engineQuery ?? MiniSearch.wildcard);
 
     expect(query.includeAppIds).toEqual(["articles"]);
+    // 否定项只保留在 engineQuery 中，不污染语义检索文本。
+    expect(query.text).toBe("signals");
     expect(results.map((result) => result.id)).toEqual(["signals"]);
+  });
+
+  it("纯 app 过滤不产生语义文本", () => {
+    const query = parseLuceneQuery("app:articles");
+    expect(query.text).toBe("");
+    expect(query.includeAppIds).toEqual(["articles"]);
   });
 
   it("拒绝未闭合的 Lucene 分组", () => {
