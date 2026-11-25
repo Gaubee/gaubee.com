@@ -26,7 +26,7 @@ ARG ZVEC_VERSION
 ARG TARGETARCH
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl libssl-dev pkg-config \
+    && apt-get install -y --no-install-recommends ca-certificates curl libssl-dev pkg-config g++ libstdc++-12-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
