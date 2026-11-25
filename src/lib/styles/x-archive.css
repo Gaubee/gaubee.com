@@ -95,6 +95,55 @@
   overflow-wrap: anywhere;
 }
 
+/* 引用帖原帖（2026-11-25）：引用者的评论在上，原帖内容以缩进块常显。
+ * 原文不做译/原切换（它本来就是他者的正文），只标作者与来源。 */
+.x-arch-quote {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid color-mix(in oklab, currentColor 28%, transparent);
+  border-radius: 0 8px 8px 0;
+  background: color-mix(in oklab, currentColor 4%, transparent);
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.x-arch-quote-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+.x-arch-quote-label {
+  opacity: 0.55;
+  letter-spacing: 0.04em;
+}
+.x-arch-quote-author {
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+}
+.x-arch-quote-name {
+  opacity: 0.6;
+  font-size: 11px;
+}
+.x-arch-quote-link {
+  margin-left: auto;
+  opacity: 0.6;
+  color: inherit;
+  text-decoration: none;
+  font-size: 11px;
+}
+.x-arch-quote-text {
+  opacity: 0.9;
+}
+.x-arch-quote-text a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
 /* ---------------------------------------------------------------------------
  * 线程链分隔（捕捉 v2，2026-10-09：entry.thread 多段正文之间的接续标记）。
  * 最小样式：细分割线 + 缩进层级感；后续视觉调在这里改。

@@ -40,6 +40,19 @@ export interface Tweet {
   // 全库纠正（2026-10-09）：x-media-backfill --all 收割的 X 译文（存量被污染条目的
   // 原中文）。存在且 translations 无该 id 时作为译文出 译/原 toggle。
   xTrans?: string;
+  // 引用帖（2026-11-25 修复）：被引用的原帖。文本来自 syndication quoted_tweet，
+  // 渲染时附在正文之后；原文始终展示（不参与 译/原 toggle）。
+  quote?: QuotedTweet;
+}
+
+/** 引用帖里的原帖（author 为 screen_name，不带 @） */
+export interface QuotedTweet {
+  id?: string;
+  author: string;
+  name?: string;
+  text: string;
+  created_at?: string;
+  url?: string;
 }
 
 export interface AuthorInfo {
@@ -229,6 +242,28 @@ export function itemCard(
     parts.push(`    <div class="x-arch-text x-arch-trans">${richText(translation)}</div>`);
   } else if (origHtml) {
     parts.push(`    <div class="x-arch-text">${origHtml}</div>`);
+  }
+  // 引用帖（2026-11-25）：原帖内容必须出现——此前只存了引用者的评论，读者看不到
+  // 被引用的正文。原文常显（不进 译/原 toggle），附作者与可点击原帖链接。
+  const quote = t.quote;
+  if (quote?.text?.trim()) {
+    const qAuthor = quote.author.trim();
+    const qUrl =
+      quote.url ??
+      (quote.id && qAuthor ? `https://x.com/${qAuthor}/status/${quote.id}` : "");
+    const qHead =
+      `<span class="x-arch-quote-label">引用</span>` +
+      (qAuthor
+        ? `<a class="x-arch-quote-author" href="https://x.com/${escapeHtml(qAuthor)}" target="_blank" rel="nofollow noopener">@${escapeHtml(qAuthor)}</a>`
+        : "") +
+      (quote.name ? `<span class="x-arch-quote-name">${escapeHtml(quote.name)}</span>` : "") +
+      (qUrl
+        ? `<a class="x-arch-quote-link" href="${escapeHtml(qUrl)}" target="_blank" rel="noopener">原帖</a>`
+        : "");
+    parts.push(
+      `    <blockquote class="x-arch-quote"><div class="x-arch-quote-head">${qHead}</div>` +
+        `<div class="x-arch-quote-text">${richText(quote.text.trim())}</div></blockquote>`,
+    );
   }
   const imgs = (t.mediaLocal ?? []).filter((p) => !p.endsWith(".mp4"));
   if (imgs.length) {

@@ -77,10 +77,13 @@ for (const s of STREAMS) {
             const href = link?.getAttribute("href") ?? "";
             const m = href.match(/\/([^/]+)\/status\/(\d+)/);
             // 捕捉 v2：翻译态检测（候选选择器双检，未经真机登录态实测——见文件头）
+            // 2026-11-25 实证：X 当前按钮文案是「显示原文」（不是「显示原帖」），
+            // 同时翻译态会带 thumbsUp/DownVoteButton 反馈钮——三个信号任一命中即算。
             const translated =
               !!a.querySelector('[data-testid="translation"], [data-testid="translationBanner"]') ||
+              !!a.querySelector('[data-testid="thumbsUpVoteButton"], [data-testid="thumbsDownVoteButton"]') ||
               [...a.querySelectorAll('button, [role="button"]')].some((el) =>
-                /显示原帖|Show original/i.test(el.textContent ?? ""),
+                /显示原帖|显示原文|Show original/i.test(el.textContent ?? ""),
               );
             // 媒体：推文图片（排除头像/缩进引用里的重复）；视频取 DOM 里能拿到的 mp4 源
             const media = [
@@ -98,7 +101,8 @@ for (const s of STREAMS) {
             return {
               id: m?.[2] ?? "",
               author: m?.[1] ?? "",
-              text: (textEl?.innerText ?? "").slice(0, 400),
+              // 2026-11-25：不再截 400 字——长帖在 fixup 阶段点「展开全文」后重抓全文
+              text: (textEl?.innerText ?? "").slice(0, 6000),
               created_at: time?.getAttribute("datetime") ?? "",
               reposted: !!social && /repost|转发/i.test(social.textContent ?? ""),
               media,
@@ -112,53 +116,102 @@ for (const s of STREAMS) {
       const seen = new Set(items.map((i) => i.id));
       for (const t of batch) if (!seen.has(t.id)) items.push(t);
 
-      // 捕捉 v2 译文收割：视口内翻译态条目——tweetText（X 译文）存 xTrans，点「显示原帖」
-      // 展开原文再抓存 text；点击失败（无按钮/3 秒内文本未变化）→ xTrans 留译文、text 置空串
+      // 2026-11-25 修复三件事（kzf 反馈）：
+      // 1. 长帖「展开全文」没点 → 点 Show more/展开全文，等文本变长后重抓；
+      // 2. 翻译态优先保留原文：先收割 X 译文到 xTrans，再点「显示原帖」抓原文；
+      // 3. 引用帖原帖缺失：article 内第二个 tweetText 就是被引用的正文，连作者一起存 quote。
       try {
         const fixed = await page.evaluate(async () => {
           const out = [];
+          const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
           for (const a of [...document.querySelectorAll('article[data-testid="tweet"]')].slice(0, 60)) {
-            const textEl = a.querySelector('[data-testid="tweetText"]');
-            const banner = a.querySelector('[data-testid="translation"], [data-testid="translationBanner"]');
-            const btns = [...a.querySelectorAll('button, [role="button"]')].filter((el) =>
-              /显示原帖|Show original/i.test(el.textContent ?? ""),
-            );
-            // 优先取位于主推文 tweetText 之后的按钮（主推自己的切换钮；引述推文的嵌套按钮靠后兜底）
-            const btn =
-              btns.find((el) => !textEl || el.compareDocumentPosition(textEl) & Node.DOCUMENT_POSITION_PRECEDING) ??
-              btns[0];
-            if (!banner && !btn) continue;
             const href = a.querySelector('a[href*="/status/"]')?.getAttribute("href") ?? "";
             const id = href.match(/\/status\/(\d+)/)?.[1] ?? "";
             if (!id) continue;
-            const xTrans = (textEl?.innerText ?? "").slice(0, 400);
-            let text = "";
-            let expanded = false;
-            if (btn) {
+            let textEl = a.querySelector('[data-testid="tweetText"]');
+            if (!textEl) continue;
+
+            const banner = a.querySelector('[data-testid="translation"], [data-testid="translationBanner"]');
+            const origBtns = [...a.querySelectorAll('button, [role="button"]')].filter((el) =>
+              /显示原帖|显示原文|Show original/i.test(el.textContent ?? ""),
+            );
+            const origBtn =
+              origBtns.find((el) => !textEl || el.compareDocumentPosition(textEl) & Node.DOCUMENT_POSITION_PRECEDING) ??
+              origBtns[0];
+            const translated =
+              !!banner ||
+              !!a.querySelector('[data-testid="thumbsUpVoteButton"], [data-testid="thumbsDownVoteButton"]') ||
+              !!origBtn;
+            let xTrans = translated ? (textEl.innerText ?? "").trim() : "";
+            let expandedFromTranslation = false;
+
+            if (origBtn) {
               try {
-                btn.click();
+                origBtn.click();
               } catch {}
               // 等原文渲染（React 重绘），3 秒内文本没变即认点击失败
               for (let i = 0; i < 20; i++) {
-                await new Promise((r) => setTimeout(r, 150));
+                await sleep(150);
                 const t2 = (a.querySelector('[data-testid="tweetText"]')?.innerText ?? "").trim();
-                if (t2 && t2 !== xTrans.trim()) {
-                  text = t2.slice(0, 400);
-                  expanded = true;
+                if (t2 && t2 !== xTrans) {
+                  expandedFromTranslation = true;
                   break;
                 }
               }
             }
-            out.push({ id, xTrans, text, expanded });
+
+            // 展开全文：主推与引用推各自的 Show more 都在 article 内，全部点掉
+            const moreBtns = [...a.querySelectorAll('button, [role="button"]')].filter((el) =>
+              /^(Show more|展开全文|显示更多|查看更多|显示完整)$/i.test((el.textContent ?? "").trim()),
+            );
+            if (moreBtns.length) {
+              const before = (a.querySelector('[data-testid="tweetText"]')?.innerText ?? "").length;
+              for (const b of moreBtns) {
+                try {
+                  b.click();
+                } catch {}
+              }
+              for (let i = 0; i < 20; i++) {
+                await sleep(150);
+                const now = (a.querySelector('[data-testid="tweetText"]')?.innerText ?? "").length;
+                if (now > before) break;
+              }
+            }
+
+            textEl = a.querySelector('[data-testid="tweetText"]');
+            const finalText = (textEl?.innerText ?? "").trim();
+
+            // 引用帖：第二个 tweetText = 被引用原帖；第二个头像容器的 testid 后缀 = 作者 handle
+            const tws = [...a.querySelectorAll('[data-testid="tweetText"]')];
+            let quote = null;
+            if (tws.length > 1) {
+              const qText = (tws[1].innerText ?? "").trim();
+              const avatars = [...a.querySelectorAll('[data-testid^="UserAvatar-Container-"]')];
+              const handle =
+                avatars[1]?.getAttribute("data-testid")?.replace("UserAvatar-Container-", "") ?? "";
+              if (qText) quote = { author: handle, text: qText.slice(0, 6000) };
+            }
+
+            out.push({
+              id,
+              translated,
+              xTrans,
+              // 翻译态但没能切回原文：text 留空，交给 syndication 富化补原文
+              text: translated && !expandedFromTranslation ? "" : finalText.slice(0, 6000),
+              quote,
+            });
           }
           return out;
         });
         for (const f of fixed) {
           const item = items.find((i) => i.id === f.id);
           if (!item) continue;
-          item.xTranslated = true;
-          item.xTrans = f.xTrans;
-          item.text = f.expanded ? f.text : "";
+          if (f.translated) {
+            item.xTranslated = true;
+            item.xTrans = f.xTrans;
+          }
+          item.text = f.text;
+          if (f.quote?.text) item.quote = f.quote;
         }
       } catch {
         // 宿主不支持异步 evaluate 时降级：收尾兜底统一标记（text 置空待富化）

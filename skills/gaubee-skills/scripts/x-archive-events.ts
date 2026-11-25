@@ -36,9 +36,17 @@ async function main() {
   const argv = process.argv.slice(2);
   let startNum = 0;
   let dry = false;
+  // 2026-11-25 修复：历史重渲染只处理既有归档时用 --existing-only + 日期范围，
+  // 避免为本没有公开落点的日期新建 event（那属于发布决策，不该由修复顺手做）。
+  let existingOnly = false;
+  let since = "";
+  let until = "";
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--start") startNum = Number.parseInt(argv[++i] ?? "0", 10) || 0;
     else if (argv[i] === "--dry") dry = true;
+    else if (argv[i] === "--existing-only") existingOnly = true;
+    else if (argv[i] === "--since") since = argv[++i] ?? "";
+    else if (argv[i] === "--until") until = argv[++i] ?? "";
   }
   void startNum; // 历史参数：曾用于指定起始编号，现编号完全由既有文件决定
 
@@ -106,6 +114,8 @@ async function main() {
   // 视频缺 poster 全卡在 10-12~17 的冻结归档里）。日报覆盖只拦「新生成」。
   const days = [...byDay.keys()]
     .filter((d) => !dailyCovered.has(d) || existingByDay.has(d))
+    .filter((d) => (since ? d >= since : true) && (until ? d <= until : true))
+    .filter((d) => (existingOnly ? existingByDay.has(d) : true))
     .sort();
   console.error(
     `有动态的日期 ${byDay.size} 天；跳过日报已覆盖 ${dailyCovered.size} 天；待生成 ${days.length} 天（新日子从 ${String(nextFree).padStart(5, "0")} 起续号）`,

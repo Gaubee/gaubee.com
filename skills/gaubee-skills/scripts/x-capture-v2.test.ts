@@ -19,6 +19,7 @@ import * as path from "node:path";
 import { inlineText, itemCard, type Tweet } from "./lib/x-arch-render.ts";
 import {
   classifyTextCorrection,
+  extractQuote,
   sameAuthorStatusLinks,
   saveAuthors,
   threadPartText,
@@ -293,6 +294,64 @@ describe("classifyTextCorrection（全库纠正判定纯函数）", () => {
     expect(classifyTextCorrection(EN.slice(0, 40), EN).action).toBe("truncated");
   });
 
+  test("时间线预览截断带省略号：去掉结尾 … 后仍能识别 → truncated", () => {
+    // 2026-11-25 修复：X 在截断处补「…」，存量不是严格前缀，旧判定漏掉
+    expect(classifyTextCorrection(`${EN.slice(0, 40)}…`, EN).action).toBe("truncated");
+    expect(classifyTextCorrection(`${EN.slice(0, 40)}...`, EN).action).toBe("truncated");
+  });
+
+  test("展示层 URL 截断（display_url…）：正文开头一致且 orig 无尾省略号 → cleanurl", () => {
+    // 2026-11-25 实证：DOM 抓到的是 github.com/longbridge/nsh…（X 展示层截断），
+    // syndication 展开后是同一正文的干净版，长度可能更短
+    const stored = "你不知道，NSH 的机制，配合 AutoUpdater 有多爽。\n\nhttps://\ngithub.com/longbridge/nsh\n/pull/922\n…";
+    const orig = "你不知道，NSH 的机制，配合 AutoUpdater 有多爽。\n\nhttps://github.com/longbridge/nsh/pull/922";
+    expect(classifyTextCorrection(stored, orig).action).toBe("cleanurl");
+    // 作者自己写的省略号（orig 也以 … 结尾）不误判
+    expect(classifyTextCorrection("就是要这个效果……", "就是要这个效果……").action).toBe("none");
+  });
+
+  test("引用帖原帖：quoted_tweet → quote（t.co 展开、作者、可点链接）", () => {
+    const syn = {
+      quoted_tweet: {
+        id_str: "1234567890",
+        created_at: "2026-10-01T08:00:00.000Z",
+        text: "original https://t.co/q1",
+        user: { screen_name: "orig", name: "Original" },
+        entities: { urls: [{ url: "https://t.co/q1", expanded_url: "https://example.com/orig" }] },
+      },
+    };
+    const q = extractQuote(syn);
+    expect(q).toEqual({
+      id: "1234567890",
+      author: "orig",
+      name: "Original",
+      text: "original https://example.com/orig",
+      created_at: "2026-10-01T08:00:00.000Z",
+      url: "https://x.com/orig/status/1234567890",
+    });
+    // 无 quoted_tweet 或文本为空 → null（不写半截对象）
+    expect(extractQuote({ text: "只是普通帖" })).toBeNull();
+    expect(extractQuote({ quoted_tweet: { text: "   ", user: { screen_name: "x" } } })).toBeNull();
+  });
+
+  test("itemCard：quote 常显原帖正文与作者，不参与译/原 toggle", () => {
+    const t: Tweet = {
+      id: "X2",
+      text: "引用一下",
+      created_at: "2026-10-08T10:20:00.000Z",
+      kind: "liked",
+      author: "me",
+      quote: { id: "9", author: "orig", text: "原帖 <b>正文</b>", url: "https://x.com/orig/status/9" },
+    };
+    const html = itemCard(t, { me: { name: "Me" } }, { X2: "引用一下的译文" }, {});
+    expect(html).toContain('class="x-arch-quote"');
+    expect(html).toContain("@orig");
+    expect(html).toContain("原帖 &lt;b&gt;正文&lt;/b&gt;");
+    expect(html).toContain('href="https://x.com/orig/status/9"');
+    // 原帖块不在 x-arch-orig/x-arch-trans 的 toggle 容器里
+    expect(html).toContain('<blockquote class="x-arch-quote">');
+  });
+
   test("存量含 t.co（与展开后的 orig 前缀失配）→ none，交给 t.co 展开路径", () => {
     expect(classifyTextCorrection("check this https://t.co/xyz and more", "check this https://example.com/full").action).toBe("none");
   });
@@ -338,7 +397,7 @@ describe("inlineText linkify 防线与 itemCard data-* 注入", () => {
     const t: Tweet = { id: "X2", text: "hi", created_at: "2026-10-08T10:20:00.000Z", kind: "liked", author: "me" };
     const full = itemCard(t, { me: { name: 'Kai "K" <Z>', avatar: "https://pbs.twimg.com/a_bigger.jpg" } }, {}, {});
     expect(full).toContain('data-name="Kai &quot;K&quot; &lt;Z&gt;"');
-    expect(full).toContain('data-avatar="https://pbs.twimg.com/a_bigger.jpg"');
+    expect(full).toContain('data-avatar="https://twimg.tweb.xin/twimg/a_bigger.jpg"');
     expect(full).toContain('class="x-arch-ext"');
     expect(full).not.toContain("↗");
     const bare = itemCard(t, {}, {}, {});

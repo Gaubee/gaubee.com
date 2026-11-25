@@ -62,6 +62,11 @@ interface Tweet {
   xTranslated?: boolean; // 捕捉时 X 自动翻译态：text 待 syndication 原文覆盖，富化后清除
   xTrans?: string; // X 自动译文收割（原文覆盖后保留，供译文复用）
   thread?: ThreadPart[]; // 同作者线程链（最早部分→本条，含自身；>1 段才写）
+  // 引用帖（2026-11-25 修复）：syndication quoted_tweet 的原帖正文/作者/链接。
+  // 此前只存引用者的评论，读者看不到被引用的内容——这是数据缺口，不是样式问题。
+  quote?: QuotedTweet;
+  // --quotes 窗口刷新的断点标记（本地日）：同日重跑跳过已刷条目，跨日会重新核对
+  quotesChecked?: string;
   // --all 全库纠正（2026-10-09）：该条已按 v2 口径纠正过（原文/t.co/线程/头像/媒体），
   // 审计与断点续跑依据——--all 跳过已标条目，不再重复打 syndication
   enrichedV2?: boolean;
@@ -72,6 +77,16 @@ export interface ThreadPart {
   id: string;
   text: string;
   created_at?: string;
+}
+
+/** 引用帖里的原帖（author 为 screen_name，不带 @；url 可派生时写全） */
+export interface QuotedTweet {
+  id?: string;
+  author: string;
+  name?: string;
+  text: string;
+  created_at?: string;
+  url?: string;
 }
 
 /** syndication 拉取器（注入用）：null=永久不可见，undefined=网络性失败 */
@@ -168,6 +183,25 @@ function cleanText(text: string, entities: any): string {
   return decodeEntities(out.trim());
 }
 
+/** 引用帖原帖（2026-11-25）：syndication 的 quoted_tweet → 可渲染对象。
+ *  文本走与正文相同的 cleanText（展开 t.co、剔除媒体占位）；空文本视为无引用。 */
+export function extractQuote(syn: any): QuotedTweet | null {
+  const q = syn?.quoted_tweet;
+  if (!q) return null;
+  const text = cleanText(String(q.text ?? ""), q.entities);
+  if (!text) return null;
+  const author = String(q.user?.screen_name ?? "");
+  const id = String(q.id_str ?? "");
+  return {
+    id,
+    author,
+    name: q.user?.name,
+    text,
+    created_at: q.created_at,
+    url: author && id ? `https://x.com/${author}/status/${id}` : undefined,
+  };
+}
+
 // ---------- 原文纠正判定（--all 全库纠正，2026-10-09；纯函数供测试） ----------
 
 /** CJK 占比高（kzf 口径）：中文字符 >30% 或 >6 个 */
@@ -179,18 +213,39 @@ function cjkHigh(s: string): boolean {
 /** 原文纠正判定：存量 text 与 syndication 原文 orig 不一致时分类处置。
  *  - "pollution"：存量 CJK 占比高而 orig 非 CJK 主导 → X 自动翻译污染
  *    （browser 抓到的是 X 译文）——text 应换 orig，存量中文收割为 xTrans；
- *  - "truncated"：存量是 orig 的前缀截断（len 更短且 orig 以存量前 80 字符开头）
+ *  - "truncated"：存量是 orig 的前缀截断（含时间线预览补「…」的形态）
  *    ——text 应换 orig；
+ *  - "cleanurl"：存量带展示层截断 URL（display_url 以 … 结尾）而 orig 无尾省略号、
+ *    正文开头一致——orig 是同一正文的干净版，text 应换 orig；
  *  - "none"：两者皆非（如中文作者的中文原文）→ text 不动。
  *  orig 为空或与存量一致时恒为 none。 */
 export function classifyTextCorrection(
   stored: string,
   orig: string,
-): { action: "pollution" | "truncated" | "none"; xTrans?: string } {
+): { action: "pollution" | "truncated" | "cleanurl" | "none"; xTrans?: string } {
   if (!orig || orig === stored) return { action: "none" };
   if (cjkHigh(stored) && !cjkHigh(orig)) return { action: "pollution", xTrans: stored };
-  if (stored.length < orig.length && orig.startsWith(stored.slice(0, 80))) {
-    return { action: "truncated" };
+  // 截断判定：orig 以存量前 80 字符开头，且 orig 更长。
+  // 2026-11-25 修复：时间线预览会在截断处补「…」，存量不是 orig 的严格前缀；
+  // 去掉结尾省略号后再比对，覆盖「展开全文」未点开的条目。
+  const bare = stored.replace(/(…|\.\.\.)\s*$/, "").trim();
+  const truncated =
+    stored.length < orig.length &&
+    (orig.startsWith(stored.slice(0, 80)) ||
+      (bare.length >= 20 && orig.startsWith(bare.slice(0, 80))));
+  if (truncated) return { action: "truncated" };
+  // 展示层 URL 截断：X 把长链接显示成 display_url…，DOM 抓到的正文因此带省略号；
+  // syndication 展开后的 orig 是同一正文的干净版（通常更短，别被长度规则挡掉）。
+  // 纯链接帖在 DOM 里会被折行（https://\ngithub.com/…），比较时抹掉空白。
+  const compact = (s: string) => s.replace(/\s+/g, "");
+  if (
+    stored.includes("…") &&
+    !orig.trimEnd().endsWith("…") &&
+    orig.length > stored.length * 0.8 &&
+    (orig.startsWith(stored.slice(0, 20)) ||
+      compact(orig).startsWith(compact(stored).slice(0, 20)))
+  ) {
+    return { action: "cleanurl" };
   }
   return { action: "none" };
 }
@@ -334,11 +389,17 @@ async function main() {
   let noDownload = false;
   let maxGb = 4.5;
   let allMode = false;
+  // 2026-11-25 引用帖修复：--quotes 只刷窗口内条目的引用原帖与正文（忽略 synChecked），
+  // --since 限定起始本地日（默认近 60 天）。用于历史数据一次性回灌，不下载媒体。
+  let quotesMode = false;
+  let since = localDate(new Date(Date.now() - 60 * 86_400_000));
   const forceIds = new Set<string>();
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--limit") limit = Number.parseInt(argv[++i] ?? "0", 10) || Infinity;
     else if (argv[i] === "--no-download") noDownload = true;
     else if (argv[i] === "--all") allMode = true;
+    else if (argv[i] === "--quotes") quotesMode = true;
+    else if (argv[i] === "--since") since = argv[++i] ?? since;
     else if (argv[i] === "--max-gb") maxGb = Number.parseFloat(argv[++i] ?? "4.5") || 4.5;
     else if (argv[i] === "--ids")
       for (const s of (argv[++i] ?? "").split(",")) {
@@ -346,6 +407,7 @@ async function main() {
         if (id) forceIds.add(id);
       }
   }
+  if (quotesMode) noDownload = true; // 一次性刷引用/正文，不重复下载媒体
 
   const SITE = process.env.GAUBEE_SITE ?? path.resolve(import.meta.dir, "..", "..", "..");
   const storeFile = path.join(SRC, "x.json");
@@ -358,11 +420,15 @@ async function main() {
   // enrichedV2=断点续跑）> 默认（无 synChecked 的新条目 + 翻译态条目）
   const todo = forceIds.size
     ? ([...forceIds].map((id) => store.items[id]).filter((t) => Boolean(t)) as Tweet[])
-    : allMode
-      ? Object.values(store.items).filter((t) => !t.enrichedV2)
-      : Object.values(store.items).filter((t) => !t.synChecked || t.xTranslated);
+    : quotesMode
+      ? Object.values(store.items).filter(
+          (t) => (t.created_at ?? "").slice(0, 10) >= since && t.quotesChecked !== localDate(),
+        )
+      : allMode
+        ? Object.values(store.items).filter((t) => !t.enrichedV2)
+        : Object.values(store.items).filter((t) => !t.synChecked || t.xTranslated);
   console.error(
-    `待回灌 ${todo.length} 条（库存 ${Object.keys(store.items).length}${forceIds.size ? `，--ids 强制 ${forceIds.size}` : ""}${allMode ? "，--all 全库纠正" : ""}）`,
+    `待回灌 ${todo.length} 条（库存 ${Object.keys(store.items).length}${forceIds.size ? `，--ids 强制 ${forceIds.size}` : ""}${allMode ? "，--all 全库纠正" : ""}${quotesMode ? `，--quotes 引用/正文刷新（since ${since}）` : ""}）`,
   );
 
   // 头像 upsert（捕捉 v2）：随每次 fetchSyn 成功新增/更新，与库存同节奏落盘
@@ -386,10 +452,12 @@ async function main() {
     translated: 0,
     avatars: 0,
     threads: 0,
+    quotes: 0, // 引用帖原帖补全/更新（2026-11-25）
     synCalls: 0,
     // --all 全库纠正（2026-10-09）分类计数
     polluted: 0, // 翻译污染修复（= xTrans 收割数）
     truncated: 0, // 前缀截断补全
+    urlcleaned: 0, // 展示层 URL 截断（display_url…）换成展开后的干净正文
     placeholder: 0, // "(archive)"/空占位被真实原文替换
     tco: 0, // t.co 短链展开（按 entities 展开/媒体占位剔除）
   };
@@ -451,7 +519,7 @@ async function main() {
     // --all 全库纠正（或 --ids 强制）：改走分类纠正——翻译污染收割 xTrans、
     // 前缀截断补全；皆非（如中文作者中文原文）text 不动
     const text = cleanText(String(syn.text ?? ""), syn.entities);
-    const correctAll = allMode || forceIds.has(t.id);
+    const correctAll = allMode || forceIds.has(t.id) || quotesMode;
     if (t.xTranslated) {
       stats.translated++;
       if (text && text !== t.text) stats.text++;
@@ -472,6 +540,10 @@ async function main() {
       } else if (cls.action === "truncated") {
         t.text = text;
         stats.truncated++;
+      } else if (cls.action === "cleanurl") {
+        // 展示层 URL 截断（display_url…）→ 换成 syndication 展开后的干净正文
+        t.text = text;
+        stats.urlcleaned++;
       }
     } else if (text && text.length > t.text.length) {
       if (text !== t.text) stats.text++;
@@ -487,6 +559,17 @@ async function main() {
       }
     }
     if (!t.author && syn.user?.screen_name) t.author = syn.user.screen_name;
+
+    // 引用帖（2026-11-25）：quoted_tweet 的原帖正文/作者/链接落库。
+    // 原帖被删或不可见时保留既有 quote（不把已有内容清空）。
+    const quote = extractQuote(syn);
+    if (quote) {
+      // 浏览器展开过的原帖可能比 syndication 更全（长帖全文），不因回灌而变短
+      if (!t.quote || quote.text.length >= (t.quote.text?.length ?? 0)) {
+        if (JSON.stringify(t.quote) !== JSON.stringify(quote)) stats.quotes++;
+        t.quote = quote;
+      }
+    }
 
     // 线程链（捕捉 v2）：沿同作者 status 链接向上/向下收集，>1 段才写 entry.thread
     const thread = await walkThread(syn, threadFetcher);
@@ -559,6 +642,8 @@ async function main() {
     }
 
     t.synChecked = true;
+    // --quotes 断点：同日重跑跳过；跨日会重新核对（引用原帖可能被编辑/删除）
+    if (quotesMode) t.quotesChecked = localDate();
     // 全库纠正标记（审计与断点续跑依据）：成功富化的条目不再被 --all 重拉
     if (correctAll) t.enrichedV2 = true;
     stats.ok++;
@@ -577,7 +662,8 @@ async function main() {
     `完成：ok=${stats.ok} 不可用=${stats.unavailable} 网络失败=${stats.netFail}（下次重试）\n` +
       `富化：正文 ${stats.text} 条、媒体推文 ${stats.mediaTweets}、含视频 ${stats.videoTweets}\n` +
       `捕捉 v2：翻译态原文覆盖 ${stats.translated}、头像新增/更新 ${stats.avatars}、线程链 ${stats.threads} 条（syndication 共 ${stats.synCalls} 次调用）\n` +
-      `全库纠正：翻译污染修复 ${stats.polluted}（xTrans 收割同数）、前缀截断补全 ${stats.truncated}、占位替换 ${stats.placeholder}、t.co 展开 ${stats.tco}\n` +
+      `引用帖：原帖补全/更新 ${stats.quotes} 条\n` +
+      `全库纠正：翻译污染修复 ${stats.polluted}（xTrans 收割同数）、前缀截断补全 ${stats.truncated}、展示 URL 清洗 ${stats.urlcleaned}、占位替换 ${stats.placeholder}、t.co 展开 ${stats.tco}\n` +
       `下载：${dlFiles} 文件 ${(bytes / 1024 / 1024).toFixed(1)} MB${guardTripped ? `（护栏 ${maxGb}GB 触发，历史剩余未下载）` : ""}`,
   );
 }
