@@ -8,7 +8,7 @@
 
 ```
 浏览器 ──/api/search──> openresty (TLS, 17080)
-                             │  proxy_pass 127.0.0.1:17081
+                             │  proxy_pass 127.0.0.1:17082
                              ▼
                       search-server 容器
                       POST /api/search, GET /health
@@ -20,12 +20,10 @@
 - 索引与模型都在 search-server 容器内（或只读卷挂载），无外部数据库。
 - 客户端失败/超时（800ms，冷启动首查 2s）自动回退浏览器端 MiniSearch。
 
-> **端口冲突警告（部署前必读）**：当前生产文档记录 `127.0.0.1:17081` 已被
-> cdn-media-pointer 的 `python -m http.server` 占用（`deploy/cdn-base-rollout.md`）。
-> 本服务默认端口按需求写为 17081；上线时二选一：
-> 1. compose 设置 `SEARCH_SERVER_PORT=17082`（推荐，最小改动），openresty 同步改端口；
-> 2. 把 cdn-media-pointer 迁到其它回环端口后再用 17081。
-> 两者都改完之前不要同时启动，否则后启动者 bind 失败。
+> **端口说明**：`127.0.0.1:17081` 已被 cdn-media-pointer 的
+> `python -m http.server` 占用（`deploy/cdn-base-rollout.md`）。本服务默认使用
+> **17082**，compose 与 openresty 均已按 17082 写入；若 17082 再冲突，用
+> `SEARCH_SERVER_PORT` 覆盖并同步 openresty。
 
 ## 1.1 API 契约
 
@@ -111,8 +109,8 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     ports:
-      # 只发布到宿主 loopback；默认 17081，冲突时用 SEARCH_SERVER_PORT 覆盖（见上）
-      - "127.0.0.1:${SEARCH_SERVER_PORT:-17081}:17081"
+      # 只发布到宿主 loopback；默认 17082（17081 被 cdn-media-pointer 占用）
+      - "127.0.0.1:${SEARCH_SERVER_PORT:-17082}:17082"
     volumes:
       # 推荐：索引由 CI 产出后只读挂载，容器重建即换索引
       # - /opt/gaubee/search-index:/app/index:ro
@@ -122,10 +120,10 @@ services:
       RUST_LOG: info
       SEARCH_THREADS: "4"
       # 容器内必须监听 0.0.0.0，宿主端口已限制 loopback
-      SEARCH_BIND: 0.0.0.0:17081
+      SEARCH_BIND: 0.0.0.0:17082
     mem_limit: 2g
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:17081/health"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:17082/health"]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -151,7 +149,7 @@ tokenizer 与查询峰值，实测 RSS 约 **0.45 GiB**（见第 6 节）；2 Gi
 location = /api/search {
     limit_except POST { deny all; }
 
-    proxy_pass http://127.0.0.1:17081/api/search;
+    proxy_pass http://127.0.0.1:17082/api/search;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -168,13 +166,13 @@ location = /api/search/health {
     allow 127.0.0.1;
     allow ::1;
     deny all;
-    proxy_pass http://127.0.0.1:17081/health;
+    proxy_pass http://127.0.0.1:17082/health;
 }
 ```
 
 注意：
 
-- 若 17081 冲突改用 17082，上面两处 `proxy_pass` 同步修改。
+- 若 17082 冲突，用 `SEARCH_SERVER_PORT` 覆盖并同步上面两处 `proxy_pass`。
 - openresty 的 WAF（1Panel `defaultUrlBlack`）对 `/api/search` 无 `.git` 等命中；
   如出现 403，先查 WAF req_log 而不是容器日志。
 - 服务端已返回 `Access-Control-Allow-Origin: *`（只读公开数据），但生产走同源反代，
@@ -210,7 +208,7 @@ sudo cp -a /tmp/artifact/search-index /opt/gaubee/search-index.next
 sudo mv /opt/gaubee/search-index /opt/gaubee/search-index.prev
 sudo mv /opt/gaubee/search-index.next /opt/gaubee/search-index
 docker compose restart search-server
-# 验证：curl -fsS http://127.0.0.1:17081/health | jq
+# 验证：curl -fsS http://127.0.0.1:17082/health | jq
 ```
 
 回滚：把 `.prev` 换回来并重启。索引目录约 22 MB，保留上一代成本可忽略。
@@ -277,7 +275,7 @@ docker compose restart search-server
 
 | 现象 | 检查 |
 | --- | --- |
-| 502 / 连接拒绝 | 容器是否 running；`curl 127.0.0.1:17081/health`；端口是否被 cdn-media-pointer 占用 |
+| 502 / 连接拒绝 | 容器是否 running；`curl 127.0.0.1:17082/health`；端口是否被其它进程占用 |
 | 启动即退出 | `docker logs`；索引缺失（先 build）；模型缺失（fetch-model.sh）；`libzvec_c_api.so` 未在 `LD_LIBRARY_PATH` |
 | 搜索慢 / 首查 2s+ | 容器刚启动，索引段未驻留；观察 `tookMs`；必要时提高 `SEARCH_THREADS` |
 | 客户端一直走 MiniSearch | 浏览器 Network 看 `/api/search` 状态；openresty location 是否精确匹配；CORS 预检是否被 WAF 拦 |

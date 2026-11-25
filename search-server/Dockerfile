@@ -87,15 +87,15 @@ COPY --from=builder /build/index /app/index
 ENV LD_LIBRARY_PATH=/app/lib \
     INDEX_DIR=/app/index \
     MODEL_DIR=/app/model \
-    SEARCH_BIND=0.0.0.0:17081 \
+    SEARCH_BIND=0.0.0.0:17082 \
     SEARCH_THREADS=4 \
     RUST_LOG=info
 
 USER search
-EXPOSE 17081
+EXPOSE 17082
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
-    CMD curl -fsS http://127.0.0.1:17081/health || exit 1
+    CMD curl -fsS http://127.0.0.1:17082/health || exit 1
 
 ENTRYPOINT ["/app/search-server"]
 CMD ["serve"]

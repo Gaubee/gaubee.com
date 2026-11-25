@@ -203,8 +203,12 @@ fn parse_date_str(text: &str) -> Option<i64> {
     if let Ok(date) = DateTime::parse_from_rfc3339(text) {
         return Some(date.with_timezone(&Utc).timestamp_millis());
     }
-    if let Ok(date) = NaiveDate::parse_from_str(&text[..text.len().min(10)], "%Y-%m-%d") {
-        return Some(date.and_hms_opt(0, 0, 0)?.and_utc().timestamp_millis());
+    // 用 get(..) 而非 &text[..10]：多字节 date（如「日本語です」）的第 10 字节
+    // 可能落在字符中间，直接切片会 panic（复核 P2-1）。
+    if let Some(prefix) = text.get(..text.len().min(10)) {
+        if let Ok(date) = NaiveDate::parse_from_str(prefix, "%Y-%m-%d") {
+            return Some(date.and_hms_opt(0, 0, 0)?.and_utc().timestamp_millis());
+        }
     }
     if let Ok(date) = text.parse::<DateTime<Utc>>() {
         return Some(date.timestamp_millis());
@@ -301,6 +305,13 @@ code fence
     fn parses_date_only_fallback() {
         assert_eq!(parse_date_str("2020-01-02"), Some(1_577_923_200_000));
         assert_eq!(parse_date_str("not a date"), None);
+    }
+
+    #[test]
+    fn multibyte_date_does_not_panic() {
+        // 复核 P2-1：第 10 字节落在多字节字符中间时，旧实现 &text[..10] 会 panic。
+        assert_eq!(parse_date_str("日本語です"), None);
+        assert_eq!(parse_date_str("二〇二〇年一月二日"), None);
     }
 }
 
