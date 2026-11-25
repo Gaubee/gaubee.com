@@ -21,6 +21,7 @@ pub const ZVEC_DATA_TYPE_INT64: zvec_data_type_t = 5;
 pub const ZVEC_DATA_TYPE_VECTOR_FP32: zvec_data_type_t = 23;
 
 pub const ZVEC_INDEX_TYPE_HNSW: zvec_index_type_t = 1;
+pub const ZVEC_INDEX_TYPE_FLAT: zvec_index_type_t = 3;
 pub const ZVEC_INDEX_TYPE_INVERT: zvec_index_type_t = 10;
 pub const ZVEC_INDEX_TYPE_FTS: zvec_index_type_t = 11;
 
@@ -72,6 +73,10 @@ pub struct zvec_sub_query_t {
 }
 #[repr(C)]
 pub struct zvec_hnsw_query_params_t {
+    _private: [u8; 0],
+}
+#[repr(C)]
+pub struct zvec_flat_query_params_t {
     _private: [u8; 0],
 }
 #[repr(C)]
@@ -292,6 +297,19 @@ extern "C" {
     pub fn zvec_query_params_hnsw_set_ef(
         params: *mut zvec_hnsw_query_params_t,
         ef: i32,
+    ) -> zvec_error_code_t;
+    pub fn zvec_query_params_flat_create(
+        is_using_refiner: bool,
+        scale_factor: f32,
+    ) -> *mut zvec_flat_query_params_t;
+    pub fn zvec_query_params_flat_destroy(params: *mut zvec_flat_query_params_t);
+    pub fn zvec_vector_query_set_query_params(
+        query: *mut zvec_vector_query_t,
+        params: *mut c_void,
+    ) -> zvec_error_code_t;
+    pub fn zvec_sub_query_set_flat_params(
+        query: *mut zvec_sub_query_t,
+        params: *mut zvec_flat_query_params_t,
     ) -> zvec_error_code_t;
     pub fn zvec_query_params_fts_create(
         default_operator: *const c_char,

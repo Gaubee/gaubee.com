@@ -459,16 +459,18 @@ impl ZvecStore {
                             output_ptrs.as_ptr(),
                             output_ptrs.len(),
                         ))?;
-                        let hnsw = ffi::zvec_query_params_hnsw_create();
-                        if hnsw.is_null() {
-                            bail!("zvec_query_params_hnsw_create 返回 NULL");
+                        let flat = ffi::zvec_query_params_flat_create(false, 10.0);
+                        if flat.is_null() {
+                            bail!("zvec_query_params_flat_create 返回 NULL");
                         }
-                        if let Err(error) = check(ffi::zvec_query_params_hnsw_set_ef(hnsw, 100)) {
-                            ffi::zvec_query_params_hnsw_destroy(hnsw);
+                        // set_query_params 转移所有权，成功后不能 destroy。
+                        if let Err(error) = check(ffi::zvec_vector_query_set_query_params(
+                            query_handle,
+                            flat as *mut c_void,
+                        )) {
+                            ffi::zvec_query_params_flat_destroy(flat);
                             return Err(error);
                         }
-                        // set_hnsw_params 转移所有权，成功后不能 destroy。
-                        check(ffi::zvec_vector_query_set_hnsw_params(query_handle, hnsw))?;
                         check(ffi::zvec_collection_query(
                             self.collection,
                             query_handle,
@@ -693,26 +695,28 @@ fn build_schema() -> Result<Schema> {
     unsafe { ffi::zvec_index_params_destroy(fts_params) };
     field_result?;
 
-    // dense：HNSW + COSINE。
-    let hnsw_params = unsafe { ffi::zvec_index_params_create(ffi::ZVEC_INDEX_TYPE_HNSW) };
-    if hnsw_params.is_null() {
-        bail!("zvec_index_params_create(HNSW) 返回 NULL");
+    // dense：Flat + COSINE。
+    // 2026-11-25 Linux 实证：HNSW 索引在 multi-query/RRF 下会报
+    // "Reference index must be Flat or IVF"（macOS 未复现）；Flat 满足该约束，
+    // 2903 chunks 的暴力检索延迟仍在毫秒级。
+    let vector_params = unsafe { ffi::zvec_index_params_create(ffi::ZVEC_INDEX_TYPE_FLAT) };
+    if vector_params.is_null() {
+        bail!("zvec_index_params_create(FLAT) 返回 NULL");
     }
-    let hnsw_result = (|| -> Result<()> {
+    let vector_result = (|| -> Result<()> {
         check(unsafe {
-            ffi::zvec_index_params_set_metric_type(hnsw_params, ffi::ZVEC_METRIC_TYPE_COSINE)
+            ffi::zvec_index_params_set_metric_type(vector_params, ffi::ZVEC_METRIC_TYPE_COSINE)
         })?;
-        check(unsafe { ffi::zvec_index_params_set_hnsw_params(hnsw_params, 16, 100) })?;
         add_field_with_params(
             schema.0,
             FIELD_EMBEDDING,
             ffi::ZVEC_DATA_TYPE_VECTOR_FP32,
             EMBEDDING_DIM as u32,
-            hnsw_params,
+            vector_params,
         )
     })();
-    unsafe { ffi::zvec_index_params_destroy(hnsw_params) };
-    hnsw_result?;
+    unsafe { ffi::zvec_index_params_destroy(vector_params) };
+    vector_result?;
 
     Ok(schema)
 }
@@ -807,16 +811,15 @@ fn build_vector_sub_query(embedding: &[f32], topk: i32) -> Result<VectorSubQuery
         )
     })?;
     check(unsafe { ffi::zvec_sub_query_set_num_candidates(sub.0, topk) })?;
-    let hnsw = unsafe { ffi::zvec_query_params_hnsw_create() };
-    if hnsw.is_null() {
-        bail!("zvec_query_params_hnsw_create 返回 NULL");
-    }
-    if let Err(error) = check(unsafe { ffi::zvec_query_params_hnsw_set_ef(hnsw, 100) }) {
-        unsafe { ffi::zvec_query_params_hnsw_destroy(hnsw) };
-        return Err(error);
+    let flat = unsafe { ffi::zvec_query_params_flat_create(false, 10.0) };
+    if flat.is_null() {
+        bail!("zvec_query_params_flat_create 返回 NULL");
     }
     // 所有权转移给 sub-query。
-    check(unsafe { ffi::zvec_sub_query_set_hnsw_params(sub.0, hnsw) })?;
+    if let Err(error) = check(unsafe { ffi::zvec_sub_query_set_flat_params(sub.0, flat) }) {
+        unsafe { ffi::zvec_query_params_flat_destroy(flat) };
+        return Err(error);
+    }
     Ok(sub)
 }
 
