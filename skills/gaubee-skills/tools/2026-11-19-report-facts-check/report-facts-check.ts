@@ -53,6 +53,21 @@ function readJson<T>(file: string): T | null {
   }
 }
 
+/**
+ * 按快照的 `private` 字段拆分公开/私有提交数。
+ *
+ * 这里**不能**用仓库名正则：`fde2e|keel|jixoai/bu$|omni` 曾把已转公开的 keel 与
+ * reply9842 算成私有，与 `report-commit-count-audit` 的结论互相打脸（2026-11-25）。
+ * `private` 由抓取时的 GitHub API isPrivate 落盘，是唯一可信来源。
+ */
+export function splitPublicPrivate(
+  pushes: Array<{ repo: string; count: number; private?: boolean }>,
+  totalCommits: number,
+): { pubN: number; privN: number } {
+  const privN = pushes.filter((p) => p.private).reduce((n, p) => n + p.count, 0);
+  return { pubN: totalCommits - privN, privN };
+}
+
 function main(): number {
   const argv = process.argv.slice(2);
   const date = argv.find((a) => /^\d{4}-\d{2}-\d{2}$/.test(a));
@@ -106,14 +121,12 @@ function main(): number {
   }
 
   // 提交公私分列
-  const commits = readJson<{ totalCommits?: number; pushes?: Array<{ repo: string; count: number }> }>(
+  const commits = readJson<{ totalCommits?: number; pushes?: Array<{ repo: string; count: number; private?: boolean }> }>(
     path.join(DATA, "sources", "github-commits", "history", `${date}.json`),
   );
   const m = text.match(/公开仓\s*(\d+)\s*条\s*\+\s*私有仓\s*(\d+)\s*条/);
   if (commits?.pushes && m) {
-    const priv = commits.pushes.filter((p) => /fde2e|keel|jixoai\/bu$|omni/.test(p.repo));
-    const privN = priv.reduce((n, p) => n + p.count, 0);
-    const pubN = (commits.totalCommits ?? 0) - privN;
+    const { pubN, privN } = splitPublicPrivate(commits.pushes, commits.totalCommits ?? 0);
     checks.push({
       name: "提交公开数",
       claimed: m[1]!,
@@ -205,4 +218,4 @@ function main(): number {
   return 0;
 }
 
-process.exit(main());
+if (import.meta.main) process.exit(main());

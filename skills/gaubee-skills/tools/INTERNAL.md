@@ -3,7 +3,7 @@
 > 2026-11-23 从 `REGISTRY.md` 移出。判定标准：唯一消费者是每日维护任务本身。
 > 这类工具**不占体力、不进登记簿、不算工坊产出**——它们是我工作的一部分。
 
-共 75 个。
+共 76 个。
 
 | 日期 | 工具 | 路径 | 说明 | 状态 | 备注 |
 | --- | --- | --- | --- | --- | --- |
@@ -82,3 +82,4 @@
 | 2026-11-23 | weekly-theme-signals | tools/2026-11-23-weekly-theme-signals/ | 周报分析素材：提交按 scope 聚合、星标按分类聚合、抖动识别、工坊进展（W47 首跑：久点 9+9+8+7 条为绝对主线，21 个新增里 agent skills 占 6） | proposed |  |
 | 2026-10-12 | report-window-guard | tools/2026-10-12-report-window-guard/ | build-report 窗口口径回归守卫 | proposed |  |
 | 2026-10-12 | staging-forecast | tools/2026-10-12-staging-forecast/ | staging 到期预报 | proposed |  |
+| 2026-11-25 | gate-consistency-audit | tools/2026-11-25-gate-consistency-audit/ | 两个提交门禁的口径交叉校验：同一份报告一方 ok 一方 fail 时报警（11-25 实证：commit-count-audit 用 private 字段、facts-check 用仓库名正则，把已转公开的 keel/reply9842 算成私有；修完四天全绿，改回旧正则能稳定复现冲突） | proposed |  |

@@ -19,6 +19,16 @@ const SITE = process.env.GAUBEE_SITE ?? path.resolve(import.meta.dir, "..", ".."
 const REPORTS = path.join(SITE, "skills", "gaubee-skills", "reports", "daily");
 const EVENTS = path.join(SITE, "src", "content", "events");
 const STATUS_RE = /\/status\/(\d{15,})/g;
+/**
+ * 引用块里的原帖链接（`.x-arch-quote*`）不算当窗条目：引用只是正文里的排版，
+ * 被引用的推文另有它自己的归窗。整块先剔除再做 status 扫描，避免假阳性。
+ */
+const QUOTE_RE = /<div class="x-arch-quote">[\s\S]*?<\/div><\/div>/g;
+
+/** 提取文本里的推文 id；先剔除引用块，避免把被引用的原帖误判成跨窗重复。 */
+export function collectIds(text: string): string[] {
+	return [...text.replace(QUOTE_RE, "").matchAll(STATUS_RE)].map((m) => m[1]!);
+}
 
 function localDay(ms: number): string {
 	return new Date(ms).toLocaleDateString("sv-SE", { timeZone: "Asia/Shanghai" });
@@ -32,8 +42,7 @@ function indexWindows(): Map<string, Set<string>> {
 		for (const id of ids) set.add(id);
 		byDate.set(date, set);
 	};
-	const collect = (file: string): string[] =>
-		[...readFileSync(file, "utf8").matchAll(STATUS_RE)].map((m) => m[1]!);
+	const collect = (file: string): string[] => collectIds(readFileSync(file, "utf8"));
 
 	if (existsSync(REPORTS)) {
 		for (const f of readdirSync(REPORTS)) {
@@ -62,7 +71,7 @@ function main(): number {
 		console.error(`目标报告不存在：${file}`);
 		return 1;
 	}
-	const mine = [...new Set([...readFileSync(file, "utf8").matchAll(STATUS_RE)].map((m) => m[1]!))];
+	const mine = [...new Set(collectIds(readFileSync(file, "utf8")))];
 	const windows = indexWindows();
 
 	const stray: string[] = [];
@@ -84,4 +93,4 @@ function main(): number {
 	return 0;
 }
 
-process.exit(main());
+if (import.meta.main) process.exit(main());

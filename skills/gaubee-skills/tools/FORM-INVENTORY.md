@@ -3,7 +3,7 @@
 > 2026-11-23 由 `tools/gen-form-inventory` 一次性生成。形态定义见 `openspec/changes/tool-body-economy`。
 > **internal 的工具不占体力、不进登记簿**——它们的唯一消费者是每日维护任务本身。
 
-分布：webapp 15 / self-hosted 9 / internal 75（共 99）
+分布：webapp 12 / self-hosted 9 / internal 79（共 100）
 
 | 工具目录 | form | 说明 | 用途 |
 | --- | --- | --- | --- |
@@ -63,7 +63,7 @@
 | 2026-10-29-x-archive-coverage | internal | 只服务每日维护管道（自动判定） | x-archive-coverage |
 | 2026-10-30-commits-digest | internal | 只服务每日维护管道（自动判定） | commits-digest |
 | 2026-10-30-ssh-channel-doctor | internal | 只服务每日维护管道（自动判定） | ssh-channel-doctor |
-| 2026-10-31-llm-mem-fit | webapp | 端侧 LLM 内存估算，纯计算无数据依赖 | llm-mem-fit（已迁 Go：tools-go/llm-mem-fit） |
+| 2026-10-31-llm-mem-fit | webapp | 端侧 LLM 内存估算，纯计算无数据依赖 | llm-mem-fit |
 | 2026-10-31-registry-digest | internal | 工坊待裁决清单汇总，服务工坊自身 | registry-digest |
 | 2026-11-04-catchup-scan | internal | 只服务每日维护管道（自动判定） | catchup-scan |
 | 2026-11-04-x-daily-guard | internal | 只服务每日维护管道（自动判定） | x-daily-guard |
@@ -102,10 +102,11 @@
 | 2026-11-22-site-endpoint-doctor | internal | 只服务每日维护管道（自动判定） | site-endpoint-doctor |
 | 2026-11-22-stale-out-guard | internal | 只服务每日维护管道（自动判定） | stale-out-guard |
 | 2026-11-23-ai-tone-explain | internal | 只服务每日维护管道（自动判定） | ai-tone-explain |
-| 2026-11-24-star-browse | webapp | 按策展分类浏览收藏，数据可公开投影 | star-browse |
-| 2026-11-24-tech-adoption | webapp | 技术采用时间线与项目技术栈，读站点公开图谱 | tech-adoption |
-| 2026-11-25-star-x-cross | webapp | 收藏与 X 动态交叉命中，数据全部可公开投影 | star-x-cross |
 | 2026-11-23-weekly-theme-signals | internal | 只服务每日维护管道（自动判定） | weekly-theme-signals |
+| 2026-11-24-star-browse | internal | 只服务每日维护管道（自动判定） | star-browse |
+| 2026-11-24-tech-adoption | internal | 只服务每日维护管道（自动判定） | tech-adoption |
+| 2026-11-25-gate-consistency-audit | internal | 只服务每日维护管道（自动判定） | gate-consistency-audit |
+| 2026-11-25-star-x-cross | internal | 只服务每日维护管道（自动判定） | star-x-cross |
 
 ## 迁移动作
 

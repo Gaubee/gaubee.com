@@ -3384,5 +3384,11 @@
   "2123511741317599281": "unkernel 0.2 发布了！\n\n  🦾 带 wasm JIT 的 ARM64 CPU\n  🐧 默认 Debian\n  📦 Distroless 内核\n  🚀 最高 16 核\n  🧪 实验性 WASI 执行\n ⚡ fx、bun 和 claude 直接可用\n\n在 unkernel [dot] dev 试用",
   "2124895696516202969": "Ladybird 进入 alpha 了 🐞\n\nmacOS 和 Linux 下载已在官网提供。\n\nhttps://ladybird.org/posts/alpha/",
   "2125062647846694979": "HungerG（隐身模型）本周对 OpenCode Go 订阅者免费\n\n1M 上下文\n多模态\n不用数据训练",
-  "2124921646028919016": "我以前不太喜欢 TypeScript，但 @vercel_labs scriptc 改变了这一点。\n\n4.3 万行编译成 29 MB 的原生二进制，启动即用，不需要 Node.js 运行时。\n\n我还是更喜欢 JSDoc。我开了 issue，@ctatedev 修好了。感谢他和 @cramforce\n\nhttps://github.com/vercel-labs/scriptc"
+  "2124921646028919016": "我以前不太喜欢 TypeScript，但 @vercel_labs scriptc 改变了这一点。\n\n4.3 万行编译成 29 MB 的原生二进制，启动即用，不需要 Node.js 运行时。\n\n我还是更喜欢 JSDoc。我开了 issue，@ctatedev 修好了。感谢他和 @cramforce\n\nhttps://github.com/vercel-labs/scriptc",
+  "2125285106591936993": "UI/UX 设计探索：iOS 键盘重设计\n\n打字机的味道\n\n真正的机械按键，打字时真的有小拨杆上下起伏。",
+  "2125510109417857368": "现在你可以在本地跑腾讯 Hy4 flash 了，由 AngelSlim 量化！\n\n💻 笔记本：Spark 上最高 39 TPS，128GB Mac M5 Max 通过 llama.cpp 最高 50 TPS。\n\n⚡ PC：24GB 4090D 上最高 58 TPS，64GB Mac M4 Pro 上通过 Strata 最高 18 TPS。想跑更强的设备，用 Strata hy4-flash-hpc 分支。",
+  "2125484250140991952": "Perry 进展：宣布 Perry Feather！\n\nFeather 是一个可直接替换 Electron 的方案，能把**整个**应用原生编译。我们做了自研的 Blink（也就是 Chrome 的渲染器）绑定，彻底去掉 V8，让原生编译的 Perry 应用直接控制内容。",
+  "2125460650608697602": "感谢分享。这个 iOS 应用看起来太棒了。Inkling 模型下个版本会快约 50%，即将发布。",
+  "2125443929093075394": "https://x.com/i/article/2125440711281774593",
+  "2125290656692085164": "介绍 MAGI-2，Higgsfield 独家上线。\n\n最高 30 秒的前沿级 1080p 画质，生成费用每秒 0.08 美元。\n\n400B 参数的开源权重视频模型即将推出。\n\n现已在 Higgsfield 独家提供，也可通过 Higgsfield API 调用。"
 }

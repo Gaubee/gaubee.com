@@ -254,6 +254,12 @@ function stageFinalize(): void {
     console.log("  · 报告一致性失败已由归因工具解释，降级为提示");
   }
   push(run("提交计数对账", bun("tools/2026-11-12-report-commit-count-audit/report-commit-count-audit.ts"), { timeoutSec: 250 }), "soft");
+  // 两个提交门禁口径互相打脸时报警（2026-11-25 实证：facts-check 曾按仓库名正则判私有）。
+  push(run("提交门禁口径", bun("tools/2026-11-25-gate-consistency-audit/gate-consistency-audit.ts", "--date", YESTERDAY), { timeoutSec: 200 }), "soft");
+  // 门禁规则的回归守卫：引用块剔除、private 字段拆分，改了规则就要两边一起过。
+  push(run("门禁单测", bun("test", "--timeout", "20000",
+    "tools/2026-11-04-x-daily-guard/x-daily-guard.test.ts",
+    "tools/2026-11-19-report-facts-check/report-facts-check.test.ts"), { timeoutSec: 150 }), "soft");
   push(run("taxonomy 链接自洽", bun("tools/2026-11-17-taxo-note-guard/taxo-note-guard.ts"), { timeoutSec: 120 }), "soft");
 
   // 人话腔：只把 RED 当问题，LOW/YELLOW 是「材料稀薄」提示不算错。
