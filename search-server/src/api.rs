@@ -22,6 +22,8 @@ pub const ENGINE: &str = "sqlite-fts5";
 pub struct AppState {
     pub index: LoadedIndex,
     pub embedder: Option<EmbeddingClient>,
+    /// 仅当 manifest.model == embedder.model() 时为 true；否则向量空间不可复用。
+    pub vector_enabled: bool,
     pub started: Instant,
 }
 
@@ -73,6 +75,9 @@ pub struct HealthResponse {
     pub engine: &'static str,
     pub embed_model: Option<String>,
     pub embed_configured: bool,
+    pub vector_enabled: bool,
+    pub index_model: String,
+    pub active_model: Option<String>,
     pub embed_dim: usize,
     pub embed_cache_entries: usize,
     pub embed_cache_hits: u64,
@@ -160,18 +165,19 @@ fn run_search(state: &AppState, request: SearchRequest) -> Result<SearchResponse
     let mut degraded = false;
     let mut embedding = None;
     if mode != SearchMode::Fts {
-        match state.embedder.as_ref() {
-            Some(client) => match client.embed_query(query, state.index.dim()) {
+        if !state.vector_enabled {
+            // 模型与索引不一致（或未配置 key）：禁止使用旧向量，退化为 FTS。
+            degraded = true;
+        } else if let Some(client) = state.embedder.as_ref() {
+            match client.embed_query(query, state.index.dim()) {
                 Ok(vector) => embedding = Some(vector),
                 Err(error) => {
                     tracing::warn!(%error, "查询 embedding 失败，降级为 FTS-only");
                     degraded = true;
                 }
-            },
-            None => {
-                tracing::warn!("未配置 embedding 客户端，查询降级为 FTS-only");
-                degraded = true;
             }
+        } else {
+            degraded = true;
         }
     }
 
@@ -222,20 +228,28 @@ fn run_search(state: &AppState, request: SearchRequest) -> Result<SearchResponse
 }
 
 async fn health_handler(State(state): State<Arc<AppState>>) -> Json<HealthResponse> {
+    Json(health_response(&state))
+}
+
+fn health_response(state: &AppState) -> HealthResponse {
     let manifest = state.index.manifest();
+    let active_model = state
+        .embedder
+        .as_ref()
+        .map(|client| client.model().to_string());
     let cache = state
         .embedder
         .as_ref()
         .map(|client| client.cache_stats())
         .unwrap_or_default();
-    Json(HealthResponse {
+    HealthResponse {
         ok: true,
         engine: ENGINE,
-        embed_model: state
-            .embedder
-            .as_ref()
-            .map(|client| client.model().to_string()),
+        embed_model: active_model.clone(),
         embed_configured: state.embedder.is_some(),
+        vector_enabled: state.vector_enabled,
+        index_model: manifest.model.clone(),
+        active_model,
         embed_dim: state.index.dim(),
         embed_cache_entries: cache.entries,
         embed_cache_hits: cache.hits,
@@ -246,7 +260,7 @@ async fn health_handler(State(state): State<Arc<AppState>>) -> Json<HealthRespon
         index_built_at: manifest.built_at.clone(),
         index: state.index.path().display().to_string(),
         uptime_ms: state.started.elapsed().as_millis(),
-    })
+    }
 }
 
 struct ApiError {
@@ -357,6 +371,7 @@ mod tests {
             AppState {
                 index,
                 embedder,
+                vector_enabled: true,
                 started: Instant::now(),
             },
         )
@@ -398,6 +413,34 @@ mod tests {
             response.results[0].id,
             "src/content/events/0001.rust-async.md"
         );
+        let health = health_response(&state);
+        assert!(health.vector_enabled);
+        assert_eq!(health.index_model, "mock-embed");
+        assert_eq!(health.active_model.as_deref(), Some("mock-embed"));
+    }
+
+    #[test]
+    fn model_mismatch_disables_vector_and_reports_health() {
+        let server = MockEmbeddingServer::start(MockMode::Success { dim: 8 }, 0);
+        let (_dir, mut state) = state_for(server.url());
+        let mut other = config(server.url());
+        other.model = "other-embed".to_string();
+        state.embedder = Some(EmbeddingClient::new(&other).unwrap());
+        state.vector_enabled = false;
+
+        let response = run_search(&state, request("rust 异步")).unwrap();
+        assert!(response.degraded);
+        assert!(!response.results.is_empty());
+        assert_eq!(
+            response.results[0].id,
+            "src/content/events/0001.rust-async.md"
+        );
+
+        let health = health_response(&state);
+        assert!(!health.vector_enabled);
+        assert_eq!(health.index_model, "mock-embed");
+        assert_eq!(health.active_model.as_deref(), Some("other-embed"));
+        assert_eq!(health.embed_dim, 8);
     }
 
     #[test]

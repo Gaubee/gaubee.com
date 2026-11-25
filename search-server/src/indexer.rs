@@ -32,6 +32,10 @@ pub struct CheckReport {
     pub documents: usize,
     pub content_hash: String,
     pub index_content_hash: Option<String>,
+    pub expected_model: String,
+    pub index_model: Option<String>,
+    pub content_matches: bool,
+    pub model_matches: bool,
     pub matches: bool,
 }
 
@@ -180,20 +184,36 @@ pub fn build_index(options: &BuildOptions) -> Result<BuildReport> {
     })
 }
 
-/// 检查索引是否存在且内容指纹一致（容器 entrypoint 用）。
-pub fn check_index(content_root: &Path, index_path: &Path) -> Result<CheckReport> {
+/// 检查索引是否存在、内容指纹与 embedding 模型一致（容器 entrypoint 用）。
+///
+/// 模型名必须参与判定：不同模型的向量空间不兼容，即使维度相同也不能复用。
+pub fn check_index(
+    content_root: &Path,
+    index_path: &Path,
+    expected_model: &str,
+) -> Result<CheckReport> {
     let documents = load_content(content_root)?;
     if documents.is_empty() {
         bail!("内容目录为空：{}", content_root.display());
     }
     let fingerprint = content_fingerprint(&documents);
-    let index_content_hash = crate::store::read_content_hash(index_path)?;
-    let matches = index_content_hash.as_deref() == Some(fingerprint.as_str());
+    let manifest = crate::store::read_index_manifest(index_path)?;
+    let index_content_hash = manifest
+        .as_ref()
+        .map(|manifest| manifest.content_hash.clone());
+    let index_model = manifest.as_ref().map(|manifest| manifest.model.clone());
+    let content_matches = index_content_hash.as_deref() == Some(fingerprint.as_str());
+    let expected_model = expected_model.trim().to_string();
+    let model_matches = index_model.as_deref() == Some(expected_model.as_str());
     Ok(CheckReport {
         documents: documents.len(),
         content_hash: fingerprint,
         index_content_hash,
-        matches,
+        expected_model,
+        index_model,
+        content_matches,
+        model_matches,
+        matches: content_matches && model_matches,
     })
 }
 
@@ -298,8 +318,18 @@ mod tests {
             .expect("hybrid");
         assert!(!hits.is_empty());
 
-        let check = check_index(&content, &index_path).expect("check");
+        let check = check_index(&content, &index_path, "mock-embed").expect("check");
+        assert!(check.content_matches);
+        assert!(check.model_matches);
         assert!(check.matches);
+
+        let check =
+            check_index(&content, &index_path, "another-embed").expect("check model changed");
+        assert!(check.content_matches);
+        assert!(!check.model_matches);
+        assert!(!check.matches);
+        assert_eq!(check.index_model.as_deref(), Some("mock-embed"));
+        assert_eq!(check.expected_model, "another-embed");
 
         // 内容变化后指纹不匹配。
         std::fs::write(
@@ -307,7 +337,9 @@ mod tests {
             "---\ntitle: Rust 异步运行时\ndate: 2024-03-01\ntags:\n  - rust\n---\n\n内容已变化。\n",
         )
         .unwrap();
-        let check = check_index(&content, &index_path).expect("check changed");
+        let check = check_index(&content, &index_path, "mock-embed").expect("check changed");
+        assert!(!check.content_matches);
+        assert!(check.model_matches);
         assert!(!check.matches);
     }
 

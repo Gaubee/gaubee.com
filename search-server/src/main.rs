@@ -128,6 +128,9 @@ struct CheckArgs {
     content: PathBuf,
     #[arg(long, default_value = "./index.sqlite", env = "INDEX_FILE")]
     index: PathBuf,
+    /// 当前要使用的 embedding 模型；与索引 manifest.model 不一致即视为 stale。
+    #[arg(long, default_value = DEFAULT_MODEL, env = "MAGPIE_EMBED_MODEL")]
+    model: String,
 }
 
 fn main() {
@@ -188,20 +191,37 @@ fn run_build(args: BuildArgs) -> Result<()> {
 }
 
 fn run_check(args: CheckArgs) -> Result<()> {
-    let report = check_index(&args.content, &args.index)?;
-    println!("documents:   {}", report.documents);
-    println!("contentHash: {}", report.content_hash);
+    let report = check_index(&args.content, &args.index, &args.model)?;
+    println!("documents:     {}", report.documents);
+    println!("contentHash:   {}", report.content_hash);
     println!(
-        "indexHash:   {}",
+        "indexHash:     {}",
         report.index_content_hash.as_deref().unwrap_or("<缺失>")
     );
+    println!("expectedModel: {}", report.expected_model);
+    println!(
+        "indexModel:    {}",
+        report.index_model.as_deref().unwrap_or("<缺失>")
+    );
+    println!(
+        "contentMatch:  {}  modelMatch: {}",
+        report.content_matches, report.model_matches
+    );
     if !report.matches {
+        let reason = if !report.content_matches {
+            "内容指纹不一致"
+        } else {
+            "embedding 模型不一致"
+        };
         anyhow::bail!(
-            "索引缺失或内容指纹不一致：{}（需要重建）",
-            args.index.display()
+            "索引需要重建（{}）：{}（indexModel={:?}, expectedModel={:?}）",
+            reason,
+            args.index.display(),
+            report.index_model,
+            report.expected_model
         );
     }
-    println!("status:      up-to-date");
+    println!("status:        up-to-date");
     Ok(())
 }
 
@@ -231,13 +251,29 @@ async fn run_serve(args: ServeArgs) -> Result<()> {
         None
     };
 
-    let embed_model = embedder
-        .as_ref()
-        .map(|client| client.model().to_string())
-        .unwrap_or_else(|| "none".to_string());
+    let index_model = manifest.model.clone();
+    let active_model = embedder.as_ref().map(|client| client.model().to_string());
+    let vector_enabled = active_model.as_deref() == Some(index_model.as_str());
+    if let Some(active) = active_model.as_deref() {
+        if vector_enabled {
+            tracing::info!(
+                index_model = %index_model,
+                active_model = %active,
+                "embedding 模型与索引一致，启用向量检索"
+            );
+        } else {
+            tracing::warn!(
+                index_model = %index_model,
+                active_model = %active,
+                "embedding 模型与索引不一致：禁用向量检索，仅 FTS；请重建索引"
+            );
+        }
+    }
+    let embed_model = active_model.clone().unwrap_or_else(|| "none".to_string());
     let state = Arc::new(AppState {
         index,
         embedder,
+        vector_enabled,
         started,
     });
 
@@ -249,7 +285,9 @@ async fn run_serve(args: ServeArgs) -> Result<()> {
         engine = ENGINE,
         docs = state.index.chunk_count(),
         documents = manifest.documents,
-        embed_model = %embed_model,
+        index_model = %index_model,
+        active_model = %embed_model,
+        vector_enabled,
         embed_dim = state.index.dim(),
         query_timeout_ms = args.timeout_ms,
         "search-server 已启动"

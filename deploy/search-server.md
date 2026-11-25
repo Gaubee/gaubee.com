@@ -78,9 +78,11 @@ Content-Type: application/json
 - `mode=vector`：纯向量；embedding 失败时同样降级 FTS-only 并置 `degraded=true`。
 - `mode=fts`：不调用 embedding，永不 `degraded`。
 - `GET /health` 返回：
-  `{ok, engine, embedModel, embedConfigured, embedDim, embedCacheEntries, embedCacheHits, embedCacheMisses, docs, documents, chunks, indexBuiltAt, index, uptimeMs}`。
+  `{ok, engine, embedModel, embedConfigured, vectorEnabled, indexModel, activeModel, embedDim, embedCacheEntries, embedCacheHits, embedCacheMisses, docs, documents, chunks, indexBuiltAt, index, uptimeMs}`。
   `docs` 是 chunk 数（兼容旧字段），`documents` 是去重后的篇数；
-  `embedCache*` 是进程内 query embedding LRU 的条目/命中/未命中计数。
+  `embedCache*` 是进程内 query embedding LRU 的条目/命中/未命中计数；
+  `vectorEnabled=false` 表示 `manifest.model` 与当前 embedding 模型不一致
+  （或未配置 key），vector/hybrid 会降级 FTS。
 
 ## 1.2 环境变量
 
@@ -225,15 +227,18 @@ location = /api/search/health {
 ### 5.1 容器启动（entrypoint）
 
 ```
-check /data/index.sqlite 的 contentHash 与 /app/content 当前指纹
-├── 一致 → serve
+check /data/index.sqlite：
+  1) contentHash 与 /app/content 当前指纹
+  2) manifest.model 与 MAGPIE_EMBED_MODEL
+├── 两者都一致 → serve（vectorEnabled=true）
 └── 缺失/不一致 → build（写临时文件，成功后原子 rename）
-    ├── 成功 → serve
-    ├── 失败且有旧索引 → 用旧索引 serve，stderr 告警
+    ├── 成功 → serve（新模型/新内容）
+    ├── 失败且有旧索引 → 用旧索引 serve（模型不一致时 vectorEnabled=false，仅 FTS）
     └── 失败且无索引 → exit 1（容器重启，watchtower/人工介入）
 ```
 
 - 内容指纹覆盖每篇的 `title + tags + date + 正文 sha256`，按 parentId 排序后汇总。
+- 模型名参与指纹判定：不同 embedding 模型的向量空间不可混用，即使维度相同。
 - 内容更新需要重建镜像（`src/content` 在镜像内）；新容器首次启动自动重建索引。
 - 构建失败不会破坏旧索引；旧索引缺少新内容，但搜索仍可用。
 - 查询 embedding 不可用时，服务仍可 FTS-only 运行；构建则必须能调通 magpie。
@@ -338,7 +343,60 @@ loopback shim 转发到公网 magpie，验证 host 网络/本地 URL 路径；sh
 > 频繁出现，先查网关本地延迟，再考虑调整 `MAGPIE_TIMEOUT_MS`。LRU 命中时
 > 查询约 5 ms，能显著降低重复 query 的网关压力。
 
-## 8. 安全与许可证
+## 8. 换 embedding 模型 / 订阅失效
+
+如果 mistral 订阅失效，或需要换到 magpie 的其他 embedding 模型（例如
+`text-embedding-3-small`），按以下流程操作。**不同模型的向量空间不兼容，
+即使维度相同也不能复用旧索引。**
+
+1. 修改宿主 env 文件：
+
+   ```bash
+   sudoedit /etc/gaubee-search.env
+   # MAGPIE_EMBED_MODEL=text-embedding-3-small
+   # 或 magpie 当前可用的其它模型
+   ```
+
+   同时确认 `MAGPIE_API_KEY` 对新模型仍有效（同一个 caller key 通常可用于
+   网关内所有模型；以网关实际返回为准）。
+
+2. 强制重建容器（改 env_file 后 `restart` 不够，需要 recreate）：
+
+   ```bash
+   cd /opt/gaubee.com   # compose 文件所在目录
+   docker compose up -d --force-recreate search-server
+   ```
+
+3. entrypoint 会执行 model-aware `check`：内容指纹相同、但
+   `manifest.model != MAGPIE_EMBED_MODEL` 时判定 stale，自动用新模型重建索引
+   （本机 1985 chunks：mistral 约 **80 s**，text-embedding-3-small 约 4 min；原子替换，失败不破坏旧索引）。
+
+4. 成功后的验证：
+
+   ```bash
+   curl -fsS http://127.0.0.1:17082/health | jq '{activeModel, indexModel, vectorEnabled, embedDim}'
+   # 期望 activeModel == indexModel，vectorEnabled=true，embedDim=新模型维度
+   docker logs gaubee-search-server 2>&1 | grep -E 'embedding|索引构建完成'
+   ```
+
+5. 构建失败时（key 无效 / 新模型不可用 / 网关故障）：
+   - 旧索引继续 serve；
+   - serve 启动日志出现 WARN：`embedding 模型与索引不一致：禁用向量检索，仅 FTS`；
+   - `/health` 显示 `vectorEnabled=false`、`activeModel` 为新模型、
+     `indexModel` 为旧模型；
+   - hybrid/vector 请求返回 `degraded=true` 的 FTS 结果，不会误用旧向量；
+   - 修复 key/模型后再次 `docker compose up -d --force-recreate search-server`，
+     entrypoint 会重试构建。
+
+6. 回滚：旧索引在成功重建时已被原子替换，因此回滚模型也需要再重建一次
+   （改回 env → recreate）。若希望保留快速回滚点，在切换前手动备份：
+
+   ```bash
+   sudo cp -a /opt/gaubee/search/index.sqlite /opt/gaubee/search/index.sqlite.prev
+   # 回滚：停服务 → 覆盖回 index.sqlite → 改回模型 → 启动
+   ```
+
+## 9. 安全与许可证
 
 - `MAGPIE_API_KEY` 只通过 `env_file: /etc/gaubee-search.env`（chmod 600）注入；
   不写入镜像、仓库、日志。日志只打印模型名、状态码与耗时不打印 key。
@@ -355,7 +413,7 @@ loopback shim 转发到公网 magpie，验证 host 网络/本地 URL 路径；sh
 - 换 embedding 模型会改变维度；索引元数据记录 `embedDim`，维度不一致时查询会
   自动降级 FTS-only（并告警），不会返回错误结果。
 
-## 9. 故障排查
+## 10. 故障排查
 
 | 现象 | 检查 |
 | --- | --- |
@@ -363,6 +421,7 @@ loopback shim 转发到公网 magpie，验证 host 网络/本地 URL 路径；sh
 | 启动即退出 | `docker logs`：无旧索引且构建失败（magpie 不可达/key 缺失/内容为空） |
 | health 长时间 unhealthy | 首次构建仍在进行；看 `docker logs -f` 的 embedding 进度，放宽 `start_period` |
 | 搜索一直 `degraded=true` | 查询 embedding 超时/失败：测 `MAGPIE_URL` 延迟；看日志中的状态码；临时调大 `MAGPIE_TIMEOUT_MS` |
+| `/health` 的 `vectorEnabled=false` | `indexModel` 与 `activeModel` 不一致（换模型未重建）或未配置 key；按第 8 节重建或恢复模型 |
 | 客户端一直走 MiniSearch | 浏览器 Network 看 `/api/search` 状态；openresty location 是否精确匹配；CORS 预检是否被 WAF 拦 |
 | 结果不含新文章 | 内容在镜像内：重建镜像并重启；`/health` 的 `indexBuiltAt` 是否变化 |
 | 索引损坏/无法打开 | 删除 `/opt/gaubee/search/index.sqlite` 重启，自动重建 |

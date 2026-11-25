@@ -158,11 +158,13 @@ impl EmbeddingClient {
         if config.model.trim().is_empty() {
             bail!("MAGPIE_EMBED_MODEL 为空");
         }
-        let client = Client::builder()
+        let builder = Client::builder()
             .timeout(config.timeout)
-            .connect_timeout(Duration::from_millis(1_500))
-            .build()
-            .context("创建 embedding HTTP 客户端失败")?;
+            .connect_timeout(Duration::from_millis(1_500));
+        // 单测的 mock server 不适合复用 keep-alive 连接；生产保持默认连接池。
+        #[cfg(test)]
+        let builder = builder.pool_max_idle_per_host(0);
+        let client = builder.build().context("创建 embedding HTTP 客户端失败")?;
         Ok(Self {
             client,
             endpoint: endpoint_for(&config.base_url),

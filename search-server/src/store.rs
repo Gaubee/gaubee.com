@@ -569,8 +569,8 @@ fn hit_from_meta(meta: &ChunkMeta, score: f32) -> Hit {
     }
 }
 
-/// 读取索引内容指纹（serve/entrypoint 检查索引是否过期）。
-pub fn read_content_hash(path: &Path) -> Result<Option<String>> {
+/// 读取索引 manifest（check/serve 校验内容与 embedding 模型用）。
+pub fn read_index_manifest(path: &Path) -> Result<Option<IndexManifest>> {
     if !path.is_file() {
         return Ok(None);
     }
@@ -585,7 +585,13 @@ pub fn read_content_hash(path: &Path) -> Result<Option<String>> {
         return Ok(None);
     };
     let manifest: IndexManifest = serde_json::from_str(&json).context("解析索引 manifest 失败")?;
-    Ok(Some(manifest.content_hash))
+    Ok(Some(manifest))
+}
+
+/// 读取索引内容指纹（历史接口，保留给测试/诊断）。
+#[cfg(test)]
+pub fn read_content_hash(path: &Path) -> Result<Option<String>> {
+    Ok(read_index_manifest(path)?.map(|manifest| manifest.content_hash))
 }
 
 /// jieba 预分词：保留含字母/数字/汉字的 token，丢弃纯标点与空白。

@@ -77,20 +77,49 @@ impl Drop for MockEmbeddingServer {
 }
 
 fn handle_connection(mut stream: TcpStream, mode: MockMode, delay_ms: u64) -> std::io::Result<()> {
+    // 监听 socket 是非阻塞的；accept 出来的连接在部分平台会继承该标志，
+    // 显式改回阻塞，避免 read 偶发 WouldBlock 被当成连接错误。
+    stream.set_nonblocking(false)?;
     stream.set_read_timeout(Some(Duration::from_secs(2)))?;
     let mut buffer = Vec::new();
+    loop {
+        let Some((headers, body)) = next_request(&mut stream, &mut buffer)? else {
+            return Ok(());
+        };
+        let close = headers.lines().any(|line| {
+            line.to_ascii_lowercase()
+                .strip_prefix("connection:")
+                .is_some_and(|value| value.trim() == "close")
+        });
+
+        if delay_ms > 0 {
+            std::thread::sleep(Duration::from_millis(delay_ms));
+        }
+        let response = response_for(mode, &body);
+        stream.write_all(&response)?;
+        if close {
+            return Ok(());
+        }
+    }
+}
+
+/// 从同一个 keep-alive 连接读取下一个请求；连接关闭返回 None。
+fn next_request(
+    stream: &mut TcpStream,
+    buffer: &mut Vec<u8>,
+) -> std::io::Result<Option<(String, Vec<u8>)>> {
     let mut chunk = [0u8; 4096];
     let header_end = loop {
-        let read = stream.read(&mut chunk)?;
-        if read == 0 {
-            return Ok(());
-        }
-        buffer.extend_from_slice(&chunk[..read]);
-        if let Some(position) = find_bytes(&buffer, b"\r\n\r\n") {
+        if let Some(position) = find_bytes(buffer, b"\r\n\r\n") {
             break position;
         }
+        let read = stream.read(&mut chunk)?;
+        if read == 0 {
+            return Ok(None);
+        }
+        buffer.extend_from_slice(&chunk[..read]);
         if buffer.len() > 2 * 1024 * 1024 {
-            return Ok(());
+            return Ok(None);
         }
     };
     let headers = String::from_utf8_lossy(&buffer[..header_end]).to_string();
@@ -109,16 +138,16 @@ fn handle_connection(mut stream: TcpStream, mode: MockMode, delay_ms: u64) -> st
     while buffer.len() < body_start + content_length {
         let read = stream.read(&mut chunk)?;
         if read == 0 {
-            break;
+            return Ok(None);
         }
         buffer.extend_from_slice(&chunk[..read]);
     }
-    let body = &buffer[body_start..(body_start + content_length).min(buffer.len())];
+    let body = buffer[body_start..body_start + content_length].to_vec();
+    buffer.drain(0..body_start + content_length);
+    Ok(Some((headers, body)))
+}
 
-    if delay_ms > 0 {
-        std::thread::sleep(Duration::from_millis(delay_ms));
-    }
-
+fn response_for(mode: MockMode, body: &[u8]) -> Vec<u8> {
     if let MockMode::Fail { status } = mode {
         let reason = match status {
             429 => "Too Many Requests",
@@ -126,10 +155,7 @@ fn handle_connection(mut stream: TcpStream, mode: MockMode, delay_ms: u64) -> st
             503 => "Service Unavailable",
             _ => "Error",
         };
-        let response =
-            format!("HTTP/1.1 {status} {reason}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
-        stream.write_all(response.as_bytes())?;
-        return Ok(());
+        return format!("HTTP/1.1 {status} {reason}\r\nContent-Length: 0\r\n\r\n").into_bytes();
     }
 
     let request: serde_json::Value = serde_json::from_slice(body).unwrap_or_default();
@@ -149,17 +175,16 @@ fn handle_connection(mut stream: TcpStream, mode: MockMode, delay_ms: u64) -> st
                     }
                 })
                 .to_string();
-                let response = format!(
-                    "HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                return format!(
+                    "HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
                     payload.len(),
                     payload
-                );
-                stream.write_all(response.as_bytes())?;
-                return Ok(());
+                )
+                .into_bytes();
             }
             dim
         }
-        MockMode::Fail { .. } => return Ok(()),
+        MockMode::Fail { .. } => return Vec::new(),
     };
     let data = inputs
         .iter()
@@ -180,13 +205,12 @@ fn handle_connection(mut stream: TcpStream, mode: MockMode, delay_ms: u64) -> st
         "usage": { "prompt_tokens": inputs.len(), "total_tokens": inputs.len() },
     })
     .to_string();
-    let response = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+    format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
         payload.len(),
         payload
-    );
-    stream.write_all(response.as_bytes())?;
-    Ok(())
+    )
+    .into_bytes()
 }
 
 /// 基于关键词的可复现向量：alpha/rust/异步 → 第 0 维，beta/向量/数据库 → 第 1 维，其余第 2 维。
