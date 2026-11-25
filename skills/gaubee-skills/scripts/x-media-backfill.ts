@@ -87,6 +87,8 @@ export interface QuotedTweet {
   text: string;
   created_at?: string;
   url?: string;
+  /** X 自带译文（若从页面捕获；站内优先 translations[quote.id]） */
+  xTrans?: string;
 }
 
 /** syndication 拉取器（注入用）：null=永久不可见，undefined=网络性失败 */

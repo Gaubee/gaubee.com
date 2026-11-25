@@ -335,7 +335,7 @@ describe("classifyTextCorrection（全库纠正判定纯函数）", () => {
     expect(extractQuote({ quoted_tweet: { text: "   ", user: { screen_name: "x" } } })).toBeNull();
   });
 
-  test("itemCard：quote 常显原帖正文与作者，不参与译/原 toggle", () => {
+  test("itemCard：quote 常显原帖正文与作者；无译文时不渲染切换器", () => {
     const t: Tweet = {
       id: "X2",
       text: "引用一下",
@@ -349,8 +349,37 @@ describe("classifyTextCorrection（全库纠正判定纯函数）", () => {
     expect(html).toContain("@orig");
     expect(html).toContain("原帖 &lt;b&gt;正文&lt;/b&gt;");
     expect(html).toContain('href="https://x.com/orig/status/9"');
-    // 原帖块不在 x-arch-orig/x-arch-trans 的 toggle 容器里
-    expect(html).toContain('<blockquote class="x-arch-quote">');
+    // 没有引用译文 → 只有一段纯文本，不出 xq- radio
+    expect(html).not.toContain('name="xq-9"');
+    expect(html).not.toContain("x-arch-quote-trans");
+  });
+
+  test("itemCard：quote 译文按 quote.id 复用同一 translations 文件，并出译/原切换", () => {
+    const t: Tweet = {
+      id: "X3",
+      text: "comment",
+      created_at: "2026-10-08T10:20:00.000Z",
+      kind: "liked",
+      author: "me",
+      quote: { id: "9", author: "orig", text: "Original quote text", url: "https://x.com/orig/status/9" },
+    };
+    const html = itemCard(t, { me: { name: "Me" } }, { "9": "引用原帖的中文译文" }, {});
+    expect(html).toContain('name="xq-9"');
+    expect(html).toContain('id="xq-9-zh"');
+    expect(html).toContain('id="xq-9-orig"');
+    expect(html).toContain("x-arch-quote-orig");
+    expect(html).toContain("x-arch-quote-trans");
+    expect(html).toContain("Original quote text");
+    expect(html).toContain("引用原帖的中文译文");
+    // 回退 X 自带译文
+    const withX = itemCard(
+      { ...t, quote: { ...t.quote!, xTrans: "X 自带译文" } },
+      { me: { name: "Me" } },
+      {},
+      {},
+    );
+    expect(withX).toContain("X 自带译文");
+    expect(withX).toContain('name="xq-9"');
   });
 
   test("存量含 t.co（与展开后的 orig 前缀失配）→ none，交给 t.co 展开路径", () => {

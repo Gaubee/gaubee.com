@@ -70,7 +70,12 @@ if (verifyOnly) {
   process.exit(bad === 0 ? 0 : 1);
 }
 
-interface Tweet { id: string; text?: string; created_at?: string }
+interface Tweet {
+  id: string;
+  text?: string;
+  created_at?: string;
+  quote?: { id?: string; text?: string };
+}
 
 const store: { items: Record<string, Tweet> } = JSON.parse(readFileSync(SRC, "utf8"));
 const zh: Record<string, string> = existsSync(TRANSLATIONS)
@@ -81,7 +86,20 @@ const missing = Object.values(store.items)
   .filter((t) => (t.text ?? "").trim() && !zh[t.id] && !hasCJK(t.text ?? ""))
   .map((t) => ({ id: t.id, text: t.text! }));
 
-if (missing.length === 0) {
+// 引用帖原帖（2026-11-25）：按 quote.id 走同一套译文库；同一 id 只导一次。
+// 已有译文（可能来自原帖本身作为主条目）或原文为中文时跳过。
+const seen = new Set(missing.map((m) => m.id));
+const quoteMissing: { id: string; text: string }[] = [];
+for (const t of Object.values(store.items)) {
+  const q = t.quote;
+  if (!q?.id || !(q.text ?? "").trim()) continue;
+  if (zh[q.id] || hasCJK(q.text) || seen.has(q.id)) continue;
+  seen.add(q.id);
+  quoteMissing.push({ id: q.id, text: q.text });
+}
+
+const allMissing = [...missing, ...quoteMissing];
+if (allMissing.length === 0) {
   console.log("无未翻译条目（非中文正文且缺译文的为 0），无需翻译增量");
   process.exit(0);
 }
@@ -93,9 +111,9 @@ if (!force) {
 }
 const CHUNK = 50;
 let n = 0;
-for (let i = 0; i < missing.length; i += CHUNK) {
+for (let i = 0; i < allMissing.length; i += CHUNK) {
   n++;
-  await Bun.write(path.join(outDir, `src-${String(n).padStart(2, "0")}.json`), JSON.stringify(missing.slice(i, i + CHUNK)));
+  await Bun.write(path.join(outDir, `src-${String(n).padStart(2, "0")}.json`), JSON.stringify(allMissing.slice(i, i + CHUNK)));
 }
-console.log(`导出 ${missing.length} 条未翻译（非中文正文）→ ${outDir}/src-01..${String(n).padStart(2, "0")}.json（${CHUNK} 条/块）`);
+console.log(`导出 ${allMissing.length} 条未翻译（非中文正文；含引用原帖 ${quoteMissing.length}）→ ${outDir}/src-01..${String(n).padStart(2, "0")}.json（${CHUNK} 条/块）`);
 console.log("下一步：Agent 翻译各块为 out-NN.json（{id:译文}，键一一对应），然后 --verify + x-translations-merge.ts");

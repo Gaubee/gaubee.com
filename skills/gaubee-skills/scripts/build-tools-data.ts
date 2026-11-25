@@ -99,7 +99,7 @@ function main(): number {
         created_at?: string;
         kind?: string;
         author?: string;
-        quote?: { author?: string; text?: string; url?: string };
+        quote?: { id?: string; author?: string; text?: string; url?: string; xTrans?: string };
       }
     >;
   }>(path.join(DATA, "sources", "x-likes", "x.json"));
@@ -116,9 +116,15 @@ function main(): number {
         // 事件页仍是全文，这里只是 WebApp 的轻量投影。
         text: (t.text ?? "").slice(0, 1000),
         zh: trans?.[t.id!] ? trans[t.id!]!.slice(0, 1000) : undefined,
-        // 引用帖原帖（2026-11-25）：搜索/交叉工具要能命中被引用的内容
+        // 引用帖原帖（2026-11-25）：搜索/交叉工具要能命中被引用的内容；
+        // 译文走同一个 translations 文件（键 = quote.id），没有则回退 X 自带译文。
         quote: t.quote?.text
-          ? { author: t.quote.author ?? "", text: t.quote.text.slice(0, 600), url: t.quote.url }
+          ? {
+              author: t.quote.author ?? "",
+              text: t.quote.text.slice(0, 600),
+              url: t.quote.url,
+              zh: ((t.quote.id ? trans?.[t.quote.id] : undefined) ?? t.quote.xTrans)?.slice(0, 600),
+            }
           : undefined,
       }))
       .sort((a, b) => b.at.localeCompare(a.at))

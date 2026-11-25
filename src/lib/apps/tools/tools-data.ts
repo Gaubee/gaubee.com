@@ -52,7 +52,7 @@ export interface XItem {
   text: string;
   zh?: string;
   /** 引用帖的原帖（2026-11-25）：搜索与交叉工具也要能命中引用内容 */
-  quote?: { author: string; text: string; url?: string };
+  quote?: { author: string; text: string; url?: string; zh?: string };
 }
 
 import { base } from "$app/paths";
@@ -133,7 +133,7 @@ export function searchX(items: XItem[], query: string): XItem[] {
   const out = kws.length
     ? items.filter((it) => {
         const hay =
-          `${it.text} ${it.zh ?? ""} ${it.author} ${it.quote?.author ?? ""} ${it.quote?.text ?? ""}`.toLowerCase();
+          `${it.text} ${it.zh ?? ""} ${it.author} ${it.quote?.author ?? ""} ${it.quote?.text ?? ""} ${it.quote?.zh ?? ""}`.toLowerCase();
         return kws.every((k) => hay.includes(k));
       })
     : items;
@@ -279,7 +279,7 @@ export function starXCross(repos: StarRepo[], items: XItem[], query = ""): StarX
       latest: list.map((x) => x.item.at ?? "").sort().at(-1) ?? "",
       authors: [...new Set(list.map((x) => x.item.author))],
       sample: `${list[0]!.item.zh ?? list[0]!.item.text}${
-        list[0]!.item.quote ? ` ｜ 引用 @${list[0]!.item.quote.author}：${list[0]!.item.quote.text}` : ""
+        list[0]!.item.quote ? ` ｜ 引用 @${list[0]!.item.quote.author}：${list[0]!.item.quote.zh ?? list[0]!.item.quote.text}` : ""
       }`,
     };
   });

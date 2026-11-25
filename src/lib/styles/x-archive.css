@@ -137,6 +137,24 @@
 .x-arch-quote-text {
   opacity: 0.9;
 }
+/* 引用原帖复用主推的 radio 切换机制（2026-11-25）：默认显示译文，选中「原」切换 */
+.x-arch-quote-orig {
+  display: none;
+}
+.x-arch-lang-input-orig:checked ~ .x-arch-quote-orig {
+  display: block;
+}
+.x-arch-lang-input-orig:checked ~ .x-arch-quote-trans {
+  display: none;
+}
+.x-arch-lang-input-orig:checked ~ .x-arch-quote-head .x-arch-lang-zh {
+  background: transparent;
+  color: var(--muted-foreground);
+}
+.x-arch-lang-input-orig:checked ~ .x-arch-quote-head .x-arch-lang-orig {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
 .x-arch-quote-text a {
   color: inherit;
   text-decoration: underline;

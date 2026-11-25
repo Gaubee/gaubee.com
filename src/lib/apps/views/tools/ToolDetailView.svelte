@@ -88,7 +88,7 @@
         .map((it) => ({
           a: `@${it.author}`,
           b: `${(it.zh ?? it.text).slice(0, 120)}${
-            it.quote ? ` ｜ 引用 @${it.quote.author}：${it.quote.text.slice(0, 80)}` : ""
+            it.quote ? ` ｜ 引用 @${it.quote.author}：${(it.quote.zh ?? it.quote.text).slice(0, 80)}` : ""
           }`,
           c: it.at,
         }));

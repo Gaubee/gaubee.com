@@ -53,6 +53,8 @@ export interface QuotedTweet {
   text: string;
   created_at?: string;
   url?: string;
+  /** X 自带译文（若抓到）；站内优先用 translations[quote.id] */
+  xTrans?: string;
 }
 
 export interface AuthorInfo {
@@ -244,25 +246,41 @@ export function itemCard(
     parts.push(`    <div class="x-arch-text">${origHtml}</div>`);
   }
   // 引用帖（2026-11-25）：原帖内容必须出现——此前只存了引用者的评论，读者看不到
-  // 被引用的正文。原文常显（不进 译/原 toggle），附作者与可点击原帖链接。
+  // 被引用的正文。原帖复用主推文的「译/原」切换机制，译文按 quote.id 从同一个
+  // translations 文件取（没有则回退 X 自带译文 quote.xTrans）——不是新造一套翻译。
   const quote = t.quote;
   if (quote?.text?.trim()) {
     const qAuthor = quote.author.trim();
     const qUrl =
       quote.url ??
       (quote.id && qAuthor ? `https://x.com/${qAuthor}/status/${quote.id}` : "");
+    const qKey = quote.id || t.id;
+    const qTranslation = quote.id ? (translations[quote.id] ?? quote.xTrans) : quote.xTrans;
+    const qRadios = qTranslation
+      ? `<input type="radio" name="xq-${qKey}" id="xq-${qKey}-zh" class="x-arch-lang-input x-arch-lang-input-zh" checked aria-label="显示引用译文" />` +
+        `<input type="radio" name="xq-${qKey}" id="xq-${qKey}-orig" class="x-arch-lang-input x-arch-lang-input-orig" aria-label="显示引用原文" />`
+      : "";
+    const qSwitch = qTranslation
+      ? `<span class="x-arch-lang-switch" role="group" aria-label="切换引用原文/译文">` +
+        `<label for="xq-${qKey}-zh" class="x-arch-lang-opt x-arch-lang-zh">译</label>` +
+        `<label for="xq-${qKey}-orig" class="x-arch-lang-opt x-arch-lang-orig">原</label></span>`
+      : "";
     const qHead =
       `<span class="x-arch-quote-label">引用</span>` +
       (qAuthor
         ? `<a class="x-arch-quote-author" href="https://x.com/${escapeHtml(qAuthor)}" target="_blank" rel="nofollow noopener">@${escapeHtml(qAuthor)}</a>`
         : "") +
       (quote.name ? `<span class="x-arch-quote-name">${escapeHtml(quote.name)}</span>` : "") +
+      qSwitch +
       (qUrl
         ? `<a class="x-arch-quote-link" href="${escapeHtml(qUrl)}" target="_blank" rel="noopener">原帖</a>`
         : "");
+    const qBody = qTranslation
+      ? `<div class="x-arch-quote-text x-arch-quote-orig">${richText(quote.text.trim())}</div>` +
+        `<div class="x-arch-quote-text x-arch-quote-trans">${richText(qTranslation)}</div>`
+      : `<div class="x-arch-quote-text">${richText(quote.text.trim())}</div>`;
     parts.push(
-      `    <blockquote class="x-arch-quote"><div class="x-arch-quote-head">${qHead}</div>` +
-        `<div class="x-arch-quote-text">${richText(quote.text.trim())}</div></blockquote>`,
+      `    <div class="x-arch-quote">${qRadios}<div class="x-arch-quote-head">${qHead}</div>${qBody}</div>`,
     );
   }
   const imgs = (t.mediaLocal ?? []).filter((p) => !p.endsWith(".mp4"));

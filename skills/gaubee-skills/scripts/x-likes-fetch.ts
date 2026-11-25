@@ -56,6 +56,7 @@ interface Tweet {
     text: string;
     created_at?: string;
     url?: string;
+    xTrans?: string;
   };
   thread?: { id: string; text: string; created_at?: string }[];
   synChecked?: boolean;
