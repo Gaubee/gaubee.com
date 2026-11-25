@@ -262,6 +262,14 @@
   text-underline-offset: 2px;
 }
 
+/* 长 URL / 长连续串必须可折行：Markdown 的 autolink 是单个不可断词，
+   应用内 56px Dock 挤压后的阅读区（390px 视口剩 ~300px）会被长链接撑出
+   横向滚动（实证：事件阅读流 325px 容器被 https://x.com/... 撑到 607px）。 */
+.prose,
+.event-markdown {
+  overflow-wrap: break-word;
+}
+
 /* 外链尾部图标（lucide external-link path，mask 内 stroke=black 产生 alpha） */
 .prose a.md-link-external::after,
 .event-markdown a.md-link-external::after {

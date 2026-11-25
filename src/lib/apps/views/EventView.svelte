@@ -426,7 +426,7 @@
                     href="/article/events/{entry.id.stem}"
                     aria-label={`打开 ${titleFor(entry)} 独立详情页`}
                   >
-                    详情
+                    <span class="hidden sm:inline">详情</span>
                     <ArrowUpRightIcon class="size-3.5" />
                   </a>
                 </div>
@@ -472,7 +472,7 @@
                       href="/article/events/{entry.id.stem}"
                       aria-label={`打开 ${titleFor(entry)} 独立详情页`}
                     >
-                      详情页
+                      <span class="hidden sm:inline">详情页</span>
                       <ArrowUpRightIcon class="size-3.5" />
                     </a>
                   </header>
