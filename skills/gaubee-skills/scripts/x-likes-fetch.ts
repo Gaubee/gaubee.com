@@ -234,12 +234,14 @@ async function main() {
   const argv = process.argv.slice(2);
   let backend = "browser";
   let userOverride = "";
+  let noMedia = false;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--backend") backend = argv[++i] ?? "browser";
     else if (argv[i] === "--user") userOverride = argv[++i] ?? "";
+    else if (argv[i] === "--no-media") noMedia = true;
   }
   if (!["browser", "xurl"].includes(backend)) {
-    console.error("usage: x-likes-fetch.ts [--backend browser|xurl] [--user <username>]");
+    console.error("usage: x-likes-fetch.ts [--backend browser|xurl] [--user <username>] [--no-media]");
     process.exit(2);
   }
 
@@ -331,6 +333,8 @@ async function main() {
       .slice(0, videoBackfill);
     wantMedia.push(...candidates);
   }
+  // 测试/隔离运行：--no-media 只抓文本与引用，不落任何媒体文件（避免污染 staging）
+  if (noMedia) wantMedia.length = 0;
   let mediaBytes = 0;
   let mediaFiles = 0;
   for (const t of wantMedia) {
