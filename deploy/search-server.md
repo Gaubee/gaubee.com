@@ -21,7 +21,8 @@
 - 静态站点仍由现有 Rust axum static-server 容器提供；search-server 是**独立容器**。
 - 索引是单文件 `/data/index.sqlite`，挂载宿主卷 `/opt/gaubee/search`，容器重建不丢。
 - 客户端仍是 `POST /api/search`；超时已调为 1200ms（冷启动 2500ms），
-  超时后回退浏览器端 MiniSearch。服务端查询 embedding 超时默认 2s 并降级 FTS。
+  超时后回退浏览器端 MiniSearch。服务端查询 embedding 超时生产默认 1s
+  （Dockerfile/compose；CLI 默认 2s），超时降级 FTS。
 - 查询 embedding 失败/超时（默认 2s）时服务自动降级为 FTS-only，响应
   `degraded: true`，客户端照常展示 FTS 结果。
 - serve 侧 query embedding 有 256 条进程内 LRU（key = 模型 + 查询文本），
@@ -322,9 +323,9 @@ loopback shim 转发到公网 magpie，验证 host 网络/本地 URL 路径；sh
 - 与线上 zvec（`https://gaubee.com/api/search`）同查询 top-5 对比：
   平均重合 **2.15/5**（中位 2；分布 0 条×2、1 条×5、2 条×4、3 条×6、4 条×3）。
   排名差异来自 chunk 粒度、embedding 模型与 RRF 融合，属预期。
-- 降级验证：把 `MAGPIE_TIMEOUT_MS` 设为 2000 并用公网 shim 时，首轮 20 条查询
-  全部在约 2.0 s 返回 `degraded=true`（FTS-only）；本地 mistral p50 387 ms
-  不应触发。`mode=fts` 不调用 embedding。
+- 降级验证：临时把 `MAGPIE_TIMEOUT_MS` 设为 2000（生产默认 1000）并用公网
+  shim 时，首轮 20 条查询全部在约 2.0 s 返回 `degraded=true`（FTS-only）；
+  本地 mistral p50 387 ms 不应触发。`mode=fts` 不调用 embedding。
 - 过滤/边界：apps、excludeApps、tags、dateFrom/dateTo 均生效；空查询返回空；
   `"`/`%_%`/`C++`/`!!!` 不报错；`github 日报` 的 20 条结果 parent 唯一；
   257 字查询返回 400。
@@ -339,7 +340,7 @@ loopback shim 转发到公网 magpie，验证 host 网络/本地 URL 路径；sh
 > **查询延迟风险**：生产必须使用同机 magpie（`network_mode: host` +
 > `http://127.0.0.1:3425`）。服务器实测 mistral p50 387 ms / max 580 ms，
 > 客户端 1200 ms（冷启动 2500 ms）可覆盖；公网 magpie 单次 1.5–27 s，不可用于
-> hybrid。服务端仍保留 2 s 超时降级 FTS 作为兜底；若 `/health` 的 degraded
+> hybrid。服务端生产默认 1 s 超时降级 FTS 作为兜底；若 `/health` 的 degraded
 > 频繁出现，先查网关本地延迟，再考虑调整 `MAGPIE_TIMEOUT_MS`。LRU 命中时
 > 查询约 5 ms，能显著降低重复 query 的网关压力。
 
