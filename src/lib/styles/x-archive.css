@@ -27,8 +27,20 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  /* 移动端（含应用内 56px Dock 挤压后的阅读区）单行放不下头像/作者/时间/
+     译原切换/原推文链接，必须允许换行；否则 flex:none 的「原推文」会把
+     文档撑出横向滚动（320px 实测溢出 51px，事件详情面板 607px/325px）。 */
+  flex-wrap: wrap;
+  row-gap: 2px;
   margin-bottom: 6px;
   font-size: 13px;
+}
+/* 390px 独立阅读页的卡片内宽 ~328px：8px 间距会让「原推文」差 2px 换行，
+   收到 7px 保持单行；更窄时自然换行兜底。 */
+@media (max-width: 430px) {
+  .x-arch-head {
+    column-gap: 7px;
+  }
 }
 
 .x-arch-avatar {
@@ -37,6 +49,9 @@
   height: 22px;
   border-radius: 999px;
   object-fit: cover;
+  /* 清掉 Tailwind Typography 给 .prose img 的上下外边距：22px 头像被撑出
+     66px 行高，头部整行发虚。 */
+  margin: 0;
 }
 
 .x-arch-kind {
@@ -111,6 +126,9 @@
   display: flex;
   align-items: baseline;
   gap: 6px;
+  /* 与主推头同策略：窄阅读区允许换行，避免「原帖」链接顶出引用块。 */
+  flex-wrap: wrap;
+  row-gap: 2px;
   margin-bottom: 4px;
   font-size: 12px;
 }
@@ -192,6 +210,8 @@
   object-fit: cover;
   border-radius: 10px;
   border: 1px solid var(--border);
+  /* 同上：网格 gap 负责间距，忽略 .prose img 的上下外边距（实测 24px）。 */
+  margin: 0;
 }
 .x-arch-media:has(> :only-child) .x-arch-img {
   height: auto;
@@ -202,7 +222,7 @@
 .x-arch-video {
   display: block;
   width: 100%;
-  margin-top: 8px;
+  margin: 8px 0 0;
   border-radius: 10px;
   background: #000;
 }

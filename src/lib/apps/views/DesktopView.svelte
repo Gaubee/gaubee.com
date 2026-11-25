@@ -227,7 +227,9 @@
   /* Widget 瀑布流：容器查询自适应列数 */
   .widget-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    /* 轨道最小宽度必须再与容器宽度取 min：320px 视口下内容区仅 ~231px，
+       固定 16rem（256px）会撑出桌面层横向滚动。 */
+    grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
     gap: 1rem;
     align-items: start;
   }
