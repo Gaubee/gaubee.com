@@ -28,13 +28,15 @@ const outputDirectory = join(projectRoot, "static", "search-index");
 const TARGET_SHARD_BYTES = 500 * 1024;
 
 interface ApplicationSource {
-  appId: "articles" | "shout";
+  appId: "articles" | "event";
   directory: "articles" | "events";
 }
 
 const applications: readonly ApplicationSource[] = [
   { appId: "articles", directory: "articles" },
-  { appId: "shout", directory: "events" },
+  // 2026-11-25 修复：event 应用注册的 searchService appId 是 "event"，
+  // 这里曾写 "shout"（旧名），manifest 对不上导致事件搜索静默返回空。
+  { appId: "event", directory: "events" },
 ];
 
 async function listMarkdownFiles(directoryPath: string): Promise<string[]> {
