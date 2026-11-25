@@ -56,14 +56,14 @@ ENV INDEX_FILE=/data/index.sqlite \
     EMBED_BATCH_SIZE=48 \
     EMBED_CONCURRENCY=4 \
     MAGPIE_BUILD_TIMEOUT_MS=180000 \
-    MAGPIE_TIMEOUT_MS=2000 \
+    MAGPIE_TIMEOUT_MS=1000 \
     RUST_LOG=info
 
 USER search
 EXPOSE 17082
 VOLUME ["/data"]
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=45m --retries=3 \
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5m --retries=3 \
     CMD curl -fsS http://127.0.0.1:17082/health || exit 1
 
 ENTRYPOINT ["/app/entrypoint.sh"]

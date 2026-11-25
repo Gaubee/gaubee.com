@@ -89,7 +89,7 @@ Content-Type: application/json
 | `MAGPIE_URL` | `https://magpie.aiweb.xin` | 网关基础地址；生产用 `http://127.0.0.1:3425`（host 网络） |
 | `MAGPIE_API_KEY` | 无 | caller key；**只放 env_file，不进仓库/镜像/日志** |
 | `MAGPIE_EMBED_MODEL` | `mistral-embed` | 1024 维；换模型必须重建索引（维度随模型变化） |
-| `MAGPIE_TIMEOUT_MS` | `2000` | serve 查询 embedding 超时（毫秒），超时降级 |
+| `MAGPIE_TIMEOUT_MS` | `1000` | serve 查询 embedding 超时（毫秒），超时降级 |
 | `MAGPIE_QUERY_RETRIES` | `0` | 查询重试次数；默认超时即降级，避免放大客户端超时 |
 | `EMBED_BATCH_SIZE` | `48` | 构建期每请求条数；mistral 下 64 条 1600 字符 chunk 会超 token 上限，超限自动二分拆批 |
 | `EMBED_CONCURRENCY` | `4` | 构建期并发请求数 |
@@ -166,7 +166,7 @@ services:
       EMBED_BATCH_SIZE: "48"
       EMBED_CONCURRENCY: "4"
       MAGPIE_BUILD_TIMEOUT_MS: "180000"
-      MAGPIE_TIMEOUT_MS: "2000"
+      MAGPIE_TIMEOUT_MS: "1000"
       # host 网络：直接监听宿主 loopback，供同机 openresty 反代
       SEARCH_BIND: 127.0.0.1:17082
     mem_limit: 512m
@@ -176,7 +176,7 @@ services:
       timeout: 3s
       retries: 3
       # 首次启动要调 magpie 建索引；按实测构建时间放宽（见第 7 节）
-      start_period: 45m
+      start_period: 5m
     logging:
       driver: json-file
       options:
