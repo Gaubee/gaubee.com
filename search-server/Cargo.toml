@@ -1,0 +1,45 @@
+[package]
+name = "search-server"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.92"
+description = "Semantic search service for gaubee.com powered by alibaba/zvec"
+license = "Apache-2.0"
+
+[[bin]]
+name = "search-server"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+axum = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive", "env"] }
+hex = "0.4"
+ndarray = "0.17"
+ort = { version = "=2.0.0-rc.15", default-features = false, features = [
+  "std",
+  "ndarray",
+  "download-binaries",
+  "copy-dylibs",
+  "tls-native",
+] }
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+sha2 = "0.10"
+thiserror = "2"
+tokenizers = "0.23"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+walkdir = "2"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

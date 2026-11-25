@@ -3,7 +3,7 @@ import { searchIndexProcessor } from "$lib/content-pipeline/processors/search-in
 import { tagsProcessor } from "$lib/content-pipeline/processors/tags";
 import { articlesSource } from "$lib/content-pipeline/sources/articles";
 import { defineRoute, leafRoute } from "$lib/router";
-import { createFileSearchService } from "$lib/search/file-service";
+import { createServerSearchService } from "$lib/search/server-service";
 import ListIcon from "@lucide/svelte/icons/list";
 /**
  * 文章应用（系统内置，不可卸载）。
@@ -79,7 +79,7 @@ export const articlesApp = defineApp({
     },
   ],
   vfsOwnership: ["src/content/articles/"],
-  searchService: () => createFileSearchService({ appId: "articles", appName: "文章" }),
+  searchService: () => createServerSearchService({ appId: "articles", appName: "文章" }),
   // ★ 声明式内容管道：articles 源 + 标签/搜索索引处理器
   contentPipeline: {
     source: articlesSource,

@@ -1,0 +1,9 @@
+# 仅把构建 search-server 镜像所需文件送入 build context。
+**
+!search-server/Cargo.toml
+!search-server/Cargo.lock
+!search-server/build.rs
+!search-server/src/**
+!search-server/scripts/**
+!src/content/articles/**
+!src/content/events/**
