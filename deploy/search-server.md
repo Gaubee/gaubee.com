@@ -248,7 +248,7 @@ docker compose restart search-server
 
 - 内容：1505 篇（articles 63 / events 1442），2903 chunks。
 - 构建（8 线程）：**272.1 s**；索引 `index/collection` **21.6 MiB / 56 个文件**
-  （dense HNSW + jieba FTS + 标量），`manifest.json` 4 KiB。
+  （dense Flat + jieba FTS + 标量），`manifest.json` 4 KiB。
 - 查询：冷启动首查 HTTP 端到端 34.5 ms；26 组查询 ×3 次（20 条中英混合 + app/date/tag
   过滤）中位 **5.23 ms**，p95 **6.46 ms**，最大 6.53 ms；服务端 `tookMs` 3–6 ms。
 - 进程 RSS：启动并跑完基准后约 **445 MiB**（模型 448 MiB 为主要占用）。
