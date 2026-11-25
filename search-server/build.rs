@@ -47,7 +47,13 @@ fn main() {
         println!("cargo:rustc-link-arg=-lclang_rt.osx");
     }
     #[cfg(target_os = "linux")]
-    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib_dir.display());
+    {
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib_dir.display());
+        // ort-sys 的静态 ONNX Runtime 由 C++ 编译，引用 libstdc++ 的 wstring/
+        // thread pool 符号；Linux 的 rust-lld 不会自动带上 libstdc++（CI 实证
+        // undefined symbol ..._M_replace_cold）。显式链接。
+        println!("cargo:rustc-link-arg=-lstdc++");
+    }
 
     println!("cargo:rerun-if-env-changed=ZVEC_SDK_DIR");
     println!("cargo:rerun-if-changed={}", lib_dir.display());
