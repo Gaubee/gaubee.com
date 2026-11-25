@@ -254,7 +254,7 @@ mod tests {
             timeout: std::time::Duration::from_secs(5),
             batch_size: 2,
             concurrency: 2,
-            max_retries: 1,
+            max_retries: 0,
         }
     }
 

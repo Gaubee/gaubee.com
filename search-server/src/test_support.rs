@@ -9,8 +9,17 @@ use std::time::Duration;
 
 #[derive(Debug, Clone, Copy)]
 pub enum MockMode {
-    Success { dim: usize },
-    Fail { status: u16 },
+    Success {
+        dim: usize,
+    },
+    Fail {
+        status: u16,
+    },
+    /// 模拟网关 400：单请求条数超过 max_batch 时返回 token 超限。
+    TooManyTokens {
+        dim: usize,
+        max_batch: usize,
+    },
 }
 
 pub struct MockEmbeddingServer {
@@ -123,15 +132,35 @@ fn handle_connection(mut stream: TcpStream, mode: MockMode, delay_ms: u64) -> st
         return Ok(());
     }
 
-    let MockMode::Success { dim } = mode else {
-        return Ok(());
-    };
     let request: serde_json::Value = serde_json::from_slice(body).unwrap_or_default();
     let inputs = request
         .get("input")
         .and_then(|value| value.as_array())
         .cloned()
         .unwrap_or_default();
+    let dim = match mode {
+        MockMode::Success { dim } => dim,
+        MockMode::TooManyTokens { dim, max_batch } => {
+            if inputs.len() > max_batch {
+                let payload = serde_json::json!({
+                    "error": {
+                        "code": "context_length_exceeded",
+                        "message": "Too many tokens overall, split into more batches."
+                    }
+                })
+                .to_string();
+                let response = format!(
+                    "HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    payload.len(),
+                    payload
+                );
+                stream.write_all(response.as_bytes())?;
+                return Ok(());
+            }
+            dim
+        }
+        MockMode::Fail { .. } => return Ok(()),
+    };
     let data = inputs
         .iter()
         .enumerate()

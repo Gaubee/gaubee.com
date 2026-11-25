@@ -32,4 +32,4 @@ fi
 
 exec /app/search-server serve \
     --index "$INDEX_FILE" \
-    --bind "${SEARCH_BIND:-0.0.0.0:17082}"
+    --bind "${SEARCH_BIND:-127.0.0.1:17082}"

@@ -50,10 +50,10 @@ RUN chmod +x /app/entrypoint.sh && chown -R search:search /app
 ENV INDEX_FILE=/data/index.sqlite \
     CONTENT_DIR=/app/content \
     BUILD_ON_START=1 \
-    SEARCH_BIND=0.0.0.0:17082 \
+    SEARCH_BIND=127.0.0.1:17082 \
     MAGPIE_URL=https://magpie.aiweb.xin \
-    MAGPIE_EMBED_MODEL=text-embedding-3-small \
-    EMBED_BATCH_SIZE=64 \
+    MAGPIE_EMBED_MODEL=mistral-embed \
+    EMBED_BATCH_SIZE=48 \
     EMBED_CONCURRENCY=4 \
     MAGPIE_BUILD_TIMEOUT_MS=180000 \
     MAGPIE_TIMEOUT_MS=2000 \
@@ -63,7 +63,7 @@ USER search
 EXPOSE 17082
 VOLUME ["/data"]
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=3s --start-period=45m --retries=3 \
     CMD curl -fsS http://127.0.0.1:17082/health || exit 1
 
 ENTRYPOINT ["/app/entrypoint.sh"]

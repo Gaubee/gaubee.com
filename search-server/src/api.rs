@@ -74,6 +74,9 @@ pub struct HealthResponse {
     pub embed_model: Option<String>,
     pub embed_configured: bool,
     pub embed_dim: usize,
+    pub embed_cache_entries: usize,
+    pub embed_cache_hits: u64,
+    pub embed_cache_misses: u64,
     pub docs: usize,
     pub documents: usize,
     pub chunks: usize,
@@ -220,6 +223,11 @@ fn run_search(state: &AppState, request: SearchRequest) -> Result<SearchResponse
 
 async fn health_handler(State(state): State<Arc<AppState>>) -> Json<HealthResponse> {
     let manifest = state.index.manifest();
+    let cache = state
+        .embedder
+        .as_ref()
+        .map(|client| client.cache_stats())
+        .unwrap_or_default();
     Json(HealthResponse {
         ok: true,
         engine: ENGINE,
@@ -229,6 +237,9 @@ async fn health_handler(State(state): State<Arc<AppState>>) -> Json<HealthRespon
             .map(|client| client.model().to_string()),
         embed_configured: state.embedder.is_some(),
         embed_dim: state.index.dim(),
+        embed_cache_entries: cache.entries,
+        embed_cache_hits: cache.hits,
+        embed_cache_misses: cache.misses,
         docs: state.index.chunk_count(),
         documents: state.index.document_count(),
         chunks: manifest.chunks,

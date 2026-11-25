@@ -6,8 +6,9 @@
 //! - 响应按 `index` 排序，逐个校验维度并做 L2 归一化（存储与查询都归一化，
 //!   检索时用点积即余弦相似度）；
 //! - serve 侧超时默认 2s，失败由调用方降级到 FTS-only。
+use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::mpsc;
+use std::sync::{mpsc, Mutex};
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
@@ -15,7 +16,11 @@ use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_BASE_URL: &str = "https://magpie.aiweb.xin";
-pub const DEFAULT_MODEL: &str = "text-embedding-3-small";
+/// mistral-embed 在本机/服务器网关的 p50 明显低于 text-embedding-3-small，
+/// 且 1024 维索引更小；默认模型与索引维度由 build 时实际返回自动落盘。
+pub const DEFAULT_MODEL: &str = "mistral-embed";
+/// 查询 embedding 进程内 LRU 容量（key = 模型 + 查询文本）。
+pub const QUERY_CACHE_CAPACITY: usize = 256;
 
 #[derive(Clone)]
 pub struct EmbeddingConfig {
@@ -35,9 +40,83 @@ impl Default for EmbeddingConfig {
             api_key: String::new(),
             model: DEFAULT_MODEL.to_string(),
             timeout: Duration::from_millis(2_000),
-            batch_size: 64,
+            batch_size: 48,
             concurrency: 4,
             max_retries: 2,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CacheStats {
+    pub entries: usize,
+    pub hits: u64,
+    pub misses: u64,
+}
+
+struct QueryCache {
+    capacity: usize,
+    map: HashMap<String, Vec<f32>>,
+    order: VecDeque<String>,
+    hits: u64,
+    misses: u64,
+}
+
+impl QueryCache {
+    fn new(capacity: usize) -> Self {
+        Self {
+            capacity,
+            map: HashMap::new(),
+            order: VecDeque::new(),
+            hits: 0,
+            misses: 0,
+        }
+    }
+
+    fn get(&mut self, key: &str) -> Option<Vec<f32>> {
+        let Some(position) = self.order.iter().position(|item| item == key) else {
+            self.misses += 1;
+            return None;
+        };
+        let owned = self.order.remove(position)?;
+        self.order.push_back(owned);
+        self.hits += 1;
+        self.map.get(key).cloned()
+    }
+
+    fn insert(&mut self, key: String, vector: Vec<f32>) {
+        if self.capacity == 0 {
+            return;
+        }
+        if self.map.contains_key(&key) {
+            if let Some(position) = self.order.iter().position(|item| item == &key) {
+                self.order.remove(position);
+            }
+            self.order.push_back(key.clone());
+            self.map.insert(key, vector);
+            return;
+        }
+        if self.map.len() >= self.capacity {
+            if let Some(oldest) = self.order.pop_front() {
+                self.map.remove(&oldest);
+            }
+        }
+        self.order.push_back(key.clone());
+        self.map.insert(key, vector);
+    }
+
+    fn remove(&mut self, key: &str) {
+        self.map.remove(key);
+        if let Some(position) = self.order.iter().position(|item| item == key) {
+            self.order.remove(position);
+        }
+    }
+
+    fn stats(&self) -> CacheStats {
+        CacheStats {
+            entries: self.map.len(),
+            hits: self.hits,
+            misses: self.misses,
         }
     }
 }
@@ -50,6 +129,7 @@ pub struct EmbeddingClient {
     batch_size: usize,
     concurrency: usize,
     max_retries: u32,
+    query_cache: Mutex<QueryCache>,
 }
 
 #[derive(Serialize)]
@@ -91,6 +171,7 @@ impl EmbeddingClient {
             batch_size: config.batch_size.max(1),
             concurrency: config.concurrency.max(1),
             max_retries: config.max_retries,
+            query_cache: Mutex::new(QueryCache::new(QUERY_CACHE_CAPACITY)),
         })
     }
 
@@ -99,7 +180,19 @@ impl EmbeddingClient {
     }
 
     /// 查询向量；`expected_dim` 来自索引元数据，不匹配立即报错（调用方降级）。
+    ///
+    /// 进程内 LRU 按「模型 + 查询文本」复用；命中时直接返回归一化向量。
     pub fn embed_query(&self, query: &str, expected_dim: usize) -> Result<Vec<f32>> {
+        let key = format!("{}\u{0}{query}", self.model);
+        if let Ok(mut cache) = self.query_cache.lock() {
+            if let Some(vector) = cache.get(&key) {
+                if vector.len() == expected_dim {
+                    return Ok(vector);
+                }
+                cache.remove(&key);
+            }
+        }
+
         let mut vectors = self.embed_all(std::slice::from_ref(&query.to_string()))?;
         let vector = vectors.pop().context("query embedding 返回空结果")?;
         if vector.len() != expected_dim {
@@ -108,7 +201,17 @@ impl EmbeddingClient {
                 vector.len()
             );
         }
+        if let Ok(mut cache) = self.query_cache.lock() {
+            cache.insert(key, vector.clone());
+        }
         Ok(vector)
+    }
+
+    pub fn cache_stats(&self) -> CacheStats {
+        self.query_cache
+            .lock()
+            .map(|cache| cache.stats())
+            .unwrap_or_default()
     }
 
     /// 批量 embedding，返回顺序与输入一致；所有向量已 L2 归一化。
@@ -194,6 +297,18 @@ impl EmbeddingClient {
             match self.embed_batch_once(texts) {
                 Ok(vectors) => return Ok(vectors),
                 Err(error) => {
+                    if error.split_batch && texts.len() > 1 {
+                        let middle = texts.len() / 2;
+                        tracing::warn!(
+                            batch = texts.len(),
+                            left = middle,
+                            right = texts.len() - middle,
+                            "embedding 批次超过网关 token 上限，拆分为两个子批次重试"
+                        );
+                        let mut vectors = self.embed_batch(&texts[..middle])?;
+                        vectors.extend(self.embed_batch(&texts[middle..])?);
+                        return Ok(vectors);
+                    }
                     let retryable = error.retryable;
                     if !retryable || attempt >= self.max_retries {
                         return Err(error.message);
@@ -231,6 +346,7 @@ impl EmbeddingClient {
                 return Err(BatchError {
                     retryable: error.is_timeout() || error.is_connect() || error.is_request(),
                     retry_after: None,
+                    split_batch: false,
                     message: anyhow::anyhow!("embedding 网络错误：{error}"),
                 });
             }
@@ -250,9 +366,15 @@ impl EmbeddingClient {
                 .take(300)
                 .collect::<String>()
                 .replace(&self.api_key, "[redacted]");
+            // 在完整 body 上判断，避免 300 字截断把标记截掉。
+            let split_batch = status.as_u16() == 400
+                && (body.contains("Too many tokens")
+                    || body.contains("context_length_exceeded")
+                    || body.to_ascii_lowercase().contains("too many tokens"));
             return Err(BatchError {
                 retryable: status.as_u16() == 429 || status.is_server_error(),
                 retry_after,
+                split_batch,
                 message: anyhow::anyhow!("embedding 网关返回 {status}：{snippet}"),
             });
         }
@@ -262,12 +384,14 @@ impl EmbeddingClient {
             .map_err(|error| BatchError {
                 retryable: false,
                 retry_after: None,
+                split_batch: false,
                 message: anyhow::anyhow!("解析 embedding 响应失败：{error}"),
             })?;
         if payload.data.len() != texts.len() {
             return Err(BatchError {
                 retryable: false,
                 retry_after: None,
+                split_batch: false,
                 message: anyhow::anyhow!(
                     "embedding 返回条数不匹配：期望 {}，实际 {}",
                     texts.len(),
@@ -287,6 +411,7 @@ impl EmbeddingClient {
 struct BatchError {
     retryable: bool,
     retry_after: Option<u64>,
+    split_batch: bool,
     message: anyhow::Error,
 }
 
@@ -331,8 +456,68 @@ mod tests {
             timeout: Duration::from_millis(timeout_ms),
             batch_size: 4,
             concurrency: 2,
-            max_retries: 1,
+            max_retries: 0,
         }
+    }
+
+    #[test]
+    fn default_model_is_mistral_embed() {
+        assert_eq!(DEFAULT_MODEL, "mistral-embed");
+        assert_eq!(QUERY_CACHE_CAPACITY, 256);
+    }
+
+    #[test]
+    fn query_cache_reuses_model_and_text() {
+        let server = MockEmbeddingServer::start(MockMode::Success { dim: 8 }, 0);
+        let client = EmbeddingClient::new(&config(server.url(), 5_000)).expect("client");
+        let first = client.embed_query("rust 异步", 8).expect("first");
+        let second = client.embed_query("rust 异步", 8).expect("cached");
+        assert_eq!(first, second);
+        let stats = client.cache_stats();
+        assert_eq!(stats.entries, 1);
+        assert_eq!(stats.hits, 1);
+        assert_eq!(stats.misses, 1);
+
+        client.embed_query("另一个查询", 8).expect("miss");
+        let stats = client.cache_stats();
+        assert_eq!(stats.entries, 2);
+        assert_eq!(stats.misses, 2);
+    }
+
+    #[test]
+    fn splits_batches_when_gateway_token_limit_exceeded() {
+        let server = MockEmbeddingServer::start(
+            MockMode::TooManyTokens {
+                dim: 8,
+                max_batch: 3,
+            },
+            0,
+        );
+        let mut config = config(server.url(), 5_000);
+        config.batch_size = 5;
+        config.concurrency = 1;
+        config.max_retries = 0;
+        let client = EmbeddingClient::new(&config).expect("client");
+        let texts = (0..10)
+            .map(|index| format!("text-{index}"))
+            .collect::<Vec<_>>();
+        let vectors = client.embed_all(&texts).expect("split and embed");
+        assert_eq!(vectors.len(), 10);
+        assert!(vectors.iter().all(|vector| vector.len() == 8));
+    }
+
+    #[test]
+    fn query_cache_is_lru() {
+        let mut cache = QueryCache::new(2);
+        cache.insert("a".to_string(), vec![1.0]);
+        cache.insert("b".to_string(), vec![2.0]);
+        assert_eq!(cache.get("a"), Some(vec![1.0]));
+        cache.insert("c".to_string(), vec![3.0]);
+        assert!(cache.map.contains_key("a"));
+        assert!(!cache.map.contains_key("b"));
+        assert!(cache.map.contains_key("c"));
+        assert_eq!(cache.get("b"), None);
+        assert_eq!(cache.stats().entries, 2);
     }
 
     #[test]

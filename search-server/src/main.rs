@@ -92,8 +92,8 @@ struct BuildArgs {
     index: PathBuf,
     #[command(flatten)]
     magpie: MagpieArgs,
-    /// 每请求 embedding 条数（实测 magpie 接受 256，默认 64）。
-    #[arg(long, default_value_t = 64, env = "EMBED_BATCH_SIZE")]
+    /// 每请求 embedding 条数（mistral 实测 48 可用、64 超 token 上限，默认 48）。
+    #[arg(long, default_value_t = 48, env = "EMBED_BATCH_SIZE")]
     embed_batch_size: usize,
     /// 并发 embedding 请求数（默认 4）。
     #[arg(long, default_value_t = 4, env = "EMBED_CONCURRENCY")]

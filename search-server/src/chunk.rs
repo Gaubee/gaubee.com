@@ -3,7 +3,7 @@
 //! 不再依赖本地 tokenizer：按 Unicode 字符窗口切分（默认 1600 字符 / 200
 //! overlap，单篇最多 8 个 chunk）。超过 8 个窗口时不再丢弃尾部，而是在
 //! [0, len-window] 上等距取样，保留首尾覆盖。1600 字符约对应 600–800 个
-//! 中英混合 token，远低于 text-embedding-3-small 的 8191 token 上限。
+//! 中英混合 token，远低于主流 embedding 模型的 8192 token 上限。
 use sha2::{Digest, Sha256};
 
 pub const WINDOW_CHARS: usize = 1600;
