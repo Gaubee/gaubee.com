@@ -41,11 +41,56 @@ interface Tweet {
   // 磁盘落点 = cdn-media/staging/x/<月>/<文件>（canonical key 布局，media-pack 输入约定）
   mediaLocal?: string[];
   videoLocal?: string[];
+  posterLocal?: string;
   // 捕捉 v2（kzf 2026-10-09 裁决③）：翻译态标记 + X 自动译文收割。
   // xTranslated=true 时 text 可能是 X 译文（点击展开原文失败）或已点开的原文——
   // 由 x-media-backfill.ts 重拉 syndication 保证原文，富化后清 xTranslated、保留 xTrans。
   xTranslated?: boolean;
   xTrans?: string;
+  // 富化产物（2026-11-25）：浏览器重扫不得丢这些字段——quote/线程/断点标记都由
+  // x-media-backfill 写入，若合并时被新抓取对象覆盖，引用原帖会整批消失。
+  quote?: {
+    id?: string;
+    author: string;
+    name?: string;
+    text: string;
+    created_at?: string;
+    url?: string;
+  };
+  thread?: { id: string; text: string; created_at?: string }[];
+  synChecked?: boolean;
+  quotesChecked?: string;
+  enrichedV2?: boolean;
+}
+
+/** 合并「已富化旧条目」与「浏览器新抓取」：文本取更长、媒体取更全，
+ *  但 quote / thread / 富化断点标记必须从旧条目继承（2026-11-25 修复）。 */
+export function mergeCaptured(prev: Tweet, fresh: Tweet): Tweet {
+  const text =
+    (prev.text ?? "").length >= (fresh.text ?? "").length ? prev.text : fresh.text;
+  const quote =
+    fresh.quote && (!prev.quote || fresh.quote.text.length >= prev.quote.text.length)
+      ? fresh.quote
+      : prev.quote;
+  return {
+    ...fresh,
+    text,
+    kind: prev.kind,
+    author: fresh.author || prev.author,
+    media: fresh.media?.length ? fresh.media : prev.media,
+    video: fresh.video?.length ? fresh.video : prev.video,
+    hasVideo: fresh.hasVideo || prev.hasVideo,
+    mediaLocal: prev.mediaLocal,
+    videoLocal: prev.videoLocal,
+    posterLocal: fresh.posterLocal || prev.posterLocal,
+    xTranslated: fresh.xTranslated ?? prev.xTranslated,
+    xTrans: fresh.xTrans ?? prev.xTrans,
+    quote,
+    thread: fresh.thread ?? prev.thread,
+    synChecked: prev.synChecked,
+    quotesChecked: prev.quotesChecked,
+    enrichedV2: prev.enrichedV2,
+  };
 }
 
 interface StreamCursor {
@@ -235,13 +280,7 @@ async function main() {
     } else if (prev.text === "" || prev.text === "(archive)") {
       // 捕捉 v2：新抓取没带翻译态时保留旧条目的标记/译文（点击失败的条目 text 为空，
       // 走的就是本分支——xTranslated 必须存活，否则富化层不会补原文）
-      store.items[t.id] = {
-        ...t,
-        xTranslated: t.xTranslated ?? prev.xTranslated,
-        xTrans: t.xTrans ?? prev.xTrans,
-        mediaLocal: prev.mediaLocal,
-        videoLocal: prev.videoLocal,
-      };
+      store.items[t.id] = mergeCaptured(prev, t);
     } else if (
       (!prev.author && (t.author || t.media?.length || t.hasVideo)) ||
       (t.hasVideo && !prev.hasVideo) ||
@@ -249,20 +288,7 @@ async function main() {
     ) {
       // 富数据补全：旧条目缺 author/media/hasVideo，浏览器重扫时回填；text 取更长的版本
       //（archive 的 fullText 是全文，浏览器 DOM 文本截断在 400——不能让截断版倒灌）
-      const text = (prev.text ?? "").length >= (t.text ?? "").length ? prev.text : t.text;
-      store.items[t.id] = {
-        ...t,
-        text,
-        kind: prev.kind,
-        author: t.author || prev.author,
-        media: t.media?.length ? t.media : prev.media,
-        video: t.video?.length ? t.video : prev.video,
-        mediaLocal: prev.mediaLocal,
-        videoLocal: prev.videoLocal,
-        // 捕捉 v2：翻译态/译文两边取有值的一边（新收割优先）
-        xTranslated: t.xTranslated ?? prev.xTranslated,
-        xTrans: t.xTrans ?? prev.xTrans,
-      };
+      store.items[t.id] = mergeCaptured(prev, t);
     }
   }
   store.updated_at = new Date().toISOString();
@@ -413,7 +439,9 @@ async function main() {
   );
 }
 
-main().catch((err) => {
-  console.error(err instanceof Error ? err.message : err);
-  process.exit(1);
-});
+if (import.meta.main) {
+  main().catch((err) => {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  });
+}

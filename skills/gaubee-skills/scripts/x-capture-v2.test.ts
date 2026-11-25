@@ -28,6 +28,7 @@ import {
   type AuthorRec,
   type SynFetcher,
 } from "./x-media-backfill.ts";
+import { mergeCaptured } from "./x-likes-fetch.ts";
 
 // ---------- 假 syndication payload ----------
 
@@ -449,5 +450,62 @@ describe("upsertAuthor / saveAuthors（捕捉 v2 头像覆盖）", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+// ---------- 浏览器重扫合并（2026-11-25 引用帖不被覆盖） ----------
+
+describe("mergeCaptured（富化字段继承）", () => {
+  const prev = {
+    id: "1",
+    text: "旧的全文",
+    created_at: "2026-10-01T00:00:00.000Z",
+    kind: "liked" as const,
+    author: "old",
+    mediaLocal: ["cdn-media/x/2026-10/a.jpg"],
+    quote: { id: "9", author: "orig", text: "原帖正文", url: "https://x.com/orig/status/9" },
+    thread: [{ id: "1", text: "第一段" }],
+    synChecked: true,
+    quotesChecked: "2026-11-25",
+    enrichedV2: true,
+  };
+
+  test("新抓取没有 quote/thread/断点标记时全部继承，媒体不被空值清掉", () => {
+    const fresh = {
+      id: "1",
+      text: "新抓到的原文",
+      created_at: "2026-10-01T00:00:00.000Z",
+      kind: "liked" as const,
+      author: "new",
+      hasVideo: true,
+    };
+    const m = mergeCaptured(prev, fresh);
+    expect(m.quote).toEqual(prev.quote);
+    expect(m.thread).toEqual(prev.thread);
+    expect(m.synChecked).toBe(true);
+    expect(m.quotesChecked).toBe("2026-11-25");
+    expect(m.enrichedV2).toBe(true);
+    expect(m.mediaLocal).toEqual(prev.mediaLocal);
+    expect(m.author).toBe("new");
+    expect(m.text).toBe("新抓到的原文"); // 新文本更长
+  });
+
+  test("新抓取带更长的引用原帖时更新；更短时保留旧的", () => {
+    const longer = mergeCaptured(prev, {
+      id: "1",
+      text: "x",
+      created_at: prev.created_at,
+      kind: "liked",
+      quote: { author: "orig", text: "原帖正文更长的版本" },
+    });
+    expect(longer.quote?.text).toBe("原帖正文更长的版本");
+    const shorter = mergeCaptured(prev, {
+      id: "1",
+      text: "x",
+      created_at: prev.created_at,
+      kind: "liked",
+      quote: { author: "orig", text: "短" },
+    });
+    expect(shorter.quote?.text).toBe("原帖正文");
   });
 });

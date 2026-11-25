@@ -85,7 +85,13 @@
     if (["x-search", "x-top-authors"].includes(toolId)) {
       return searchX(xitems, q)
         .slice(0, 20)
-        .map((it) => ({ a: `@${it.author}`, b: (it.zh ?? it.text).slice(0, 120), c: it.at }));
+        .map((it) => ({
+          a: `@${it.author}`,
+          b: `${(it.zh ?? it.text).slice(0, 120)}${
+            it.quote ? ` ｜ 引用 @${it.quote.author}：${it.quote.text.slice(0, 80)}` : ""
+          }`,
+          c: it.at,
+        }));
     }
     return [];
   }

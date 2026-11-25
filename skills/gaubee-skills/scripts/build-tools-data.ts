@@ -90,9 +90,19 @@ function main(): number {
   }
 
   // 3) x：只投影公开账号的推文正文与时间
-  const xstore = readJson<{ items?: Record<string, { id?: string; text?: string; created_at?: string; kind?: string; author?: string }> }>(
-    path.join(DATA, "sources", "x-likes", "x.json"),
-  );
+  const xstore = readJson<{
+    items?: Record<
+      string,
+      {
+        id?: string;
+        text?: string;
+        created_at?: string;
+        kind?: string;
+        author?: string;
+        quote?: { author?: string; text?: string; url?: string };
+      }
+    >;
+  }>(path.join(DATA, "sources", "x-likes", "x.json"));
   const trans = readJson<Record<string, string>>(path.join(SITE, "skills", "gaubee-skills", "translations", "x-tweets.zh.json"));
   if (xstore?.items) {
     const items = Object.values(xstore.items)
@@ -102,9 +112,14 @@ function main(): number {
         author: t.author ?? "",
         kind: t.kind ?? "liked",
         at: (t.created_at ?? "").slice(0, 10),
-        // 正文截到 280 字：WebApp 的检索与预览够用，整份 1.6MB 会拖慢首屏
-        text: (t.text ?? "").slice(0, 280),
-        zh: trans?.[t.id!] ? trans[t.id!]!.slice(0, 280) : undefined,
+        // 正文截到 1000 字（2026-11-25 从 280 上调）：检索/预览要能看到长帖主体；
+        // 事件页仍是全文，这里只是 WebApp 的轻量投影。
+        text: (t.text ?? "").slice(0, 1000),
+        zh: trans?.[t.id!] ? trans[t.id!]!.slice(0, 1000) : undefined,
+        // 引用帖原帖（2026-11-25）：搜索/交叉工具要能命中被引用的内容
+        quote: t.quote?.text
+          ? { author: t.quote.author ?? "", text: t.quote.text.slice(0, 600), url: t.quote.url }
+          : undefined,
       }))
       .sort((a, b) => b.at.localeCompare(a.at))
       .slice(0, 1500);

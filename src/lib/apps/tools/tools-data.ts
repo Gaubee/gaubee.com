@@ -51,6 +51,8 @@ export interface XItem {
   at: string;
   text: string;
   zh?: string;
+  /** 引用帖的原帖（2026-11-25）：搜索与交叉工具也要能命中引用内容 */
+  quote?: { author: string; text: string; url?: string };
 }
 
 import { base } from "$app/paths";
@@ -122,7 +124,7 @@ export function starTimeline(repos: StarRepo[], sinceDays = 90): Array<{ date: s
   return all.filter((x) => x.date >= since);
 }
 
-/** X 动态检索 */
+/** X 动态检索（含引用帖原帖，2026-11-25） */
 export function searchX(items: XItem[], query: string): XItem[] {
   const kws = query
     .toLowerCase()
@@ -130,7 +132,8 @@ export function searchX(items: XItem[], query: string): XItem[] {
     .filter(Boolean);
   const out = kws.length
     ? items.filter((it) => {
-        const hay = `${it.text} ${it.zh ?? ""} ${it.author}`.toLowerCase();
+        const hay =
+          `${it.text} ${it.zh ?? ""} ${it.author} ${it.quote?.author ?? ""} ${it.quote?.text ?? ""}`.toLowerCase();
         return kws.every((k) => hay.includes(k));
       })
     : items;
@@ -234,8 +237,9 @@ export function starXCross(repos: StarRepo[], items: XItem[], query = ""): StarX
   const candidates = new Map<string, { count: number; latest: string; authors: Set<string>; sample: string }>();
 
   for (const it of items) {
-    const text = it.text ?? "";
-    if (!text) continue;
+    // 引用帖的原帖也算正文（2026-11-25）：「有人试过吗」+ 原帖链接才是完整信号
+    const text = `${it.text ?? ""}\n${it.quote?.text ?? ""}`;
+    if (!text.trim()) continue;
     const seen = new Set<string>();
     for (const m of text.matchAll(/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)/g)) {
       if (RESERVED_OWNERS.has(m[1]!.toLowerCase())) continue;
@@ -274,7 +278,9 @@ export function starXCross(repos: StarRepo[], items: XItem[], query = ""): StarX
       count: list.length,
       latest: list.map((x) => x.item.at ?? "").sort().at(-1) ?? "",
       authors: [...new Set(list.map((x) => x.item.author))],
-      sample: list[0]!.item.zh ?? list[0]!.item.text,
+      sample: `${list[0]!.item.zh ?? list[0]!.item.text}${
+        list[0]!.item.quote ? ` ｜ 引用 @${list[0]!.item.quote.author}：${list[0]!.item.quote.text}` : ""
+      }`,
     };
   });
   if (q) {

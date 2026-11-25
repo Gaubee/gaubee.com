@@ -102,7 +102,7 @@ for (const s of STREAMS) {
               id: m?.[2] ?? "",
               author: m?.[1] ?? "",
               // 2026-11-25：不再截 400 字——长帖在 fixup 阶段点「展开全文」后重抓全文
-              text: (textEl?.innerText ?? "").slice(0, 6000),
+              text: (textEl?.innerText ?? "").slice(0, 25000),
               created_at: time?.getAttribute("datetime") ?? "",
               reposted: !!social && /repost|转发/i.test(social.textContent ?? ""),
               media,
@@ -189,7 +189,7 @@ for (const s of STREAMS) {
               const avatars = [...a.querySelectorAll('[data-testid^="UserAvatar-Container-"]')];
               const handle =
                 avatars[1]?.getAttribute("data-testid")?.replace("UserAvatar-Container-", "") ?? "";
-              if (qText) quote = { author: handle, text: qText.slice(0, 6000) };
+              if (qText) quote = { author: handle, text: qText.slice(0, 25000) };
             }
 
             out.push({
@@ -197,7 +197,7 @@ for (const s of STREAMS) {
               translated,
               xTrans,
               // 翻译态但没能切回原文：text 留空，交给 syndication 富化补原文
-              text: translated && !expandedFromTranslation ? "" : finalText.slice(0, 6000),
+              text: translated && !expandedFromTranslation ? "" : finalText.slice(0, 25000),
               quote,
             });
           }
