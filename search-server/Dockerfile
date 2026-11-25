@@ -20,13 +20,13 @@
 ARG RUST_VERSION=1.92
 ARG ZVEC_VERSION=0.8.1
 
-FROM rust:${RUST_VERSION}-bookworm AS builder
+FROM rust:${RUST_VERSION}-trixie AS builder
 
 ARG ZVEC_VERSION
 ARG TARGETARCH
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl libssl-dev pkg-config g++ libstdc++-12-dev \
+    && apt-get install -y --no-install-recommends ca-certificates curl libssl-dev pkg-config g++ \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
@@ -70,7 +70,7 @@ RUN ./target/release/search-server build \
       --model-dir /build/.cache/models/multilingual-e5-small \
       --threads "$(nproc)"
 
-FROM debian:bookworm-slim AS runtime
+FROM debian:trixie-slim AS runtime
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl libstdc++6 libgomp1 \
