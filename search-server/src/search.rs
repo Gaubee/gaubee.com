@@ -190,6 +190,7 @@ pub struct DedupedResult {
 /// 按 parentId 去重（保留最高分 chunk），排序后切片。
 pub fn dedupe_and_page(
     mut hits: Vec<ScoredHit>,
+    query: &str,
     offset: usize,
     limit: usize,
 ) -> (Vec<DedupedResult>, usize) {
@@ -220,7 +221,7 @@ pub fn dedupe_and_page(
             app_name: app_name(&scored.hit.app_id).to_string(),
             app_id: scored.hit.app_id,
             title: scored.hit.title,
-            excerpt: excerpt(&scored.hit.text, 160),
+            excerpt: excerpt_around(&scored.hit.text, query, 160),
             href: scored.hit.href,
             date: scored.hit.date,
             score: scored.score,
@@ -235,6 +236,75 @@ pub fn app_name(app_id: &str) -> &'static str {
         "articles" => "文章",
         _ => "内容",
     }
+}
+
+/// 查询感知摘要：优先截取命中词附近，避免 X 日报这类长文档的开头元数据占据摘要。
+/// 没有命中词（纯语义召回）时退回前缀摘要。
+pub fn excerpt_around(text: &str, query: &str, max_chars: usize) -> String {
+    let normalized = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if normalized.is_empty() {
+        return String::new();
+    }
+    let max_chars = max_chars.max(20);
+    let chars: Vec<char> = normalized.chars().collect();
+    if chars.len() <= max_chars {
+        return normalized;
+    }
+
+    let lower = normalized.to_lowercase();
+    let mut best: Option<usize> = None;
+    for term in query_terms(query) {
+        if let Some(byte) = lower.find(&term.to_lowercase()) {
+            let position = lower[..byte].chars().count();
+            best = Some(best.map_or(position, |current| current.min(position)));
+        }
+    }
+
+    let Some(position) = best else {
+        return excerpt(&normalized, max_chars);
+    };
+    if position <= max_chars / 3 {
+        return excerpt(&normalized, max_chars);
+    }
+
+    let start = position.saturating_sub(max_chars / 3);
+    let end = (start + max_chars).min(chars.len());
+    let snippet = chars[start..end].iter().collect::<String>();
+    let mut out = String::new();
+    if start > 0 {
+        out.push('…');
+    }
+    out.push_str(snippet.trim());
+    if end < chars.len() {
+        out.push('…');
+    }
+    out
+}
+
+/// 从查询里提取可检索词：拉丁词取整词，中文长词拆成 bigram（避免整句匹配不到）。
+fn query_terms(query: &str) -> Vec<String> {
+    let mut terms = Vec::new();
+    for raw in query.split(|c: char| c.is_whitespace() || c.is_ascii_punctuation()) {
+        let token = raw.trim_matches(|c: char| "，。！？；：、“”‘’（）《》".contains(c));
+        let count = token.chars().count();
+        if count < 2 {
+            continue;
+        }
+        let cjk = token
+            .chars()
+            .any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c));
+        if cjk && count > 4 {
+            let chars: Vec<char> = token.chars().collect();
+            for pair in chars.windows(2) {
+                terms.push(pair.iter().collect::<String>());
+            }
+        } else {
+            terms.push(token.to_string());
+        }
+    }
+    terms.sort();
+    terms.dedup();
+    terms
 }
 
 /// 截取前缀摘要（按 char 边界，避免切断 UTF-8）。
@@ -353,7 +423,7 @@ mod tests {
             ScoredHit::new(hit("a", 0.95, 10), SearchMode::Vector),
             ScoredHit::new(hit("c", 0.85, 30), SearchMode::Vector),
         ];
-        let (results, total) = dedupe_and_page(scored, 0, 10);
+        let (results, total) = dedupe_and_page(scored, "", 0, 10);
         assert_eq!(total, 3);
         assert_eq!(results.len(), 3);
         assert_eq!(results[0].id, "a");
@@ -372,7 +442,7 @@ mod tests {
                 )
             })
             .collect();
-        let (results, total) = dedupe_and_page(scored, 1, 2);
+        let (results, total) = dedupe_and_page(scored, "", 1, 2);
         assert_eq!(total, 5);
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].id, "p3");
@@ -388,6 +458,26 @@ mod tests {
         normalize_fts_scores(&mut hits);
         assert!((hits[0].score - 0.5).abs() < 1e-6);
         assert!((hits[1].score - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn excerpt_around_centers_on_query_term() {
+        let text = format!(
+            "{}多线程像普通函数一样调用{}",
+            "前文".repeat(60),
+            "后文".repeat(60)
+        );
+        let snippet = excerpt_around(&text, "像调用普通函数一样用多线程", 80);
+        assert!(snippet.contains("多线程"));
+        assert!(snippet.starts_with('…'), "snippet={snippet}");
+    }
+
+    #[test]
+    fn excerpt_around_falls_back_when_no_term_matches() {
+        let text = "一二三四五六七八九十".repeat(20);
+        let snippet = excerpt_around(&text, "完全无关的英文查询", 30);
+        assert!(snippet.starts_with("一二三四五"));
+        assert!(snippet.ends_with('…'));
     }
 
     #[test]

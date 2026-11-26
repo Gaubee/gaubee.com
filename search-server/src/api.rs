@@ -205,7 +205,7 @@ fn run_search(state: &AppState, request: SearchRequest) -> Result<SearchResponse
         normalize_fts_scores(&mut scored);
     }
 
-    let (results, total) = dedupe_and_page(scored, offset, limit);
+    let (results, total) = dedupe_and_page(scored, query, offset, limit);
     Ok(SearchResponse {
         results: results
             .into_iter()
@@ -321,6 +321,7 @@ async fn cors(request: Request, next: Next) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::chunk::{MAX_CHUNKS_PER_DOC, OVERLAP_CHARS, WINDOW_CHARS};
     use crate::embed::EmbeddingConfig;
     use crate::indexer::{build_index, BuildOptions};
     use crate::test_support::{MockEmbeddingServer, MockMode};
@@ -365,6 +366,9 @@ mod tests {
             embedding: config(url.clone()),
             incremental: false,
             max_new_chunks: 0,
+            window_chars: WINDOW_CHARS,
+            overlap_chars: OVERLAP_CHARS,
+            max_chunks_per_doc: MAX_CHUNKS_PER_DOC,
         })
         .expect("build");
         let index = LoadedIndex::open(&index_path).expect("open");

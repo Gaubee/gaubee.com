@@ -6,7 +6,7 @@ use std::time::Instant;
 use anyhow::{bail, Context, Result};
 use sha2::{Digest, Sha256};
 
-use crate::chunk::{chunk_text, MAX_CHUNKS_PER_DOC, OVERLAP_CHARS, WINDOW_CHARS};
+use crate::chunk::chunk_text_with;
 use crate::content::{load_content, SourceDocument};
 use crate::embed::{EmbeddingClient, EmbeddingConfig};
 use crate::manifest::{now_rfc3339, IndexManifest, FORMAT_VERSION};
@@ -21,6 +21,10 @@ pub struct BuildOptions {
     pub incremental: bool,
     /// 允许新算 embedding 的 chunk 上限；超过即中止。0 = 不限（构建机全量用）。
     pub max_new_chunks: usize,
+    /// 切分窗口（字符）。换 embedding 模型时按新模型的滑动窗口调整。
+    pub window_chars: usize,
+    pub overlap_chars: usize,
+    pub max_chunks_per_doc: usize,
 }
 
 #[derive(Debug)]
@@ -87,7 +91,12 @@ pub fn build_index(options: &BuildOptions) -> Result<BuildReport> {
             &document.text,
         );
         *apps.entry(document.app_id.clone()).or_default() += 1;
-        for chunk in chunk_text(&document.text) {
+        for chunk in chunk_text_with(
+            &document.text,
+            options.window_chars,
+            options.overlap_chars,
+            options.max_chunks_per_doc,
+        ) {
             pending.push(PendingChunk {
                 parent_id: document.parent_id.clone(),
                 app_id: document.app_id.clone(),
@@ -108,9 +117,9 @@ pub fn build_index(options: &BuildOptions) -> Result<BuildReport> {
     }
     tracing::info!(
         chunks = pending.len(),
-        window_chars = WINDOW_CHARS,
-        overlap_chars = OVERLAP_CHARS,
-        max_chunks_per_doc = MAX_CHUNKS_PER_DOC,
+        window_chars = options.window_chars,
+        overlap_chars = options.overlap_chars,
+        max_chunks_per_doc = options.max_chunks_per_doc,
         "chunk 切分与分词完成"
     );
 
@@ -118,7 +127,33 @@ pub fn build_index(options: &BuildOptions) -> Result<BuildReport> {
 
     // 增量：旧索引里 content_hash 与 chunk 序号都没变的 chunk 直接复用向量。
     // embedding 只依赖 (标题 + 正文 + 前缀模板)，三者在 hash 覆盖范围内，可安全跳过。
-    let reusable = if options.incremental {
+    //
+    // 但必须先比对「向量空间身份」：同内容换模型时 hash 不变，盲目复用会把
+    // 两个模型的向量混进一个索引。模型不同就忽略旧向量，本次退化为全量。
+    let base_manifest = crate::store::read_index_manifest(&options.index_path)?;
+    let same_space = base_manifest
+        .as_ref()
+        .map(|manifest| manifest.model.as_str() == client.space())
+        .unwrap_or(false);
+    // 切窗口/overlap/每篇上限同样会让 chunk 边界变化，不能按同序号复用。
+    let same_chunking = base_manifest
+        .as_ref()
+        .map(|manifest| {
+            manifest.chunk_window_chars == options.window_chars
+                && manifest.chunk_overlap_chars == options.overlap_chars
+                && manifest.max_chunks_per_doc == options.max_chunks_per_doc
+        })
+        .unwrap_or(false);
+    if options.incremental && base_manifest.is_some() && !(same_space && same_chunking) {
+        tracing::warn!(
+            base_model = ?base_manifest.as_ref().map(|manifest| &manifest.model),
+            current = %client.space(),
+            base_window = ?base_manifest.as_ref().map(|manifest| manifest.chunk_window_chars),
+            current_window = options.window_chars,
+            "索引模型或切分参数不一致：忽略旧向量，本次按全量重建"
+        );
+    }
+    let reusable = if options.incremental && same_space && same_chunking {
         crate::store::load_reusable_vectors(&options.index_path)?
     } else {
         Default::default()
@@ -221,9 +256,9 @@ pub fn build_index(options: &BuildOptions) -> Result<BuildReport> {
         apps,
         model: client.space().to_string(),
         embed_dim,
-        chunk_window_chars: WINDOW_CHARS,
-        chunk_overlap_chars: OVERLAP_CHARS,
-        max_chunks_per_doc: MAX_CHUNKS_PER_DOC,
+        chunk_window_chars: options.window_chars,
+        chunk_overlap_chars: options.overlap_chars,
+        max_chunks_per_doc: options.max_chunks_per_doc,
     };
 
     let records = pending
@@ -331,9 +366,11 @@ pub fn content_fingerprint(documents: &[SourceDocument]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::chunk::{MAX_CHUNKS_PER_DOC, OVERLAP_CHARS, WINDOW_CHARS};
     use crate::search::ValidatedFilters;
     use crate::store::{LoadedIndex, SearchMode};
     use crate::test_support::{MockEmbeddingServer, MockMode};
+    use rusqlite::Connection;
 
     fn write_fixture(root: &Path) {
         std::fs::create_dir_all(root.join("events")).unwrap();
@@ -377,6 +414,9 @@ mod tests {
             embedding: config(server.url()),
             incremental: true,
             max_new_chunks: 0,
+            window_chars: WINDOW_CHARS,
+            overlap_chars: OVERLAP_CHARS,
+            max_chunks_per_doc: MAX_CHUNKS_PER_DOC,
         })
         .expect("initial build");
         assert_eq!(first.embedded, 2);
@@ -394,6 +434,9 @@ mod tests {
             embedding: config(server.url()),
             incremental: true,
             max_new_chunks: 0,
+            window_chars: WINDOW_CHARS,
+            overlap_chars: OVERLAP_CHARS,
+            max_chunks_per_doc: MAX_CHUNKS_PER_DOC,
         })
         .expect("incremental build");
         assert_eq!(second.documents, 3);
@@ -420,10 +463,103 @@ mod tests {
             embedding: config(server.url()),
             incremental: false,
             max_new_chunks: 0,
+            window_chars: WINDOW_CHARS,
+            overlap_chars: OVERLAP_CHARS,
+            max_chunks_per_doc: MAX_CHUNKS_PER_DOC,
         })
         .expect("full build");
         assert_eq!(full.reused, 0);
         assert_eq!(full.embedded, 3);
+    }
+
+    #[test]
+    fn incremental_rebuild_ignores_vectors_from_other_model() {
+        let server = MockEmbeddingServer::start(MockMode::Success { dim: 8 }, 0);
+        let directory = tempfile::tempdir().unwrap();
+        let content = directory.path().join("content");
+        write_fixture(&content);
+        let index_path = directory.path().join("index.sqlite");
+
+        build_index(&BuildOptions {
+            content_root: content.clone(),
+            index_path: index_path.clone(),
+            embedding: config(server.url()),
+            incremental: true,
+            max_new_chunks: 0,
+            window_chars: WINDOW_CHARS,
+            overlap_chars: OVERLAP_CHARS,
+            max_chunks_per_doc: MAX_CHUNKS_PER_DOC,
+        })
+        .expect("initial build");
+
+        // 同内容、同维度，但模型名不同：hash 虽然一样，向量空间不可混用。
+        let mut other = config(server.url());
+        other.model = "other-embed".to_string();
+        let second = build_index(&BuildOptions {
+            content_root: content,
+            index_path,
+            embedding: other,
+            incremental: true,
+            max_new_chunks: 0,
+            window_chars: WINDOW_CHARS,
+            overlap_chars: OVERLAP_CHARS,
+            max_chunks_per_doc: MAX_CHUNKS_PER_DOC,
+        })
+        .expect("model-switch build");
+        assert_eq!(second.reused, 0, "换模型必须忽略旧向量");
+        assert_eq!(second.embedded, 2, "两篇都要用新模型重算");
+    }
+
+    #[test]
+    fn incremental_rebuild_ignores_vectors_from_other_chunking() {
+        let server = MockEmbeddingServer::start(MockMode::Success { dim: 8 }, 0);
+        let directory = tempfile::tempdir().unwrap();
+        let content = directory.path().join("content");
+        write_fixture(&content);
+        let index_path = directory.path().join("index.sqlite");
+
+        build_index(&BuildOptions {
+            content_root: content.clone(),
+            index_path: index_path.clone(),
+            embedding: config(server.url()),
+            incremental: true,
+            max_new_chunks: 0,
+            window_chars: WINDOW_CHARS,
+            overlap_chars: OVERLAP_CHARS,
+            max_chunks_per_doc: MAX_CHUNKS_PER_DOC,
+        })
+        .expect("initial build");
+
+        // 篡改 manifest 的窗口参数，模拟「换了切分参数」的旧索引。
+        let connection = Connection::open(&index_path).unwrap();
+        let raw: String = connection
+            .query_row("SELECT value FROM meta WHERE key = 'manifest'", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        let mut manifest: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        manifest["chunkWindowChars"] = serde_json::json!(800);
+        connection
+            .execute(
+                "UPDATE meta SET value = ?1 WHERE key = 'manifest'",
+                [manifest.to_string()],
+            )
+            .unwrap();
+        drop(connection);
+
+        let second = build_index(&BuildOptions {
+            content_root: content,
+            index_path,
+            embedding: config(server.url()),
+            incremental: true,
+            max_new_chunks: 0,
+            window_chars: WINDOW_CHARS,
+            overlap_chars: OVERLAP_CHARS,
+            max_chunks_per_doc: MAX_CHUNKS_PER_DOC,
+        })
+        .expect("chunking-switch build");
+        assert_eq!(second.reused, 0, "切分参数变化必须忽略旧向量");
+        assert_eq!(second.embedded, 2);
     }
 
     #[test]
@@ -440,6 +576,9 @@ mod tests {
             embedding: config(server.url()),
             incremental: true,
             max_new_chunks: 0,
+            window_chars: WINDOW_CHARS,
+            overlap_chars: OVERLAP_CHARS,
+            max_chunks_per_doc: MAX_CHUNKS_PER_DOC,
         })
         .expect("initial build");
 
@@ -455,6 +594,9 @@ mod tests {
             embedding: config(server.url()),
             incremental: true,
             max_new_chunks: 0,
+            window_chars: WINDOW_CHARS,
+            overlap_chars: OVERLAP_CHARS,
+            max_chunks_per_doc: MAX_CHUNKS_PER_DOC,
         })
         .expect("incremental build");
         assert_eq!(second.reused, 1, "未改动的那篇复用");
@@ -476,6 +618,9 @@ mod tests {
             embedding: config(server.url()),
             incremental: true,
             max_new_chunks: 0,
+            window_chars: WINDOW_CHARS,
+            overlap_chars: OVERLAP_CHARS,
+            max_chunks_per_doc: MAX_CHUNKS_PER_DOC,
         })
         .expect("build without existing index");
         assert_eq!(report.reused, 0);
@@ -497,6 +642,9 @@ mod tests {
             embedding: config(server.url()),
             incremental: true,
             max_new_chunks: 1,
+            window_chars: WINDOW_CHARS,
+            overlap_chars: OVERLAP_CHARS,
+            max_chunks_per_doc: MAX_CHUNKS_PER_DOC,
         })
         .unwrap_err();
         assert!(error.to_string().contains("超过上限"), "{error:#}");
@@ -517,6 +665,9 @@ mod tests {
             embedding: config(server.url()),
             incremental: false,
             max_new_chunks: 0,
+            window_chars: WINDOW_CHARS,
+            overlap_chars: OVERLAP_CHARS,
+            max_chunks_per_doc: MAX_CHUNKS_PER_DOC,
         })
         .expect("build");
         assert_eq!(report.documents, 2);
@@ -583,6 +734,9 @@ mod tests {
             embedding: config(good.url()),
             incremental: false,
             max_new_chunks: 0,
+            window_chars: WINDOW_CHARS,
+            overlap_chars: OVERLAP_CHARS,
+            max_chunks_per_doc: MAX_CHUNKS_PER_DOC,
         })
         .expect("initial build");
         let original = std::fs::read(&index_path).unwrap();
@@ -594,6 +748,9 @@ mod tests {
             embedding: config(bad.url()),
             incremental: false,
             max_new_chunks: 0,
+            window_chars: WINDOW_CHARS,
+            overlap_chars: OVERLAP_CHARS,
+            max_chunks_per_doc: MAX_CHUNKS_PER_DOC,
         })
         .unwrap_err();
         assert!(error.to_string().contains("503"));

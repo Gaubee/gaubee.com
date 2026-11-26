@@ -614,8 +614,7 @@ fn hit_from_meta(meta: &ChunkMeta, score: f32) -> Hit {
     }
 }
 
-/// 读取索引 manifest（仅测试/诊断用；check 走 `verify_index_integrity` 一次拿全）。
-#[cfg(test)]
+/// 读取索引 manifest（增量构建用它比对模型身份；check 走 `verify_index_integrity`）。
 pub fn read_index_manifest(path: &Path) -> Result<Option<IndexManifest>> {
     if !path.is_file() {
         return Ok(None);
