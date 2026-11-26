@@ -72,6 +72,7 @@ Content-Type: application/json
 | `EMBED_CONCURRENCY` | `1` | 构建期并发（llama-server 单 slot 时只能 1） |
 | `EMBED_BUILD_TIMEOUT_MS` | `900000` | 构建期单请求超时（1600 字符 chunk 单批可达数分钟） |
 | `EMBED_INCREMENTAL` | `true` | 复用旧索引中内容未变的向量 |
+| `EMBED_MAX_NEW_CHUNKS` | `0` | 增量重建允许新算的 chunk 上限；自动任务设 300，超过即中止（防误触发全量） |
 | `INDEX_FILE` | `/data/index.sqlite` | 索引文件 |
 | `CONTENT_DIR` | `/app/content` | 镜像内公开内容目录 |
 | `BUILD_ON_START` | `0` | 生产默认 0：只 check 不重建；`1` 才在启动时重建 |
@@ -199,10 +200,14 @@ check /data/index.sqlite：
     │   ├── 成功 → serve
     │   ├── 失败且有旧索引 → 用旧索引 serve
     │   └── 失败且无索引 → exit 1
-    └── BUILD_ON_START=0（生产默认）→ exit 1，并打印离线重建命令
+    ├── BUILD_ON_START=0 且结构完整（内容/模型过期）→ **服务旧索引**并告警，
+    │   等 index-sync 增量重建（避免 auto-update 重建容器时崩溃循环）
+    └── BUILD_ON_START=0 且索引缺失/损坏 → exit 1，并打印离线重建命令
 ```
 
 - **生产用 `BUILD_ON_START=0`**：服务器只有 2 核，全量重建要小时级，不能放在启动路径。
+- `check --allow-stale` 只放宽「内容/模型过期」，结构损坏仍然失败；这是 auto-update
+  每 5 分钟可能重建容器时的安全垫。
 - 完整性校验是新增的（2026-11-26）：损坏或版本不符的索引不再「check 通过、serve 崩」，
   避免容器进入崩溃循环。
 - 内容指纹覆盖 `title + tags + date + 正文 sha256`，按 parentId 排序后汇总。
@@ -261,8 +266,40 @@ curl -fsS http://127.0.0.1:17082/health | jq '{engine,vectorEnabled,indexModel,d
 ### 5.4 索引与发布的先后
 
 `src/content` 随镜像发布；**新 event 一发布，线上索引就相对内容变旧**。
-当前策略：索引只用于搜索召回，内容变旧不影响站点渲染，但新文章搜不到。
-每次日报发布后执行 5.3 的增量重建（几分钟），索引就追上内容。
+索引只用于搜索召回，变旧不影响站点渲染，但新文章搜不到。
+
+### 5.5 自动追索引（index-sync）
+
+发布链路已经自动化，不再需要人跑 5.3：
+
+```
+日报发布 → CI 重建 gaubee-search 镜像（含新 src/content）
+         → 服务器 auto-update（每 5 分钟）拉镜像并重建容器（此时服务旧索引）
+         → index-sync（每 10 分钟）发现镜像内容比索引新 → 增量重建 → 重启 search-server
+```
+
+安装（一次性）：
+
+```bash
+scp search-server/scripts/index-sync.sh gaubee-cloud:/etc/edge/gaubeeos/index-sync.sh
+ssh gaubee-cloud 'chmod +x /etc/edge/gaubeeos/index-sync.sh'
+ssh gaubee-cloud '(crontab -l 2>/dev/null; echo "*/10 * * * * /etc/edge/gaubeeos/index-sync.sh >> /var/log/gaubee-search-index.log 2>&1") | crontab -'
+```
+
+机制与保护：
+
+- 用 `index.source` 侧文件记录「索引来自哪个镜像 ID」；镜像没变就直接跳过（零成本）。
+- 先跑 `check`：内容一致只更新侧文件；结构损坏则拒绝自愈并告警。
+- 只做增量；`--max-new-chunks 300` 兜底——窗口参数或模型变化会变成全量，直接中止，
+  要求回构建机处理。正常日报增量是 8–30 个 chunk，2–5 分钟。
+- 重建失败保留旧索引；线上始终有可服务的索引。
+- 日志：`/var/log/gaubee-search-index.log`，cron 每 10 分钟一次，`flock` 防重入。
+
+手动触发一次：
+
+```bash
+ssh gaubee-cloud '/etc/edge/gaubeeos/index-sync.sh'
+```
 
 ## 6. 旧版清理
 
@@ -349,9 +386,9 @@ bge-small-zh 看起来更省，但 512 token 上下文装不下 1600 字符 chun
 | --- | --- |
 | `/health` 里 `vectorEnabled=false` | `indexModel` 与 `activeModel` 是否相同；不同则索引与当前 `EMBED_*` 不匹配，重建或改回 |
 | 响应 `degraded=true` | embedding 服务不可达或超时；`docker logs gaubee-embed`、`curl 127.0.0.1:18081/health` |
-| 容器反复重启 | `check` 失败且 `BUILD_ON_START=0`；看日志里的完整性/指纹原因，按 5.3 重建 |
+| 容器反复重启 | 索引结构损坏或缺失（stale 会照常服务）；看日志里的完整性原因，按 5.3 重建 |
 | embedding 返回 400「is larger than the max context size」 | llama-server `-c` 太小或 `-np` 把上下文对半分；改 `-c 4096 -np 1` |
 | 查询很慢（>1s） | 首次查询在预热模型；持续慢则看 `docker stats` 的 CPU 是否被其它容器抢占 |
 | openresty 502 | 容器是否 `network_mode: host`；`ss -tlnp \| grep 17082` 是否只监听 127.0.0.1 |
-| 新文章搜不到 | 索引比内容旧；按 5.3 做增量重建 |
+| 新文章搜不到 | 等 index-sync（每 10 分钟）；或手动跑一次并看 `/var/log/gaubee-search-index.log` |
 | 内存吃紧 | search-server 限 300m、embed 限 600m；如实测 RSS 明显上涨，先看是否 `-np` 被调大 |

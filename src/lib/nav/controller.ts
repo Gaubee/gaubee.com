@@ -41,8 +41,8 @@ export interface HistoryLocationState {
   [key: string]: unknown;
 }
 
-/** pop 区路由集合（搜索、通知为浮层应用，走 /app/* 新路径）。 */
-export const POP_ROUTES = ["/app/search", "/app/notifications"] as const;
+/** pop 区路由集合（目前只有通知是浮层应用；搜索已于 2026-11-26 改为 main 独立应用）。 */
+export const POP_ROUTES = ["/app/notifications"] as const;
 export type PopRoute = (typeof POP_ROUTES)[number];
 
 export interface NavLayout {
@@ -162,7 +162,7 @@ const PERSIST_DEBOUNCE_MS = 300;
 const STORAGE_KEY = "gaubee:os:nav-layout";
 
 // 动态 TabRegistry，从外部注入
-// 默认值使用新路径（search/notifications 为 pop 浮层，不在 main/bottom tab）
+// 默认值使用新路径（notifications 为 pop 浮层；搜索已于 2026-11-26 改为 main 应用）
 const DEFAULT_ALL_TABS = [
   "/app/articles",
   "/app/event",
@@ -175,7 +175,7 @@ let tabRegistry: TabRegistry = {
   allTabs: [...DEFAULT_ALL_TABS],
   defaultMainTabs: ["/app/articles", "/app/event", "/app/settings"],
   defaultBottomTabs: ["/app/github", "/app/terminal"],
-  popRoutes: ["/app/search", "/app/notifications"],
+  popRoutes: ["/app/notifications"],
 };
 
 /** 兼容性导出：旧静态常量（指向 tabRegistry 默认值）。

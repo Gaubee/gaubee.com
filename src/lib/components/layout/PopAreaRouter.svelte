@@ -16,10 +16,9 @@
 
   const navState = $derived(navStore.current)
 
-  // 根据当前 pop 路径决定标题与图标（pop 路径为 /app/search、/app/notifications）
+  // 根据当前 pop 路径决定标题与图标（目前 pop 只剩通知；搜索已是 main 应用）
   const title = $derived.by(() => {
     const path = navState.popLocation.pathname
-    if (path.startsWith('/app/search')) return '搜索'
     if (path.startsWith('/app/notifications')) return '通知'
     return '弹层'
   })
