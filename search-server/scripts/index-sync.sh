@@ -72,12 +72,14 @@ if ! run_check --allow-stale >/tmp/index-sync-stale.log 2>&1; then
 fi
 
 log "index is stale; incremental rebuild (max new chunks: $MAX_NEW_CHUNKS)"
+# 先留上一代；build 内部写临时文件、成功后原子替换 --index，失败不碰旧索引。
+cp -f "$MODELS_DIR/index.sqlite" "$MODELS_DIR/index.sqlite.prev"
 if ! docker run --rm --network host --user 0:0 \
     -v "$MODELS_DIR:/data" \
     --entrypoint /app/search-server \
     "$IMG_ID" build \
         --content /app/content \
-        --index /data/index.sqlite.new \
+        --index /data/index.sqlite \
         --embed-url "$EMBED_URL" \
         --embed-model "$EMBED_MODEL" \
         --embed-prompts "$EMBED_PROMPTS" \
@@ -88,15 +90,12 @@ if ! docker run --rm --network host --user 0:0 \
     >/tmp/index-sync-build.log 2>&1; then
     log "ERROR: rebuild failed; keeping the old index"
     tail -8 /tmp/index-sync-build.log | sed 's/^/  /'
-    rm -f "$MODELS_DIR/index.sqlite.new"
     exit 1
 fi
 
 grep -E "索引构建完成|增量重建" /tmp/index-sync-build.log | sed 's/^/  /'
 
-# 原子替换 + 保留上一代。
-cp -f "$MODELS_DIR/index.sqlite" "$MODELS_DIR/index.sqlite.prev"
-mv -f "$MODELS_DIR/index.sqlite.new" "$MODELS_DIR/index.sqlite"
+# build 已原子替换 index.sqlite；只补权限与侧文件。
 chmod 644 "$MODELS_DIR/index.sqlite" "$MODELS_DIR/index.sqlite.prev"
 printf '%s\n' "$IMG_ID" >"$SIDECAR"
 

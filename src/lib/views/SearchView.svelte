@@ -133,9 +133,12 @@
   }
 
   function publish(buffer: Map<string, SearchResult>): void {
-    results = [...buffer.values()].sort(
-      (left, right) => right.date - left.date || right.score - left.score,
-    )
+    results = [...buffer.values()].sort(byRelevance)
+  }
+
+  /** 相关性优先，同分再看时间。服务端分数是 RRF/余弦，跨应用也大致可比。 */
+  function byRelevance(left: SearchResult, right: SearchResult): number {
+    return right.score - left.score || right.date - left.date
   }
 
   function schedulePublish(buffer: Map<string, SearchResult>, controller: AbortController): void {
@@ -198,9 +201,7 @@
         } else if (progress.type === 'service-error') {
           error = `${progress.appId} 搜索失败：${progress.message}`
         } else if (progress.type === 'complete') {
-          const final = [...buffer.values()].sort(
-            (left, right) => right.date - left.date || right.score - left.score,
-          )
+          const final = [...buffer.values()].sort(byRelevance)
           results = final
           searching = false
           completed = true
