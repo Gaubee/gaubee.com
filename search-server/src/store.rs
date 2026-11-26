@@ -20,7 +20,7 @@ use rusqlite::{params, params_from_iter, Connection, OpenFlags, OptionalExtensio
 use sha2::{Digest, Sha256};
 
 use crate::manifest::IndexManifest;
-use crate::search::{rrf_score, ValidatedFilters};
+use crate::search::{rrf_score_weighted, FusionWeights, ValidatedFilters};
 
 static JIEBA: LazyLock<Jieba> = LazyLock::new(Jieba::new);
 
@@ -301,6 +301,8 @@ pub struct LoadedIndex {
     connection: Mutex<Connection>,
     chunks: Vec<ChunkMeta>,
     vectors: Vec<f32>,
+    /// chunk 级词文档频率（小写 token），供 PRF 用全库 IDF 抑制泛词。
+    token_df: HashMap<String, u32>,
     dim: usize,
     manifest: IndexManifest,
     path: PathBuf,
@@ -308,6 +310,15 @@ pub struct LoadedIndex {
 
 impl LoadedIndex {
     pub fn open(path: &Path) -> Result<Self> {
+        Self::open_inner(path, false)
+    }
+
+    /// 额外统计全库词频（PRF 用）。默认 `open` 不做，避免关闭 PRF 时白付内存/启动成本。
+    pub fn open_with_prf_stats(path: &Path) -> Result<Self> {
+        Self::open_inner(path, true)
+    }
+
+    fn open_inner(path: &Path, with_token_stats: bool) -> Result<Self> {
         let connection = Connection::open_with_flags(
             path,
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
@@ -334,16 +345,20 @@ impl LoadedIndex {
             bail!("索引 embedDim 非法：0");
         }
 
-        let mut statement = connection.prepare(
+        let mut sql = String::from(
             "SELECT d.id, d.parent_id, d.app_id, d.title, d.tags, d.date,
-                    d.chunk_index, d.href, d.text, v.embedding
-             FROM docs d JOIN vectors v ON v.doc_id = d.id
-             ORDER BY d.id",
-        )?;
+                    d.chunk_index, d.href, d.text, v.embedding",
+        );
+        if with_token_stats {
+            sql.push_str(", d.text_tokens");
+        }
+        sql.push_str(" FROM docs d JOIN vectors v ON v.doc_id = d.id ORDER BY d.id");
+        let mut statement = connection.prepare(&sql)?;
         let mut rows = statement.query([])?;
         let dim = manifest.embed_dim;
         let mut chunks = Vec::new();
         let mut vectors = Vec::new();
+        let mut token_df: HashMap<String, u32> = HashMap::new();
         while let Some(row) = rows.next()? {
             let blob: Vec<u8> = row.get(9)?;
             if blob.len() != dim * 4 {
@@ -354,6 +369,16 @@ impl LoadedIndex {
                 );
             }
             vectors.extend(decode_vector(&blob)?);
+            if with_token_stats {
+                let text_tokens: String = row.get(10)?;
+                let mut seen = HashSet::new();
+                for token in text_tokens.split_whitespace() {
+                    let lower = token.to_lowercase();
+                    if seen.insert(lower.clone()) {
+                        *token_df.entry(lower).or_insert(0) += 1;
+                    }
+                }
+            }
             chunks.push(ChunkMeta {
                 doc_id: row.get(0)?,
                 parent_id: row.get(1)?,
@@ -378,6 +403,7 @@ impl LoadedIndex {
             connection: Mutex::new(connection),
             chunks,
             vectors,
+            token_df,
             dim,
             manifest,
             path: path.to_path_buf(),
@@ -390,6 +416,14 @@ impl LoadedIndex {
 
     pub fn dim(&self) -> usize {
         self.dim
+    }
+
+    /// chunk 级文档频率（大小写不敏感）；未知 token 返回 0。
+    pub fn document_frequency(&self, token: &str) -> u32 {
+        self.token_df
+            .get(&token.to_lowercase())
+            .copied()
+            .unwrap_or(0)
     }
 
     pub fn path(&self) -> &Path {
@@ -425,8 +459,27 @@ impl LoadedIndex {
             }
             SearchMode::Hybrid => {
                 let embedding = embedding.context("hybrid 检索缺少 query embedding")?;
-                self.hybrid_search(embedding, query, filters, topk)
+                self.hybrid_search(embedding, query, filters, topk, FusionWeights::default())
             }
+        }
+    }
+
+    /// 与 `search` 相同，但 hybrid 融合可按路加权（PRF/评测用）。
+    pub fn search_weighted(
+        &self,
+        mode: SearchMode,
+        embedding: Option<&[f32]>,
+        query: &str,
+        filters: &ValidatedFilters,
+        topk: usize,
+        weights: FusionWeights,
+    ) -> Result<Vec<Hit>> {
+        if mode == SearchMode::Hybrid {
+            let topk = topk.clamp(1, 1_000);
+            let embedding = embedding.context("hybrid 检索缺少 query embedding")?;
+            self.hybrid_search(embedding, query, filters, topk, weights)
+        } else {
+            self.search(mode, embedding, query, filters, topk)
         }
     }
 
@@ -552,17 +605,18 @@ impl LoadedIndex {
         query: &str,
         filters: &ValidatedFilters,
         topk: usize,
+        weights: FusionWeights,
     ) -> Result<Vec<Hit>> {
         let fts_hits = self.fts_search(query, filters, topk)?;
         let vector_hits = self.vector_search(embedding, filters, topk)?;
 
         let mut merged: HashMap<i64, (Hit, f32)> = HashMap::new();
         for (rank, hit) in fts_hits.into_iter().enumerate() {
-            let score = rrf_score(rank);
+            let score = rrf_score_weighted(rank, weights.fts);
             merged.entry(hit.doc_id).or_insert((hit, 0.0)).1 += score;
         }
         for (rank, hit) in vector_hits.into_iter().enumerate() {
-            let score = rrf_score(rank);
+            let score = rrf_score_weighted(rank, weights.vector);
             merged.entry(hit.doc_id).or_insert((hit, 0.0)).1 += score;
         }
 
@@ -964,6 +1018,88 @@ mod tests {
             .search(SearchMode::Fts, None, "semantic", &date_filter, 5)
             .expect("date filter");
         assert!(hits.is_empty());
+    }
+
+    #[test]
+    fn weighted_hybrid_prefers_vector_route_top_hit() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("index.sqlite");
+        let vector_a = vector([1.0, 0.0, 0.0]);
+        let vector_b = vector([0.0, 1.0, 0.0]);
+        let tokens_a = tokenize_for_index("alpha rust");
+        let tokens_b = tokenize_for_index("alpha beta");
+        let records = [
+            ChunkRecord {
+                parent_id: "parent-a",
+                app_id: "event",
+                title: "alpha rust",
+                tags: "",
+                date: 2_000,
+                chunk_index: 0,
+                content_hash: "hash-a",
+                href: "/a",
+                text: "alpha rust",
+                text_tokens: &tokens_a,
+                embedding: &vector_a,
+            },
+            ChunkRecord {
+                parent_id: "parent-b",
+                app_id: "event",
+                title: "alpha beta",
+                tags: "",
+                date: 1_000,
+                chunk_index: 0,
+                content_hash: "hash-b",
+                href: "/b",
+                text: "alpha beta",
+                text_tokens: &tokens_b,
+                embedding: &vector_b,
+            },
+        ];
+        write_index(&path, &records, &manifest(3)).expect("write index");
+        let index = LoadedIndex::open(&path).expect("open");
+        // 向量只指向 parent-b：等权时两路 rank 对调、融合分相同，按日期让 parent-a 在前；
+        // 压低 FTS 权重后 parent-b 应升到第一。
+        let query_vector = vector([0.0, 1.0, 0.0]);
+        let filters = ValidatedFilters::default();
+        let equal = index
+            .search_weighted(
+                SearchMode::Hybrid,
+                Some(&query_vector),
+                "alpha",
+                &filters,
+                10,
+                FusionWeights::default(),
+            )
+            .expect("equal weights");
+        assert_eq!(equal[0].parent_id, "parent-a");
+        assert!((equal[0].score - equal[1].score).abs() < 1e-6);
+
+        let vector_first = index
+            .search_weighted(
+                SearchMode::Hybrid,
+                Some(&query_vector),
+                "alpha",
+                &filters,
+                10,
+                FusionWeights {
+                    fts: 0.6,
+                    vector: 1.0,
+                },
+            )
+            .expect("weighted");
+        assert_eq!(vector_first[0].parent_id, "parent-b");
+        assert!(vector_first[0].score > vector_first[1].score);
+    }
+
+    #[test]
+    fn token_document_frequency_is_case_insensitive() {
+        let (_dir, path) = build_temp();
+        let index = LoadedIndex::open_with_prf_stats(&path).expect("open");
+        assert_eq!(index.document_frequency("rust"), 1);
+        assert_eq!(index.document_frequency("RUST"), 1);
+        assert_eq!(index.document_frequency("semantic"), 1);
+        assert_eq!(index.document_frequency("missing"), 0);
     }
 
     #[test]

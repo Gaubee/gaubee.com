@@ -10,6 +10,7 @@ mod content;
 mod embed;
 mod indexer;
 mod manifest;
+mod prf;
 mod search;
 mod store;
 #[cfg(test)]
@@ -23,7 +24,7 @@ use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
-use crate::api::{router, AppState, ENGINE};
+use crate::api::{router, AppState, FusionConfig, ENGINE};
 use crate::chunk::{MAX_CHUNKS_PER_DOC, OVERLAP_CHARS, WINDOW_CHARS};
 use crate::embed::{
     EmbeddingClient, EmbeddingConfig, PromptProfile, DEFAULT_BASE_URL, DEFAULT_MODEL,
@@ -134,6 +135,69 @@ struct BuildArgs {
     max_chunks_per_doc: usize,
 }
 
+#[derive(Args, Clone)]
+struct FusionArgs {
+    /// hybrid 固定候选池：FTS 与向量各取 N 条再融合，limit 只影响分页；0=按 limit 动态扩展（旧行为）。
+    #[arg(long, default_value_t = 200, env = "SEARCH_CANDIDATE_POOL")]
+    candidate_pool: usize,
+    /// FTS 路 RRF 权重；1.0 为经典等权 RRF。评测推荐 0.3：压低词法候选深度对语义命中的挤压。
+    #[arg(long, default_value_t = 0.3, env = "SEARCH_FTS_WEIGHT")]
+    fts_weight: f32,
+    /// 向量路 RRF 权重。
+    #[arg(long, default_value_t = 1.0, env = "SEARCH_VEC_WEIGHT")]
+    vector_weight: f32,
+    /// 启用伪相关反馈：首轮 top10 关键词扩展后做第二轮 hybrid，两轮加权 RRF。
+    ///
+    /// 当前语料评测为负收益（hard MRR 下降），默认关闭，仅保留实验开关。
+    #[arg(
+        long,
+        default_value_t = false,
+        action = clap::ArgAction::Set,
+        env = "SEARCH_PRF"
+    )]
+    prf: bool,
+    /// PRF 扩展词数（内部收敛到 3–5）。
+    #[arg(long, default_value_t = 4, env = "SEARCH_PRF_TERMS")]
+    prf_terms: usize,
+    /// PRF 扩展轮权重（原轮固定 1.0）。
+    #[arg(long, default_value_t = 0.8, env = "SEARCH_PRF_WEIGHT")]
+    prf_round_weight: f32,
+}
+
+impl FusionArgs {
+    fn config(&self) -> Result<FusionConfig> {
+        if self.candidate_pool > 1_000 {
+            anyhow::bail!(
+                "SEARCH_CANDIDATE_POOL 过大：{}（最多 1000）",
+                self.candidate_pool
+            );
+        }
+        if !self.fts_weight.is_finite() || self.fts_weight < 0.0 {
+            anyhow::bail!("SEARCH_FTS_WEIGHT 非法：{}", self.fts_weight);
+        }
+        if !self.vector_weight.is_finite() || self.vector_weight < 0.0 {
+            anyhow::bail!("SEARCH_VEC_WEIGHT 非法：{}", self.vector_weight);
+        }
+        if self.fts_weight + self.vector_weight <= 0.0 {
+            anyhow::bail!("FTS 与向量权重不能同时为 0");
+        }
+        if !self.prf_round_weight.is_finite() || self.prf_round_weight < 0.0 {
+            anyhow::bail!("SEARCH_PRF_WEIGHT 非法：{}", self.prf_round_weight);
+        }
+        if self.prf && !(1..=10).contains(&self.prf_terms) {
+            anyhow::bail!("SEARCH_PRF_TERMS 非法：{}（1–10）", self.prf_terms);
+        }
+        Ok(FusionConfig {
+            candidate_pool: self.candidate_pool,
+            fts_weight: self.fts_weight,
+            vector_weight: self.vector_weight,
+            prf: self.prf,
+            prf_terms: self.prf_terms,
+            prf_round_weight: self.prf_round_weight,
+        })
+    }
+}
+
 #[derive(Args)]
 struct ServeArgs {
     #[arg(long, default_value = "./index.sqlite", env = "INDEX_FILE")]
@@ -142,6 +206,8 @@ struct ServeArgs {
     bind: String,
     #[command(flatten)]
     embed: EmbedArgs,
+    #[command(flatten)]
+    fusion: FusionArgs,
     /// 查询 embedding 超时（毫秒）；超时自动降级 FTS-only。
     #[arg(long, default_value_t = 3_000, env = "EMBED_TIMEOUT_MS")]
     timeout_ms: u64,
@@ -307,7 +373,12 @@ fn build_embedder(args: &ServeArgs) -> Option<EmbeddingClient> {
 
 async fn run_serve(args: ServeArgs, embedder: Option<EmbeddingClient>) -> Result<()> {
     let started = Instant::now();
-    let index = LoadedIndex::open(&args.index)?;
+    let fusion = args.fusion.config()?;
+    let index = if fusion.prf {
+        LoadedIndex::open_with_prf_stats(&args.index)?
+    } else {
+        LoadedIndex::open(&args.index)?
+    };
     let manifest = index.manifest().clone();
     store::warmup();
 
@@ -334,6 +405,7 @@ async fn run_serve(args: ServeArgs, embedder: Option<EmbeddingClient>) -> Result
         index,
         embedder,
         vector_enabled,
+        fusion,
         started,
     });
 
@@ -350,6 +422,12 @@ async fn run_serve(args: ServeArgs, embedder: Option<EmbeddingClient>) -> Result
         vector_enabled,
         embed_dim = state.index.dim(),
         query_timeout_ms = args.timeout_ms,
+        candidate_pool = fusion.candidate_pool,
+        fts_weight = fusion.fts_weight,
+        vector_weight = fusion.vector_weight,
+        prf = fusion.prf,
+        prf_terms = fusion.prf_terms,
+        prf_round_weight = fusion.prf_round_weight,
         "search-server 已启动"
     );
     tracing::info!(
