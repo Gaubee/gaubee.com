@@ -401,7 +401,7 @@ mod tests {
         // 全量重建（incremental=false）不读旧索引，全部重新算。
         let full = build_index(&BuildOptions {
             content_root: content,
-            index_path: index_path,
+            index_path,
             embedding: config(server.url()),
             incremental: false,
         })
@@ -434,7 +434,7 @@ mod tests {
         .unwrap();
         let second = build_index(&BuildOptions {
             content_root: content,
-            index_path: index_path,
+            index_path,
             embedding: config(server.url()),
             incremental: true,
         })

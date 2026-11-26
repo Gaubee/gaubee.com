@@ -465,10 +465,15 @@ impl EmbeddingClient {
                 .collect::<String>()
                 .replace(&self.api_key, "[redacted]");
             // 在完整 body 上判断，避免 300 字截断把标记截掉。
+            // 本地 llama.cpp 超上下文时报 `input (N tokens) is larger than the max
+            // context size`；拆成更小的批能让批内总量降下来（单条超长仍会失败，
+            // 那种情况该由窗口大小解决，见 chunk.rs 的 WINDOW_CHARS）。
+            let lowered = body.to_ascii_lowercase();
             let split_batch = status.as_u16() == 400
                 && (body.contains("Too many tokens")
                     || body.contains("context_length_exceeded")
-                    || body.to_ascii_lowercase().contains("too many tokens"));
+                    || lowered.contains("too many tokens")
+                    || lowered.contains("is larger than the max context size"));
             return Err(BatchError {
                 retryable: status.as_u16() == 429 || status.is_server_error(),
                 retry_after,

@@ -122,15 +122,16 @@ pub struct Hit {
     pub score: f32,
 }
 
-/// 从已存在的索引里载出可复用向量：`(parent_id, chunk_index) -> (content_hash, embedding)`。
+/// 可复用向量表：`(parent_id, chunk_index) -> (content_hash, embedding)`。
+pub type ReusableVectors = std::collections::HashMap<(String, i32), (String, Vec<f32>)>;
+
+/// 从已存在的索引里载出可复用向量。
 ///
 /// 增量重建用：同一 parent 的 content_hash 没变、chunk 序号也没变时，向量可以原样
 /// 复用（embedding 只依赖标题+正文+前缀模板，三者都没变就必然同值）。索引不存在
 /// 或读不出来时返回空表，调用方自然退化为全量重建。
-pub fn load_reusable_vectors(
-    path: &Path,
-) -> Result<std::collections::HashMap<(String, i32), (String, Vec<f32>)>> {
-    let mut reusable = std::collections::HashMap::new();
+pub fn load_reusable_vectors(path: &Path) -> Result<ReusableVectors> {
+    let mut reusable = ReusableVectors::new();
     if !path.is_file() {
         return Ok(reusable);
     }
