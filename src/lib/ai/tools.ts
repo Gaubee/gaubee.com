@@ -16,7 +16,7 @@ const MAX_EXCERPT_CHARS = 300;
 const DEFAULT_ARTICLE_CHARS = 1_200;
 const MAX_ARTICLE_CHARS = 1_500;
 /** 只允许读取构建期 VFS 中的 markdown，禁止任意 URL / 路径。 */
-const ARTICLE_ID_RE = /^src\/content\/(articles|events)\/[A-Za-z0-9._-]+\.md$/;
+const ARTICLE_ID_RE = /^src\/content\/(articles|events)\/[^/]+\.md$/;
 
 const searchSiteSchema: Record<string, unknown> = {
   type: "object",
@@ -184,7 +184,7 @@ async function readArticle(
 ): Promise<ReadArticleResult> {
   throwIfAborted(signal);
   const id = args.id;
-  if (typeof id !== "string" || !ARTICLE_ID_RE.test(id)) {
+  if (typeof id !== "string" || !ARTICLE_ID_RE.test(id) || id.includes("..")) {
     throw new Error("id 必须匹配 src/content/(articles|events)/<name>.md");
   }
   const maxChars = clampInteger(args.maxChars, DEFAULT_ARTICLE_CHARS, 1, MAX_ARTICLE_CHARS);

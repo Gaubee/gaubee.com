@@ -126,6 +126,18 @@ describe("read_article", () => {
     expect(result.text).not.toContain("\n\n\n");
   });
 
+  it("文件名含单引号的文章也能读取", async () => {
+    const result = await callTool("read_article", {
+      id: "src/content/articles/0002.Ya-'an-earthquake-Han-Han's-deleted-blog-post.md",
+    });
+    if ("error" in result) {
+      // 真实内容从构建产物读取；本地测试环境没有该文件时至少不应因正则拒绝。
+      expect(result.error).toBe("not_found");
+    } else {
+      expect(result.id).toContain("0002.");
+    }
+  });
+
   it("不存在的 id 返回 not_found", async () => {
     const result = await callTool("read_article", {
       id: "src/content/articles/9999.not-found.md",
