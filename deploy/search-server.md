@@ -94,6 +94,7 @@ docker build -f search-server/Dockerfile -t gaubee-search:sqlite .
 ```yaml
   gaubee-embed:
     image: gaubee-llama:local          # 见 3.1
+    pull_policy: never                 # 本地镜像，避免 auto-update 每 5 分钟报 pull 失败
     container_name: gaubee-embed
     restart: unless-stopped
     network_mode: host
