@@ -1,18 +1,18 @@
 # ---------------------------------------------------------------------------
-# 构建并推送语义搜索服务镜像（zvec + E5-small ONNX）。
+# 构建并推送语义搜索服务镜像（SQLite FTS5 + magpie 远程 embedding）。
 #
 # 触发：
-#   - main push，且改动涉及 search-server/** 或 src/content/**（内容变更需要重建索引）
+#   - main push，且改动涉及 search-server/** 或 src/content/**（内容变更随镜像发布）
 #   - 手动 workflow_dispatch
 #
 # 产物：ghcr.io/gaubee/gaubee-search:latest（+ sha 短码 tag）
-# 服务器侧：compose 里 search-server 服务直接 pull 该镜像；索引与模型都烘进镜像，
-# 启动即就绪，不在运行容器里重建。
+# 服务器侧：compose 里 search-server 服务直接 pull 该镜像；镜像只含二进制与
+# src/content，索引在容器首次启动时按内容指纹自动构建到 /data 卷。
 #
 # 注意：
 #   - 构建上下文必须是仓库根目录（Dockerfile 需要 src/content）。
-#   - 模型下载与 zvec SDK 都在 Dockerfile 内做 sha256 校验。
-#   - 首次构建约 5 分钟；GHA layer cache 会缓存模型/SDK 层。
+#   - 构建期不下载 zvec/ONNX/模型，也不需要 MAGPIE_API_KEY。
+#   - 首次镜像构建约 2–3 分钟；GHA layer cache 会缓存 Cargo 依赖层。
 # ---------------------------------------------------------------------------
 
 name: Build and Push Search Server Image

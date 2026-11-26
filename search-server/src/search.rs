@@ -1,4 +1,6 @@
-//! 查询过滤表达式、结果打分归一化与 parentId 去重。
+//! 查询过滤校验、RRF 融合分、结果归一化与 parentId 去重。
+use std::collections::HashSet;
+
 use anyhow::{bail, Result};
 
 use crate::store::{Hit, SearchMode};
@@ -14,57 +16,73 @@ pub struct SearchFilters {
     pub date_to: Option<i64>,
 }
 
-/// 生成 zvec 过滤表达式；空过滤返回 None。
-///
-/// 值域只允许 `[A-Za-z0-9.-]`（应用 id 与站点标签的实际形态），拒绝引号、
-/// 通配符与反斜杠，避免表达式注入和 LIKE 语义漂移。
-pub fn build_filter(filters: &SearchFilters) -> Result<Option<String>> {
-    let mut clauses = Vec::new();
+/// 校验后的过滤条件；SQL 参数只从这些值构造，避免表达式注入。
+#[derive(Debug, Clone, Default)]
+pub struct ValidatedFilters {
+    pub apps: HashSet<String>,
+    pub exclude_apps: HashSet<String>,
+    /// 已编码为 `" tag "` 形式，保证整词匹配。
+    pub tags: Vec<String>,
+    pub date_from: Option<i64>,
+    pub date_to: Option<i64>,
+}
 
-    if !filters.apps.is_empty() {
-        let values = filters
+impl SearchFilters {
+    pub fn validate(&self) -> Result<ValidatedFilters> {
+        let apps = self
             .apps
             .iter()
             .map(|app| validate_app(app))
+            .collect::<Result<HashSet<_>>>()?;
+        let exclude_apps = self
+            .exclude_apps
+            .iter()
+            .map(|app| validate_app(app))
+            .collect::<Result<HashSet<_>>>()?;
+        let tags = self
+            .tags
+            .iter()
+            .map(|tag| validate_tag(tag).map(|tag| format!(" {tag} ")))
             .collect::<Result<Vec<_>>>()?;
-        clauses.push(format!(
-            "({})",
-            values
-                .iter()
-                .map(|app| format!("appId = '{app}'"))
-                .collect::<Vec<_>>()
-                .join(" OR ")
-        ));
-    }
-
-    for app in &filters.exclude_apps {
-        let app = validate_app(app)?;
-        clauses.push(format!("appId != '{app}'"));
-    }
-
-    for tag in &filters.tags {
-        let tag = validate_tag(tag)?;
-        // tags 存储为 " tag1 tag2 "（前后带空格），保证整词匹配。
-        clauses.push(format!("tags LIKE '% {tag} %'"));
-    }
-
-    if let Some(date) = filters.date_from {
-        clauses.push(format!("date >= {date}"));
-    }
-    if let Some(date) = filters.date_to {
-        clauses.push(format!("date <= {date}"));
-    }
-    if let (Some(from), Some(to)) = (filters.date_from, filters.date_to) {
-        if from > to {
-            bail!("dateFrom 不能大于 dateTo");
+        if let (Some(from), Some(to)) = (self.date_from, self.date_to) {
+            if from > to {
+                bail!("dateFrom 不能大于 dateTo");
+            }
         }
+        Ok(ValidatedFilters {
+            apps,
+            exclude_apps,
+            tags,
+            date_from: self.date_from,
+            date_to: self.date_to,
+        })
     }
+}
 
-    Ok(if clauses.is_empty() {
-        None
-    } else {
-        Some(clauses.join(" AND "))
-    })
+impl ValidatedFilters {
+    /// 与内存中的 chunk 元数据匹配（向量扫描路径）。
+    pub fn matches(&self, app_id: &str, tags: &str, date: i64) -> bool {
+        if !self.apps.is_empty() && !self.apps.contains(app_id) {
+            return false;
+        }
+        if self.exclude_apps.contains(app_id) {
+            return false;
+        }
+        if !self.tags.iter().all(|tag| tags.contains(tag.as_str())) {
+            return false;
+        }
+        if let Some(from) = self.date_from {
+            if date < from {
+                return false;
+            }
+        }
+        if let Some(to) = self.date_to {
+            if date > to {
+                return false;
+            }
+        }
+        true
+    }
 }
 
 /// 应用 id：字母数字、`-`、`.`。
@@ -80,9 +98,9 @@ fn validate_app(value: &str) -> Result<String> {
     Ok(value.to_string())
 }
 
-/// 站点标签：在上面的基础上允许 `+`（C++）、`#`（C#）、`&`（html&css）。
+/// 站点标签：在 app 规则上允许 `+`（C++）、`#`（C#）、`&`（html&css）。
 ///
-/// 仍拒绝引号、反斜杠与 LIKE 通配符 `%`/`_`，避免表达式注入与匹配漂移。
+/// 仍拒绝引号、反斜杠与 LIKE 通配符 `%`/`_`，避免匹配漂移。
 fn validate_tag(value: &str) -> Result<String> {
     let value = value.trim();
     if value.is_empty()
@@ -104,9 +122,14 @@ pub fn encode_tags(tags: &[String]) -> String {
     }
 }
 
-/// COSINE 距离 → 相似度。
-pub fn normalize_vector_score(distance: f32) -> f32 {
-    (1.0 - distance).clamp(0.0, 1.0)
+/// 单路排名 → RRF 分（rank 从 0 开始）。
+pub fn rrf_score(rank: usize) -> f32 {
+    1.0 / (RRF_RANK_CONSTANT + rank as f32 + 1.0)
+}
+
+/// 向量余弦相似度 → [0, 1]。
+pub fn normalize_vector_score(similarity: f32) -> f32 {
+    similarity.clamp(0.0, 1.0)
 }
 
 /// RRF 融合分 → [0, 1]（两路召回、rank_constant=60 的理论最大值）。
@@ -180,7 +203,7 @@ pub fn dedupe_and_page(
             .then_with(|| left.hit.parent_id.cmp(&right.hit.parent_id))
     });
 
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
     let mut unique = Vec::new();
     for hit in hits {
         if seen.insert(hit.hit.parent_id.clone()) {
@@ -232,6 +255,7 @@ mod tests {
 
     fn hit(parent: &str, score: f32, date: i64) -> Hit {
         Hit {
+            doc_id: 0,
             parent_id: parent.to_string(),
             app_id: "event".to_string(),
             title: "标题".to_string(),
@@ -244,62 +268,50 @@ mod tests {
     }
 
     #[test]
-    fn filter_maps_apps_tabs_and_dates() {
-        let filter = SearchFilters {
+    fn filter_validation_accepts_real_values() {
+        let filters = SearchFilters {
             apps: vec!["event".into(), "articles".into()],
             exclude_apps: vec!["shout".into()],
-            tags: vec!["rust".into()],
+            tags: vec!["C++".into(), "html&css".into(), "rust".into()],
             date_from: Some(1_000),
             date_to: Some(2_000),
         };
-        let expression = build_filter(&filter).unwrap().unwrap();
-        assert_eq!(
-            expression,
-            "(appId = 'event' OR appId = 'articles') AND appId != 'shout' AND tags LIKE '% rust %' AND date >= 1000 AND date <= 2000"
-        );
+        let validated = filters.validate().unwrap();
+        assert!(validated.matches("event", " rust C++ html&css ", 1_500));
+        assert!(!validated.matches("shout", " rust C++ html&css ", 1_500));
+        assert!(!validated.matches("event", " rust C++ ", 1_500));
+        assert!(!validated.matches("event", " rust C++ html&css ", 2_001));
     }
 
     #[test]
-    fn empty_filter_is_none() {
-        assert!(build_filter(&SearchFilters::default()).unwrap().is_none());
-    }
-
-    #[test]
-    fn rejects_injection_and_wildcards() {
-        let filter = SearchFilters {
+    fn filter_rejects_injection_and_wildcards() {
+        let filters = SearchFilters {
             apps: vec!["event' OR appId = 'articles".into()],
             ..Default::default()
         };
-        assert!(build_filter(&filter).is_err());
+        assert!(filters.validate().is_err());
 
-        let filter = SearchFilters {
+        let filters = SearchFilters {
             tags: vec!["a%b".into()],
             ..Default::default()
         };
-        assert!(build_filter(&filter).is_err());
+        assert!(filters.validate().is_err());
     }
 
     #[test]
-    fn accepts_real_site_tags() {
-        let filter = SearchFilters {
-            tags: vec!["C++".into(), "html&css".into(), "agent-tooling".into()],
-            ..Default::default()
-        };
-        let expression = build_filter(&filter).unwrap().unwrap();
-        assert_eq!(
-            expression,
-            "tags LIKE '% C++ %' AND tags LIKE '% html&css %' AND tags LIKE '% agent-tooling %'"
-        );
-    }
-
-    #[test]
-    fn rejects_reversed_date_range() {
-        let filter = SearchFilters {
+    fn filter_rejects_reversed_date_range() {
+        let filters = SearchFilters {
             date_from: Some(10),
             date_to: Some(5),
             ..Default::default()
         };
-        assert!(build_filter(&filter).is_err());
+        assert!(filters.validate().is_err());
+    }
+
+    #[test]
+    fn empty_filter_matches_everything() {
+        let filters = SearchFilters::default().validate().unwrap();
+        assert!(filters.matches("event", "", 0));
     }
 
     #[test]
@@ -312,28 +324,34 @@ mod tests {
     }
 
     #[test]
-    fn vector_score_is_one_minus_distance() {
-        assert!((normalize_vector_score(0.0) - 1.0).abs() < 1e-6);
-        assert!((normalize_vector_score(1.0) - 0.0).abs() < 1e-6);
-        assert_eq!(normalize_vector_score(-0.5), 1.0);
-        assert_eq!(normalize_vector_score(2.0), 0.0);
+    fn rrf_rank_zero_is_best() {
+        assert!(rrf_score(0) > rrf_score(1));
+        assert!((rrf_score(0) - 1.0 / 61.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn vector_score_is_cosine_clamped() {
+        assert_eq!(normalize_vector_score(1.0), 1.0);
+        assert_eq!(normalize_vector_score(0.5), 0.5);
+        assert_eq!(normalize_vector_score(-0.5), 0.0);
+        assert_eq!(normalize_vector_score(2.0), 1.0);
     }
 
     #[test]
     fn hybrid_score_normalizes_to_unit() {
-        assert!((normalize_hybrid_score(0.03278688) - 1.0).abs() < 1e-5);
+        let fused = rrf_score(0) + rrf_score(0);
+        assert!((normalize_hybrid_score(fused) - 1.0).abs() < 1e-5);
         assert_eq!(normalize_hybrid_score(0.0), 0.0);
         assert_eq!(normalize_hybrid_score(1.0), 1.0);
     }
 
     #[test]
     fn dedupe_keeps_best_chunk_and_orders() {
-        // Vector 模式下 raw_score 是 COSINE 距离（越小越相似）。
         let scored = vec![
-            ScoredHit::new(hit("a", 0.2, 10), SearchMode::Vector),
-            ScoredHit::new(hit("b", 0.1, 20), SearchMode::Vector),
-            ScoredHit::new(hit("a", 0.05, 10), SearchMode::Vector),
-            ScoredHit::new(hit("c", 0.15, 30), SearchMode::Vector),
+            ScoredHit::new(hit("a", 0.8, 10), SearchMode::Vector),
+            ScoredHit::new(hit("b", 0.9, 20), SearchMode::Vector),
+            ScoredHit::new(hit("a", 0.95, 10), SearchMode::Vector),
+            ScoredHit::new(hit("c", 0.85, 30), SearchMode::Vector),
         ];
         let (results, total) = dedupe_and_page(scored, 0, 10);
         assert_eq!(total, 3);
@@ -357,7 +375,7 @@ mod tests {
         let (results, total) = dedupe_and_page(scored, 1, 2);
         assert_eq!(total, 5);
         assert_eq!(results.len(), 2);
-        assert_eq!(results[0].id, "p1");
+        assert_eq!(results[0].id, "p3");
         assert_eq!(results[1].id, "p2");
     }
 

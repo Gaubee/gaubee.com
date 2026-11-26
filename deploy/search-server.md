@@ -1,8 +1,10 @@
-# search-server 部署手册（zvec 语义搜索）
+# search-server 部署手册（SQLite FTS5 + 本地 llama.cpp embedding）
 
-> 状态：Phase 1 已于 2026-11-25 部署（17082 + openresty `/api/search`）；后续变更仍需评审。
-> 引擎：alibaba/zvec 0.8.1（进程内向量库，Apache-2.0）+ intfloat/multilingual-e5-small
-> ONNX（MIT）+ ONNX Runtime（MIT，经 `ort` 构建期下载）。
+> 状态：2026-11-26 切到**全本地** embedding。旧 zvec/ONNX 进程内模型、magpie 远程
+> embedding 都已停用（magpie 的 mistral 订阅预算耗尽，返回 402，已不可依赖）。
+>
+> 引擎：SQLite（FTS5 + 暴力余弦扫描，rusqlite bundled）+ 本地
+> `llama-server`（llama.cpp）+ EmbeddingGemma 2 文本 q4 GGUF（768 维）。
 
 ## 1. 拓扑
 
@@ -10,20 +12,25 @@
 浏览器 ──/api/search──> openresty (TLS, 17080)
                              │  proxy_pass 127.0.0.1:17082
                              ▼
-                      search-server 容器
-                      POST /api/search, GET /health
-                      zvec collection + E5 模型（进程内）
+              gaubee-search-server（host 网络，61 MiB RSS）
+              POST /api/search, GET /health
+              /data/index.sqlite（SQLite 单文件索引，只读挂载）
+                             │
+                             │ POST http://127.0.0.1:18081/v1/embeddings
+                             ▼
+              gaubee-embed（host 网络，263 MiB RSS）
+              llama-server + embeddinggemma-2-UD-Q4_K_XL.gguf
 ```
 
-- 静态站点仍由现有 Rust axum static-server 容器提供；search-server 是**独立容器**，
-  不修改 `static-server/` 镜像。
-- 索引与模型都在 search-server 容器内（或只读卷挂载），无外部数据库。
-- 客户端失败/超时（800ms，冷启动首查 2s）自动回退浏览器端 MiniSearch。
+- 两个容器都是 `network_mode: host`，只监听 loopback；对外由 openresty 终结 TLS。
+- 索引是单文件 `/data/index.sqlite`，宿主 `/opt/gaubee/search-models/`，**只读挂载**。
+- 模型 `/opt/gaubee/search-models/embeddinggemma-2-UD-Q4_K_XL.gguf`（168 MB），只读挂载。
+- 客户端仍是 `POST /api/search`；服务端查询 embedding 超时 3s，超时降级 FTS
+  （响应 `degraded: true`），客户端再回退浏览器端 MiniSearch。
+- serve 侧 query embedding 有 256 条进程内 LRU（key = 向量空间身份 + 查询文本）。
 
-> **端口说明**：`127.0.0.1:17081` 已被 cdn-media-pointer 的
-> `python -m http.server` 占用（`deploy/cdn-base-rollout.md`）。本服务默认使用
-> **17082**，compose 与 openresty 均已按 17082 写入；若 17082 再冲突，用
-> `SEARCH_SERVER_PORT` 覆盖并同步 openresty。
+> **端口**：`17081` 被 cdn-media-pointer 占用，搜索服务固定 `17082`；
+> embedding 服务用 `18081`（仅 loopback）。
 
 ## 1.1 API 契约
 
@@ -31,257 +38,320 @@
 POST /api/search
 Content-Type: application/json
 
-{
-  "q": "rust 异步",
-  "apps": ["event"],          // 可选：限定应用
-  "excludeApps": ["articles"],// 可选：排除应用
-  "tags": ["rust"],           // 可选：标签（整词匹配）
-  "dateFrom": 1704067200000,  // 可选：毫秒时间戳
-  "dateTo": 1767225600000,
-  "limit": 10,                // 默认 10，最大 50
-  "offset": 0,                // 最大 200
-  "mode": "hybrid"            // hybrid（默认）/ vector / fts
-}
+{ "q": "语义查询", "mode": "hybrid|vector|fts", "limit": 10, "offset": 0,
+  "apps": ["article"], "excludeApps": [], "tags": [], "dateFrom": 0, "dateTo": 0 }
 ```
-
-响应：
 
 ```json
-{
-  "results": [
-    {
-      "id": "src/content/events/01931.github-daily-2026-11-24.md",
-      "appId": "event",
-      "appName": "事件",
-      "title": "GitHub 日报：2026-11-24",
-      "excerpt": "……",
-      "href": "/article/events/01931.github-daily-2026-11-24",
-      "date": 1763942400000,
-      "score": 0.5
-    }
-  ],
-  "total": 55,
-  "tookMs": 4,
-  "engine": "zvec",
-  "degraded": false
-}
+{ "results": [{ "id", "appId", "appName", "title", "excerpt", "href", "date", "score" }],
+  "total": 42, "tookMs": 12, "engine": "sqlite-fts5", "degraded": false }
 ```
 
-- 结果按 `parentId` 去重（同篇取最高分 chunk），`id` 即 parentId。
-- `total` 是候选集内去重后的文档数，受 topk 截断，不是全库精确 count。
-- `GET /health` 返回 `{ok, engine, zvecVersion, docs, documents, chunks, indexBuiltAt, index, uptimeMs}`。
+`GET /health` 关键字段：
+
+| 字段 | 含义 |
+| --- | --- |
+| `engine` | `sqlite-fts5` |
+| `vectorEnabled` | 向量检索是否启用（模型身份与索引不一致时为 false，仅 FTS） |
+| `indexModel` / `activeModel` | 形如 `embeddinggemma-2:gemma2`，含任务前缀模板 |
+| `embedDim` | 768 |
+| `docs` / `documents` / `chunks` | chunk 数 / 文档数 / manifest 记录数 |
+| `embedCache*` | 查询向量缓存命中统计 |
+
+## 1.2 环境变量
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `EMBED_URL` | `http://127.0.0.1:18081` | embedding 服务地址（llama-server 或任何 OpenAI 兼容网关） |
+| `EMBED_API_KEY` | 空 | 远程网关才需要；loopback 地址自动放行空 key |
+| `EMBED_MODEL` | `embeddinggemma-2` | 请求体里的 model 名 |
+| `EMBED_PROMPTS` | `gemma2` | 任务前缀模板：`gemma2` / `bge-zh` / `none`。**必须与建索引时一致** |
+| `EMBED_TIMEOUT_MS` | `3000` | serve 查询 embedding 超时，超时降级 FTS |
+| `EMBED_QUERY_RETRIES` | `0` | 查询重试次数；默认超时即降级 |
+| `EMBED_BATCH_SIZE` | `16` | 构建期每请求条数（本地单 slot，太大会排队） |
+| `EMBED_CONCURRENCY` | `1` | 构建期并发（llama-server 单 slot 时只能 1） |
+| `EMBED_BUILD_TIMEOUT_MS` | `900000` | 构建期单请求超时（1600 字符 chunk 单批可达数分钟） |
+| `EMBED_INCREMENTAL` | `true` | 复用旧索引中内容未变的向量 |
+| `INDEX_FILE` | `/data/index.sqlite` | 索引文件 |
+| `CONTENT_DIR` | `/app/content` | 镜像内公开内容目录 |
+| `BUILD_ON_START` | `0` | 生产默认 0：只 check 不重建；`1` 才在启动时重建 |
+| `SEARCH_BIND` | `127.0.0.1:17082` | host 网络下监听宿主 loopback |
+| `RUST_LOG` | `info` | 日志级别 |
 
 ## 2. 构建镜像
 
-Dockerfile 使用多阶段构建，构建上下文必须是**仓库根目录**（内容在 `src/content`）：
+构建上下文必须是仓库根目录（内容在 `src/content`）：
 
 ```bash
-cd /path/to/gaubee.com
-docker build -f search-server/Dockerfile -t gaubee-search:local .
+docker build -f search-server/Dockerfile -t gaubee-search:sqlite .
 ```
 
-> **镜像拉取通道（2026-11-25 实测）**：生产服务器直连 `ghcr.io` 的 blob 域名
-> （`pkg-containers.githubusercontent.com`）会 TLS 超时，但 `ghcr.nju.edu.cn`
-> 镜像可正常拉取且 digest 与 ghcr.io 一致。因此 compose 使用
-> `ghcr.nju.edu.cn/gaubee/gaubee-search:latest`；CI 仍推 ghcr.io。
-
-`search-server/Dockerfile.dockerignore` 只放行 crate 源码与 `src/content/{articles,events}`，
-不会把 node_modules/static 大目录送进构建上下文。
-
-构建期会：
-1. 下载并校验 zvec SDK v0.8.1（linux-amd64/arm64 按 `TARGETARCH`）。
-2. `cargo build --release --locked`（ONNX Runtime 静态链接，运行期无需 ORT .so）。
-3. 下载并校验 E5 模型（固定 revision + sha256）。
-4. 运行 `search-server build` 生成索引（约 1500 篇 / 2900 chunks）。
-
-镜像体积估算约 **700 MB**（base 80 + 二进制 35 + zvec 102 + 模型 448 + 索引 22）。
-模型是主要占用；如把 `MODEL_DIR`/`INDEX_DIR` 改为只读卷，可降到 ~240 MB。
+镜像约 **144 MB**（debian:trixie-slim + 二进制 + 内容），不含模型与 llama.cpp。
 
 ## 3. compose service
 
-放到 1Panel 应用 compose（与站点 web 服务同一 compose 文件或独立文件均可）：
-
 ```yaml
-services:
+  gaubee-embed:
+    image: gaubee-llama:local          # 见 3.1
+    container_name: gaubee-embed
+    restart: unless-stopped
+    network_mode: host
+    mem_limit: 600m
+    volumes:
+      - /opt/gaubee/search-models:/models:ro
+    command:
+      - -m
+      - /models/embeddinggemma-2-UD-Q4_K_XL.gguf
+      - --embeddings
+      - --pooling
+      - mean
+      - --embd-normalize
+      - "2"
+      - -c
+      - "4096"
+      - -b
+      - "4096"
+      - -ub
+      - "4096"
+      - -np
+      - "1"
+      - -t
+      - "2"
+      - -ngl
+      - "0"
+      - --host
+      - 127.0.0.1
+      - --port
+      - "18081"
+
   search-server:
-    image: ghcr.nju.edu.cn/gaubee/gaubee-search:latest
-    # 或本地构建：
-    # build:
-    #   context: ..
-    #   dockerfile: search-server/Dockerfile
+    image: gaubee-search:sqlite-local
     container_name: gaubee-search-server
     restart: unless-stopped
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
-    ports:
-      # 只发布到宿主 loopback；默认 17082（17081 被 cdn-media-pointer 占用）
-      - "127.0.0.1:${SEARCH_SERVER_PORT:-17082}:17082"
+    network_mode: host
     volumes:
-      # 推荐：索引由 CI 产出后只读挂载，容器重建即换索引
-      # - /opt/gaubee/search-index:/app/index:ro
-      # 可选：模型放宿主卷，缩小镜像（需构建镜像时保留同路径占位）
-      # - /opt/gaubee/models/multilingual-e5-small:/app/model:ro
+      - /opt/gaubee/search-models:/data:ro
     environment:
-      RUST_LOG: info
-      SEARCH_THREADS: "4"
-      # 容器内必须监听 0.0.0.0，宿主端口已限制 loopback
-      SEARCH_BIND: 0.0.0.0:17082
-    mem_limit: 2g
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:17082/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 20s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+      SEARCH_BIND: 127.0.0.1:17082
+      INDEX_FILE: /data/index.sqlite
+      EMBED_URL: http://127.0.0.1:18081
+      EMBED_MODEL: embeddinggemma-2
+      EMBED_PROMPTS: gemma2
+      EMBED_TIMEOUT_MS: "3000"
+      BUILD_ON_START: "0"
+    mem_limit: 300m
+    depends_on:
+      - gaubee-embed
 ```
 
-内存上限说明：zvec 初始化时 `memory_limit=1 GiB`（`store.rs`），加上 ONNX session、
-tokenizer 与查询峰值，实测 RSS 约 **0.45 GiB**（见第 6 节）；2 GiB limit 留有并发余量。
-若并发搜索显著增长，先调 `SEARCH_THREADS`（ONNX 线程）与 zvec memory limit，再考虑升 limit。
+### 3.1 llama-server 镜像
+
+服务器是 CentOS 7，宿主 glibc/OpenSSL 太老，llama.cpp 官方预编译二进制无法直接运行；
+放进 trixie 容器即可。构建方式（一次性）：
+
+```bash
+# 下载官方发布包（b12728 起支持 gemma-embedding2 架构）
+curl -fL -o llama.tar.gz \
+  https://github.com/ggml-org/llama.cpp/releases/download/b12728/llama-b12728-bin-ubuntu-x64.tar.gz
+tar -xzf llama.tar.gz                       # → llama-b12728/
+mkdir -p /tmp/llama-img && cd /tmp/llama-img
+cat > Dockerfile <<'EOF'
+FROM debian:trixie-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libgomp1 libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY llama-b12728/ /opt/llama/
+ENV LD_LIBRARY_PATH=/opt/llama
+ENTRYPOINT ["/opt/llama/llama-server"]
+EOF
+cp -r ../llama-b12728 .
+docker build -t gaubee-llama:local .
+```
+
+> **上下文必须够大**：`-c 1024` 会让 1600 字符的 chunk（约 724–793 token）在批内
+> 叠加时直接 400。用 `-c 4096 -np 1`；`-np 2` 会把上下文对半分，等同于 2048。
 
 ## 4. openresty 反代
 
-在站点 vhost（`gaubee.com.conf`）加入**精确匹配** location。`= /api/search` 的优先级
-高于现有 `/api/`（auth/geo）前缀，不需要调整原 location 顺序：
-
 ```nginx
-# 语义搜索：只允许 POST，同源请求，不缓存
 location = /api/search {
-    limit_except POST { deny all; }
-
     proxy_pass http://127.0.0.1:17082/api/search;
-    proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header Connection "";
-    proxy_connect_timeout 2s;
     proxy_read_timeout 10s;
-    proxy_send_timeout 10s;
-    add_header Cache-Control "no-store" always;
 }
-
-# 健康检查只允许本机（运维 curl / 监控）
-location = /api/search/health {
-    allow 127.0.0.1;
-    allow ::1;
-    deny all;
+location = /health {
     proxy_pass http://127.0.0.1:17082/health;
 }
 ```
 
-注意：
+## 5. 索引生命周期
 
-- 若 17082 冲突，用 `SEARCH_SERVER_PORT` 覆盖并同步上面两处 `proxy_pass`。
-- openresty 的 WAF（1Panel `defaultUrlBlack`）对 `/api/search` 无 `.git` 等命中；
-  如出现 403，先查 WAF req_log 而不是容器日志。
-- 服务端已返回 `Access-Control-Allow-Origin: *`（只读公开数据），但生产走同源反代，
-  不依赖 CORS。
+### 5.1 容器启动（entrypoint）
 
-## 5. 索引更新流程
-
-### 5.1 推荐：CI 构建索引（不可变产物）
-
-理由：索引构建需要 448 MiB 模型 + 约 5 分钟 CPU；放进运行容器会导致启动慢、
-每次重启重建、且运行环境需要内容源码。CI 构建让容器启动即就绪，索引随发布版本可回滚。
-
-流程（建议 GitHub Actions job，内容变更时触发）：
-
-```bash
-# CI runner（linux/amd64），缓存模型目录
-./search-server/scripts/fetch-model.sh                # MODEL_DIR 默认 search-server/.cache
-cargo build --release --locked --manifest-path search-server/Cargo.toml
-./search-server/target/release/search-server build \
-  --content src/content \
-  --index build/search-index \
-  --model-dir search-server/.cache/models/multilingual-e5-small \
-  --threads 4
-
-# 发布产物：build/search-index/{collection,manifest.json}
+```
+check /data/index.sqlite：
+  1) 结构完整性：格式版本 / docs 与 vectors 表 / 行数一致 / 向量长度 / PRAGMA quick_check
+  2) contentHash 与 /app/content 当前指纹
+  3) manifest.model 与 `EMBED_MODEL:EMBED_PROMPTS`（向量空间身份）
+├── 全部一致 → serve（vectorEnabled=true）
+└── 任一不匹配：
+    ├── BUILD_ON_START=1 → build（写临时文件，成功后原子 rename）
+    │   ├── 成功 → serve
+    │   ├── 失败且有旧索引 → 用旧索引 serve
+    │   └── 失败且无索引 → exit 1
+    └── BUILD_ON_START=0（生产默认）→ exit 1，并打印离线重建命令
 ```
 
-服务器侧原子替换（search-server 运行中不要原地改 collection）：
+- **生产用 `BUILD_ON_START=0`**：服务器只有 2 核，全量重建要小时级，不能放在启动路径。
+- 完整性校验是新增的（2026-11-26）：损坏或版本不符的索引不再「check 通过、serve 崩」，
+  避免容器进入崩溃循环。
+- 内容指纹覆盖 `title + tags + date + 正文 sha256`，按 parentId 排序后汇总。
+- 模型与**前缀模板**都参与身份判定：`embeddinggemma-2:gemma2` ≠ `embeddinggemma-2:none`。
+
+### 5.2 增量重建
+
+`build` 默认读旧索引，按 `(parentId, chunkIndex)` 比对 `content_hash`：
+hash 相同、chunk 序号相同的直接复用旧向量，只对新增/改动文档调 embedding。
+
+实测（2026-11-26，本地 M 系列）：新增 2 篇日报 → `reused=1983 / todo=8`，
+耗时 150 秒；同规模全量重建约 58 分钟。
 
 ```bash
-sudo rm -rf /opt/gaubee/search-index.next
-sudo cp -a /tmp/artifact/search-index /opt/gaubee/search-index.next
-sudo mv /opt/gaubee/search-index /opt/gaubee/search-index.prev
-sudo mv /opt/gaubee/search-index.next /opt/gaubee/search-index
-docker compose restart search-server
-# 验证：curl -fsS http://127.0.0.1:17082/health | jq
+# 日常增量（在能访问 embedding 服务的机器上）
+search-server build --content src/content --index /tmp/index.sqlite \
+  --embed-url http://127.0.0.1:18081 --embed-model embeddinggemma-2 --embed-prompts gemma2
+
+# 强制全量
+search-server build ... --incremental false
 ```
 
-回滚：把 `.prev` 换回来并重启。索引目录约 22 MB，保留上一代成本可忽略。
+> 增量可复用的前提是**窗口参数与前缀模板都没变**。改 `chunk.rs` 的
+> `WINDOW_CHARS/OVERLAP_CHARS` 或 `EMBED_PROMPTS`，所有 hash 都会变，等于全量。
 
-### 5.2 备选：容器启动时构建（不推荐）
+### 5.3 手动重建 / 发布流程（当前生产做法）
 
-需要把 `src/content` 与模型一起放进运行镜像，并让 entrypoint 先执行
-`search-server build && search-server serve`。代价：
+索引在**构建机**上离线生成，再上传到服务器（不要在 2 核服务器上全量重建）：
 
-- 每次容器启动多 5+ 分钟（实测 2903 chunks ≈ 4.5 分钟，见第 6 节），健康检查需放宽；
-- 索引写在容器可写层，重启即重算；要保留必须挂可写卷；
-- 内容更新需要重建镜像（除非挂载内容目录），发布链更长。
+```bash
+# 1. 本地（或 CI）增量重建到最新内容
+cd search-server
+cargo run --release -- build \
+  --content ../src/content --index /tmp/index.sqlite \
+  --embed-url http://127.0.0.1:18081 --embed-model embeddinggemma-2 --embed-prompts gemma2
 
-只建议本地/预览环境使用。
+# 2. 校验（contentMatch / modelMatch / integrity 三绿）
+cargo run --release -- check \
+  --content ../src/content --index /tmp/index.sqlite \
+  --embed-model embeddinggemma-2 --embed-prompts gemma2
 
-### 5.3 每日增量（Phase 2，接口已就绪）
+# 3. 上传并原子替换（保留上一代）
+scp /tmp/index.sqlite gaubee-cloud:/opt/gaubee/search-models/index.sqlite.new
+ssh gaubee-cloud 'cd /opt/gaubee/search-models && \
+  cp index.sqlite index.sqlite.prev && mv index.sqlite.new index.sqlite'
 
-当前 CLI 只做全量重建。zvec 侧已提供 `upsert` 与 `delete_by_filter`（`store.rs`），
-增量流程建议：
+# 4. 重启搜索容器（索引只读挂载，进程内已加载旧副本）
+ssh gaubee-cloud 'cd /etc/edge/gaubeeos && docker compose restart search-server'
 
-1. 每次构建额外输出 `index/parents.json`：`{parentId, contentHash, chunkIds[]}`。
-   `contentHash` 已按「标题 + 标签 + 日期 + 正文」计算（`indexer::document_hash`）。
-2. 每日任务加载新内容，与旧 `parents.json` 对比：
-   - 新增/变更：`zvec_collection_delete_by_filter("parentId = '<id>'")` →
-     embedding 新 chunks → `upsert`；
-   - 删除：`delete_by_filter("parentId = '<id>'")`；
-   - 未变化：跳过。
-3. `optimize()` + `flush()`，写新 manifest。
-4. 重启 search-server（当前无热加载；Phase 2 可加 SIGHUP 重建 store）。
+# 5. 验证
+curl -fsS http://127.0.0.1:17082/health | jq '{engine,vectorEnabled,indexModel,docs}'
+```
 
-鉴于索引仅 22 MB、全量构建约 5 分钟、内容日更量有限，**首期建议每日全量重建**
-（CI 定时任务），比增量状态机更简单、更不易漂移；等索引/内容规模显著上升再启用增量。
+回滚：`mv index.sqlite.prev index.sqlite` 后重启。索引是单文件，原子替换即可。
 
-## 6. 实测基准（本机 macOS arm64，Phase 1 验收）
+### 5.4 索引与发布的先后
 
-本机 macOS arm64（M 系列，`SEARCH_THREADS=4`），2026-11-25 Phase 1 验收：
+`src/content` 随镜像发布；**新 event 一发布，线上索引就相对内容变旧**。
+当前策略：索引只用于搜索召回，内容变旧不影响站点渲染，但新文章搜不到。
+每次日报发布后执行 5.3 的增量重建（几分钟），索引就追上内容。
 
-- 内容：1505 篇（articles 63 / events 1442），2903 chunks。
-- 构建（8 线程）：**272.1 s**；索引 `index/collection` **21.6 MiB / 56 个文件**
-  （dense Flat + jieba FTS + 标量），`manifest.json` 4 KiB。
-- 查询：冷启动首查 HTTP 端到端 34.5 ms；26 组查询 ×3 次（20 条中英混合 + app/date/tag
-  过滤）中位 **5.23 ms**，p95 **6.46 ms**，最大 6.53 ms；服务端 `tookMs` 3–6 ms。
-- 进程 RSS：启动并跑完基准后约 **445 MiB**（模型 448 MiB 为主要占用）。
-- 浏览器端：真实预览页搜索返回 20 条；**停掉 search-server 后**同一查询由 MiniSearch
-  接管，353 ms 出现结果，页面无报错。
-- top-5 明细只记录在任务报告/基准日志，避免本文件随内容漂移。
+## 6. 旧版清理
 
-## 7. 许可证与版本钉死
+- 旧 zvec 容器 / `ghcr.io/gaubee/gaubee-search:latest`（745 MB）已停用，可删。
+- 旧 `scripts/fetch-model.sh`、`fetch-zvec-sdk.sh`、`build.rs`、`src/zvec_ffi.rs` 已移除。
+- `/opt/gaubee/search-index`（zvec 目录形态）可删除。
+- 旧 magpie 相关环境变量（`MAGPIE_*`）不再使用，compose 里已移除。
 
-| 组件 | 版本 | 许可证 | 说明 |
-| --- | --- | --- | --- |
-| alibaba/zvec SDK | 0.8.1（v0.8.1 release） | Apache-2.0 | `libzvec_c_api` + core + ailego |
-| intfloat/multilingual-e5-small | revision `614241f` | MIT | ONNX fp32，384 维 |
-| ONNX Runtime（ort-sys 预编译） | 随 ort 2.0.0-rc.15 | MIT | 构建期下载，静态链接 |
-| search-server | 本仓库 | 同仓库 | Rust 2021 |
+## 7. 基准与实测（2026-11-26）
 
-升级 zvec 时必须同步更新：
+### 7.1 内存
 
-- `Cargo.toml` 的 FFI 绑定（`src/zvec_ffi.rs`）与 `scripts/fetch-zvec-sdk.sh` 的版本/校验和；
-- `Dockerfile` 的 `ZVEC_VERSION` / 两处 sha256；
-- 重新跑 `cargo test`（含 zvec 往返测试）与本机 20 条查询基准。
+| 组件 | RSS |
+| --- | ---: |
+| gaubee-search-server（SQLite + 1991 chunks） | **62–66 MiB** |
+| gaubee-embed（EG2 q4 + llama.cpp，2 线程） | **263–301 MiB**（随负载波动） |
+| 合计 | **约 325–370 MiB** |
+| 旧 zvec 单容器（对比） | 809 MiB |
 
-## 8. 故障排查
+### 7.2 延迟（服务器 2 核 Xeon Cascadelake，宿主直连 17082）
 
-| 现象 | 检查 |
+| 场景 | 耗时 |
+| --- | ---: |
+| 查询 embedding（预热后，EG2 768d） | ~110 ms |
+| 纯向量检索（1985 chunks 暴力扫描） | 1–2 ms |
+| FTS 检索 | 5–7 ms |
+| hybrid 端到端（服务端） | **10–86 ms** |
+| 首次查询（含模型预热） | ~500 ms |
+
+### 7.3 构建吞吐（决定重建时间）
+
+| 环境 | 1600 字符 chunk |
+| --- | ---: |
+| 本地 M 系列（8 线程） | ~1.5 s/篇 |
+| 服务器 2 核 | ~7.9 s/篇 |
+
+1985 chunks 全量：本地约 58 分钟，服务器 3 小时以上 → 故生产离线构建。
+
+### 7.4 检索质量抽样（生产 hybrid）
+
+| 查询 | Top1 |
 | --- | --- |
-| 502 / 连接拒绝 | 容器是否 running；`curl 127.0.0.1:17082/health`；端口是否被其它进程占用 |
-| 启动即退出 | `docker logs`；索引缺失（先 build）；模型缺失（fetch-model.sh）；`libzvec_c_api.so` 未在 `LD_LIBRARY_PATH` |
-| 搜索慢 / 首查 2s+ | 容器刚启动，索引段未驻留；观察 `tookMs`；必要时提高 `SEARCH_THREADS` |
-| 客户端一直走 MiniSearch | 浏览器 Network 看 `/api/search` 状态；openresty location 是否精确匹配；CORS 预检是否被 WAF 拦 |
-| 索引更新后结果不变 | 是否原子替换后重启；`/health` 的 `indexBuiltAt` 是否变化 |
+| 异步运行时是怎么实现的 | 简单解构 Iced 运行时模型与设计哲学（0.977） |
+| 怎么减少服务的内存占用 | X 日报 2026-10-21（0.911） |
+| JavaScript（限 article） | 如何开始一个模块化可扩展的 Web App（0.984） |
+
+## 8. 换 embedding 模型
+
+向量空间身份 = `EMBED_MODEL:EMBED_PROMPTS`，写进 manifest；`check`/`serve` 都会比对。
+
+换模型步骤：
+
+1. 确认新模型在 llama.cpp 里受支持（架构名，例如 `gemma-embedding2` 需要 b12728+）。
+2. 选定 GPT 前缀模板；若现有 `PromptProfile` 不匹配，在 `embed.rs` 加一个变体。
+3. **全量重建**索引（旧向量不可复用：维度或分布不同）：
+   `search-server build ... --incremental false`。
+4. 上传索引，`docker compose restart search-server`。
+5. `curl /health` 确认 `indexModel == activeModel` 且 `vectorDim` 符合预期。
+
+换模型时记得同步 `deploy` 里的 `-c`（新模型的滑动窗口决定 chunk 窗口），
+以及 `chunk.rs` 的 `WINDOW_CHARS`（改了必然触发全量重建）。
+
+### 8.1 候选模型（实测数据，2026-11-26）
+
+| 模型 | 权重 | 进程 RSS | 查询 | 1600 字符文档 | 中文质量 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| **EmbeddingGemma 2 文本 q4_K_XL** | 168 MB | 344 MB（macOS）/ 263 MB（容器） | 69 ms | 1.5 s | 好，多语言 |
+| bge-small-zh-v1.5 q8 | 26 MB | 108 MB | 14 ms | 231 ms | 中文强、英文弱，**512 token 上限** |
+| magpie `mistral-embed`（远程） | 0 | 0 | 387 ms | — | 2026-11-25 预算耗尽（402） |
+
+bge-small-zh 看起来更省，但 512 token 上下文装不下 1600 字符 chunk（实测 694 token
+直接 400），要选它必须把 `WINDOW_CHARS` 降到 400 左右，chunk 数翻倍。
+
+## 9. 安全与许可证
+
+- 模型：EmbeddingGemma 2，Apache 2.0；GGUF 由 unsloth 转换（同许可）。
+- llama.cpp：MIT。
+- 两个容器都只监听 loopback；不对外暴露 18081/17082。
+- `EMBED_API_KEY` 只在需要远程网关时设置，经 env_file 注入，不进镜像/日志。
+
+## 10. 故障排查
+
+| 现象 | 排查 |
+| --- | --- |
+| `/health` 里 `vectorEnabled=false` | `indexModel` 与 `activeModel` 是否相同；不同则索引与当前 `EMBED_*` 不匹配，重建或改回 |
+| 响应 `degraded=true` | embedding 服务不可达或超时；`docker logs gaubee-embed`、`curl 127.0.0.1:18081/health` |
+| 容器反复重启 | `check` 失败且 `BUILD_ON_START=0`；看日志里的完整性/指纹原因，按 5.3 重建 |
+| embedding 返回 400「is larger than the max context size」 | llama-server `-c` 太小或 `-np` 把上下文对半分；改 `-c 4096 -np 1` |
+| 查询很慢（>1s） | 首次查询在预热模型；持续慢则看 `docker stats` 的 CPU 是否被其它容器抢占 |
+| openresty 502 | 容器是否 `network_mode: host`；`ss -tlnp \| grep 17082` 是否只监听 127.0.0.1 |
+| 新文章搜不到 | 索引比内容旧；按 5.3 做增量重建 |
+| 内存吃紧 | search-server 限 300m、embed 限 600m；如实测 RSS 明显上涨，先看是否 `-np` 被调大 |

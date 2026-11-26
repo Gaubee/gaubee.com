@@ -6,7 +6,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createMiniSearchIndex } from "./minisearch";
-import { createServerSearchService } from "./server-service";
+import { COLD_TIMEOUT_MS, createServerSearchService, DEFAULT_TIMEOUT_MS } from "./server-service";
 import type { SearchBatch, SearchQuery, SearchResult, SearchService } from "./types";
 
 afterEach(() => {
@@ -64,6 +64,11 @@ async function collect(
 }
 
 describe("createServerSearchService", () => {
+  it("默认超时覆盖 mistral-embed 延迟并保留冷启动余量", () => {
+    expect(DEFAULT_TIMEOUT_MS).toBe(1_200);
+    expect(COLD_TIMEOUT_MS).toBe(2_500);
+  });
+
   it("把自由文本与应用过滤发给 /api/search，并映射结果", async () => {
     const calls: { url?: string; init?: RequestInit } = {};
     const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {

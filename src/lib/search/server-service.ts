@@ -7,10 +7,10 @@ import { createFileSearchService } from "./file-service";
 import type { SearchBatch, SearchResult, SearchService, SearchTask } from "./types";
 
 const DEFAULT_ENDPOINT = "/api/search";
-/** 常规请求超时（服务已预热）。 */
-const DEFAULT_TIMEOUT_MS = 800;
+/** 常规请求超时（服务已预热；mistral-embed p50 约 387ms，留余量）。 */
+export const DEFAULT_TIMEOUT_MS = 1_200;
 /** 冷启动首查超时（容器刚起、索引段尚未驻留）。 */
-const COLD_TIMEOUT_MS = 2_000;
+export const COLD_TIMEOUT_MS = 2_500;
 /** 每个应用一次请求取回的上限（服务端去重后）。 */
 const REQUEST_LIMIT = 20;
 

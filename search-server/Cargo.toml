@@ -1,9 +1,9 @@
 [package]
 name = "search-server"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.92"
-description = "Semantic search service for gaubee.com powered by alibaba/zvec"
+description = "Semantic search service for gaubee.com: SQLite FTS5 + remote embeddings"
 license = "Apache-2.0"
 
 [[bin]]
@@ -16,21 +16,19 @@ axum = "0.8"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive", "env"] }
 hex = "0.4"
-ndarray = "0.17"
-ort = { version = "=2.0.0-rc.15", default-features = false, features = [
-  "std",
-  "ndarray",
-  "download-binaries",
-  "copy-dylibs",
-  "tls-native",
-] }
+jieba-rs = "0.8"
 regex = "1"
+reqwest = { version = "0.12", default-features = false, features = [
+  "blocking",
+  "json",
+  "rustls-tls",
+] }
+rusqlite = { version = "0.37", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
 sha2 = "0.10"
 thiserror = "2"
-tokenizers = "0.23"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
