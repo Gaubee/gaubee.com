@@ -182,11 +182,7 @@ export function readCache(filter: SearchAppFilter, query: string): SearchResult[
   return entry.results;
 }
 
-export function writeCache(
-  filter: SearchAppFilter,
-  query: string,
-  results: SearchResult[],
-): void {
+export function writeCache(filter: SearchAppFilter, query: string, results: SearchResult[]): void {
   if (!normalizeQuery(query)) return;
   const key = cacheKey(filter, query);
   cache.delete(key);

@@ -308,9 +308,6 @@
         跨文章与事件检索，支持自然语言，也可用 <code class="text-xs">app:articles</code> 限定范围
       </p>
     </div>
-    {#if history.length > 0 && !query.trim()}
-      <Button variant="ghost" size="sm" onclick={clearAllHistory}>清空记录</Button>
-    {/if}
   </header>
 
   <div class="relative">
@@ -319,7 +316,7 @@
     />
     <Input
       bind:ref={inputEl}
-      class="h-11 pr-10 pl-10 text-base"
+      class="border-border/60 h-11 pr-10 pl-10 text-base [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
       type="search"
       value={query}
       oninput={(event) => updateQuery(event.currentTarget.value)}
@@ -345,7 +342,7 @@
     {#each FILTERS as option (option.id)}
       <button
         type="button"
-        class="rounded-full border px-3 py-1 text-xs transition-colors"
+        class="h-8 rounded-full border px-3 text-xs transition-colors"
         class:border-primary={filter === option.id}
         class:bg-primary={filter === option.id}
         class:text-primary-foreground={filter === option.id}
@@ -392,15 +389,24 @@
     {#if history.length > 0}
       <section class="overflow-hidden rounded-lg border" aria-label="最近搜索">
         <div class="text-muted-foreground bg-muted/40 flex items-center gap-2 px-3 py-2 text-xs">
-          <HistoryIcon class="size-3.5" />
-          最近搜索
+          <span class="flex items-center gap-2">
+            <HistoryIcon class="size-3.5" />
+            最近搜索
+          </span>
+          <button
+            type="button"
+            class="hover:text-foreground ml-auto rounded px-1.5 py-0.5 text-xs transition-colors"
+            onclick={clearAllHistory}
+          >
+            清空记录
+          </button>
         </div>
         <ul class="divide-y">
           {#each history as item (item)}
             <li class="group flex items-center">
               <button
                 type="button"
-                class="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted"
+                class="flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted"
                 onclick={() => runFromHistory(item)}
               >
                 <SearchIcon class="text-muted-foreground size-3.5 shrink-0" />
@@ -454,7 +460,7 @@
           out:fade={{ duration: prefersReducedMotion ? 0 : 120 }}
         >
           <a
-            class="block rounded-lg px-3 py-3 transition-colors hover:bg-muted"
+            class="group -mx-3 block rounded-lg px-3 py-3 transition-colors hover:bg-muted"
             class:bg-muted={selectedIndex === index}
             href={result.href}
             onclick={(event) => {
@@ -467,7 +473,7 @@
               <span class="bg-muted text-foreground/80 rounded px-1.5 py-0.5">{result.appName}</span>
               <time>{formatDate(result.date)}</time>
             </div>
-            <h2 class="line-clamp-1 text-sm font-semibold">{result.title}</h2>
+            <h2 class="line-clamp-1 text-sm font-semibold group-hover:underline group-hover:decoration-muted-foreground/40 group-hover:underline-offset-2">{result.title}</h2>
             <p class="text-muted-foreground mt-1 line-clamp-2 text-sm leading-5">
               {result.excerpt}
             </p>
