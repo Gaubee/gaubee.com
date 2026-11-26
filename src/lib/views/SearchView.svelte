@@ -4,11 +4,14 @@
 	2. 会话层补齐：搜索历史（localStorage）、结果缓存（内存 10 分钟）、
 	   最近一次搜索刷新后恢复（sessionStorage 30 分钟）。
 	3. 仍只协调各应用注册的异步搜索服务；本视图不直接访问数据源。
+	4. 浏览器内置 AI 可用时提供对话式检索入口；不可用时完全不渲染，且与普通结果互斥。
 -->
 <script lang="ts">
   import { onDestroy, onMount, tick } from 'svelte'
   import { flip } from 'svelte/animate'
   import { fade } from 'svelte/transition'
+  import { detectAiCapability, type AiCapability } from '$lib/ai/capability'
+  import AiChat from '$lib/ai/AiChat.svelte'
   import { navController } from '$lib/nav/nav-controller-instance'
   import { searchRegisteredServices } from '$lib/search/coordinator'
   import { parseLuceneQuery } from '$lib/search/lucene'
@@ -31,6 +34,7 @@
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import SearchIcon from '@lucide/svelte/icons/search'
+  import SparklesIcon from '@lucide/svelte/icons/sparkles'
   import XIcon from '@lucide/svelte/icons/x'
   import HistoryIcon from '@lucide/svelte/icons/history'
   import FileTextIcon from '@lucide/svelte/icons/file-text'
@@ -59,6 +63,13 @@
   let selectedIndex = $state(-1)
   let prefersReducedMotion = $state(false)
   let inputEl = $state<HTMLInputElement | null>(null)
+  /** 浏览器内置 AI 能力；null = 尚未探测，不渲染任何 AI 元素。 */
+  let aiCapability = $state<AiCapability | null>(null)
+  let aiOpen = $state(false)
+  const aiAvailable = $derived(
+    aiCapability?.state === 'available' || aiCapability?.state === 'downloadable',
+  )
+  const showAi = $derived(aiOpen && aiAvailable)
 
   let taskController: AbortController | null = null
   let inputTimer: ReturnType<typeof setTimeout> | null = null
@@ -160,6 +171,10 @@
     sortMode = mode
     saveSortMode(mode)
     results = sortResults(results)
+  }
+
+  function toggleAi(): void {
+    aiOpen = !aiOpen
   }
 
   function schedulePublish(buffer: Map<string, SearchResult>, controller: AbortController): void {
@@ -295,12 +310,20 @@
   }
 
   onMount(() => {
+    let disposed = false
     const media = window.matchMedia('(prefers-reduced-motion: reduce)')
     const updateMotionPreference = () => {
       prefersReducedMotion = media.matches
     }
     updateMotionPreference()
     media.addEventListener('change', updateMotionPreference)
+
+    // AI 不可用时保持 null 之后直接不渲染，避免入口闪烁。
+    void detectAiCapability().then((capability) => {
+      if (disposed) return
+      aiCapability = capability
+      if (capability.state === 'unavailable') aiOpen = false
+    })
 
     history = loadHistory()
     sortMode = loadSortMode()
@@ -313,7 +336,10 @@
       usedCache = true
     }
 
-    return () => media.removeEventListener('change', updateMotionPreference)
+    return () => {
+      disposed = true
+      media.removeEventListener('change', updateMotionPreference)
+    }
   })
 
   onDestroy(() => {
@@ -404,13 +430,31 @@
         相关
       </button>
     </div>
-    {#if completed && query.trim()}
+    {#if aiAvailable}
+      <button
+        type="button"
+        class="inline-flex h-8 items-center gap-1 rounded-full border px-3 text-xs transition-colors"
+        class:border-primary={aiOpen}
+        class:bg-primary={aiOpen}
+        class:text-primary-foreground={aiOpen}
+        class:text-muted-foreground={!aiOpen}
+        class:hover:bg-muted={!aiOpen}
+        aria-label="AI 搜索助手"
+        aria-expanded={aiOpen}
+        aria-controls="ai-chat-panel"
+        onclick={toggleAi}
+      >
+        <SparklesIcon class="size-3.5" />
+        AI
+      </button>
+    {/if}
+    {#if completed && query.trim() && !showAi}
       <span class="text-muted-foreground ml-auto text-xs tabular-nums">
         {results.length} 条结果
         {#if elapsedMs > 0}· {elapsedMs}ms{/if}
         {#if usedCache}· 缓存{/if}
       </span>
-    {:else if searching}
+    {:else if searching && !showAi}
       <span class="text-muted-foreground ml-auto flex items-center gap-1.5 text-xs">
         <LoaderIcon class="size-3.5 animate-spin" />
         搜索中
@@ -418,118 +462,126 @@
     {/if}
   </div>
 
-  <div class="sr-only" aria-live="polite">
-    {#if searching}
-      正在搜索
-    {:else if completed}
-      找到 {results.length} 条结果
-    {/if}
-  </div>
-
-  {#if error}
-    <p
-      class="border-destructive/30 text-destructive rounded-md border px-3 py-2 text-sm"
-      role="alert"
-    >
-      {error}
-    </p>
+  {#if aiAvailable}
+    <div hidden={!aiOpen}>
+      <AiChat />
+    </div>
   {/if}
 
-  {#if !query.trim()}
-    {#if history.length > 0}
-      <section class="overflow-hidden rounded-lg border" aria-label="最近搜索">
-        <div class="text-muted-foreground bg-muted/40 flex items-center gap-2 px-3 py-2 text-xs">
-          <span class="flex items-center gap-2">
-            <HistoryIcon class="size-3.5" />
-            最近搜索
-          </span>
-          <button
-            type="button"
-            class="hover:text-foreground ml-auto rounded px-1.5 py-0.5 text-xs transition-colors"
-            onclick={clearAllHistory}
-          >
-            清空记录
-          </button>
+  {#if !showAi}
+    <div class="sr-only" aria-live="polite">
+      {#if searching}
+        正在搜索
+      {:else if completed}
+        找到 {results.length} 条结果
+      {/if}
+    </div>
+
+    {#if error}
+      <p
+        class="border-destructive/30 text-destructive rounded-md border px-3 py-2 text-sm"
+        role="alert"
+      >
+        {error}
+      </p>
+    {/if}
+
+    {#if !query.trim()}
+      {#if history.length > 0}
+        <section class="overflow-hidden rounded-lg border" aria-label="最近搜索">
+          <div class="text-muted-foreground bg-muted/40 flex items-center gap-2 px-3 py-2 text-xs">
+            <span class="flex items-center gap-2">
+              <HistoryIcon class="size-3.5" />
+              最近搜索
+            </span>
+            <button
+              type="button"
+              class="hover:text-foreground ml-auto rounded px-1.5 py-0.5 text-xs transition-colors"
+              onclick={clearAllHistory}
+            >
+              清空记录
+            </button>
+          </div>
+          <ul class="divide-y">
+            {#each history as item (item)}
+              <li class="group flex items-center">
+                <button
+                  type="button"
+                  class="flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted"
+                  onclick={() => runFromHistory(item)}
+                >
+                  <SearchIcon class="text-muted-foreground size-3.5 shrink-0" />
+                  <span class="truncate">{item}</span>
+                </button>
+                <button
+                  type="button"
+                  class="text-muted-foreground hover:text-foreground mr-2 rounded p-1.5 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                  aria-label={`删除搜索记录：${item}`}
+                  onclick={() => removeHistory(item)}
+                >
+                  <XIcon class="size-3.5" />
+                </button>
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {:else}
+        <div class="flex min-h-52 flex-col items-center justify-center gap-2 text-center">
+          <SearchIcon class="text-muted-foreground size-7" />
+          <p class="text-muted-foreground text-sm">输入关键词开始搜索</p>
+          <p class="text-muted-foreground/70 text-xs">
+            支持 <kbd class="rounded border px-1">↑</kbd>
+            <kbd class="rounded border px-1">↓</kbd> 选择，
+            <kbd class="rounded border px-1">Enter</kbd> 打开，
+            <kbd class="rounded border px-1">Esc</kbd> 清空
+          </p>
         </div>
-        <ul class="divide-y">
-          {#each history as item (item)}
-            <li class="group flex items-center">
-              <button
-                type="button"
-                class="flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted"
-                onclick={() => runFromHistory(item)}
-              >
-                <SearchIcon class="text-muted-foreground size-3.5 shrink-0" />
-                <span class="truncate">{item}</span>
-              </button>
-              <button
-                type="button"
-                class="text-muted-foreground hover:text-foreground mr-2 rounded p-1.5 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                aria-label={`删除搜索记录：${item}`}
-                onclick={() => removeHistory(item)}
-              >
-                <XIcon class="size-3.5" />
-              </button>
-            </li>
-          {/each}
-        </ul>
-      </section>
-    {:else}
+      {/if}
+    {:else if searching && results.length === 0}
+      <div class="space-y-3" aria-label="正在搜索">
+        {#each [0, 1, 2] as row (row)}
+          <div
+            class="h-20 animate-pulse rounded-md bg-muted"
+            style={`animation-delay: ${row * 80}ms`}
+          ></div>
+        {/each}
+      </div>
+    {:else if completed && results.length === 0 && !error}
       <div class="flex min-h-52 flex-col items-center justify-center gap-2 text-center">
-        <SearchIcon class="text-muted-foreground size-7" />
-        <p class="text-muted-foreground text-sm">输入关键词开始搜索</p>
-        <p class="text-muted-foreground/70 text-xs">
-          支持 <kbd class="rounded border px-1">↑</kbd>
-          <kbd class="rounded border px-1">↓</kbd> 选择，
-          <kbd class="rounded border px-1">Enter</kbd> 打开，
-          <kbd class="rounded border px-1">Esc</kbd> 清空
-        </p>
+        <FileTextIcon class="text-muted-foreground size-7" />
+        <p class="text-muted-foreground text-sm">没有匹配的内容</p>
+        <p class="text-muted-foreground/70 text-xs">试试更短的关键词，或切换上方范围</p>
+      </div>
+    {:else}
+      <div class="divide-y">
+        {#each results as result, index (result.id)}
+          <article
+            animate:flip={{ duration: prefersReducedMotion ? 0 : 180 }}
+            in:fade={{ duration: prefersReducedMotion ? 0 : 160 }}
+            out:fade={{ duration: prefersReducedMotion ? 0 : 120 }}
+          >
+            <a
+              class="group -mx-3 block rounded-lg px-3 py-3 transition-colors hover:bg-muted"
+              class:bg-muted={selectedIndex === index}
+              href={result.href}
+              onclick={(event) => {
+                event.preventDefault()
+                openResult(result)
+              }}
+              onmouseenter={() => (selectedIndex = index)}
+            >
+              <div class="text-muted-foreground mb-1.5 flex items-center gap-2 text-xs">
+                <span class="bg-muted text-foreground/80 rounded px-1.5 py-0.5">{result.appName}</span>
+                <time>{formatDate(result.date)}</time>
+              </div>
+              <h2 class="line-clamp-1 text-sm font-semibold group-hover:underline group-hover:decoration-muted-foreground/40 group-hover:underline-offset-2">{result.title}</h2>
+              <p class="text-muted-foreground mt-1 line-clamp-2 text-sm leading-5">
+                {result.excerpt}
+              </p>
+            </a>
+          </article>
+        {/each}
       </div>
     {/if}
-  {:else if searching && results.length === 0}
-    <div class="space-y-3" aria-label="正在搜索">
-      {#each [0, 1, 2] as row (row)}
-        <div
-          class="h-20 animate-pulse rounded-md bg-muted"
-          style={`animation-delay: ${row * 80}ms`}
-        ></div>
-      {/each}
-    </div>
-  {:else if completed && results.length === 0 && !error}
-    <div class="flex min-h-52 flex-col items-center justify-center gap-2 text-center">
-      <FileTextIcon class="text-muted-foreground size-7" />
-      <p class="text-muted-foreground text-sm">没有匹配的内容</p>
-      <p class="text-muted-foreground/70 text-xs">试试更短的关键词，或切换上方范围</p>
-    </div>
-  {:else}
-    <div class="divide-y">
-      {#each results as result, index (result.id)}
-        <article
-          animate:flip={{ duration: prefersReducedMotion ? 0 : 180 }}
-          in:fade={{ duration: prefersReducedMotion ? 0 : 160 }}
-          out:fade={{ duration: prefersReducedMotion ? 0 : 120 }}
-        >
-          <a
-            class="group -mx-3 block rounded-lg px-3 py-3 transition-colors hover:bg-muted"
-            class:bg-muted={selectedIndex === index}
-            href={result.href}
-            onclick={(event) => {
-              event.preventDefault()
-              openResult(result)
-            }}
-            onmouseenter={() => (selectedIndex = index)}
-          >
-            <div class="text-muted-foreground mb-1.5 flex items-center gap-2 text-xs">
-              <span class="bg-muted text-foreground/80 rounded px-1.5 py-0.5">{result.appName}</span>
-              <time>{formatDate(result.date)}</time>
-            </div>
-            <h2 class="line-clamp-1 text-sm font-semibold group-hover:underline group-hover:decoration-muted-foreground/40 group-hover:underline-offset-2">{result.title}</h2>
-            <p class="text-muted-foreground mt-1 line-clamp-2 text-sm leading-5">
-              {result.excerpt}
-            </p>
-          </a>
-        </article>
-      {/each}
-    </div>
   {/if}
 </section>
