@@ -7,11 +7,13 @@ import {
   clearHistory,
   forgetQuery,
   loadHistory,
+  loadSortMode,
   normalizeQuery,
   readCache,
   readSnapshot,
   rememberQuery,
   resetCacheForTests,
+  saveSortMode,
   writeCache,
   writeSnapshot,
 } from "./search-session";
@@ -97,6 +99,19 @@ describe("搜索历史", () => {
   it("空查询不入历史", () => {
     rememberQuery("   ");
     expect(loadHistory()).toEqual([]);
+  });
+});
+
+describe("排序偏好", () => {
+  it("默认时间逆序", () => {
+    expect(loadSortMode()).toBe("time");
+  });
+
+  it("记住相关性优先，忽略非法值", () => {
+    saveSortMode("relevance");
+    expect(loadSortMode()).toBe("relevance");
+    window.localStorage.setItem("gaubee:search:sort:v1", "bogus");
+    expect(loadSortMode()).toBe("time");
   });
 });
 

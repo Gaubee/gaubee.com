@@ -13,6 +13,8 @@
 import type { SearchResult } from "./types";
 
 export type SearchAppFilter = "all" | "articles" | "event";
+/** 结果排序：默认时间逆序；用户可切到相关性优先。 */
+export type SearchSortMode = "time" | "relevance";
 
 export interface SearchSnapshot {
   query: string;
@@ -23,6 +25,7 @@ export interface SearchSnapshot {
 
 const HISTORY_KEY = "gaubee:search:history:v1";
 const SNAPSHOT_KEY = "gaubee:search:snapshot:v1";
+const SORT_KEY = "gaubee:search:sort:v1";
 const MAX_HISTORY = 12;
 const SNAPSHOT_TTL_MS = 30 * 60_000;
 const CACHE_TTL_MS = 10 * 60_000;
@@ -103,6 +106,27 @@ export function forgetQuery(query: string): string[] {
 export function clearHistory(): string[] {
   saveHistory([]);
   return [];
+}
+
+/** 排序偏好（localStorage）。默认时间逆序。 */
+export function loadSortMode(): SearchSortMode {
+  const store = storage();
+  if (!store) return "time";
+  try {
+    return store.getItem(SORT_KEY) === "relevance" ? "relevance" : "time";
+  } catch {
+    return "time";
+  }
+}
+
+export function saveSortMode(mode: SearchSortMode): void {
+  const store = storage();
+  if (!store) return;
+  try {
+    store.setItem(SORT_KEY, mode);
+  } catch {
+    // 忽略
+  }
 }
 
 export function readSnapshot(): SearchSnapshot | null {
