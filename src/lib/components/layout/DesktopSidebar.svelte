@@ -97,5 +97,5 @@
     <AreaNav area="bottom" {collapsed} />
   </div>
 
-  <!-- 注意：搜索/通知等 pop 入口已移至顶部状态栏 tray 区，Dock 底部不再显示 -->
+  <!-- 注意：通知 pop 与搜索应用入口在顶部状态栏 tray 区，Dock 底部不再显示 -->
 </aside>

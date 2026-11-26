@@ -121,6 +121,9 @@ struct BuildArgs {
     /// 复用旧索引里内容未变的向量（默认开）。用 `--no-incremental` 强制全量。
     #[arg(long, default_value_t = true, action = clap::ArgAction::Set, env = "EMBED_INCREMENTAL")]
     incremental: bool,
+    /// 增量重建允许新算的 chunk 上限；超过即中止（防止在 2 核服务器上误触发全量重建）。0=不限。
+    #[arg(long, default_value_t = 0, env = "EMBED_MAX_NEW_CHUNKS")]
+    max_new_chunks: usize,
 }
 
 #[derive(Args)]
@@ -145,6 +148,9 @@ struct CheckArgs {
     content: PathBuf,
     #[arg(long, default_value = "./index.sqlite", env = "INDEX_FILE")]
     index: PathBuf,
+    /// 索引结构完整、但内容或模型已过期时仍返回 0（容器启动用：先服务旧索引，等后台重建）。
+    #[arg(long, default_value_t = false)]
+    allow_stale: bool,
     #[command(flatten)]
     embed: EmbedArgs,
 }
@@ -194,6 +200,7 @@ fn run_build(args: BuildArgs) -> Result<()> {
         index_path: args.index.clone(),
         embedding,
         incremental: args.incremental,
+        max_new_chunks: args.max_new_chunks,
     })?;
     println!(
         "索引构建完成：{} 篇文档 / {} chunks（新算 {} / 复用 {}），耗时 {:.1}s，索引 {:.1} MiB",
@@ -231,6 +238,12 @@ fn run_check(args: CheckArgs) -> Result<()> {
         report.content_matches, report.model_matches, report.integrity_ok
     );
     if !report.matches {
+        if args.allow_stale && report.integrity_ok {
+            println!(
+                "status:        stale-but-valid（内容/模型已过期，先服务旧索引，等待后台重建）"
+            );
+            return Ok(());
+        }
         let reason = if !report.integrity_ok {
             "索引损坏或版本不支持"
         } else if !report.content_matches {

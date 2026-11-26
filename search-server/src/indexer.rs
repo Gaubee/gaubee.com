@@ -19,6 +19,8 @@ pub struct BuildOptions {
     pub embedding: EmbeddingConfig,
     /// 复用旧索引里内容未变的向量（默认 true：日常只新增几篇，不必重建全库）。
     pub incremental: bool,
+    /// 允许新算 embedding 的 chunk 上限；超过即中止。0 = 不限（构建机全量用）。
+    pub max_new_chunks: usize,
 }
 
 #[derive(Debug)]
@@ -139,6 +141,17 @@ pub fn build_index(options: &BuildOptions) -> Result<BuildReport> {
             reused = reused.len(),
             pending = pending.len(),
             "增量重建：复用未变更文档的旧向量"
+        );
+    }
+
+    // 上限护栏：窗口参数或模型一旦变化，todo 会等于全量。服务器只有 2 核，
+    // 全量重建是小时级，宁可让自动任务失败并告警，也不能悄悄占用线上几小时。
+    if options.max_new_chunks > 0 && todo.len() > options.max_new_chunks {
+        bail!(
+            "增量重建需要新算 {} 个 chunk，超过上限 {}（可能改了窗口参数或换过模型）。\
+             请在构建机上用 --incremental false 全量重建后再上传。",
+            todo.len(),
+            options.max_new_chunks
         );
     }
 
@@ -363,6 +376,7 @@ mod tests {
             index_path: index_path.clone(),
             embedding: config(server.url()),
             incremental: true,
+            max_new_chunks: 0,
         })
         .expect("initial build");
         assert_eq!(first.embedded, 2);
@@ -379,6 +393,7 @@ mod tests {
             index_path: index_path.clone(),
             embedding: config(server.url()),
             incremental: true,
+            max_new_chunks: 0,
         })
         .expect("incremental build");
         assert_eq!(second.documents, 3);
@@ -404,6 +419,7 @@ mod tests {
             index_path,
             embedding: config(server.url()),
             incremental: false,
+            max_new_chunks: 0,
         })
         .expect("full build");
         assert_eq!(full.reused, 0);
@@ -423,6 +439,7 @@ mod tests {
             index_path: index_path.clone(),
             embedding: config(server.url()),
             incremental: true,
+            max_new_chunks: 0,
         })
         .expect("initial build");
 
@@ -437,6 +454,7 @@ mod tests {
             index_path,
             embedding: config(server.url()),
             incremental: true,
+            max_new_chunks: 0,
         })
         .expect("incremental build");
         assert_eq!(second.reused, 1, "未改动的那篇复用");
@@ -457,10 +475,32 @@ mod tests {
             index_path,
             embedding: config(server.url()),
             incremental: true,
+            max_new_chunks: 0,
         })
         .expect("build without existing index");
         assert_eq!(report.reused, 0);
         assert_eq!(report.embedded, 2);
+    }
+
+    #[test]
+    fn incremental_rebuild_respects_max_new_chunks() {
+        let server = MockEmbeddingServer::start(MockMode::Success { dim: 8 }, 0);
+        let directory = tempfile::tempdir().unwrap();
+        let content = directory.path().join("content");
+        write_fixture(&content);
+        let index_path = directory.path().join("index.sqlite");
+
+        // 没有旧索引 → 2 个 chunk 都要新算；上限设 1 必须中止，且不生成索引。
+        let error = build_index(&BuildOptions {
+            content_root: content,
+            index_path: index_path.clone(),
+            embedding: config(server.url()),
+            incremental: true,
+            max_new_chunks: 1,
+        })
+        .unwrap_err();
+        assert!(error.to_string().contains("超过上限"), "{error:#}");
+        assert!(!index_path.exists());
     }
 
     #[test]
@@ -476,6 +516,7 @@ mod tests {
             index_path: index_path.clone(),
             embedding: config(server.url()),
             incremental: false,
+            max_new_chunks: 0,
         })
         .expect("build");
         assert_eq!(report.documents, 2);
@@ -541,6 +582,7 @@ mod tests {
             index_path: index_path.clone(),
             embedding: config(good.url()),
             incremental: false,
+            max_new_chunks: 0,
         })
         .expect("initial build");
         let original = std::fs::read(&index_path).unwrap();
@@ -551,6 +593,7 @@ mod tests {
             index_path: index_path.clone(),
             embedding: config(bad.url()),
             incremental: false,
+            max_new_chunks: 0,
         })
         .unwrap_err();
         assert!(error.to_string().contains("503"));

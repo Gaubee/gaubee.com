@@ -85,11 +85,12 @@ describe("areaForPath", () => {
     pinnedTabs: [],
   };
 
-  it("pop 路径优先", () => {
-    expect(areaForPath(layout, "/app/search")).toBe("pop");
+  it("pop 路径优先；搜索已是 main 应用", () => {
     expect(areaForPath(layout, "/app/notifications")).toBe("pop");
+    // 2026-11-26：搜索改成独立 main 应用，不再走 pop。
+    expect(areaForPath(layout, "/app/search")).toBe("main");
     // 注意：areaForPath 接收 pathname（已剥离 query），不处理带 query 的字符串。
-    // /app/search/sub 是 pop（子路径），但 /app/search?q=foo 由调用方先剥离 query。
+    // pop 子路径仍是 pop，但 ?q= 由调用方先剥离 query。
   });
 
   it("bottom tab 路径", () => {
@@ -153,15 +154,15 @@ describe("reduceKernel: NAVIGATE", () => {
     expect(result.notify).toEqual([{ area: "bottom", type: "PUSH" }]);
   });
 
-  it("pop 路径导航：sourceArea=main 点 search，进 pop", () => {
+  it("pop 路径导航：sourceArea=main 点通知，进 pop", () => {
     const state = makeInitialState();
     const result = reduceKernel(state, {
       type: "NAVIGATE",
       sourceArea: "main",
       action: "PUSH",
-      location: makeLocation("/app/search"),
+      location: makeLocation("/app/notifications"),
     });
-    expect(result.nextState.popLocation.pathname).toBe("/app/search");
+    expect(result.nextState.popLocation.pathname).toBe("/app/notifications");
     expect(result.notify).toEqual([{ area: "pop", type: "PUSH" }]);
   });
 
@@ -421,9 +422,9 @@ describe("reduceKernel: ACTIVATE_POP / DEACTIVATE_POP", () => {
     const state = makeInitialState();
     const r1 = reduceKernel(state, {
       type: "ACTIVATE_POP",
-      location: makeLocation("/app/search"),
+      location: makeLocation("/app/notifications"),
     });
-    expect(r1.nextState.popLocation.pathname).toBe("/app/search");
+    expect(r1.nextState.popLocation.pathname).toBe("/app/notifications");
 
     const r2 = reduceKernel(state, {
       type: "ACTIVATE_POP",
@@ -435,7 +436,7 @@ describe("reduceKernel: ACTIVATE_POP / DEACTIVATE_POP", () => {
   it("关闭 pop", () => {
     const state: KernelState = {
       ...makeInitialState(),
-      popLocation: makeLocation("/app/search"),
+      popLocation: makeLocation("/app/notifications"),
     };
     const result = reduceKernel(state, { type: "DEACTIVATE_POP" });
     expect(result.nextState.popLocation.pathname).toBe("/");
@@ -453,11 +454,11 @@ describe("reduceKernel: POPSTATE", () => {
       type: "POPSTATE",
       mainLocation: makeLocation("/article/0001"),
       bottomLocation: makeLocation("/app/github"),
-      popLocation: makeLocation("/app/search"),
+      popLocation: makeLocation("/app/notifications"),
     });
     expect(result.nextState.mainLocation.pathname).toBe("/article/0001");
     expect(result.nextState.bottomLocation.pathname).toBe("/app/github");
-    expect(result.nextState.popLocation.pathname).toBe("/app/search");
+    expect(result.nextState.popLocation.pathname).toBe("/app/notifications");
     expect(result.notify).toEqual([
       { area: "main", type: "BACK" },
       { area: "bottom", type: "BACK" },
@@ -514,7 +515,7 @@ describe("URL 序列化往返", () => {
   });
 
   it("带 _p 的 URL：pop location 解析", () => {
-    mockWindow("http://localhost/app/articles?_p=/app/search");
+    mockWindow("http://localhost/app/articles?_p=/app/notifications");
     const layout = {
       mainTabs: [...DEFAULT_MAIN_TABS],
       bottomTabs: [...DEFAULT_BOTTOM_TABS],
@@ -522,7 +523,7 @@ describe("URL 序列化往返", () => {
     };
     const parsed = parseBrowserLocation(window.location, layout);
     expect(parsed.main.pathname).toBe("/app/articles");
-    expect(parsed.pop.pathname).toBe("/app/search");
+    expect(parsed.pop.pathname).toBe("/app/notifications");
   });
 
   it("深链接推断：URL 直接是 bottom 路径且无 _b，推断为 bottom", () => {
@@ -539,14 +540,14 @@ describe("URL 序列化往返", () => {
   });
 
   it("深链接推断：URL 直接是 pop 路径且无 _p，推断为 pop", () => {
-    mockWindow("http://localhost/app/search");
+    mockWindow("http://localhost/app/notifications");
     const layout = {
       mainTabs: [...DEFAULT_MAIN_TABS],
       bottomTabs: [...DEFAULT_BOTTOM_TABS],
       pinnedTabs: [],
     };
     const parsed = parseBrowserLocation(window.location, layout);
-    expect(parsed.pop.pathname).toBe("/app/search");
+    expect(parsed.pop.pathname).toBe("/app/notifications");
     expect(parsed.main.pathname).toBe("/");
   });
 
@@ -559,18 +560,18 @@ describe("URL 序列化往返", () => {
       updatedAt: 0,
       mainLocation: makeLocation("/article/0001"),
       bottomLocation: makeLocation("/app/github"),
-      popLocation: makeLocation("/app/search"),
+      popLocation: makeLocation("/app/notifications"),
       appScenes: {},
     };
     const url = buildCanonicalUrl(state);
     expect(url).toContain("/article/0001");
     // URLSearchParams 会把 / 编码为 %2F
     expect(url).toContain("_b=%2Fapp%2Fgithub");
-    expect(url).toContain("_p=%2Fapp%2Fsearch");
+    expect(url).toContain("_p=%2Fapp%2Fnotifications");
     // 解码后能还原
     const parsedUrl = new URL(url, "http://localhost");
     expect(parsedUrl.searchParams.get("_b")).toBe("/app/github");
-    expect(parsedUrl.searchParams.get("_p")).toBe("/app/search");
+    expect(parsedUrl.searchParams.get("_p")).toBe("/app/notifications");
   });
 
   it("buildCanonicalUrl：bottom/pop 未激活时不编码 _b/_p", () => {

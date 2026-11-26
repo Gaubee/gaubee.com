@@ -364,6 +364,7 @@ mod tests {
             index_path: index_path.clone(),
             embedding: config(url.clone()),
             incremental: false,
+            max_new_chunks: 0,
         })
         .expect("build");
         let index = LoadedIndex::open(&index_path).expect("open");
