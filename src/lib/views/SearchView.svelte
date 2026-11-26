@@ -16,13 +16,16 @@
     clearHistory,
     forgetQuery,
     loadHistory,
+    loadSortMode,
     normalizeQuery,
     readCache,
     readSnapshot,
     rememberQuery,
+    saveSortMode,
     writeCache,
     writeSnapshot,
     type SearchAppFilter,
+    type SearchSortMode,
   } from '$lib/search/search-session'
   import type { SearchResult } from '$lib/search/types'
   import { Button } from '$lib/components/ui/button'
@@ -44,6 +47,8 @@
 
   let query = $state('')
   let filter = $state<SearchAppFilter>('all')
+  /** 默认时间逆序；可切到相关性优先，偏好记在 localStorage。 */
+  let sortMode = $state<SearchSortMode>('time')
   let results = $state<SearchResult[]>([])
   let searching = $state(false)
   let completed = $state(false)
@@ -103,7 +108,7 @@
     const cached = readCache(filter, normalized)
     if (cached) {
       cancelActiveTask()
-      applyResults(cached)
+      applyResults(sortResults(cached))
       elapsedMs = 0
       usedCache = true
       selectedIndex = -1
@@ -133,12 +138,28 @@
   }
 
   function publish(buffer: Map<string, SearchResult>): void {
-    results = [...buffer.values()].sort(byRelevance)
+    results = sortResults([...buffer.values()])
+  }
+
+  function sortResults(list: SearchResult[]): SearchResult[] {
+    return [...list].sort(sortMode === 'relevance' ? byRelevance : byTime)
+  }
+
+  /** 默认排序：时间逆序，同一天再比相关性。 */
+  function byTime(left: SearchResult, right: SearchResult): number {
+    return right.date - left.date || right.score - left.score
   }
 
   /** 相关性优先，同分再看时间。服务端分数是 RRF/余弦，跨应用也大致可比。 */
   function byRelevance(left: SearchResult, right: SearchResult): number {
     return right.score - left.score || right.date - left.date
+  }
+
+  function changeSort(mode: SearchSortMode): void {
+    if (sortMode === mode) return
+    sortMode = mode
+    saveSortMode(mode)
+    results = sortResults(results)
   }
 
   function schedulePublish(buffer: Map<string, SearchResult>, controller: AbortController): void {
@@ -162,7 +183,7 @@
       const cached = readCache(filter, normalized)
       if (cached) {
         cancelActiveTask()
-        applyResults(cached)
+        applyResults(sortResults(cached))
         elapsedMs = 0
         usedCache = true
         selectedIndex = -1
@@ -201,7 +222,7 @@
         } else if (progress.type === 'service-error') {
           error = `${progress.appId} 搜索失败：${progress.message}`
         } else if (progress.type === 'complete') {
-          const final = [...buffer.values()].sort(byRelevance)
+          const final = sortResults([...buffer.values()])
           results = final
           searching = false
           completed = true
@@ -282,11 +303,12 @@
     media.addEventListener('change', updateMotionPreference)
 
     history = loadHistory()
+    sortMode = loadSortMode()
     const snapshot = readSnapshot()
     if (snapshot) {
       query = snapshot.query
       filter = snapshot.filter
-      applyResults(snapshot.results)
+      applyResults(sortResults(snapshot.results))
       elapsedMs = 0
       usedCache = true
     }
@@ -354,6 +376,34 @@
         {option.label}
       </button>
     {/each}
+    <div
+      class="border-border/70 flex items-center gap-0.5 rounded-full border p-0.5"
+      role="group"
+      aria-label="排序方式"
+    >
+      <button
+        type="button"
+        class="h-7 rounded-full px-2.5 text-xs transition-colors"
+        class:bg-muted={sortMode === 'time'}
+        class:text-foreground={sortMode === 'time'}
+        class:text-muted-foreground={sortMode !== 'time'}
+        aria-pressed={sortMode === 'time'}
+        onclick={() => changeSort('time')}
+      >
+        最新
+      </button>
+      <button
+        type="button"
+        class="h-7 rounded-full px-2.5 text-xs transition-colors"
+        class:bg-muted={sortMode === 'relevance'}
+        class:text-foreground={sortMode === 'relevance'}
+        class:text-muted-foreground={sortMode !== 'relevance'}
+        aria-pressed={sortMode === 'relevance'}
+        onclick={() => changeSort('relevance')}
+      >
+        相关
+      </button>
+    </div>
     {#if completed && query.trim()}
       <span class="text-muted-foreground ml-auto text-xs tabular-nums">
         {results.length} 条结果
