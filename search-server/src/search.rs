@@ -1,11 +1,35 @@
 //! 查询过滤校验、RRF 融合分、结果归一化与 parentId 去重。
-use std::collections::HashSet;
+use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 use anyhow::{bail, Result};
 
 use crate::store::{Hit, SearchMode};
 
 pub const RRF_RANK_CONSTANT: f32 = 60.0;
+
+/// 单路 RRF 权重。两路权重相同即经典 RRF；调低 FTS 可让语义命中不被
+/// 候选更深的词法命中挤出前列。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FusionWeights {
+    pub fts: f32,
+    pub vector: f32,
+}
+
+impl Default for FusionWeights {
+    fn default() -> Self {
+        Self {
+            fts: 1.0,
+            vector: 1.0,
+        }
+    }
+}
+
+impl FusionWeights {
+    /// 所有路的权重和，用于把融合原始分归一化回 [0, 1]。
+    pub fn sum(&self) -> f32 {
+        self.fts.max(0.0) + self.vector.max(0.0)
+    }
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct SearchFilters {
@@ -127,14 +151,22 @@ pub fn rrf_score(rank: usize) -> f32 {
     1.0 / (RRF_RANK_CONSTANT + rank as f32 + 1.0)
 }
 
+/// 单路排名 → 加权 RRF 分。
+pub fn rrf_score_weighted(rank: usize, weight: f32) -> f32 {
+    weight.max(0.0) * rrf_score(rank)
+}
+
 /// 向量余弦相似度 → [0, 1]。
 pub fn normalize_vector_score(similarity: f32) -> f32 {
     similarity.clamp(0.0, 1.0)
 }
 
-/// RRF 融合分 → [0, 1]（两路召回、rank_constant=60 的理论最大值）。
-pub fn normalize_hybrid_score(score: f32) -> f32 {
-    let max = 2.0 / (RRF_RANK_CONSTANT + 1.0);
+/// RRF 融合分 → [0, 1]；`weight_sum` 为参与融合的权重和。
+pub fn normalize_hybrid_score_with(score: f32, weight_sum: f32) -> f32 {
+    if weight_sum <= 0.0 {
+        return 0.0;
+    }
+    let max = weight_sum / (RRF_RANK_CONSTANT + 1.0);
     (score / max).clamp(0.0, 1.0)
 }
 
@@ -152,6 +184,56 @@ pub fn normalize_fts_scores(hits: &mut [ScoredHit]) {
     }
 }
 
+/// 多轮检索的加权 RRF 合并（PRF 首轮与扩展轮）。
+///
+/// 每一轮都视为独立排名列表，按 `weight * rrf_score(rank)` 累加到同一
+/// chunk；同一 chunk 保留单轮排名最高的元数据。最终分按所有轮权重和
+/// 归一化到 [0, 1]。
+pub fn merge_ranked_rounds(rankings: Vec<(f32, Vec<Hit>)>) -> Vec<ScoredHit> {
+    let weight_sum = rankings
+        .iter()
+        .map(|(weight, _)| weight.max(0.0))
+        .sum::<f32>();
+    let mut merged: HashMap<i64, (Hit, f32, usize)> = HashMap::new();
+    for (weight, hits) in rankings {
+        let weight = weight.max(0.0);
+        for (rank, hit) in hits.into_iter().enumerate() {
+            let contribution = rrf_score_weighted(rank, weight);
+            match merged.entry(hit.doc_id) {
+                Entry::Occupied(mut entry) => {
+                    let (best_hit, score, best_rank) = entry.get_mut();
+                    *score += contribution;
+                    if rank < *best_rank {
+                        *best_hit = hit;
+                        *best_rank = rank;
+                    }
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert((hit, contribution, rank));
+                }
+            }
+        }
+    }
+
+    let mut hits = merged.into_values().collect::<Vec<_>>();
+    hits.sort_by(|left, right| {
+        right
+            .1
+            .partial_cmp(&left.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| right.0.date.cmp(&left.0.date))
+            .then_with(|| left.0.chunk_index.cmp(&right.0.chunk_index))
+            .then_with(|| left.0.parent_id.cmp(&right.0.parent_id))
+    });
+    hits.into_iter()
+        .map(|(hit, raw_score, _)| ScoredHit {
+            hit,
+            raw_score,
+            score: normalize_hybrid_score_with(raw_score, weight_sum),
+        })
+        .collect()
+}
+
 #[derive(Debug, Clone)]
 pub struct ScoredHit {
     pub hit: Hit,
@@ -161,10 +243,15 @@ pub struct ScoredHit {
 
 impl ScoredHit {
     pub fn new(hit: Hit, mode: SearchMode) -> Self {
+        Self::new_weighted(hit, mode, FusionWeights::default().sum())
+    }
+
+    /// `hybrid_weight_sum` 用于把加权 hybrid 原始分归一化回 [0, 1]。
+    pub fn new_weighted(hit: Hit, mode: SearchMode, hybrid_weight_sum: f32) -> Self {
         let raw_score = hit.score;
         let score = match mode {
             SearchMode::Vector => normalize_vector_score(raw_score),
-            SearchMode::Hybrid => normalize_hybrid_score(raw_score),
+            SearchMode::Hybrid => normalize_hybrid_score_with(raw_score, hybrid_weight_sum),
             SearchMode::Fts => raw_score,
         };
         Self {
@@ -337,6 +424,21 @@ mod tests {
         }
     }
 
+    /// 多轮合并测试用：doc_id 与 parent 一一对应，chunk 序号区分同文档不同 chunk。
+    fn merge_hit(doc_id: i64, parent: &str, chunk_index: i32) -> Hit {
+        Hit {
+            doc_id,
+            parent_id: parent.to_string(),
+            app_id: "event".to_string(),
+            title: parent.to_string(),
+            date: 0,
+            chunk_index,
+            href: format!("/article/events/{parent}"),
+            text: "正文".to_string(),
+            score: 0.0,
+        }
+    }
+
     #[test]
     fn filter_validation_accepts_real_values() {
         let filters = SearchFilters {
@@ -410,9 +512,59 @@ mod tests {
     #[test]
     fn hybrid_score_normalizes_to_unit() {
         let fused = rrf_score(0) + rrf_score(0);
-        assert!((normalize_hybrid_score(fused) - 1.0).abs() < 1e-5);
-        assert_eq!(normalize_hybrid_score(0.0), 0.0);
-        assert_eq!(normalize_hybrid_score(1.0), 1.0);
+        assert!((normalize_hybrid_score_with(fused, 2.0) - 1.0).abs() < 1e-5);
+        assert_eq!(normalize_hybrid_score_with(0.0, 2.0), 0.0);
+        assert_eq!(normalize_hybrid_score_with(1.0, 2.0), 1.0);
+    }
+
+    #[test]
+    fn weighted_rrf_scores_scale_by_route() {
+        let weights = FusionWeights {
+            fts: 0.6,
+            vector: 1.0,
+        };
+        assert!((weights.sum() - 1.6).abs() < 1e-6);
+        assert!((rrf_score_weighted(0, 0.6) - 0.6 / 61.0).abs() < 1e-6);
+        assert_eq!(rrf_score_weighted(0, -1.0), 0.0);
+        let best = rrf_score_weighted(0, 0.6) + rrf_score_weighted(0, 1.0);
+        assert!((normalize_hybrid_score_with(best, weights.sum()) - 1.0).abs() < 1e-5);
+        assert_eq!(normalize_hybrid_score_with(1.0, 0.0), 0.0);
+    }
+
+    #[test]
+    fn merge_rounds_sums_weights_and_normalizes() {
+        let original = vec![merge_hit(1, "shared", 0), merge_hit(2, "orig-only", 0)];
+        let expanded = vec![merge_hit(1, "shared", 0), merge_hit(3, "expanded-only", 0)];
+        let merged = merge_ranked_rounds(vec![(1.0, original), (0.8, expanded)]);
+
+        assert_eq!(merged.len(), 3);
+        assert_eq!(merged[0].hit.parent_id, "shared");
+        assert_eq!(merged[1].hit.parent_id, "orig-only");
+        assert_eq!(merged[2].hit.parent_id, "expanded-only");
+        let expected = rrf_score(0) + 0.8 * rrf_score(0);
+        assert!((merged[0].raw_score - expected).abs() < 1e-6);
+        assert!((merged[0].score - 1.0).abs() < 1e-6);
+        assert!((0.0..=1.0).contains(&merged[2].score));
+    }
+
+    #[test]
+    fn merge_rounds_keeps_best_rank_metadata_and_dedupes() {
+        let original = vec![merge_hit(2, "other", 0), merge_hit(1, "parent", 1)];
+        let expanded = vec![merge_hit(1, "parent", 0)];
+        let merged = merge_ranked_rounds(vec![(1.0, original), (0.8, expanded)]);
+
+        assert_eq!(merged[0].hit.parent_id, "parent");
+        assert_eq!(merged[0].hit.chunk_index, 0);
+        let (results, total) = dedupe_and_page(merged, "", 0, 10);
+        assert_eq!(total, 2);
+        assert_eq!(results[0].id, "parent");
+        assert_eq!(results[1].id, "other");
+    }
+
+    #[test]
+    fn merge_rounds_empty_inputs_are_empty() {
+        assert!(merge_ranked_rounds(Vec::new()).is_empty());
+        assert!(merge_ranked_rounds(vec![(1.0, Vec::new())]).is_empty());
     }
 
     #[test]

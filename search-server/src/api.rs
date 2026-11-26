@@ -14,16 +14,68 @@ use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use crate::embed::EmbeddingClient;
-use crate::search::{dedupe_and_page, normalize_fts_scores, ScoredHit, SearchFilters};
-use crate::store::{LoadedIndex, SearchMode};
+use crate::prf;
+use crate::search::{
+    dedupe_and_page, merge_ranked_rounds, normalize_fts_scores, FusionWeights, ScoredHit,
+    SearchFilters, ValidatedFilters,
+};
+use crate::store::{Hit, LoadedIndex, SearchMode};
 
 pub const ENGINE: &str = "sqlite-fts5";
+
+/// hybrid 召回与融合配置。
+///
+/// `candidate_pool = 0` 保留旧的「候选深度随 limit 变化」行为；非 0 时
+/// FTS 与向量各取固定条数，limit 只影响分页。PRF 使用同一候选池。
+#[derive(Debug, Clone, Copy)]
+pub struct FusionConfig {
+    pub candidate_pool: usize,
+    pub fts_weight: f32,
+    pub vector_weight: f32,
+    pub prf: bool,
+    pub prf_terms: usize,
+    pub prf_round_weight: f32,
+}
+
+impl Default for FusionConfig {
+    /// 结构默认保留旧行为；`serve` 的 CLI 默认是评测推荐值（固定池 200 / FTS 0.3）。
+    fn default() -> Self {
+        Self {
+            candidate_pool: 0,
+            fts_weight: 1.0,
+            vector_weight: 1.0,
+            prf: false,
+            prf_terms: prf::DEFAULT_TERMS,
+            prf_round_weight: prf::ROUND_WEIGHT,
+        }
+    }
+}
+
+impl FusionConfig {
+    pub fn weights(&self) -> FusionWeights {
+        FusionWeights {
+            fts: self.fts_weight,
+            vector: self.vector_weight,
+        }
+    }
+
+    /// 融合候选深度。固定池下 `offset + limit` 超出池时扩展池，避免空页。
+    pub fn fetch_k(&self, offset: usize, limit: usize) -> usize {
+        if self.candidate_pool > 0 {
+            self.candidate_pool.max(offset.saturating_add(limit))
+        } else {
+            // 去重要多取候选：每篇最多 8 chunk，按 8 倍扩展并设上下限。
+            ((offset + limit) * 8).clamp(50, 200)
+        }
+    }
+}
 
 pub struct AppState {
     pub index: LoadedIndex,
     pub embedder: Option<EmbeddingClient>,
     /// 仅当 manifest.model == embedder.model() 时为 true；否则向量空间不可复用。
     pub vector_enabled: bool,
+    pub fusion: FusionConfig,
     pub started: Instant,
 }
 
@@ -159,8 +211,9 @@ fn run_search(state: &AppState, request: SearchRequest) -> Result<SearchResponse
         .validate()
         .map_err(|error| SearchFailure::BadRequest(error.to_string()))?;
 
-    // 去重要多取候选：每篇最多 8 chunk，按 8 倍扩展并设上下限。
-    let fetch_k = ((offset + limit) * 8).clamp(50, 200);
+    // 固定候选池时 limit 只影响分页；否则沿用按 limit 动态扩展的旧行为。
+    let fetch_k = state.fusion.fetch_k(offset, limit);
+    let weights = state.fusion.weights();
 
     let mut degraded = false;
     let mut embedding = None;
@@ -188,22 +241,21 @@ fn run_search(state: &AppState, request: SearchRequest) -> Result<SearchResponse
     };
     let hits = state
         .index
-        .search(
+        .search_weighted(
             effective_mode,
             embedding.as_deref(),
             query,
             &filters,
             fetch_k,
+            weights,
         )
         .map_err(SearchFailure::Internal)?;
 
-    let mut scored = hits
-        .into_iter()
-        .map(|hit| ScoredHit::new(hit, effective_mode))
-        .collect::<Vec<_>>();
-    if effective_mode == SearchMode::Fts {
-        normalize_fts_scores(&mut scored);
-    }
+    let scored = if effective_mode == SearchMode::Hybrid && state.fusion.prf {
+        score_with_prf(state, query, &filters, hits, fetch_k, weights)
+    } else {
+        score_single_path(hits, effective_mode, weights)
+    };
 
     let (results, total) = dedupe_and_page(scored, query, offset, limit);
     Ok(SearchResponse {
@@ -225,6 +277,76 @@ fn run_search(state: &AppState, request: SearchRequest) -> Result<SearchResponse
         engine: ENGINE,
         degraded,
     })
+}
+
+fn score_single_path(hits: Vec<Hit>, mode: SearchMode, weights: FusionWeights) -> Vec<ScoredHit> {
+    let mut scored = hits
+        .into_iter()
+        .map(|hit| {
+            if mode == SearchMode::Hybrid {
+                ScoredHit::new_weighted(hit, mode, weights.sum())
+            } else {
+                ScoredHit::new(hit, mode)
+            }
+        })
+        .collect::<Vec<_>>();
+    if mode == SearchMode::Fts {
+        normalize_fts_scores(&mut scored);
+    }
+    scored
+}
+
+/// PRF 第二轮：用首轮 topN 的关键词扩展查询，与首轮做加权 RRF。
+///
+/// 任何一步失败（没有新词、embedding 失败、第二轮检索失败）都只返回首轮
+/// 结果；PRF 是加分项，不影响 `degraded` 语义。
+fn score_with_prf(
+    state: &AppState,
+    query: &str,
+    filters: &ValidatedFilters,
+    hits: Vec<Hit>,
+    fetch_k: usize,
+    weights: FusionWeights,
+) -> Vec<ScoredHit> {
+    let feedback = &hits[..hits.len().min(prf::FEEDBACK_DEPTH)];
+    let keywords = prf::extract_keywords(
+        feedback,
+        query,
+        state.fusion.prf_terms,
+        |token| state.index.document_frequency(token),
+        state.index.chunk_count(),
+    );
+    if keywords.is_empty() {
+        return score_single_path(hits, SearchMode::Hybrid, weights);
+    }
+    let expanded = format!("{} {}", query, keywords.join(" "));
+    tracing::debug!(?keywords, %expanded, "PRF 查询扩展");
+
+    let Some(client) = state.embedder.as_ref() else {
+        return score_single_path(hits, SearchMode::Hybrid, weights);
+    };
+    let second = client
+        .embed_query(&expanded, state.index.dim())
+        .and_then(|embedding| {
+            state.index.search_weighted(
+                SearchMode::Hybrid,
+                Some(&embedding),
+                &expanded,
+                filters,
+                fetch_k,
+                weights,
+            )
+        });
+    match second {
+        Ok(expanded_hits) => merge_ranked_rounds(vec![
+            (1.0, hits),
+            (state.fusion.prf_round_weight, expanded_hits),
+        ]),
+        Err(error) => {
+            tracing::warn!(%error, "PRF 扩展检索失败，回退首轮结果");
+            score_single_path(hits, SearchMode::Hybrid, weights)
+        }
+    }
 }
 
 async fn health_handler(State(state): State<Arc<AppState>>) -> Json<HealthResponse> {
@@ -356,9 +478,31 @@ mod tests {
     }
 
     fn state_for(url: String) -> (tempfile::TempDir, AppState) {
+        state_for_count(url, 2, FusionConfig::default())
+    }
+
+    /// 造 `count` 篇单 chunk 文档；用于验证固定候选池与 limit 解耦。
+    fn state_for_count(
+        url: String,
+        count: usize,
+        fusion: FusionConfig,
+    ) -> (tempfile::TempDir, AppState) {
         let directory = tempfile::tempdir().unwrap();
         let content = directory.path().join("content");
-        fixture(&content);
+        std::fs::create_dir_all(content.join("events")).unwrap();
+        if count == 2 {
+            fixture(&content);
+        } else {
+            for index in 0..count {
+                std::fs::write(
+                    content.join(format!("events/{index:04}.rust-{index}.md")),
+                    format!(
+                        "---\ntitle: Rust 文档 {index}\ndate: 2024-03-01\ntags:\n  - rust\n---\n\nRust 异步运行时 tokio 第 {index} 篇。\n"
+                    ),
+                )
+                .unwrap();
+            }
+        }
         let index_path = directory.path().join("index.sqlite");
         build_index(&BuildOptions {
             content_root: content,
@@ -371,7 +515,11 @@ mod tests {
             max_chunks_per_doc: MAX_CHUNKS_PER_DOC,
         })
         .expect("build");
-        let index = LoadedIndex::open(&index_path).expect("open");
+        let index = if fusion.prf {
+            LoadedIndex::open_with_prf_stats(&index_path).expect("open")
+        } else {
+            LoadedIndex::open(&index_path).expect("open")
+        };
         let embedder = EmbeddingClient::new(&config(url)).ok();
         (
             directory,
@@ -379,6 +527,7 @@ mod tests {
                 index,
                 embedder,
                 vector_enabled: true,
+                fusion,
                 started: Instant::now(),
             },
         )
@@ -396,6 +545,105 @@ mod tests {
             offset: None,
             mode: None,
         }
+    }
+
+    fn request_limit(query: &str, limit: usize) -> SearchRequest {
+        let mut search_request = request(query);
+        search_request.limit = Some(limit);
+        search_request
+    }
+
+    fn result_ids(response: &SearchResponse) -> Vec<String> {
+        response
+            .results
+            .iter()
+            .map(|result| result.id.clone())
+            .collect()
+    }
+
+    #[test]
+    fn fixed_candidate_pool_is_independent_of_limit() {
+        let server = MockEmbeddingServer::start(MockMode::Success { dim: 8 }, 0);
+        let (_dir, mut state) = state_for_count(
+            server.url(),
+            60,
+            FusionConfig {
+                candidate_pool: 200,
+                ..Default::default()
+            },
+        );
+
+        let one = run_search(&state, request_limit("rust 异步", 1)).unwrap();
+        let twenty = run_search(&state, request_limit("rust 异步", 20)).unwrap();
+        assert_eq!(one.total, 60);
+        assert_eq!(twenty.total, 60);
+        assert_eq!(one.results.len(), 1);
+        assert_eq!(twenty.results.len(), 20);
+        assert_eq!(one.results[0].id, twenty.results[0].id);
+
+        // 旧行为下 limit=1 只取 50 条候选，池子随 limit 变化。
+        state.fusion.candidate_pool = 0;
+        let legacy = run_search(&state, request_limit("rust 异步", 1)).unwrap();
+        assert_eq!(legacy.total, 50);
+    }
+
+    #[test]
+    fn prf_expansion_failure_falls_back_to_first_round() {
+        let success = MockEmbeddingServer::start(MockMode::Success { dim: 8 }, 0);
+        let (_dir, mut state) = state_for(success.url());
+        let failing = MockEmbeddingServer::start(
+            MockMode::FailAfter {
+                dim: 8,
+                ok_requests: 1,
+            },
+            0,
+        );
+        let mut fast = config(failing.url());
+        fast.max_retries = 0;
+        state.embedder = Some(EmbeddingClient::new(&fast).unwrap());
+        state.fusion = FusionConfig {
+            candidate_pool: 200,
+            prf: true,
+            ..Default::default()
+        };
+
+        let with_prf = run_search(&state, request("rust 异步")).unwrap();
+        assert!(!with_prf.degraded);
+        assert!(!with_prf.results.is_empty());
+
+        state.fusion.prf = false;
+        let first_round = run_search(&state, request("rust 异步")).unwrap();
+        assert_eq!(result_ids(&with_prf), result_ids(&first_round));
+    }
+
+    #[test]
+    fn prf_expansion_keeps_results_and_engine() {
+        let server = MockEmbeddingServer::start(MockMode::Success { dim: 8 }, 0);
+        let (_dir, mut state) = state_for(server.url());
+        state.fusion = FusionConfig {
+            candidate_pool: 200,
+            prf: true,
+            ..Default::default()
+        };
+        let response = run_search(&state, request("rust 异步")).unwrap();
+        assert!(!response.degraded);
+        assert_eq!(response.engine, ENGINE);
+        assert!(!response.results.is_empty());
+    }
+
+    #[test]
+    fn weighted_fts_route_is_configurable() {
+        let server = MockEmbeddingServer::start(MockMode::Success { dim: 8 }, 0);
+        let (_dir, mut state) = state_for(server.url());
+        state.fusion = FusionConfig {
+            candidate_pool: 200,
+            fts_weight: 0.6,
+            vector_weight: 1.0,
+            ..Default::default()
+        };
+        let response = run_search(&state, request("向量 数据库")).unwrap();
+        assert!(!response.results.is_empty());
+        assert!(!response.degraded);
     }
 
     #[test]

@@ -3,7 +3,7 @@
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -14,6 +14,11 @@ pub enum MockMode {
     },
     Fail {
         status: u16,
+    },
+    /// 前 `ok_requests` 个请求成功，之后返回 503（用于验证两轮检索的失败回退）。
+    FailAfter {
+        dim: usize,
+        ok_requests: usize,
     },
     /// 模拟网关 400：单请求条数超过 max_batch 时返回 token 超限。
     TooManyTokens {
@@ -37,6 +42,7 @@ impl MockEmbeddingServer {
         let address = listener.local_addr().expect("mock 地址").to_string();
         let shutdown = Arc::new(AtomicBool::new(false));
         let flag = shutdown.clone();
+        let served = Arc::new(AtomicUsize::new(0));
 
         let handle = std::thread::spawn(move || loop {
             if flag.load(Ordering::Relaxed) {
@@ -44,7 +50,7 @@ impl MockEmbeddingServer {
             }
             match listener.accept() {
                 Ok((stream, _)) => {
-                    let _ = handle_connection(stream, mode, delay_ms);
+                    let _ = handle_connection(stream, mode, delay_ms, &served);
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                     std::thread::sleep(Duration::from_millis(5));
@@ -76,7 +82,12 @@ impl Drop for MockEmbeddingServer {
     }
 }
 
-fn handle_connection(mut stream: TcpStream, mode: MockMode, delay_ms: u64) -> std::io::Result<()> {
+fn handle_connection(
+    mut stream: TcpStream,
+    mode: MockMode,
+    delay_ms: u64,
+    served: &AtomicUsize,
+) -> std::io::Result<()> {
     // 监听 socket 是非阻塞的；accept 出来的连接在部分平台会继承该标志，
     // 显式改回阻塞，避免 read 偶发 WouldBlock 被当成连接错误。
     stream.set_nonblocking(false)?;
@@ -95,7 +106,7 @@ fn handle_connection(mut stream: TcpStream, mode: MockMode, delay_ms: u64) -> st
         if delay_ms > 0 {
             std::thread::sleep(Duration::from_millis(delay_ms));
         }
-        let response = response_for(mode, &body);
+        let response = response_for(mode, &body, served);
         stream.write_all(&response)?;
         if close {
             return Ok(());
@@ -147,15 +158,15 @@ fn next_request(
     Ok(Some((headers, body)))
 }
 
-fn response_for(mode: MockMode, body: &[u8]) -> Vec<u8> {
+fn response_for(mode: MockMode, body: &[u8], served: &AtomicUsize) -> Vec<u8> {
     if let MockMode::Fail { status } = mode {
-        let reason = match status {
-            429 => "Too Many Requests",
-            500 => "Internal Server Error",
-            503 => "Service Unavailable",
-            _ => "Error",
-        };
-        return format!("HTTP/1.1 {status} {reason}\r\nContent-Length: 0\r\n\r\n").into_bytes();
+        return error_response(status);
+    }
+    if let MockMode::FailAfter { ok_requests, .. } = mode {
+        let count = served.fetch_add(1, Ordering::Relaxed);
+        if count >= ok_requests {
+            return error_response(503);
+        }
     }
 
     let request: serde_json::Value = serde_json::from_slice(body).unwrap_or_default();
@@ -166,6 +177,7 @@ fn response_for(mode: MockMode, body: &[u8]) -> Vec<u8> {
         .unwrap_or_default();
     let dim = match mode {
         MockMode::Success { dim } => dim,
+        MockMode::FailAfter { dim, .. } => dim,
         MockMode::TooManyTokens { dim, max_batch } => {
             if inputs.len() > max_batch {
                 let payload = serde_json::json!({
@@ -211,6 +223,16 @@ fn response_for(mode: MockMode, body: &[u8]) -> Vec<u8> {
         payload
     )
     .into_bytes()
+}
+
+fn error_response(status: u16) -> Vec<u8> {
+    let reason = match status {
+        429 => "Too Many Requests",
+        500 => "Internal Server Error",
+        503 => "Service Unavailable",
+        _ => "Error",
+    };
+    format!("HTTP/1.1 {status} {reason}\r\nContent-Length: 0\r\n\r\n").into_bytes()
 }
 
 /// 基于关键词的可复现向量：alpha/rust/异步 → 第 0 维，beta/向量/数据库 → 第 1 维，其余第 2 维。
