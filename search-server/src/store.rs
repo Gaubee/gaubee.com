@@ -122,6 +122,50 @@ pub struct Hit {
     pub score: f32,
 }
 
+/// 从已存在的索引里载出可复用向量：`(parent_id, chunk_index) -> (content_hash, embedding)`。
+///
+/// 增量重建用：同一 parent 的 content_hash 没变、chunk 序号也没变时，向量可以原样
+/// 复用（embedding 只依赖标题+正文+前缀模板，三者都没变就必然同值）。索引不存在
+/// 或读不出来时返回空表，调用方自然退化为全量重建。
+pub fn load_reusable_vectors(
+    path: &Path,
+) -> Result<std::collections::HashMap<(String, i32), (String, Vec<f32>)>> {
+    let mut reusable = std::collections::HashMap::new();
+    if !path.is_file() {
+        return Ok(reusable);
+    }
+    let connection = match Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY) {
+        Ok(connection) => connection,
+        Err(_) => return Ok(reusable),
+    };
+    let mut statement = match connection.prepare(
+        "SELECT d.parent_id, d.chunk_index, d.content_hash, v.embedding
+         FROM docs d JOIN vectors v ON v.doc_id = d.id",
+    ) {
+        Ok(statement) => statement,
+        Err(_) => return Ok(reusable),
+    };
+    let mut query_rows = match statement.query([]) {
+        Ok(query_rows) => query_rows,
+        Err(_) => return Ok(reusable),
+    };
+    loop {
+        let row = match query_rows.next() {
+            Ok(Some(row)) => row,
+            // 读到尾或中途出错都停止：增量只是优化，读到一半也算部分复用。
+            Ok(None) | Err(_) => break,
+        };
+        let parent_id: String = row.get(0)?;
+        let chunk_index: i32 = row.get(1)?;
+        let content_hash: String = row.get(2)?;
+        let blob: Vec<u8> = row.get(3)?;
+        if let Ok(vector) = decode_vector(&blob) {
+            reusable.insert((parent_id, chunk_index), (content_hash, vector));
+        }
+    }
+    Ok(reusable)
+}
+
 /// 写入索引文件（先写临时文件，成功后原子重命名，失败不破坏旧索引）。
 pub fn write_index(
     path: &Path,

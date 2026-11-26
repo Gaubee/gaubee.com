@@ -118,6 +118,9 @@ struct BuildArgs {
     /// 429/5xx/超时重试次数。
     #[arg(long, default_value_t = 3, env = "EMBED_MAX_RETRIES")]
     max_retries: u32,
+    /// 复用旧索引里内容未变的向量（默认开）。用 `--no-incremental` 强制全量。
+    #[arg(long, default_value_t = true, action = clap::ArgAction::Set, env = "EMBED_INCREMENTAL")]
+    incremental: bool,
 }
 
 #[derive(Args)]
@@ -190,11 +193,14 @@ fn run_build(args: BuildArgs) -> Result<()> {
         content_root: args.content,
         index_path: args.index.clone(),
         embedding,
+        incremental: args.incremental,
     })?;
     println!(
-        "索引构建完成：{} 篇文档 / {} chunks，耗时 {:.1}s，索引 {:.1} MiB",
+        "索引构建完成：{} 篇文档 / {} chunks（新算 {} / 复用 {}），耗时 {:.1}s，索引 {:.1} MiB",
         report.documents,
         report.chunks,
+        report.embedded,
+        report.reused,
         report.duration_ms as f64 / 1000.0,
         report.index_bytes as f64 / (1024.0 * 1024.0),
     );

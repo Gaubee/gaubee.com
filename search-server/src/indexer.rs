@@ -17,12 +17,18 @@ pub struct BuildOptions {
     pub content_root: PathBuf,
     pub index_path: PathBuf,
     pub embedding: EmbeddingConfig,
+    /// 复用旧索引里内容未变的向量（默认 true：日常只新增几篇，不必重建全库）。
+    pub incremental: bool,
 }
 
 #[derive(Debug)]
 pub struct BuildReport {
     pub documents: usize,
     pub chunks: usize,
+    /// 本次实际新算 embedding 的 chunk 数（增量时可远小于 chunks）。
+    pub embedded: usize,
+    /// 从旧索引复用的 chunk 数。
+    pub reused: usize,
     pub duration_ms: u128,
     pub index_bytes: u64,
     pub manifest: IndexManifest,
@@ -107,38 +113,87 @@ pub fn build_index(options: &BuildOptions) -> Result<BuildReport> {
     );
 
     let client = EmbeddingClient::new(&options.embedding).context("初始化 embedding 客户端失败")?;
+
+    // 增量：旧索引里 content_hash 与 chunk 序号都没变的 chunk 直接复用向量。
+    // embedding 只依赖 (标题 + 正文 + 前缀模板)，三者在 hash 覆盖范围内，可安全跳过。
+    let reusable = if options.incremental {
+        crate::store::load_reusable_vectors(&options.index_path)?
+    } else {
+        Default::default()
+    };
+    // todo 里放「需要新算 embedding 的 pending 下标」；能复用的直接拿旧向量。
+    let mut todo: Vec<usize> = Vec::new();
+    let mut reused: Vec<(usize, Vec<f32>)> = Vec::new();
+    for (index, chunk) in pending.iter().enumerate() {
+        let key = (chunk.parent_id.clone(), chunk.chunk_index);
+        match reusable.get(&key) {
+            Some((hash, vector)) if hash == &chunk.content_hash => {
+                reused.push((index, vector.clone()));
+            }
+            _ => todo.push(index),
+        }
+    }
+
+    if !reused.is_empty() {
+        tracing::info!(
+            reused = reused.len(),
+            pending = pending.len(),
+            "增量重建：复用未变更文档的旧向量"
+        );
+    }
+
     tracing::info!(
         model = %client.request_model(),
         identity = %client.space(),
         prompts = client.prompts().name(),
         batch_size = options.embedding.batch_size,
         concurrency = options.embedding.concurrency,
+        todo = todo.len(),
         "开始请求 embedding（本地 llama.cpp 或远程网关）"
     );
-    let documents_for_embedding = pending
+
+    let inputs = todo
         .iter()
-        .map(|chunk| (chunk.title.clone(), chunk.text.clone()))
+        .map(|index| (pending[*index].title.clone(), pending[*index].text.clone()))
         .collect::<Vec<_>>();
-    let vectors = client.embed_documents(&documents_for_embedding)?;
-    if vectors.len() != pending.len() {
+    let fresh = client.embed_documents(&inputs)?;
+    if fresh.len() != todo.len() {
         bail!(
             "embedding 数量不匹配：期望 {}，实际 {}",
-            pending.len(),
-            vectors.len()
+            todo.len(),
+            fresh.len()
         );
     }
-    let embed_dim = vectors.first().map(Vec::len).unwrap_or(0);
+    let embed_dim = fresh
+        .first()
+        .map(Vec::len)
+        .or_else(|| reused.first().map(|(_, vector)| vector.len()))
+        .unwrap_or(0);
     if embed_dim == 0 {
         bail!("embedding 维度为 0");
     }
-    for (chunk, vector) in pending.iter_mut().zip(vectors) {
+    for vector in &fresh {
         if vector.len() != embed_dim {
             bail!("embedding 维度错误：{} != {embed_dim}", vector.len());
         }
-        chunk.embedding = vector;
+    }
+    let fresh_count = fresh.len();
+    let reused_count = reused.len();
+    for (index, vector) in reused {
+        if vector.len() != embed_dim {
+            bail!(
+                "复用向量维度与本次不一致：{} != {embed_dim}（索引可能来自别的模型）",
+                vector.len()
+            );
+        }
+        pending[index].embedding = vector;
+    }
+    for (index, vector) in todo.into_iter().zip(fresh) {
+        pending[index].embedding = vector;
     }
     tracing::info!(
-        embedded = pending.len(),
+        embedded = fresh_count,
+        reused = reused_count,
         dim = embed_dim,
         elapsed_ms = started.elapsed().as_millis(),
         "embedding 完成"
@@ -181,6 +236,8 @@ pub fn build_index(options: &BuildOptions) -> Result<BuildReport> {
     Ok(BuildReport {
         documents: documents.len(),
         chunks: pending.len(),
+        embedded: fresh_count,
+        reused: reused_count,
         duration_ms: started.elapsed().as_millis(),
         index_bytes,
         manifest,
@@ -294,6 +351,119 @@ mod tests {
     }
 
     #[test]
+    fn incremental_rebuild_reuses_unchanged_vectors() {
+        let server = MockEmbeddingServer::start(MockMode::Success { dim: 8 }, 0);
+        let directory = tempfile::tempdir().unwrap();
+        let content = directory.path().join("content");
+        write_fixture(&content);
+        let index_path = directory.path().join("index.sqlite");
+
+        let first = build_index(&BuildOptions {
+            content_root: content.clone(),
+            index_path: index_path.clone(),
+            embedding: config(server.url()),
+            incremental: true,
+        })
+        .expect("initial build");
+        assert_eq!(first.embedded, 2);
+        assert_eq!(first.reused, 0);
+
+        // 加一篇新文档：只有它需要新算向量，两篇旧的应全部复用。
+        std::fs::write(
+            content.join("articles/0003.new-doc.md"),
+            "---\ntitle: 新增文档\ndate: 2024-04-01\ntags:\n  - test\n---\n\n这是新增的文档正文。\n",
+        )
+        .unwrap();
+        let second = build_index(&BuildOptions {
+            content_root: content.clone(),
+            index_path: index_path.clone(),
+            embedding: config(server.url()),
+            incremental: true,
+        })
+        .expect("incremental build");
+        assert_eq!(second.documents, 3);
+        assert_eq!(second.chunks, 3);
+        assert_eq!(second.reused, 2, "未变更的两篇应复用");
+        assert_eq!(second.embedded, 1, "只有新增文档需要算向量");
+
+        // 复用后的索引仍可检索到新旧内容。
+        let index = LoadedIndex::open(&index_path).expect("open");
+        let filters = ValidatedFilters::default();
+        let hits = index
+            .search(SearchMode::Fts, None, "异步", &filters, 5)
+            .expect("fts old doc");
+        assert_eq!(hits[0].parent_id, "src/content/events/0001.rust-async.md");
+        let hits = index
+            .search(SearchMode::Fts, None, "新增", &filters, 5)
+            .expect("fts new doc");
+        assert_eq!(hits[0].parent_id, "src/content/articles/0003.new-doc.md");
+
+        // 全量重建（incremental=false）不读旧索引，全部重新算。
+        let full = build_index(&BuildOptions {
+            content_root: content,
+            index_path: index_path,
+            embedding: config(server.url()),
+            incremental: false,
+        })
+        .expect("full build");
+        assert_eq!(full.reused, 0);
+        assert_eq!(full.embedded, 3);
+    }
+
+    #[test]
+    fn incremental_rebuild_recomputes_changed_document() {
+        let server = MockEmbeddingServer::start(MockMode::Success { dim: 8 }, 0);
+        let directory = tempfile::tempdir().unwrap();
+        let content = directory.path().join("content");
+        write_fixture(&content);
+        let index_path = directory.path().join("index.sqlite");
+
+        build_index(&BuildOptions {
+            content_root: content.clone(),
+            index_path: index_path.clone(),
+            embedding: config(server.url()),
+            incremental: true,
+        })
+        .expect("initial build");
+
+        // 改动一篇正文：它必须重算，另一篇仍复用。
+        std::fs::write(
+            content.join("events/0001.rust-async.md"),
+            "---\ntitle: Rust 异步运行时\ndate: 2024-03-01\ntags:\n  - rust\n---\n\n正文已改写，多了几个字。\n",
+        )
+        .unwrap();
+        let second = build_index(&BuildOptions {
+            content_root: content,
+            index_path: index_path,
+            embedding: config(server.url()),
+            incremental: true,
+        })
+        .expect("incremental build");
+        assert_eq!(second.reused, 1, "未改动的那篇复用");
+        assert_eq!(second.embedded, 1, "改动的那篇重算");
+    }
+
+    #[test]
+    fn incremental_rebuild_falls_back_when_index_missing() {
+        let server = MockEmbeddingServer::start(MockMode::Success { dim: 8 }, 0);
+        let directory = tempfile::tempdir().unwrap();
+        let content = directory.path().join("content");
+        write_fixture(&content);
+        let index_path = directory.path().join("index.sqlite");
+
+        // incremental=true 但索引不存在：应退化为全量，不报错。
+        let report = build_index(&BuildOptions {
+            content_root: content,
+            index_path,
+            embedding: config(server.url()),
+            incremental: true,
+        })
+        .expect("build without existing index");
+        assert_eq!(report.reused, 0);
+        assert_eq!(report.embedded, 2);
+    }
+
+    #[test]
     fn builds_index_with_mock_embeddings_and_searches() {
         let server = MockEmbeddingServer::start(MockMode::Success { dim: 8 }, 0);
         let directory = tempfile::tempdir().unwrap();
@@ -305,6 +475,7 @@ mod tests {
             content_root: content.clone(),
             index_path: index_path.clone(),
             embedding: config(server.url()),
+            incremental: false,
         })
         .expect("build");
         assert_eq!(report.documents, 2);
@@ -369,6 +540,7 @@ mod tests {
             content_root: content.clone(),
             index_path: index_path.clone(),
             embedding: config(good.url()),
+            incremental: false,
         })
         .expect("initial build");
         let original = std::fs::read(&index_path).unwrap();
@@ -378,6 +550,7 @@ mod tests {
             content_root: content,
             index_path: index_path.clone(),
             embedding: config(bad.url()),
+            incremental: false,
         })
         .unwrap_err();
         assert!(error.to_string().contains("503"));
