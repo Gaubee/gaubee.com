@@ -239,7 +239,9 @@ search-server build ... --incremental false
 
 ```bash
 # 1. 本地（或 CI）增量重建到最新内容
+#    增量复用读的是 --index 指向的旧索引：先拷一份线上索引，或就地在副本上构建。
 cd search-server
+cp /path/to/current/index.sqlite /tmp/index.sqlite
 cargo run --release -- build \
   --content ../src/content --index /tmp/index.sqlite \
   --embed-url http://127.0.0.1:18081 --embed-model embeddinggemma-2 --embed-prompts gemma2
