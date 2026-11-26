@@ -66,15 +66,21 @@ pub fn content_hash(text: &str) -> String {
     hex::encode(digest)
 }
 
-/// 按字符窗口切 chunk；空文本返回空 Vec。
+/// 按字符窗口切 chunk；空文本返回空 Vec。测试用默认参数。
+#[cfg(test)]
 pub fn chunk_text(text: &str) -> Vec<Chunk> {
+    chunk_text_with(text, WINDOW_CHARS, OVERLAP_CHARS, MAX_CHUNKS_PER_DOC)
+}
+
+/// 显式指定窗口参数的切分（换模型时按新模型的上下文调整）。
+pub fn chunk_text_with(text: &str, window: usize, overlap: usize, max_chunks: usize) -> Vec<Chunk> {
     let offsets = char_offsets(text);
     let total = offsets.len() - 1;
-    let starts = window_starts(total, WINDOW_CHARS, OVERLAP_CHARS, MAX_CHUNKS_PER_DOC);
+    let starts = window_starts(total, window, overlap, max_chunks);
     let mut chunks = Vec::with_capacity(starts.len());
 
     for (index, start) in starts.into_iter().enumerate() {
-        let end = (start + WINDOW_CHARS).min(total);
+        let end = (start + window).min(total);
         let slice = &text[offsets[start]..offsets[end]];
         let trimmed = slice.trim();
         if trimmed.is_empty() {

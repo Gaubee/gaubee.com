@@ -24,6 +24,7 @@ use clap::{Args, Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
 use crate::api::{router, AppState, ENGINE};
+use crate::chunk::{MAX_CHUNKS_PER_DOC, OVERLAP_CHARS, WINDOW_CHARS};
 use crate::embed::{
     EmbeddingClient, EmbeddingConfig, PromptProfile, DEFAULT_BASE_URL, DEFAULT_MODEL,
 };
@@ -124,6 +125,13 @@ struct BuildArgs {
     /// 增量重建允许新算的 chunk 上限；超过即中止（防止在 2 核服务器上误触发全量重建）。0=不限。
     #[arg(long, default_value_t = 0, env = "EMBED_MAX_NEW_CHUNKS")]
     max_new_chunks: usize,
+    /// 切分窗口（字符）。换模型时按新模型的滑动窗口调整（bge-zh 512 token 需约 400）。
+    #[arg(long, default_value_t = WINDOW_CHARS, env = "CHUNK_WINDOW_CHARS")]
+    window_chars: usize,
+    #[arg(long, default_value_t = OVERLAP_CHARS, env = "CHUNK_OVERLAP_CHARS")]
+    overlap_chars: usize,
+    #[arg(long, default_value_t = MAX_CHUNKS_PER_DOC, env = "CHUNK_MAX_PER_DOC")]
+    max_chunks_per_doc: usize,
 }
 
 #[derive(Args)]
@@ -189,6 +197,16 @@ fn main() {
 }
 
 fn run_build(args: BuildArgs) -> Result<()> {
+    if args.window_chars == 0 || args.overlap_chars >= args.window_chars {
+        anyhow::bail!(
+            "切分参数非法：window={} overlap={}（要求 window>0 且 overlap<window）",
+            args.window_chars,
+            args.overlap_chars
+        );
+    }
+    if args.max_chunks_per_doc == 0 {
+        anyhow::bail!("--max-chunks-per-doc 必须大于 0");
+    }
     let embedding = args.embed.config(
         args.timeout_ms,
         args.embed_batch_size,
@@ -201,6 +219,9 @@ fn run_build(args: BuildArgs) -> Result<()> {
         embedding,
         incremental: args.incremental,
         max_new_chunks: args.max_new_chunks,
+        window_chars: args.window_chars,
+        overlap_chars: args.overlap_chars,
+        max_chunks_per_doc: args.max_chunks_per_doc,
     })?;
     println!(
         "索引构建完成：{} 篇文档 / {} chunks（新算 {} / 复用 {}），耗时 {:.1}s，索引 {:.1} MiB",
