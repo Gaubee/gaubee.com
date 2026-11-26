@@ -3390,5 +3390,12 @@
   "2125484250140991952": "Perry 进展：宣布 Perry Feather！\n\nFeather 是一个可直接替换 Electron 的方案，能把**整个**应用原生编译。我们做了自研的 Blink（也就是 Chrome 的渲染器）绑定，彻底去掉 V8，让原生编译的 Perry 应用直接控制内容。",
   "2125460650608697602": "感谢分享。这个 iOS 应用看起来太棒了。Inkling 模型下个版本会快约 50%，即将发布。",
   "2125443929093075394": "https://x.com/i/article/2125440711281774593",
-  "2125290656692085164": "介绍 MAGI-2，Higgsfield 独家上线。\n\n最高 30 秒的前沿级 1080p 画质，生成费用每秒 0.08 美元。\n\n400B 参数的开源权重视频模型即将推出。\n\n现已在 Higgsfield 独家提供，也可通过 Higgsfield API 调用。"
+  "2125290656692085164": "介绍 MAGI-2，Higgsfield 独家上线。\n\n最高 30 秒的前沿级 1080p 画质，生成费用每秒 0.08 美元。\n\n400B 参数的开源权重视频模型即将推出。\n\n现已在 Higgsfield 独家提供，也可通过 Higgsfield API 调用。",
+  "2125908071797113162": "Ekuma v0.1.0：纯 Go 实现的 JavaScript 引擎！\n\n* ES2026（Test262 通过率 99.99%）\n* Intl 与 Temporal\n* 没有意外的 ICU 失败\n* 比 goja/Sobek 快 6–8 倍\n* 比 cznic 的 QuickJS 快 4–5 倍\n* 原生 QuickJS 速度\n* 无 JIT\n* 0BSD\n\nhttps://github.com/hajimehoshi/ekuma\n\n#golang #javascript",
+  "2125928146113585468": "🚀 我们开源了 DFly2——Hy4 flash 的投机解码草稿器，面向长上下文与 Agent 工作负载最高带来 4.2 倍加速。\n\n✨ 与目标模型共享 KV cache + top-k token 选择\n\n→ 任意上下文长度下，草稿成本保持恒定\n→ 不额外占用 KV 内存",
+  "2125889307642843144": "我们开源了 GTA 6、黑神话悟空和 100 多款热门游戏，一键即可 Remix 任意一款。\n\n认识 OpenGame：面向游戏的开源 AGI，运行在任何 AI Agent 里，不需要 Fable 5.2。\n\n代码、美术、3D、声音。\n可玩，内置广告。\nApache 2.0，29 个 agent，15+ 模型。\n\n现在任何人都能 vibe code 了",
+  "2125931324754334095": "我用 NSH 重写了 bjarneo/editor，做出了 editor。\n\nnsvim——一个轻量的 Vim 风格编辑器。\n\n它的设计目标是快速浏览文件、找到需要的内容，以及阅读 Markdown。\n\nnsvim 保留了熟悉的 LazyVim 快捷键，同时让体验更简单。\n\n你可以用这个",
+  "2125968859450802415": "我们刚刚开源了一个投机解码器，可以加速 DeepSeek-V4.1-Flash、GLM-5.3-Flash 以及我们自己的 Hy4 flash 这类稀疏模型。\n\n在 64K 上下文下，DFly2 把 DeepSeek-V4.1-Flash 的服务吞吐最高提升 81%；在 Hy4 flash 的 Agent 任务上，运行速度最高提升 4.2 倍，",
+  "2125840476817269029": "哦，在 @uisdk 里你可以用 presentation=auto 属性让任何弹窗自适应：桌面端是 Popover，移动端是 Sheet。",
+  "2125766502985224495": "Opus 5.6（下一代）创造了：Opus Creates（这是 Opus 自己起的名字）\n\n不，这不是 Fable 5.5，也不是视频模型。这是正在被路由的最新 Opus checkpoint。不，这也不是 Blender。\n\nOpus 花了 2 小时做出这个。它自己写了 WebGPU"
 }

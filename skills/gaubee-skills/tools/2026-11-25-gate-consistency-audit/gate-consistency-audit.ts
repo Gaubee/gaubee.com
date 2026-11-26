@@ -24,6 +24,7 @@ const SKILL = process.env.GAUBEE_SITE
   ? path.join(process.env.GAUBEE_SITE, "skills", "gaubee-skills")
   : path.resolve(import.meta.dir, "..", "..");
 const DATA = process.env.GAUBEE_SKILLS_DATA ?? path.join(os.homedir(), ".gaubee-skills", "data");
+const REPORTS = path.join(SKILL, "reports", "daily");
 
 interface GateResult {
   name: string;
@@ -89,6 +90,10 @@ function main(): number {
 
   let conflicts = 0;
   for (const date of dates) {
+    if (!existsSync(path.join(REPORTS, `${date}.md`))) {
+      console.log(`SKIP ${date}  GitHub 日报尚未生成，跳过口径对比`);
+      continue;
+    }
     const a = commitAudit(date);
     const b = factsCheck(date);
     const same = a.exit === b.exit;
