@@ -38,6 +38,7 @@
   import { dismissBoot, animateAppIn } from '$lib/boot'
   import { desktopService } from '$lib/apps/builtin/desktop/service.svelte'
   import { backgroundToCss } from '$lib/apps/builtin/desktop/background-render'
+  import { registerSiteTools } from '$lib/webmcp/register'
 
   let { children } = $props()
 
@@ -46,6 +47,9 @@
   const systemBackground = $derived(backgroundToCss(desktopService.background))
 
   onMount(() => {
+    // WebMCP：暴露站内只读工具（Chrome 149+ Origin Trial，不可用时为空操作）。
+    const unregisterSiteTools = registerSiteTools()
+
     // 0. 初始化内容管道（用 readonlyVfs 作为 reader，browser-only）
     //    AppManager.init 已在模块加载时投影 source/processor；此处确保 browser 端执行一次。
     contentQuery.init()
@@ -99,7 +103,10 @@
     animateAppIn()
     dismissBoot()
 
-    return () => navStore.stop()
+    return () => {
+      unregisterSiteTools()
+      navStore.stop()
+    }
   })
 </script>
 
