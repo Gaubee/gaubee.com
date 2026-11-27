@@ -3397,5 +3397,11 @@
   "2125931324754334095": "我用 NSH 重写了 bjarneo/editor，做出了 editor。\n\nnsvim——一个轻量的 Vim 风格编辑器。\n\n它的设计目标是快速浏览文件、找到需要的内容，以及阅读 Markdown。\n\nnsvim 保留了熟悉的 LazyVim 快捷键，同时让体验更简单。\n\n你可以用这个",
   "2125968859450802415": "我们刚刚开源了一个投机解码器，可以加速 DeepSeek-V4.1-Flash、GLM-5.3-Flash 以及我们自己的 Hy4 flash 这类稀疏模型。\n\n在 64K 上下文下，DFly2 把 DeepSeek-V4.1-Flash 的服务吞吐最高提升 81%；在 Hy4 flash 的 Agent 任务上，运行速度最高提升 4.2 倍，",
   "2125840476817269029": "哦，在 @uisdk 里你可以用 presentation=auto 属性让任何弹窗自适应：桌面端是 Popover，移动端是 Sheet。",
-  "2125766502985224495": "Opus 5.6（下一代）创造了：Opus Creates（这是 Opus 自己起的名字）\n\n不，这不是 Fable 5.5，也不是视频模型。这是正在被路由的最新 Opus checkpoint。不，这也不是 Blender。\n\nOpus 花了 2 小时做出这个。它自己写了 WebGPU"
+  "2125766502985224495": "Opus 5.6（下一代）创造了：Opus Creates（这是 Opus 自己起的名字）\n\n不，这不是 Fable 5.5，也不是视频模型。这是正在被路由的最新 Opus checkpoint。不，这也不是 Blender。\n\nOpus 花了 2 小时做出这个。它自己写了 WebGPU",
+  "2125969219049189803": "荷兰打破美国对华技术围堵的计划\n\n彭博社突发消息：\n荷兰计划放宽对华光刻机出口限制。\n——————————\nASML 的产品预计将出售给长鑫存储和长江存储",
+  "2125665125063692373": "很高兴分享 naja-go/naja，一个面向 Go 1.27+ 的现代、强大且健壮的 CLI 工具集。它是对 spf13/cobra、spf13/pflag 及其他生态依赖的硬分叉。\n\n一段时间以来，我和 Go 社区的许多人都知道，大量遗留 Go 项目",
+  "2126074960586104981": "卧槽，100% 免费的 UI/UX 设计工作室，17 个仓库。\n\n我已经不用 Figma 了。\n\n17 个配合 Opus 5.5 使用的 GitHub 工具。\n\n01 UI UX Pro Max → 生成设计系统。\nhttps://github.com/nextlevelbuilder/ui-ux-pro-max-skill\n\n02 Penpot → 构建可点击原型。\nhttps://github.com/penpot/penpot\n\n03 shadcn/ui →",
+  "2125943993766953144": "effect ui 看起来真的非常非常好\n\nhttps://ui.effect.website/",
+  "2086794677693690213": "用几何方式设计 Logo 的功能\n\n发布了！🍵",
+  "2110016031917855006": "https://x.com/i/article/2109996653650354178"
 }
