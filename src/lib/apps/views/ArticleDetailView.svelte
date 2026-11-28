@@ -46,6 +46,28 @@
     return contentQuery.findPost(target.collection, target.stem)
   })
 
+  /** 正文按需加载（启动期只带元数据，不含正文）。 */
+  let body = $state('')
+  let bodyLoading = $state(false)
+
+  $effect(() => {
+    const current = post
+    body = current?.body ?? ''
+    bodyLoading = false
+    if (!current || current.body) return
+
+    let cancelled = false
+    bodyLoading = true
+    void contentQuery.readBody(current).then((loaded) => {
+      if (cancelled) return
+      body = loaded
+      bodyLoading = false
+    })
+    return () => {
+      cancelled = true
+    }
+  })
+
   /** 同集合所有文章（按 date 降序）。 */
   const siblings = $derived.by<ContentEntry[]>(() => {
     void contentQuery.version
@@ -93,7 +115,11 @@
 </script>
 
 <div class="mx-auto max-w-[78rem] px-4 py-6 sm:px-6 lg:px-8">
-  {#if !target || !post}
+  {#if !contentQuery.initialized}
+    <div class="flex h-64 items-center justify-center">
+      <p class="text-muted-foreground text-sm">正在加载文章…</p>
+    </div>
+  {:else if !target || !post}
     <div class="flex h-64 items-center justify-center">
       <p class="text-muted-foreground text-sm">文章未找到</p>
     </div>
@@ -111,7 +137,7 @@
       <!-- 主内容区：控制行宽，避免宽屏阅读时单行过长。头部+正文为共享组件
            ArticleDetailContent（事件工作区第三段同源渲染）。 -->
       <div class="min-w-0">
-        <ArticleDetailContent {post} bind:contentEl={articleContentEl} />
+        <ArticleDetailContent {post} {body} bodyLoading={bodyLoading} bind:contentEl={articleContentEl} />
 
         <!-- 上一篇/下一篇 -->
         <nav class="mt-12 flex gap-4 border-t pt-6" aria-label="文章导航">
@@ -151,13 +177,13 @@
 
       <!-- 桌面端 TOC：全局应用导航在左，文章导航固定在右。 -->
       <aside class="hidden xl:block">
-        <TocTree markdown={post.body} contentEl={articleContentEl} />
+        <TocTree markdown={body} contentEl={articleContentEl} />
       </aside>
     </div>
 
     <!-- 移动端 TOC（浮动按钮 + Sheet） -->
     <div class="xl:hidden">
-      <TocTree markdown={post.body} contentEl={articleContentEl} />
+      <TocTree markdown={body} contentEl={articleContentEl} />
     </div>
   {/if}
 </div>

@@ -5,7 +5,7 @@
  * 3. 统一输入校验、8s 超时与 AbortSignal，保证页面内 Agent 与外部调用行为一致。
  */
 import { parseArticleId, parseMarkdown } from "$lib/data/frontmatter";
-import { readonlyFiles } from "$lib/vfs/readonly-data";
+import { readonlyVfs } from "$lib/vfs/readonly";
 
 export const TOOL_TIMEOUT_MS = 8_000;
 
@@ -188,9 +188,7 @@ async function readArticle(
     throw new Error("id 必须匹配 src/content/(articles|events)/<name>.md");
   }
   const maxChars = clampInteger(args.maxChars, DEFAULT_ARTICLE_CHARS, 1, MAX_ARTICLE_CHARS);
-  const raw = Object.prototype.hasOwnProperty.call(readonlyFiles, id)
-    ? readonlyFiles[id]
-    : undefined;
+  const raw = await readonlyVfs.readFile(id);
   if (typeof raw !== "string") return { error: "not_found" };
 
   const { metadata, body } = parseMarkdown(raw);

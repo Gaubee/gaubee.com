@@ -31,12 +31,36 @@ class PipelineExecutor {
       allEntries.push(...entries);
     }
 
-    this.entriesCache = entriesByCollection;
+    this.setEntries(entriesByCollection);
+    this.runProcessors(allEntries);
+  }
 
-    // 2. 执行所有 processor，传入全量 entries
+  /**
+   * 直接使用现成的 entries 执行处理器（不走 source）。
+   *
+   * 启动路径专用：readonly-index 已在构建期解析好元数据，无需再读 markdown /
+   * 跑 frontmatter 解析；正文由 contentQuery.readBody 按需补。
+   */
+  runEntries(entries: ContentEntry[]): void {
+    const entriesByCollection = new Map<string, ContentEntry[]>();
+    for (const entry of entries) {
+      const bucket = entriesByCollection.get(entry.collection);
+      if (bucket) bucket.push(entry);
+      else entriesByCollection.set(entry.collection, [entry]);
+    }
+
+    this.setEntries(entriesByCollection);
+    this.runProcessors(entries);
+  }
+
+  private setEntries(entriesByCollection: Map<string, ContentEntry[]>): void {
+    this.entriesCache = entriesByCollection;
+  }
+
+  private runProcessors(entries: ContentEntry[]): void {
     const results = new Map<string, ProcessResult>();
     for (const processor of contentPipelineRegistry.getProcessors()) {
-      const result = processor.process(allEntries);
+      const result = processor.process(entries);
       results.set(result.id, result);
     }
     this.resultsCache = results;

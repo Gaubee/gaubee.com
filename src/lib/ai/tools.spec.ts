@@ -1,12 +1,36 @@
-import { readonlyFiles } from "$lib/vfs/readonly-data";
 /**
  * 工具层测试：输入校验、limit/maxChars 收敛、搜索结果映射与 read_article 截断。
  *
- * 不依赖真实浏览器：fetch 用 stub，文章数据来自构建期 readonlyFiles。
+ * 不依赖真实浏览器：fetch 用 stub，文章数据从本地 src/content 读取后经
+ * /pages/raw 的 stub 返回（与运行时按需拉取路径一致）。
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { callTool } from "./tools";
+
+const CONTENT_ROOT = fileURLToPath(new URL("../../../src/content/", import.meta.url));
+
+/** 让 readonlyVfs 的 /pages/raw 请求命中本地 content 文件。 */
+function installReadonlyFetch(): void {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const match = url.match(/^\/pages\/raw\/(.+)$/);
+      if (!match) return { ok: false, status: 404, text: async () => "" };
+      try {
+        const raw = readFileSync(join(CONTENT_ROOT, decodeURIComponent(match[1] ?? "")), "utf-8");
+        return { ok: true, status: 200, text: async () => raw };
+      } catch {
+        return { ok: false, status: 404, text: async () => "" };
+      }
+    }),
+  );
+}
 
 function installFetch(payload: unknown): ReturnType<typeof vi.fn> {
   const fetchMock = vi.fn(async () => ({
@@ -101,9 +125,11 @@ describe("search_site", () => {
 describe("read_article", () => {
   const sampleId = "src/content/articles/0001.js-tree-index-multiple-keywords-and-check.md";
 
-  it("从 readonlyFiles 读取并按 maxChars 截断", async () => {
-    expect(typeof readonlyFiles[sampleId]).toBe("string");
+  beforeEach(() => {
+    installReadonlyFetch();
+  });
 
+  it("从 /pages/raw 读取并按 maxChars 截断", async () => {
     const result = await callTool("read_article", { id: sampleId, maxChars: 30 });
 
     if ("error" in result) throw new Error("不应返回 not_found");

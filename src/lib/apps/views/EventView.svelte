@@ -122,6 +122,29 @@
   })
   const visible = $derived(events.filter((e) => monthKeyOf(e.date) === currentMonth))
 
+  /** 当月正文（启动期只带元数据，正文按需从 /pages/raw 拉取）。 */
+  let bodyMap = $state<Record<string, string>>({})
+
+  $effect(() => {
+    void contentQuery.version
+    // 应用保活但未在前台时不预取正文（桌面首页会挂载 EventView，避免启动即拉 58 篇）。
+    if (!isActive) return
+
+    const missing = visible.filter((e) => !e.body && bodyMap[e.path] === undefined)
+    if (missing.length === 0) return
+
+    let cancelled = false
+    void contentQuery.readBodies(missing).then((loaded) => {
+      if (cancelled) return
+      const next = { ...bodyMap }
+      for (const [path, body] of loaded) next[path] = body
+      bodyMap = next
+    })
+    return () => {
+      cancelled = true
+    }
+  })
+
   /** 锚点条目（全局按 stem 反查，容错月参错位——同步 effect 会把月参修正为条目所在月）。 */
   const detailPost = $derived.by<ContentEntry | null>(() => {
     void contentQuery.version
@@ -479,7 +502,11 @@
                   <!-- 浮卡逐段挂正文容器：阅读流里的 @作者名 hover 出卡；xvideo/xhighlight/
                        mediasrc 由 EventBody 自带 -->
                   <div use:authorHoverCard>
-                    <EventBody body={entry.body} />
+                    {#if entry.body || bodyMap[entry.path] !== undefined}
+                      <EventBody body={entry.body || bodyMap[entry.path] || ''} />
+                    {:else}
+                      <p class="text-muted-foreground text-sm">正在加载正文…</p>
+                    {/if}
                   </div>
                 </section>
               {/each}

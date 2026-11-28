@@ -147,8 +147,9 @@ export class Vfs {
       const fs = await this.fs();
       return fs.promises.readFile(toZenPath(p));
     }
-    // 只读层（构建时静态数据）：公开内容无需登录即可读，不触发 GitHub API
-    const readonlyContent = readonlyVfs.readFile(p);
+    // 只读层（构建期内容）：公开内容无需登录即可读，不触发 GitHub API。
+    // 正文按需从 /pages/raw 拉取（2026-11-28 启动性能改造），此处 await 正常。
+    const readonlyContent = await readonlyVfs.readFile(p);
     if (readonlyContent !== null) return toBytes(readonlyContent);
     // 只读层无此文件（如 draft 或只读层未覆盖），在线拉取
     const content = await getFileText(p);

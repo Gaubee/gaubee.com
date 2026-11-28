@@ -35,12 +35,20 @@
 
   let {
     post,
+    /** 正文（按需加载；缺省时回退 post.body，编辑器刷新后有全文）。 */
+    body = undefined,
+    bodyLoading = false,
     contentEl = $bindable(),
   }: {
     post: ContentEntry
+    body?: string
+    bodyLoading?: boolean
     /** 正文容器（bind 双向：消费方用于滚动重置 / TocTree ScrollSpy）。 */
     contentEl?: HTMLElement
   } = $props()
+
+  /** 实际渲染的正文。 */
+  const markdown = $derived(body ?? post.body)
 
   /** 当前登录用户是否为仓库本人（显示编辑入口）。 */
   const isOwner = $derived(
@@ -119,7 +127,11 @@
     data-syntax-theme="gaubee"
     class="article-content prose dark:prose-invert prose-zinc max-w-none"
   >
-    <MarkdownViewer markdown={post.body} />
+    {#if bodyLoading && !markdown}
+      <p class="text-muted-foreground text-sm">正在加载正文…</p>
+    {:else}
+      <MarkdownViewer markdown={markdown} />
+    {/if}
   </article>
 </div>
 

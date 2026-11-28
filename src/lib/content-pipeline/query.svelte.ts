@@ -4,14 +4,16 @@
  * 替代 readonlyVfs.getPosts + contentStore 派生视图，作为所有消费方的唯一入口。
  *
  * 数据源策略：
- * - init()：用 readonlyVfs 作为 reader（构建时静态数据，同步、零延迟、SSR 后立即可用）。
+ * - init()：用构建期元数据索引（readonly-index，列表/摘要字段，无正文）。
  * - refresh()：用 vfsStore 作为 reader（编辑器写入后，反映可写态）。
+ * - readBody()/readBodies()：正文按需从 /pages/raw 拉取并缓存（阅读时才算）。
  *
  * SSR 安全：管道只在 browser 执行（init/refresh 内部判 browser）。
  * 响应式：通过 version 计数器暴露，消费方可用 contentQuery.version 触发 $derived 重算。
  */
 import { browser } from "$app/environment";
-import type { Collection } from "$lib/data/frontmatter";
+import { parseMarkdown, type ArticleMetadata, type Collection } from "$lib/data/frontmatter";
+import { readonlyIndex } from "$lib/vfs/readonly-data";
 import { readonlyVfs } from "$lib/vfs/readonly";
 import { vfsStore } from "$lib/vfs/vfs.svelte";
 
@@ -24,17 +26,32 @@ export interface TagCount {
   count: number;
 }
 
-// ---- reader 适配器 ----
+// ---- 构建期元数据索引 → ContentEntry ----
 
-/** readonlyVfs 适配为 VfsReader（同步内存读取）。 */
-const readonlyReader: VfsReader = {
-  readFile(path: string): string | null {
-    return readonlyVfs.readFile(path);
-  },
-  readdir(prefix: string): string[] {
-    return readonlyVfs.readdir(prefix).map((n) => n.path);
-  },
-};
+/** 把 readonly-index 的序列化条目还原成运行时 ContentEntry（正文留空，按需补）。 */
+function entryFromIndex(raw: (typeof readonlyIndex)[number]): ContentEntry {
+  const metadata = {
+    ...raw.metadata,
+    date: new Date(raw.date),
+    updated: raw.updated ? new Date(raw.updated) : undefined,
+    tags: raw.tags,
+  } as ArticleMetadata;
+
+  return {
+    uid: raw.path,
+    path: raw.path,
+    collection: raw.collection,
+    filename: raw.filename,
+    id: raw.id,
+    title: raw.title,
+    date: new Date(raw.date),
+    updated: raw.updated ? new Date(raw.updated) : undefined,
+    tags: raw.tags,
+    body: "",
+    excerpt: raw.excerpt,
+    metadata,
+  };
+}
 
 /** vfsStore 适配为 VfsReader（读当前内存快照，不触发异步同步）。 */
 function makeVfsStoreReader(): VfsReader {
@@ -65,13 +82,36 @@ class ContentQuery {
   /** 是否已初始化（至少跑过一次管道）。 */
   initialized = $state(false);
 
-  /** 初始化管道（用 readonlyVfs 作为 reader）。幂等。 */
-  init(): void {
-    if (!browser) return;
-    // 幂等：未初始化或 reader 缺失时跑一次；重复调用刷新只读快照
-    pipelineExecutor.run(readonlyReader);
-    this.version++;
-    this.initialized = true;
+  /** 正文缓存（path → body），按需填充。 */
+  private readonly bodyCache = new Map<string, string>();
+  private readonly bodyInflight = new Map<string, Promise<string>>();
+
+  private initTask: Promise<void> | null = null;
+  private pending = false;
+
+  /**
+   * 初始化管道（构建期元数据索引）。
+   *
+   * 同一轮同步调用合并为一次执行：AppManager 注册各应用时会多次调用，
+   * 这里用 microtask 等所有 source/processor 注册完再跑。
+   */
+  init(): Promise<void> {
+    if (!browser) return Promise.resolve();
+    this.pending = true;
+    if (!this.initTask) {
+      this.initTask = Promise.resolve().then(() => this.flushReadonly());
+    }
+    return this.initTask;
+  }
+
+  private flushReadonly(): void {
+    while (this.pending) {
+      this.pending = false;
+      pipelineExecutor.runEntries(readonlyIndex.map(entryFromIndex));
+      this.version++;
+      this.initialized = true;
+    }
+    this.initTask = null;
   }
 
   /** 重新执行管道（编辑器写入后调用）。用 vfsStore 反映可写态。 */
@@ -80,6 +120,41 @@ class ContentQuery {
     pipelineExecutor.run(makeVfsStoreReader());
     this.version++;
     this.initialized = true;
+  }
+
+  // ---- 正文按需加载 ----
+
+  /** 读取单篇正文（带缓存与并发合并）；不存在时返回空串。 */
+  async readBody(entry: ContentEntry): Promise<string> {
+    if (entry.body) return entry.body;
+
+    const cached = this.bodyCache.get(entry.path);
+    if (cached !== undefined) return cached;
+
+    const pending = this.bodyInflight.get(entry.path);
+    if (pending) return pending;
+
+    const request = readonlyVfs
+      .readFile(entry.path)
+      .then((raw) => {
+        const body = raw === null ? "" : parseMarkdown(raw).body;
+        this.bodyCache.set(entry.path, body);
+        return body;
+      })
+      .finally(() => {
+        this.bodyInflight.delete(entry.path);
+      });
+
+    this.bodyInflight.set(entry.path, request);
+    return request;
+  }
+
+  /** 批量读取正文，返回 path → body。 */
+  async readBodies(entries: ContentEntry[]): Promise<Map<string, string>> {
+    const bodies = await Promise.all(entries.map(async (entry) => {
+      return [entry.path, await this.readBody(entry)] as const;
+    }));
+    return new Map(bodies);
   }
 
   // ---- 查询 API ----
